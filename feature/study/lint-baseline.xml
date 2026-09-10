@@ -8,7 +8,7 @@
         errorLine2="              ~~~~~~~~~">
         <location
             file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionViewModel.kt"
-            line="566"
+            line="841"
             column="15"/>
     </issue>
 
@@ -41,7 +41,7 @@
         errorLine2="                      ^">
         <location
             file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionScreen.kt"
-            line="115"
+            line="126"
             column="23"/>
     </issue>
 
@@ -52,7 +52,7 @@
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionScreen.kt"
-            line="128"
+            line="139"
             column="23"/>
     </issue>
 
@@ -68,13 +68,57 @@
     </issue>
 
     <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;mastered&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;rated_study_session_mastered_counter_label&quot;>%1$d / %2$d mastered&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="41"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;mastered&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;study_session_summary_mastered_count_label&quot;>%1$d mastered&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="70"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;partial&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;study_session_summary_partial_count_label&quot;>%1$d partial&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="71"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;failed&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;study_session_summary_failed_count_label&quot;>%1$d failed&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="72"
+            column="5"/>
+    </issue>
+
+    <issue
         id="ObsoleteSdkInt"
         message="Unnecessary; `SDK_INT` is always >= 26"
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/rossomak/flashcards/feature/study/voice/TtsPlayer.kt"
-            line="486"
+            line="501"
             column="13"/>
     </issue>
 
@@ -85,7 +129,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/rossomak/flashcards/feature/study/voice/TtsPlayer.kt"
-            line="512"
+            line="527"
             column="13"/>
     </issue>
 
