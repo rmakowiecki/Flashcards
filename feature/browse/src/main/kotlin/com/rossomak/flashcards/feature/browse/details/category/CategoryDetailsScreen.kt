@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.category
 
 import android.content.res.Resources
 import androidx.activity.compose.BackHandler
@@ -68,6 +68,7 @@ import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupCont
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItems
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.browse.R
 import kotlinx.coroutines.launch
 
 @Composable
@@ -423,7 +424,7 @@ private fun SubcategoryList(
     subcategories: List<Subcategory>,
     isSelectionMode: Boolean,
     selectedSubcategoryIds: Set<String>,
-    progressFor: (String) -> TopicProgress,
+    progressFor: (String) -> SubcategoryProgress,
     onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
     onNavigateToPreviewStudySession: (Subcategory) -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
@@ -473,14 +474,14 @@ private const val PROGRESS_PERCENT_SCALE = 100
 private const val ROW_SUBTITLE_SEPARATOR = " · "
 
 /**
- * `"12 studied"` once resolved with a nonzero count; `null` while [TopicProgress.Unresolved] or
+ * `"12 studied"` once resolved with a nonzero count; `null` while [Unresolved] or
  * once resolved to zero — either way there's nothing studied to report yet, so
  * [CategoryDetailsRowSubtitle] drops the segment rather than showing "— studied" or "0 studied".
  */
-private fun TopicProgress.studiedLabel(resources: Resources): String? =
+private fun SubcategoryProgress.studiedLabel(resources: Resources): String? =
     when (this) {
-        TopicProgress.Unresolved -> null
-        is TopicProgress.Resolved -> if (studiedCount > 0) {
+        SubcategoryProgress.Unresolved -> null
+        is SubcategoryProgress.Resolved -> if (studiedCount > 0) {
             resources.getString(R.string.category_details_topic_studied_label, studiedCount)
         } else {
             null
@@ -489,19 +490,19 @@ private fun TopicProgress.studiedLabel(resources: Resources): String? =
 
 /**
  * Names Studied, never a number in the unknown state. [cardCount] is the ring's denominator — kept
- * separate from [TopicProgress] itself, which only ever holds the summary's raw counts.
+ * separate from [SubcategoryProgress] itself, which only ever holds the summary's raw counts.
  */
-private fun TopicProgress.ringContentDescription(resources: Resources, cardCount: Int): String =
+private fun SubcategoryProgress.ringContentDescription(resources: Resources, cardCount: Int): String =
     when (this) {
-        TopicProgress.Unresolved -> resources.getString(R.string.category_details_topic_progress_unavailable_cd)
-        is TopicProgress.Resolved -> resources.getString(
+        SubcategoryProgress.Unresolved -> resources.getString(R.string.category_details_topic_progress_unavailable_cd)
+        is SubcategoryProgress.Resolved -> resources.getString(
             R.string.category_details_topic_progress_cd,
             (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).toInt(),
         )
     }
 
 /** The ring's fill, `0f` for a topic with no cards rather than dividing by zero. */
-private fun TopicProgress.Resolved.studiedFraction(cardCount: Int): Float =
+private fun SubcategoryProgress.Resolved.studiedFraction(cardCount: Int): Float =
     if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 
 /**
@@ -516,13 +517,13 @@ private fun TopicProgress.Resolved.studiedFraction(cardCount: Int): Float =
  *   checkbox, still leading with the same ring, so its identity doesn't jump as the mode changes.
  *
  * The ring and the subtitle both derive from [progress] and this topic's own
- * [Subcategory.cardCount] — see [CategoryDetailsScreenState.progressFor].
+ * [cardCount] — see [CategoryDetailsScreenState.progressFor].
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 private fun Subcategory.toListGroupItem(
     isSelectionMode: Boolean,
     isSelected: Boolean,
-    progress: TopicProgress,
+    progress: SubcategoryProgress,
     playContentDescription: String,
     ringContentDescription: String,
     cardCountLabel: String,
@@ -533,7 +534,7 @@ private fun Subcategory.toListGroupItem(
     onSelectedChange: (String, Boolean) -> Unit,
 ): FlashcardsListGroupItem {
     val subcategory = this
-    val ringFraction = (progress as? TopicProgress.Resolved)?.studiedFraction(subcategory.cardCount)
+    val ringFraction = (progress as? SubcategoryProgress.Resolved)?.studiedFraction(subcategory.cardCount)
     val ring: @Composable () -> Unit = {
         FlashcardsProgressRing(
             progress = ringFraction,

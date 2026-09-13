@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +65,7 @@ import com.rossomak.flashcards.core.ui.composables.withInlineCode
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.browse.R
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 

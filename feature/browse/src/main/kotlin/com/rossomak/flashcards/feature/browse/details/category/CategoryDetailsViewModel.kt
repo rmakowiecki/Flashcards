@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.category
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -121,7 +121,7 @@ class CategoryDetailsViewModel @Inject constructor(
     }
 
     /**
-     * Deliberately fake, exactly like [SubcategoryDetailsViewModel.onFavoriteToggle]. This flips a
+     * Deliberately fake, exactly like [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsViewModel.onFavoriteToggle]. This flips a
      * flag that dies with the ViewModel and shows a snackbar, and **writes nothing anywhere** — no
      * repository, no use case, no preference. Do not wire it to storage on the assumption that it
      * is a half-finished integration; making favourites real is its own piece of work.
