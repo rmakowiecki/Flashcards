@@ -121,6 +121,9 @@ object AppSizes {
 
     /** Glyph size inside [emptyStateIconCircle]. */
     val emptyStateIcon: Dp = 40.dp
+
+    /** Diameter of the striped placeholder avatar on [com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard]. */
+    val levelCardAvatar: Dp = 56.dp
 }
 
 val MaterialTheme.sizes: AppSizes

@@ -58,10 +58,6 @@
     <string name="exit_session_dialog_message">All progress for this session will be lost. This can\'t be undone.</string>
     <string name="exit_session_confirm_button">Exit</string>
 
-    <string name="study_session_summary_mode_rated_label">Rated session</string>
-    <string name="study_session_summary_mode_fast_label">Fast session</string>
-    <string name="study_session_summary_completed_label">Deck completed</string>
-    <string name="study_session_summary_abandoned_label">Session ended early</string>
     <string name="study_session_summary_duration_label">Studied for %1$dm %2$ds</string>
     <plurals name="study_session_summary_cards_studied_label">
         <item quantity="one">%1$d card studied</item>
@@ -70,19 +66,31 @@
     <string name="study_session_summary_mastered_count_label">%1$d mastered</string>
     <string name="study_session_summary_partial_count_label">%1$d partial</string>
     <string name="study_session_summary_failed_count_label">%1$d failed</string>
+    <string name="study_session_summary_mastered_caption_label">mastered</string>
+    <string name="study_session_summary_duration_badge_label">%1$d min</string>
+    <plurals name="study_session_summary_cards_badge_label">
+        <item quantity="one">%1$d card</item>
+        <item quantity="other">%1$d cards</item>
+    </plurals>
     <string name="study_session_summary_back_button">Back to Home</string>
     <string name="study_session_summary_save_failed_message">Couldn\'t save this session</string>
 
-    <string name="study_session_summary_xp_new_cards_label">New cards: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_mastered_label">Mastered: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_partial_label">Partial: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_mastery_defended_label">Mastery defended: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_mastery_lost_label">Mastery lost: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_time_studied_label">Time studied: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_session_completed_label">Session completed: %1$d × %2$d = %3$d</string>
-    <string name="study_session_summary_xp_total_label">Total: %1$d</string>
-    <string name="study_session_summary_xp_level_label">Level %1$d</string>
-    <string name="study_session_summary_xp_progress_label">%1$d / %2$d to next level</string>
+    <string name="study_session_summary_headline_label">Great work!</string>
+    <string name="study_session_summary_headline_abandoned_label">Sad to see you go early</string>
+    <string name="study_session_summary_meta_label">%1$s · %2$s</string>
+    <string name="study_session_summary_title_label">Session complete</string>
+    <string name="study_session_summary_skip_button">Skip</string>
+    <string name="study_session_summary_close_cd">Close</string>
+    <string name="study_session_summary_tip_message">Your performance updates the card scores used to plan future sessions.</string>
+    <string name="study_session_summary_xp_running_total_label">%1$d XP</string>
+    <string name="study_session_summary_xp_row_value">%1$d × %2$d = %3$d XP</string>
+    <string name="study_session_summary_xp_row_new_cards_label">New Cards</string>
+    <string name="study_session_summary_xp_row_mastered_label">Mastered</string>
+    <string name="study_session_summary_xp_row_partial_label">Partial Credit</string>
+    <string name="study_session_summary_xp_row_mastery_defended_label">Mastery Defended</string>
+    <string name="study_session_summary_xp_row_mastery_lost_label">Mastery Lost</string>
+    <string name="study_session_summary_xp_row_time_studied_label">Time Studied</string>
+    <string name="study_session_summary_xp_row_session_completed_label">Session Completed</string>
 
     <string name="preview_session_mode_label">Mode</string>
     <string name="preview_session_voice_answering_label">Voice answering</string>
