@@ -37,8 +37,9 @@ class SessionSubmissionDrainScheduler @Inject constructor(
 
     fun scheduleDrain() {
         Log.d(TAG, "Scheduling drain worker (unique work=$UNIQUE_WORK_NAME, policy=KEEP, requires network)")
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
         val request = OneTimeWorkRequestBuilder<SessionSubmissionDeliveryWorker>()
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setConstraints(constraints)
             .build()
         workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }

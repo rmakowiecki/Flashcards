@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.study.summary
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -86,6 +88,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A Rated or Fast Study Session's mandatory egress — natural end or premature exit alike. Its own
@@ -161,7 +164,7 @@ private const val BOTTOM_SHEET_ENTER_DURATION_MS = 700
 // Hero-sized ring for the Ring phase's mastery moment — well past FlashcardsCircularProgressRing's
 // Normal/Small tiers (56dp/40dp), so drawn locally rather than stretching that shared component's
 // size axis for one caller (see MasteryRing's own doc).
-private val MASTERY_RING_DIAMETER: Dp = 200.dp
+private val MASTERY_RING_DIAMETER: Dp = 160.dp
 private val MASTERY_RING_STROKE: Dp = 14.dp
 private const val MASTERY_RING_TRACK_ALPHA = 0.3f
 private const val MASTERY_RING_START_ANGLE = -90f
@@ -181,23 +184,21 @@ fun StudySessionSummaryContent(
     // back to its initial value, replaying the whole entrance sequence from scratch.
     var replayKey by remember { mutableIntStateOf(0) }
 
-    // rememberSaveable, not remember: survives config changes (e.g. rotation) so an in-progress
-    // or already-settled sequence resumes where it left off instead of replaying from Phase.Ring.
-    // Ring only exists for a Rated result — Fast has no mastery concept to play first (see Phase's
-    // own doc) — captured once: state.mode never changes for the lifetime of this screen.
     var phase by rememberSaveable(replayKey) { mutableStateOf(if (state.mode == StudyMode.Rated) Phase.Ring else Phase.XpPour) }
     var xpRevealedCount by rememberSaveable(replayKey) { mutableIntStateOf(0) }
     var levelBarFilled by rememberSaveable(replayKey) { mutableStateOf(false) }
 
-    LaunchedEffect(phase) {
+    LaunchedEffect(phase, state.isLoading) {
+        if (state.isLoading) return@LaunchedEffect
         if (phase != Phase.Ring) return@LaunchedEffect
-        delay(RING_PHASE_DURATION_MS)
+        delay(RING_PHASE_DURATION_MS.milliseconds)
         phase = Phase.XpPour
     }
-    // Keyed on state.xpLines too: it starts empty and is populated once, asynchronously, by the
     // optimistic preview resolving — this restarts the reveal against the real list if that
-    // resolves while this phase is already active, rather than pouring an empty list.
-    LaunchedEffect(phase, state.xpLines) {
+    // resolves while this phase is already active, rather than pouring an empty list. Gated on
+    // state.isLoading for the same reason as the LaunchedEffect above — see its own comment.
+    LaunchedEffect(phase, state.xpLines, state.isLoading) {
+        if (state.isLoading) return@LaunchedEffect
         if (phase != Phase.XpPour) return@LaunchedEffect
         if (state.xpLines.isEmpty()) {
             phase = Phase.LevelCard
@@ -205,18 +206,18 @@ fun StudySessionSummaryContent(
         }
         state.xpLines.indices.forEach { index ->
             xpRevealedCount = index + 1
-            delay(XP_ROW_STAGGER_DELAY_MS)
+            delay(XP_ROW_STAGGER_DELAY_MS.milliseconds)
         }
-        delay(XP_ROW_SETTLE_DELAY_MS)
+        delay(XP_ROW_SETTLE_DELAY_MS.milliseconds)
         phase = Phase.LevelCard
     }
     LaunchedEffect(phase) {
         if (phase != Phase.LevelCard) return@LaunchedEffect
-        delay(LEVEL_CARD_ENTRANCE_DELAY_MS)
+        delay(LEVEL_CARD_ENTRANCE_DELAY_MS.milliseconds)
         levelBarFilled = true
         // Nothing to fill: advance immediately instead of waiting out a fill animation that
         // would never visibly move.
-        delay(if (state.xpIntoCurrentLevel == 0L) 0L else LEVEL_CARD_FILL_SETTLE_DELAY_MS)
+        delay((if (state.xpIntoCurrentLevel == 0L) 0L else LEVEL_CARD_FILL_SETTLE_DELAY_MS).milliseconds)
         phase = Phase.Panel
     }
 
@@ -276,8 +277,9 @@ fun StudySessionSummaryContent(
                             )
                         }
                         // The Skip slot's visibility, not its layout space, changes — nothing else
-                        // in this bar shifts as the sequence advances.
-                        if (phase != Phase.Panel) {
+                        // in this bar shifts as the sequence advances. Hidden during the loading
+                        // state too: there is no running sequence yet to skip past.
+                        if (!state.isLoading && phase != Phase.Panel) {
                             FlashcardsTextButton(
                                 text = stringResource(R.string.study_session_summary_skip_button),
                                 onClick = onSkip,
@@ -289,6 +291,17 @@ fun StudySessionSummaryContent(
                 )
             },
         ) { innerPadding ->
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
+                }
+                return@Scaffold
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -309,6 +322,10 @@ fun StudySessionSummaryContent(
                     visible = phase == Phase.LevelCard || phase == Phase.Panel,
                     enter = fadeIn(tween(LEVEL_CARD_ENTER_DURATION_MS)) +
                         slideInVertically(animationSpec = tween(LEVEL_CARD_ENTER_DURATION_MS), initialOffsetY = { -it }),
+                    // See XpPourPhaseContent's exit comment: the default exit's shrinkOut() would
+                    // silently clip this card during its own enter too. Phase only moves forward,
+                    // so exit never plays.
+                    exit = ExitTransition.None,
                 ) {
                     FlashcardsLevelCard(
                         level = state.level,
@@ -327,6 +344,8 @@ fun StudySessionSummaryContent(
                         visibleState = headerVisibleState,
                         enter = fadeIn(tween(HEADER_ENTER_DURATION_MS)) +
                             slideInVertically(animationSpec = tween(HEADER_ENTER_DURATION_MS), initialOffsetY = { it / 4 }),
+                        // See XpPourPhaseContent's exit comment.
+                        exit = ExitTransition.None,
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -372,6 +391,8 @@ fun StudySessionSummaryContent(
             visible = phase == Phase.Panel,
             enter = fadeIn(tween(BOTTOM_SHEET_ENTER_DURATION_MS)) +
                 slideInVertically(animationSpec = tween(BOTTOM_SHEET_ENTER_DURATION_MS), initialOffsetY = { it }),
+            // See XpPourPhaseContent's exit comment.
+            exit = ExitTransition.None,
         ) {
             FlashcardsBottomSheet(
                 state = rememberFlashcardsBottomSheetState(dismissible = false),
@@ -468,7 +489,7 @@ private fun RingPhaseContent(modifier: Modifier = Modifier, state: StudySessionS
     // Delayed appearance, no entrance animation — metadata badges never animate in.
     var statsVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(BADGE_ROW_ENTRANCE_DELAY_MS)
+        delay(BADGE_ROW_ENTRANCE_DELAY_MS.milliseconds)
         statsVisible = true
     }
 
@@ -603,6 +624,8 @@ private fun XpPourPhaseContent(
                 visible = index < revealedCount,
                 enter = fadeIn(tween(XP_ROW_ENTER_DURATION_MS)) +
                     slideInVertically(animationSpec = tween(XP_ROW_ENTER_DURATION_MS), initialOffsetY = { it / 2 }),
+                // Explicit no-op exit: prevents clipping the row to its animating bounds instead of showing the full card while it fades and slides
+                exit = ExitTransition.None,
             ) {
                 AnimatedXpBreakdownRow(line = line, modifier = Modifier.fillMaxWidth())
             }
