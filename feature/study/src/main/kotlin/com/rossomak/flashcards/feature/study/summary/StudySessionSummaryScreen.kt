@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.study.summary
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -309,6 +310,10 @@ fun StudySessionSummaryContent(
                     visible = phase == Phase.LevelCard || phase == Phase.Panel,
                     enter = fadeIn(tween(LEVEL_CARD_ENTER_DURATION_MS)) +
                         slideInVertically(animationSpec = tween(LEVEL_CARD_ENTER_DURATION_MS), initialOffsetY = { -it }),
+                    // See XpPourPhaseContent's exit comment: the default exit's shrinkOut() would
+                    // silently clip this card during its own enter too. Phase only moves forward,
+                    // so exit never plays.
+                    exit = ExitTransition.None,
                 ) {
                     FlashcardsLevelCard(
                         level = state.level,
@@ -327,6 +332,8 @@ fun StudySessionSummaryContent(
                         visibleState = headerVisibleState,
                         enter = fadeIn(tween(HEADER_ENTER_DURATION_MS)) +
                             slideInVertically(animationSpec = tween(HEADER_ENTER_DURATION_MS), initialOffsetY = { it / 4 }),
+                        // See XpPourPhaseContent's exit comment.
+                        exit = ExitTransition.None,
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -372,6 +379,8 @@ fun StudySessionSummaryContent(
             visible = phase == Phase.Panel,
             enter = fadeIn(tween(BOTTOM_SHEET_ENTER_DURATION_MS)) +
                 slideInVertically(animationSpec = tween(BOTTOM_SHEET_ENTER_DURATION_MS), initialOffsetY = { it }),
+            // See XpPourPhaseContent's exit comment.
+            exit = ExitTransition.None,
         ) {
             FlashcardsBottomSheet(
                 state = rememberFlashcardsBottomSheetState(dismissible = false),
@@ -603,6 +612,12 @@ private fun XpPourPhaseContent(
                 visible = index < revealedCount,
                 enter = fadeIn(tween(XP_ROW_ENTER_DURATION_MS)) +
                     slideInVertically(animationSpec = tween(XP_ROW_ENTER_DURATION_MS), initialOffsetY = { it / 2 }),
+                // Explicit no-op exit: the default exit is fadeOut() + shrinkOut(), and shrinkOut's
+                // size-change spec flips AnimatedVisibility's internal clip flag on for the whole
+                // component (enter included), clipping the row to its animating bounds instead of
+                // showing the full card while it fades and slides. Rows only ever go visible, never
+                // back, so no exit ever plays — this just kills the phantom shrink/clip.
+                exit = ExitTransition.None,
             ) {
                 AnimatedXpBreakdownRow(line = line, modifier = Modifier.fillMaxWidth())
             }
