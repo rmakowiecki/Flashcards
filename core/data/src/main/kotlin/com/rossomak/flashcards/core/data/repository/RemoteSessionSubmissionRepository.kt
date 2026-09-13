@@ -41,9 +41,7 @@ class RemoteSessionSubmissionRepository @Inject constructor(
     private val functions: FirebaseFunctions,
 ) : SessionSubmissionRepository {
 
-    // Broad on purpose, matching every other repository wrapping an SDK call in this codebase
-    // (RealVoiceGradingApi, DefaultVoiceAnswerGradingRepository, DefaultCardProgressRepository, …,
-    // all baselined the same way in detekt-baseline.xml): a callable Task can fail with more than
+    // Broad on purpose, a callable Task can fail with more than
     // just FirebaseFunctionsException (a transport-layer error before the SDK wraps it, say), and
     // this call site has no surrounding try/catch of its own — narrowing this would let an
     // unanticipated exception type crash instead of surfacing as Result.failure.

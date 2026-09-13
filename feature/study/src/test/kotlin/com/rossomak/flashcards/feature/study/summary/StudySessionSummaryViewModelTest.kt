@@ -193,6 +193,7 @@ class StudySessionSummaryViewModelTest {
                 // (not-yet-run) async dailyGoalMinutes/XP path, not a byproduct of the test racing
                 // ahead of the whole coroutine.
                 xpTotal shouldBe 0
+                isLoading shouldBe true
             }
         }
 
@@ -308,6 +309,7 @@ class StudySessionSummaryViewModelTest {
                 xpForNextLevel shouldBe config.levelThreshold(1)
                 xpLines.map { it.source } shouldNotContain XpAwardSource.MasteryDefended
                 xpLines.map { it.source } shouldNotContain XpAwardSource.MasteryLost
+                isLoading shouldBe false
             }
         }
 
@@ -323,6 +325,7 @@ class StudySessionSummaryViewModelTest {
             xpTotal shouldBe 0
             level shouldBe 1
             xpLines shouldBe emptyList()
+            isLoading shouldBe false
         }
     }
 

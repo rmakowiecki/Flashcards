@@ -128,6 +128,7 @@ class StudySessionSummaryViewModel @Inject constructor(
         _state.update {
             it.copy(
                 xpLines = buildXpBreakdownLines(result, xpResult),
+                isLoading = false,
                 xpTotal = xpResult.breakdown.xpTotal,
                 level = xpResult.newScoringState.level,
                 xpIntoCurrentLevel = xpResult.newScoringState.xpIntoCurrentLevel,
@@ -137,6 +138,7 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 
     private fun onPreviewFailed() {
+        _state.update { it.copy(isLoading = false) }
         _messages.tryEmit(StudySessionSummaryMessage.SaveFailed)
     }
 }

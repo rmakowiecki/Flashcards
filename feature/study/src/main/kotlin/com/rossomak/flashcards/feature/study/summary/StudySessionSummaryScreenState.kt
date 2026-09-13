@@ -25,6 +25,7 @@ data class StudySessionSummaryScreenState(
     val partialCount: Int = 0,
     val failedCount: Int = 0,
     val xpLines: List<XpBreakdownLine> = emptyList(),
+    val isLoading: Boolean = true,
     val xpTotal: Int = 0,
     val level: Int = ScoringState.STARTING_LEVEL,
     val xpIntoCurrentLevel: Long = 0,
