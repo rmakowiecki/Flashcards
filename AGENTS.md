@@ -249,7 +249,7 @@ See [TESTING.md](./TESTING.md) for full conventions: file/method naming, MainDis
 
 ### New worktrees
 
-Creating a new `git worktree` gives you a checkout without the gitignored local secrets (Firebase config, signing keystores, service-account JSONs) needed to build/run the app. You're allowed to run `scripts/copy-worktree-secrets.sh -f <path-to-worktree>` to copy them over from the current checkout — do this right after creating a worktree, without asking. Always pass `-f` so existing files in the target worktree are overwritten (keeps stale copies from lingering). Do not open/read these files yourself; the script copies by filename pattern only and never prints contents.
+Creating a new `git worktree` gives you a checkout without the gitignored local secrets (Firebase config, signing keystores, service-account JSONs) needed to build/run the app, and without the `graphify-out/` knowledge graph. You're allowed to run `scripts/copy-worktree-local-state.sh -f <path-to-worktree>` to bring both over from the current checkout — do this right after creating a worktree, without asking. Always pass `-f` so existing secret files in the target worktree are overwritten (keeps stale copies from lingering); `graphify-out/` is symlinked back to this checkout rather than copied, and the script refuses to touch it if the destination already has a real (non-symlinked) `graphify-out/` directory, `-f` or not. Do not open/read the secret files yourself; the script copies them by filename pattern only and never prints contents.
 
 ## Project Documentation
 
