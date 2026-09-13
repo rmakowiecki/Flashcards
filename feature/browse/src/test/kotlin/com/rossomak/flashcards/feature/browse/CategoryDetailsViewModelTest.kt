@@ -22,6 +22,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -86,7 +87,7 @@ class CategoryDetailsViewModelTest {
         viewModel.state.assertValue {
             isLoading shouldBe false
             this.subcategories shouldBe subcategories
-            error shouldBe null
+            errorResId shouldBe null
         }
     }
 
@@ -100,7 +101,7 @@ class CategoryDetailsViewModelTest {
         viewModel.state.assertValue {
             isLoading shouldBe false
             subcategories shouldBe emptyList()
-            error shouldBe "Could not load topics"
+            errorResId shouldBe R.string.category_details_load_error
         }
     }
 
@@ -497,7 +498,7 @@ class CategoryDetailsViewModelTest {
 
             viewModel.state.assertValue {
                 this.subcategories shouldBe subcategories
-                error shouldBe null
+                errorResId shouldBe null
                 isProgressResolved shouldBe false
                 progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
                 progressFor("sub-2") shouldBe SubcategoryProgress.Unresolved
@@ -511,12 +512,23 @@ class CategoryDetailsViewModelTest {
         cardProgressRepository.seedSummary(
             ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
         )
+        // Parks the summary read so it genuinely stays in flight past the point the topic list
+        // has already resolved, instead of relying on both never having been dispatched yet.
+        val summaryGate = CompletableDeferred<Unit>()
+        cardProgressRepository.summaryReadGate = summaryGate
 
         val viewModel = createViewModel()
-        // No advanceUntilIdle(): the topic list and progress reads are both still in flight.
+        advanceUntilIdle()
 
+        viewModel.state.value.subcategories shouldBe subcategories
         viewModel.state.value.isProgressResolved shouldBe false
         viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
+
+        summaryGate.complete(Unit)
+        advanceUntilIdle()
+
+        viewModel.state.value.isProgressResolved shouldBe true
+        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 1, masteredCount = 0)
     }
 
     @Test
@@ -527,10 +539,20 @@ class CategoryDetailsViewModelTest {
             cardProgressRepository.seedSummary(
                 ProgressSummary(subcategories = mapOf("sub-2" to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
             )
+            val summaryGate = CompletableDeferred<Unit>()
+            cardProgressRepository.summaryReadGate = summaryGate
 
             val viewModel = createViewModel()
             advanceUntilIdle()
 
+            // Topic list is in, summary is still parked: rows exist but every one is unresolved.
+            viewModel.state.value.subcategories shouldBe subcategories
+            subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgress.Unresolved }
+
+            summaryGate.complete(Unit)
+            advanceUntilIdle()
+
+            // Releasing the summary changes only the progress values, never the list itself.
             viewModel.state.value.subcategories shouldBe subcategories
         }
 

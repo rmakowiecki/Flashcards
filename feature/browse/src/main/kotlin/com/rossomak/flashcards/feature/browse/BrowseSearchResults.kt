@@ -23,6 +23,7 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
+import kotlin.math.roundToInt
 
 private const val PROGRESS_PERCENT_SCALE = 100
 
@@ -39,7 +40,7 @@ internal fun SubcategoryProgress.searchRingContentDescription(cardCount: Int): S
     SubcategoryProgress.Unresolved -> stringResource(R.string.browse_search_topic_progress_unavailable_cd)
     is SubcategoryProgress.Resolved -> stringResource(
         R.string.browse_search_topic_progress_cd,
-        (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).toInt(),
+        (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).roundToInt(),
     )
 }
 

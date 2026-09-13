@@ -7,6 +7,7 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
+import com.rossomak.flashcards.feature.browse.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -145,13 +146,13 @@ class CategoryDetailsViewModel @Inject constructor(
 
     private fun loadSubcategories() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, errorResId = null) }
             getSubcategories(route.categoryId)
                 .onSuccess { subcategories ->
                     _state.update { it.copy(isLoading = false, subcategories = subcategories) }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, error = "Could not load topics") }
+                    _state.update { it.copy(isLoading = false, errorResId = R.string.category_details_load_error) }
                 }
         }
     }
@@ -159,8 +160,9 @@ class CategoryDetailsViewModel @Inject constructor(
     /**
      * Runs independently of [loadSubcategories] so a slow or failed progress read never gates the
      * topic list. A failure leaves [CategoryDetailsScreenState.isProgressResolved] `false`
-     * forever — every ring stays unknown and every subtitle stays dashed, with no error surfaced,
-     * per the ticket's "no error, no retry prompt, no snackbar" rule.
+     * forever — every ring stays unknown and every subtitle simply drops its studied segment
+     * (same as a never-studied topic), with no error surfaced, per the ticket's "no error, no
+     * retry prompt, no snackbar" rule.
      */
     private fun loadProgressSummary() {
         viewModelScope.launch {

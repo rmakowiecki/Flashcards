@@ -15,6 +15,7 @@ import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -54,6 +55,15 @@ class BrowseViewModelTest {
         categoryName = categoryName,
         order = 0,
         cardCount = 12,
+    )
+
+    private val coroutines = Subcategory(
+        id = "android-coroutines",
+        name = "Coroutines",
+        categoryId = categoryId,
+        categoryName = categoryName,
+        order = 1,
+        cardCount = 8,
     )
 
     private fun createViewModel(): BrowseViewModel =
@@ -285,9 +295,12 @@ class BrowseViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
             cardProgressRepository.summaryResultToReturn = Result.failure(IllegalStateException("boom"))
+            // Parks init's own loadProgressSummary() so the search below genuinely runs while the
+            // summary read is still in flight, rather than the fake resolving it up front.
+            val summaryGate = CompletableDeferred<Unit>()
+            cardProgressRepository.summaryReadGate = summaryGate
 
             val viewModel = createViewModel()
-            advanceUntilIdle()
             viewModel.onSearchQueryChange("compose")
             advanceUntilIdle()
 
@@ -296,24 +309,35 @@ class BrowseViewModelTest {
             status.results.subcategories shouldContainExactly listOf(compose)
             viewModel.state.value.isProgressResolved shouldBe false
             viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Unresolved
+
+            summaryGate.complete(Unit)
+            advanceUntilIdle()
+
+            viewModel.state.value.isProgressResolved shouldBe false
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Unresolved
         }
 
     @Test
     fun `progress arriving after results neither reorders them nor changes their identity`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+            flashcardRepository.searchResultsByPrefix["co"] = Result.success(listOf(compose, coroutines))
             cardProgressRepository.seedSummary(
-                ProgressSummary(subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
+                ProgressSummary(
+                    subcategories = mapOf(
+                        compose.id to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0),
+                        coroutines.id to SubcategoryProgressSummary(studiedCount = 3, masteredCount = 1),
+                    ),
+                ),
             )
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onSearchQueryChange("compose")
+            viewModel.onSearchQueryChange("co")
             advanceUntilIdle()
 
             val status = viewModel.state.value.searchStatus
             status.shouldBeInstanceOf<SearchStatus.Results>()
-            status.results.subcategories shouldContainExactly listOf(compose)
+            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
         }
 
     /** Structural per ADR-0016, but a fixture bug producing the reverse must still fail loudly. */
