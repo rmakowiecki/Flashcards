@@ -316,6 +316,7 @@ fun StudySessionSummaryContent(
                         xpForNextLevel = state.xpForNextLevel,
                         progress = if (levelBarFilled) targetProgress else 0f,
                         modifier = Modifier.fillMaxWidth(),
+                        style = FlashcardsComponentStyle.OnGradient,
                     )
                 }
                 Column(
