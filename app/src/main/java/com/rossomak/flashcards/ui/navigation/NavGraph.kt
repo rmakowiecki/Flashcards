@@ -18,10 +18,10 @@ import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.feature.auth.AuthRoute
 import com.rossomak.flashcards.feature.auth.LoginScreen
-import com.rossomak.flashcards.feature.browse.CategoryDetailsRoute
-import com.rossomak.flashcards.feature.browse.CategoryDetailsScreen
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsRoute
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsScreen
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreen
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsScreen
 import com.rossomak.flashcards.feature.onboarding.OnboardingRoute
 import com.rossomak.flashcards.feature.onboarding.OnboardingScreen
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute

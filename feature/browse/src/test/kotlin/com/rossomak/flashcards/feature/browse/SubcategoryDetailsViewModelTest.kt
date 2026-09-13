@@ -17,6 +17,13 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDestination
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDialog
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsScreenState
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsViewModel
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe

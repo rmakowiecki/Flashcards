@@ -25,7 +25,7 @@ import com.rossomak.flashcards.feature.study.R
 private data class ReportableProblem(
     val action: CurationAction,
     val icon: ImageVector,
-    @StringRes val labelRes: Int,
+    @param:StringRes val labelRes: Int,
 )
 
 /**

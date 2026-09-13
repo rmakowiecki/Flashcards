@@ -41,19 +41,8 @@
         <item quantity="one">%1$d of %2$d topic selected</item>
         <item quantity="other">%1$d of %2$d topics selected</item>
     </plurals>
-    <!--
-      Own keys per ADR-0023 — never reuse common_mastery_progress_cd/common_mastery_progress_label,
-      which stay owned by StudySessionSummaryScreen. This ring draws Studied, not Mastered.
-    -->
     <string name="category_details_topic_progress_cd">%1$d%% studied</string>
     <string name="category_details_topic_progress_unavailable_cd">Studied progress unavailable</string>
-    <!--
-      Deliberately not <plurals>: "studied" is a participle, not a countable noun, so it doesn't
-      inflect with the count the way "cards" does. lint's PluralsCandidate heuristic can't tell the
-      difference, hence the explicit ignore. Never shown for a zero or not-yet-resolved count — the
-      segment is dropped entirely instead (see CategoryDetailsRowSubtitle), so there's no
-      "unresolved"/"zero" variant of this string.
-    -->
     <string name="category_details_topic_studied_label" tools:ignore="PluralsCandidate">%1$d studied</string>
     <string name="browse_category_placeholder_subtitle">Tap to explore</string>
     <string name="browse_search_hint">Search categories or topics…</string>
@@ -65,8 +54,10 @@
     <string name="browse_search_no_results_message">Nothing matches your search</string>
     <string name="browse_search_error_title">Search failed</string>
     <string name="browse_search_error_message">Could not run that search. Try again.</string>
-    <string name="browse_search_topic_parent_label">in %1$s</string>
     <string name="browse_search_start_session_cd">Study %1$s</string>
+    <string name="browse_search_topic_progress_cd">%1$d%% studied</string>
+    <string name="browse_search_topic_progress_unavailable_cd">Studied progress unavailable</string>
+    <string name="browse_search_cards_studied_subtitle">%1$s · %2$s</string>
     <string name="browse_categories_error_title">Something went wrong</string>
     <string name="browse_categories_error_message">Couldn\'t load categories.\nCheck your connection and try again.</string>
     <string name="browse_categories_empty_title">No categories yet</string>
@@ -75,12 +66,6 @@
         <item quantity="one">%d topic</item>
         <item quantity="other">%d topics</item>
     </plurals>
-    <!--
-      Shared by CategoryDetailsScreen and SubcategoryDetailsScreen (ADR-0023's promotion rule is
-      about crossing module boundaries; both screens live in :feature:browse). Deliberately not
-      `browse_`-prefixed: that would read as BrowseScreen's own namespace and reintroduce the
-      collision ADR-0023's key pattern exists to avoid.
-    -->
     <string name="favorites_added_message">Added to favorites</string>
     <string name="favorites_removed_message">Removed from favorites</string>
     <string name="favorites_undo_button">Undo</string>

@@ -10,6 +10,11 @@ import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
@@ -416,8 +421,8 @@ class CategoryDetailsViewModelTest {
 
             viewModel.state.assertValue {
                 isProgressResolved shouldBe true
-                progressFor("sub-1") shouldBe TopicProgress.Resolved(studiedCount = 2, masteredCount = 1)
-                progressFor("sub-2") shouldBe TopicProgress.Resolved(studiedCount = 3, masteredCount = 3)
+                progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 2, masteredCount = 1)
+                progressFor("sub-2") shouldBe SubcategoryProgress.Resolved(studiedCount = 3, masteredCount = 3)
             }
         }
 
@@ -434,7 +439,7 @@ class CategoryDetailsViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.assertValue {
-                progressFor("sub-2") shouldBe TopicProgress.Resolved(studiedCount = 0, masteredCount = 0)
+                progressFor("sub-2") shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
             }
         }
 
@@ -452,7 +457,7 @@ class CategoryDetailsViewModelTest {
             viewModel.state.assertValue {
                 isProgressResolved shouldBe true
                 subcategories.forEach { subcategory ->
-                    progressFor(subcategory.id) shouldBe TopicProgress.Resolved(studiedCount = 0, masteredCount = 0)
+                    progressFor(subcategory.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
                 }
             }
         }
@@ -475,7 +480,7 @@ class CategoryDetailsViewModelTest {
         advanceUntilIdle()
 
         subcategories.forEach { subcategory ->
-            val progress = viewModel.state.value.progressFor(subcategory.id) as TopicProgress.Resolved
+            val progress = viewModel.state.value.progressFor(subcategory.id) as SubcategoryProgress.Resolved
             (progress.masteredCount <= progress.studiedCount) shouldBe true
         }
     }
@@ -494,8 +499,8 @@ class CategoryDetailsViewModelTest {
                 this.subcategories shouldBe subcategories
                 error shouldBe null
                 isProgressResolved shouldBe false
-                progressFor("sub-1") shouldBe TopicProgress.Unresolved
-                progressFor("sub-2") shouldBe TopicProgress.Unresolved
+                progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
+                progressFor("sub-2") shouldBe SubcategoryProgress.Unresolved
             }
         }
 
@@ -511,7 +516,7 @@ class CategoryDetailsViewModelTest {
         // No advanceUntilIdle(): the topic list and progress reads are both still in flight.
 
         viewModel.state.value.isProgressResolved shouldBe false
-        viewModel.state.value.progressFor("sub-1") shouldBe TopicProgress.Unresolved
+        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
     }
 
     @Test
