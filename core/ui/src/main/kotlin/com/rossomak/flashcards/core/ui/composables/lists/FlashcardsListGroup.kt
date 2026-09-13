@@ -62,15 +62,16 @@ sealed interface FlashcardsListGroupItem {
     val key: Any?
 
     /**
-     * Renders as [FlashcardsListRow]: a 1- or 2-line row (title, optional [secondaryText]). For
-     * a row that also needs a wrapping description line, use [DetailedRow] instead — `Row` has
-     * no `subtitle` field, so the two shapes can't be conflated at a call site.
+     * Renders as [FlashcardsListRow]: a 1- or 2-line row (title, optional [secondaryText] or
+     * [secondaryContent]). For a row that also needs a wrapping description line, use [DetailedRow]
+     * instead — `Row` has no `subtitle` field, so the two shapes can't be conflated at a call site.
      */
     data class Row(
         val title: String,
         val onClick: () -> Unit,
         val onLongClick: (() -> Unit)? = null,
         val secondaryText: String? = null,
+        val secondaryContent: (@Composable () -> Unit)? = null,
         val enabled: Boolean = true,
         val leading: (@Composable () -> Unit)? = null,
         val trailing: (@Composable () -> Unit)? = null,
@@ -99,6 +100,7 @@ sealed interface FlashcardsListGroupItem {
         val selected: Boolean,
         val onSelectedChange: (Boolean) -> Unit,
         val subtitle: String? = null,
+        val subtitleContent: (@Composable () -> Unit)? = null,
         val enabled: Boolean = true,
         val leading: (@Composable () -> Unit)? = null,
         override val key: Any? = null,
@@ -132,6 +134,7 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
             onClick = item.onClick,
             onLongClick = item.onLongClick,
             secondaryText = item.secondaryText,
+            secondaryContent = item.secondaryContent,
             enabled = item.enabled,
             leading = item.leading,
             trailing = item.trailing,
@@ -152,6 +155,7 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
             selected = item.selected,
             onSelectedChange = item.onSelectedChange,
             subtitle = item.subtitle,
+            subtitleContent = item.subtitleContent,
             enabled = item.enabled,
             leading = item.leading,
         )

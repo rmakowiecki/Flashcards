@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.ui.composables.lists
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +55,10 @@ private const val DISABLED_ALPHA = 0.6f
  * long-press itself — this row doesn't call it a second time. Pairing [onLongClick] with a `null`
  * [onClick] is nonsensical and unsupported; every caller that wants long-press also has a real tap
  * target.
+ *
+ * [secondaryContent] overrides [secondaryText] when given, for a caller that needs more than a
+ * single-styled line — multi-color spans, a marquee, placeholder dashes while data resolves — the
+ * row still reserves the same line, it just stops drawing it itself.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -63,6 +68,7 @@ fun FlashcardsListRow(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     secondaryText: String? = null,
+    secondaryContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
     role: Role = Role.Button,
     leading: @Composable (() -> Unit)? = null,
@@ -102,12 +108,15 @@ fun FlashcardsListRow(
         ) {
             Text(
                 text = title,
+                modifier = Modifier.basicMarquee(),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
             )
-            if (secondaryText != null) {
+            if (secondaryContent != null) {
+                secondaryContent()
+            } else if (secondaryText != null) {
                 Text(
                     text = secondaryText,
                     style = MaterialTheme.typography.labelMedium,
