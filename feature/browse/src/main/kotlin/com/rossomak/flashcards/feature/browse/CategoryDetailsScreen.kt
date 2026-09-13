@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.browse
 
+import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,10 +47,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.Subcategory
-import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
@@ -235,6 +239,7 @@ fun CategoryDetailsContent(
                 subcategories = state.subcategories,
                 isSelectionMode = state.isSelectionMode,
                 selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
+                progressFor = state::progressFor,
                 onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
                 onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                 onSubcategoryLongPress = onSubcategoryLongPress,
@@ -418,6 +423,7 @@ private fun SubcategoryList(
     subcategories: List<Subcategory>,
     isSelectionMode: Boolean,
     selectedSubcategoryIds: Set<String>,
+    progressFor: (String) -> TopicProgress,
     onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
     onNavigateToPreviewStudySession: (Subcategory) -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
@@ -438,14 +444,13 @@ private fun SubcategoryList(
     ) {
         flashcardsListGroupItems(
             items = subcategories.map { subcategory ->
+                val progress = progressFor(subcategory.id)
                 subcategory.toListGroupItem(
                     isSelectionMode = isSelectionMode,
                     isSelected = subcategory.id in selectedSubcategoryIds,
+                    progress = progress,
                     playContentDescription = resources.getString(R.string.category_details_topic_play_cd, subcategory.name),
-                    masteryContentDescription = resources.getString(
-                        CoreUiR.string.common_mastery_progress_cd,
-                        (subcategory.fakeMasteryProgress() * FAKE_PROGRESS_PERCENT_SCALE).toInt(),
-                    ),
+                    ringContentDescription = progress.ringContentDescription(resources, subcategory.cardCount),
                     // Shared with Subcategory Details, hence the `subcategory_details_` name despite the
                     // call site — see the `favorites_*` strings below for the same cross-screen pattern.
                     cardCountLabel = resources.getQuantityString(
@@ -453,6 +458,7 @@ private fun SubcategoryList(
                         subcategory.cardCount,
                         subcategory.cardCount,
                     ),
+                    studiedText = progress.studiedLabel(resources),
                     onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
                     onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                     onLongPress = onSubcategoryLongPress,
@@ -463,54 +469,85 @@ private fun SubcategoryList(
     }
 }
 
-private const val FAKE_PROGRESS_PERCENT_SCALE = 100
+private const val PROGRESS_PERCENT_SCALE = 100
+private const val ROW_SUBTITLE_SEPARATOR = " · "
 
 /**
- * Deliberately fake, mirroring [CategoryDetailsViewModel.onFavoriteToggle]. There is no
- * `masteredCards` read anywhere in the codebase — the concept exists only in `CONTEXT.md`. The
- * value is derived deterministically from the topic's id rather than randomly on every call, so it
- * stays put across recomposition, scrolling and mode switches instead of flickering to a new
- * number. Real per-topic progress is separate work and does not change this row's shape, only the
- * number the ring shows.
+ * `"12 studied"` once resolved with a nonzero count; `null` while [TopicProgress.Unresolved] or
+ * once resolved to zero — either way there's nothing studied to report yet, so
+ * [CategoryDetailsRowSubtitle] drops the segment rather than showing "— studied" or "0 studied".
  */
-private fun Subcategory.fakeMasteryProgress(): Float =
-    id.hashCode().mod(FAKE_PROGRESS_PERCENT_SCALE) / FAKE_PROGRESS_PERCENT_SCALE.toFloat()
+private fun TopicProgress.studiedLabel(resources: Resources): String? =
+    when (this) {
+        TopicProgress.Unresolved -> null
+        is TopicProgress.Resolved -> if (studiedCount > 0) {
+            resources.getString(R.string.category_details_topic_studied_label, studiedCount)
+        } else {
+            null
+        }
+    }
+
+/**
+ * Names Studied, never a number in the unknown state. [cardCount] is the ring's denominator — kept
+ * separate from [TopicProgress] itself, which only ever holds the summary's raw counts.
+ */
+private fun TopicProgress.ringContentDescription(resources: Resources, cardCount: Int): String =
+    when (this) {
+        TopicProgress.Unresolved -> resources.getString(R.string.category_details_topic_progress_unavailable_cd)
+        is TopicProgress.Resolved -> resources.getString(
+            R.string.category_details_topic_progress_cd,
+            (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).toInt(),
+        )
+    }
+
+/** The ring's fill, `0f` for a topic with no cards rather than dividing by zero. */
+private fun TopicProgress.Resolved.studiedFraction(cardCount: Int): Float =
+    if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 
 /**
  * A topic row, shaped by [isSelectionMode]:
  *
- * - **Default mode** (ADR-0041): mastery ring leading, two separate destinations trailing — the
+ * - **Default mode** (ADR-0041): progress ring leading, two separate destinations trailing — the
  *   play button jumps straight into the Preview Study Session Screen for this one topic while the
  *   row itself drills into Subcategory Details and starts nothing. Long-pressing enters Selection
  *   Mode with this topic selected.
  * - **Selection Mode**: the play button and chevron are gone — starting a single-topic session
  *   mid-selection would throw away the selection being assembled — and the row becomes a
  *   checkbox, still leading with the same ring, so its identity doesn't jump as the mode changes.
+ *
+ * The ring and the subtitle both derive from [progress] and this topic's own
+ * [Subcategory.cardCount] — see [CategoryDetailsScreenState.progressFor].
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 private fun Subcategory.toListGroupItem(
     isSelectionMode: Boolean,
     isSelected: Boolean,
+    progress: TopicProgress,
     playContentDescription: String,
-    masteryContentDescription: String,
+    ringContentDescription: String,
     cardCountLabel: String,
+    studiedText: String?,
     onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
     onNavigateToPreviewStudySession: (Subcategory) -> Unit,
     onLongPress: (String) -> Unit,
     onSelectedChange: (String, Boolean) -> Unit,
 ): FlashcardsListGroupItem {
     val subcategory = this
+    val ringFraction = (progress as? TopicProgress.Resolved)?.studiedFraction(subcategory.cardCount)
     val ring: @Composable () -> Unit = {
         FlashcardsProgressRing(
-            progress = subcategory.fakeMasteryProgress(),
-            contentDescription = masteryContentDescription,
+            progress = ringFraction,
+            contentDescription = ringContentDescription,
         )
+    }
+    val subtitle: @Composable () -> Unit = {
+        CategoryDetailsRowSubtitle(cardCountLabel = cardCountLabel, studiedText = studiedText)
     }
     return if (isSelectionMode) {
         FlashcardsListGroupItem.Selectable(
             key = subcategory.id,
             title = subcategory.name,
-            subtitle = cardCountLabel,
+            subtitleContent = subtitle,
             selected = isSelected,
             onSelectedChange = { selected -> onSelectedChange(subcategory.id, selected) },
             leading = ring,
@@ -519,7 +556,7 @@ private fun Subcategory.toListGroupItem(
         FlashcardsListGroupItem.Row(
             key = subcategory.id,
             title = subcategory.name,
-            secondaryText = cardCountLabel,
+            secondaryContent = subtitle,
             onClick = {
                 onNavigateToSubcategoryDetails(subcategory.categoryId, subcategory.categoryName, subcategory.id, subcategory.name)
             },
@@ -541,4 +578,35 @@ private fun Subcategory.toListGroupItem(
             },
         )
     }
+}
+
+/**
+ * `"<cards> · <studied>"`, forced to one line, ellipsized on overflow — never a marquee; that's
+ * the title's job (see [FlashcardsListRow]/[FlashcardsSelectableListRow]), and a secondary line
+ * scrolling alongside it would be two competing motions on one row. Card count is plain/neutral
+ * text; studied is the brand accent [FlashcardsProgressRing]'s fill uses. Color is decoration on
+ * top of text that already states the word, so nothing here is color-only.
+ *
+ * [studiedText] `null` (nothing studied yet — resolving, or resolved-but-zero) drops the studied
+ * segment entirely rather than showing a dash or "0 studied": `"<cards>"` alone.
+ */
+@Composable
+private fun CategoryDetailsRowSubtitle(cardCountLabel: String, studiedText: String?) {
+    val text = if (studiedText != null) {
+        val studiedColor = MaterialTheme.colorScheme.primary
+        buildAnnotatedString {
+            append(cardCountLabel)
+            append(ROW_SUBTITLE_SEPARATOR)
+            withStyle(SpanStyle(color = studiedColor)) { append(studiedText) }
+        }
+    } else {
+        buildAnnotatedString { append(cardCountLabel) }
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }

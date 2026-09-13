@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 class CategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSubcategories: GetSubcategoriesUseCase,
+    private val getProgressSummary: GetProgressSummaryUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<CategoryDetailsRoute>()
@@ -40,6 +42,7 @@ class CategoryDetailsViewModel @Inject constructor(
 
     init {
         loadSubcategories()
+        loadProgressSummary()
     }
 
     /**
@@ -149,6 +152,21 @@ class CategoryDetailsViewModel @Inject constructor(
                 }
                 .onFailure {
                     _state.update { it.copy(isLoading = false, error = "Could not load topics") }
+                }
+        }
+    }
+
+    /**
+     * Runs independently of [loadSubcategories] so a slow or failed progress read never gates the
+     * topic list. A failure leaves [CategoryDetailsScreenState.isProgressResolved] `false`
+     * forever — every ring stays unknown and every subtitle stays dashed, with no error surfaced,
+     * per the ticket's "no error, no retry prompt, no snackbar" rule.
+     */
+    private fun loadProgressSummary() {
+        viewModelScope.launch {
+            getProgressSummary()
+                .onSuccess { summary ->
+                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
                 }
         }
     }
