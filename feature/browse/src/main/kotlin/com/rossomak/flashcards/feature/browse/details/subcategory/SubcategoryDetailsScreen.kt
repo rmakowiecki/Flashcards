@@ -276,6 +276,8 @@ private fun SubcategoryDetailsBottomBar(
         actions = {
             SubcategoryDetailsToolbarActions(
                 hasActiveFilters = state.hasActiveFilters,
+                enabled = state.content is SubcategoryDetailsContentState.Cards ||
+                    state.content is SubcategoryDetailsContentState.NoMatches,
                 onFilterClick = {
                     onDialogEvent(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
@@ -361,18 +363,19 @@ private fun RowScope.SubcategoryDetailsActions(
 @Composable
 private fun RowScope.SubcategoryDetailsToolbarActions(
     hasActiveFilters: Boolean,
+    enabled: Boolean,
     onFilterClick: () -> Unit,
     onSortClick: () -> Unit,
 ) {
     BadgedBox(badge = { if (hasActiveFilters) Badge() }) {
-        IconButton(onClick = onFilterClick) {
+        IconButton(onClick = onFilterClick, enabled = enabled) {
             Icon(
                 imageVector = Icons.Filled.FilterList,
                 contentDescription = stringResource(R.string.subcategory_details_filter_cd),
             )
         }
     }
-    IconButton(onClick = onSortClick) {
+    IconButton(onClick = onSortClick, enabled = enabled) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.Sort,
             contentDescription = stringResource(R.string.subcategory_details_sort_cd),

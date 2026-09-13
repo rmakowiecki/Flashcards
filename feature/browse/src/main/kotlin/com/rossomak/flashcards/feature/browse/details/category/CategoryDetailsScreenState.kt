@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.browse.details.category
 
+import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 
@@ -23,7 +24,7 @@ data class CategoryDetailsScreenState(
     val categoryName: String = "",
     val isLoading: Boolean = false,
     val subcategories: List<Subcategory> = emptyList(),
-    val error: String? = null,
+    @param:StringRes val errorResId: Int? = null,
     val selectedSubcategoryIds: Set<String>? = null,
     val isFavorite: Boolean = false,
     val progressSummary: ProgressSummary? = null,

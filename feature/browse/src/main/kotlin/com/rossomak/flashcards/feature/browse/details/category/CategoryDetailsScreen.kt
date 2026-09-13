@@ -200,7 +200,7 @@ fun CategoryDetailsContent(
                         )
                     },
                 )
-                if (!state.isLoading && state.error == null) {
+                if (!state.isLoading && state.errorResId == null) {
                     FlashcardsOverlineLabel(text = categoryDetailsOverline(state))
                 }
             }
@@ -225,13 +225,13 @@ fun CategoryDetailsContent(
                 CircularProgressIndicator()
             }
 
-            state.error != null -> Box(
+            state.errorResId != null -> Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = state.error)
+                Text(text = stringResource(state.errorResId))
             }
 
             else -> SubcategoryList(
