@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.category
 
 import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
 

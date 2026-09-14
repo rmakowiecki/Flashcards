@@ -56,9 +56,9 @@ import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExtendedContext
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionTopAppBar
@@ -211,7 +211,7 @@ fun FastStudySessionContent(
                 },
                 onClose = { actions.onDialogEvent(Open(ExitSession)) },
                 onReportProblem = { card ->
-                    actions.onDialogEvent(Open(ReportProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
+                    actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
                 },
             )
         },
@@ -223,7 +223,7 @@ fun FastStudySessionContent(
                 onVoicePlayPause = actions.onVoicePlayPause,
                 onVoiceNext = actions.onVoiceNext,
                 onVoicePrevious = actions.onVoicePrevious,
-                onVoiceSettingsCogClick = { actions.onDialogEvent(Open(VoiceSettings())) },
+                onVoiceSettingsCogClick = { actions.onDialogEvent(Open(SessionVoiceSettings())) },
             )
         },
     ) { innerPadding ->
@@ -234,7 +234,7 @@ fun FastStudySessionContent(
             currentCardIndex = state.currentCardIndex,
             isAnswerRevealed = state.isAnswerRevealed,
             innerPadding = innerPadding,
-            onExtendedContextClick = { actions.onDialogEvent(Open(ExtendedContext(it))) },
+            onExtendedContextClick = { actions.onDialogEvent(Open(CurrentCardExtendedContext(it))) },
         )
 
         StudySessionDialogHost(

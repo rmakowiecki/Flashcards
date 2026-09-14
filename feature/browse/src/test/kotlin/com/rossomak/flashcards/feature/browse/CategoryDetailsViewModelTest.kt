@@ -2,10 +2,19 @@ package com.rossomak.flashcards.feature.browse
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
@@ -13,6 +22,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -30,6 +40,8 @@ class CategoryDetailsViewModelTest {
     private val savedStateHandle: SavedStateHandle = mockk()
     private val flashcardRepository = FakeFlashcardRepository()
     private val getSubcategories = GetSubcategoriesUseCase(flashcardRepository)
+    private val cardProgressRepository = FakeCardProgressRepository()
+    private val getProgressSummary = GetProgressSummaryUseCase(cardProgressRepository)
 
     private val route = CategoryDetailsRoute(categoryId = "android", categoryName = "Android")
 
@@ -45,7 +57,7 @@ class CategoryDetailsViewModelTest {
     }
 
     private fun createViewModel(): CategoryDetailsViewModel =
-        CategoryDetailsViewModel(savedStateHandle, getSubcategories)
+        CategoryDetailsViewModel(savedStateHandle, getSubcategories, getProgressSummary)
 
     private fun subcategory(id: String): Subcategory = Subcategory(
         id = id,
@@ -75,7 +87,7 @@ class CategoryDetailsViewModelTest {
         viewModel.state.assertValue {
             isLoading shouldBe false
             this.subcategories shouldBe subcategories
-            error shouldBe null
+            errorResId shouldBe null
         }
     }
 
@@ -89,7 +101,7 @@ class CategoryDetailsViewModelTest {
         viewModel.state.assertValue {
             isLoading shouldBe false
             subcategories shouldBe emptyList()
-            error shouldBe "Could not load topics"
+            errorResId shouldBe R.string.category_details_load_error
         }
     }
 
@@ -387,5 +399,176 @@ class CategoryDetailsViewModelTest {
             // Each fake subcategory() carries cardCount = 3.
             selectedCardCount shouldBe 6
         }
+    }
+
+    // --- progress rings/subtitle (ADR-0016) ---
+
+    @Test
+    fun `a summary with counts resolves each topic's studied and mastered counts`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            cardProgressRepository.seedSummary(
+                ProgressSummary(
+                    subcategories = mapOf(
+                        "sub-1" to SubcategoryProgressSummary(studiedCount = 2, masteredCount = 1),
+                        "sub-2" to SubcategoryProgressSummary(studiedCount = 3, masteredCount = 3),
+                    ),
+                ),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                isProgressResolved shouldBe true
+                progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 2, masteredCount = 1)
+                progressFor("sub-2") shouldBe SubcategoryProgress.Resolved(studiedCount = 3, masteredCount = 3)
+            }
+        }
+
+    @Test
+    fun `a topic absent from the summary resolves to all-zero, not unknown`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            cardProgressRepository.seedSummary(
+                ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 2, masteredCount = 1))),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                progressFor("sub-2") shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+            }
+        }
+
+    @Test
+    fun `a User with no summary document at all resolves every topic to all-zero`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            // No seedSummary call: the fake returns Result.success(null), mirroring a User who has
+            // never finished a session.
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                isProgressResolved shouldBe true
+                subcategories.forEach { subcategory ->
+                    progressFor(subcategory.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+                }
+            }
+        }
+
+    /** Structural per ADR-0016, but a fixture bug producing the reverse must still fail loudly. */
+    @Test
+    fun `mastered is never greater than studied for any topic`() = runTest(mainDispatcherRule.testDispatcher) {
+        val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
+        flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+        cardProgressRepository.seedSummary(
+            ProgressSummary(
+                subcategories = mapOf(
+                    "sub-1" to SubcategoryProgressSummary(studiedCount = 5, masteredCount = 2),
+                    "sub-2" to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 1),
+                ),
+            ),
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        subcategories.forEach { subcategory ->
+            val progress = viewModel.state.value.progressFor(subcategory.id) as SubcategoryProgress.Resolved
+            (progress.masteredCount <= progress.studiedCount) shouldBe true
+        }
+    }
+
+    @Test
+    fun `a failed summary read leaves the topic list intact with every topic unresolved and surfaces no error`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            cardProgressRepository.summaryResultToReturn = Result.failure(IllegalStateException("boom"))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                this.subcategories shouldBe subcategories
+                errorResId shouldBe null
+                isProgressResolved shouldBe false
+                progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
+                progressFor("sub-2") shouldBe SubcategoryProgress.Unresolved
+            }
+        }
+
+    @Test
+    fun `every topic is unresolved before the summary read completes`() = runTest(mainDispatcherRule.testDispatcher) {
+        val subcategories = listOf(subcategory("sub-1"))
+        flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+        cardProgressRepository.seedSummary(
+            ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
+        )
+        // Parks the summary read so it genuinely stays in flight past the point the topic list
+        // has already resolved, instead of relying on both never having been dispatched yet.
+        val summaryGate = CompletableDeferred<Unit>()
+        cardProgressRepository.summaryReadGate = summaryGate
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.subcategories shouldBe subcategories
+        viewModel.state.value.isProgressResolved shouldBe false
+        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
+
+        summaryGate.complete(Unit)
+        advanceUntilIdle()
+
+        viewModel.state.value.isProgressResolved shouldBe true
+        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 1, masteredCount = 0)
+    }
+
+    @Test
+    fun `progress arriving after the list neither reorders it nor changes row identity`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            cardProgressRepository.seedSummary(
+                ProgressSummary(subcategories = mapOf("sub-2" to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
+            )
+            val summaryGate = CompletableDeferred<Unit>()
+            cardProgressRepository.summaryReadGate = summaryGate
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // Topic list is in, summary is still parked: rows exist but every one is unresolved.
+            viewModel.state.value.subcategories shouldBe subcategories
+            subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgress.Unresolved }
+
+            summaryGate.complete(Unit)
+            advanceUntilIdle()
+
+            // Releasing the summary changes only the progress values, never the list itself.
+            viewModel.state.value.subcategories shouldBe subcategories
+        }
+
+    @Test
+    fun `progress is identical in and out of Selection Mode`() = runTest(mainDispatcherRule.testDispatcher) {
+        val subcategories = listOf(subcategory("sub-1"))
+        flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+        cardProgressRepository.seedSummary(
+            ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 2, masteredCount = 1))),
+        )
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val progressBeforeSelection = viewModel.state.value.progressFor("sub-1")
+
+        viewModel.onSelectionModeToggle()
+
+        viewModel.state.value.progressFor("sub-1") shouldBe progressBeforeSelection
     }
 }

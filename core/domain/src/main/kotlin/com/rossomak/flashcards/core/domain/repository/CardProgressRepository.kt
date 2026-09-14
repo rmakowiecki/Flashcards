@@ -5,11 +5,11 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 
 /**
  * Reads a User's packed per-Subcategory progress document and their per-user progress-summary
- * singleton (both [ADR-0016](../../../../../../../docs/adr/0016-card-progress-model.md)).
+ * singleton (both [ADR-0016](docs/adr/0016-card-progress-model.md)).
  * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase] is one caller of
  * [getProgress] — this read is what feeds its optimistic new-cards-studied estimate — but it also
  * serves Subcategory Details and the Preview screen's defense selection; [getProgressSummary] serves
- * Category Details' and the Home screen's progress rings. Both live in `core:domain` rather
+ * Category Details', Browse's search results and the Home screen's progress rings. Both live in `core:domain` rather
  * than inside a single feature module because more than one feature reads each.
  *
  * Writing is not exposed here, nor anywhere else on the client: the server-authoritative

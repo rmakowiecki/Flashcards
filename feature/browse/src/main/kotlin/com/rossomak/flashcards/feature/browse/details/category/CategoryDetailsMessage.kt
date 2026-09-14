@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.category
 
 /**
  * One-shot snackbar messages from Category Details, per the SharedFlow-for-transient-events rule.
@@ -6,7 +6,6 @@ package com.rossomak.flashcards.feature.browse
  */
 sealed interface CategoryDetailsMessage {
 
-    /** Both favourite messages are cosmetic: nothing is persisted. See [CategoryDetailsViewModel.onFavoriteToggle]. */
     data object AddedToFavorites : CategoryDetailsMessage
 
     data object RemovedFromFavorites : CategoryDetailsMessage

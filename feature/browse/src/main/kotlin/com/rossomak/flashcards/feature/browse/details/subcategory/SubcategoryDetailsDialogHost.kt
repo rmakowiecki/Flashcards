@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import androidx.compose.runtime.Composable
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFiltersDialog
@@ -6,16 +6,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardSortOrderDia
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsDialog.Filters
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsDialog.Sort
 
-/**
- * Renders whichever dialog this screen has open (ADR-0036).
- *
- * The `when` has already narrowed to a concrete case, so each branch emits a total `copy()` — no
- * per-field event type, and no cast. The host holds no state of its own: the draft lives in
- * [SubcategoryDetailsDialog] so dismissing discards it for free.
- */
 @Composable
 fun SubcategoryDetailsDialogHost(
     activeDialog: SubcategoryDetailsDialog?,
@@ -26,7 +17,7 @@ fun SubcategoryDetailsDialogHost(
 
     when (activeDialog) {
         null -> Unit
-        is Sort -> FlashcardSortOrderDialog(
+        is SubcategoryDetailsDialog.CardsSortingOrder -> FlashcardSortOrderDialog(
             draft = activeDialog.draftState,
             onDraftChange = { onDialogEvent(DraftChange(activeDialog.copy(draftState = it))) },
             onConfirm = onConfirm,
@@ -34,7 +25,7 @@ fun SubcategoryDetailsDialogHost(
             keepAsDefault = activeDialog.keepAsDefault,
             onKeepAsDefaultChange = { onDialogEvent(DraftChange(activeDialog.copy(keepAsDefault = it))) },
         )
-        is Filters -> FlashcardFiltersDialog(
+        is SubcategoryDetailsDialog.Filters -> FlashcardFiltersDialog(
             availableTags = activeDialog.availableTags,
             filters = activeDialog.draftState,
             difficultyBounds = activeDialog.difficultyBounds,

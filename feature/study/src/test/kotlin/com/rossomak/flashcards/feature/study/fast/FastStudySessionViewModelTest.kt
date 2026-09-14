@@ -29,8 +29,8 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSettings as VoiceSettingsDialog
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings as VoiceSettingsDialog
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerState
 import com.rossomak.flashcards.feature.study.voice.VoiceGateway
 import com.rossomak.flashcards.feature.study.voice.VoicePhase
@@ -129,9 +129,9 @@ class FastStudySessionViewModelTest {
         extendedContext = null,
     )
 
-    private fun openReportProblem(viewModel: FastStudySessionViewModel): ReportProblem {
+    private fun openReportProblem(viewModel: FastStudySessionViewModel): ReportCurrentCardProblem {
         val card = requireNotNull(viewModel.state.value.currentCard)
-        return ReportProblem(cardId = card.id, subcategoryId = card.subcategoryId)
+        return ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)
     }
 
     private fun loadThreeCards() {
@@ -140,8 +140,8 @@ class FastStudySessionViewModelTest {
         )
     }
 
-    private fun reportDraft(viewModel: FastStudySessionViewModel): ReportProblem =
-        viewModel.state.value.activeDialog as ReportProblem
+    private fun reportDraft(viewModel: FastStudySessionViewModel): ReportCurrentCardProblem =
+        viewModel.state.value.activeDialog as ReportCurrentCardProblem
 
     @Test
     fun `loadFlashcards resolves routed card ids preserving order`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -813,7 +813,7 @@ class FastStudySessionViewModelTest {
         val viewModel = createViewModel(curationRepository)
         advanceUntilIdle()
         viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
-        val draft = viewModel.state.value.activeDialog as ReportProblem
+        val draft = viewModel.state.value.activeDialog as ReportCurrentCardProblem
         viewModel.onDialogEvent(DraftChange(draft.withAction(CurationAction.Delete, isChecked = true)))
 
         viewModel.onDialogEvent(Confirm)

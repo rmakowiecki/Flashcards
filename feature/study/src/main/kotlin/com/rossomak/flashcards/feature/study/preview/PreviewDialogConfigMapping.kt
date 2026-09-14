@@ -13,16 +13,16 @@ import com.rossomak.flashcards.core.domain.model.StudySessionPreference.Subcateg
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoiceAnsweringEnabled
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePlayback
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Attempts
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Length
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Mode
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.PartialRatingCardRequeueing
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.ReadAloud
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Sort
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SubcategoryCountRange
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnswering
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 
 /**
  * Pure [StudySessionConfig]/[PreviewDialog] mapping helpers pulled out of
@@ -36,15 +36,15 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceSettings
  * with the confirmed dialog's draftState folded in.
  */
 internal fun StudySessionConfig.foldInDialog(dialog: PreviewDialog): StudySessionConfig = when (dialog) {
-    is Mode -> withMode(dialog.draftState)
-    is VoiceAnswering -> copy(voiceAnsweringEnabled = dialog.draftState)
-    is Attempts -> copy(ratedAttempts = dialog.draftState)
-    is ReadAloud -> copy(readAloudEnabled = dialog.draftState)
-    is PartialRatingCardRequeueing -> copy(partialRatingCardRequeueingEnabled = dialog.draftState)
-    is Length -> copy(length = dialog.draftState)
-    is Sort -> copy(sortOrder = dialog.draftState)
-    is SubcategoryCountRange -> copy(subcategoryCountRange = dialog.draftState)
-    is VoiceSettings -> copy(voiceSettings = dialog.draftState.toVoiceSettings())
+    is SessionMode -> withMode(dialog.draftState)
+    is RatedSessionVoiceAnswering -> copy(voiceAnsweringEnabled = dialog.draftState)
+    is RatedSessionMaxCardAttempts -> copy(ratedAttempts = dialog.draftState)
+    is FastSessionReadAloud -> copy(readAloudEnabled = dialog.draftState)
+    is RatedSessionPartialRatingCardRequeueing -> copy(partialRatingCardRequeueingEnabled = dialog.draftState)
+    is SessionCardCount -> copy(length = dialog.draftState)
+    is SessionCardsSortingOrder -> copy(sortOrder = dialog.draftState)
+    is QuickSessionSubcategoryCountRange -> copy(subcategoryCountRange = dialog.draftState)
+    is SessionVoiceSettings -> copy(voiceSettings = dialog.draftState.toVoiceSettings())
     is Filters -> copy(
         tagIds = dialog.draftState.selectedTags,
         difficultyRange = dialog.draftState.difficultyRange,
@@ -67,14 +67,14 @@ internal fun StudySessionConfig.withMode(mode: StudyMode): StudySessionConfig = 
  * check it at all: tags belong to one subcategory and cannot carry to another (ADR-0030).
  */
 internal fun PreviewDialog.toStudySessionPreferenceIfKept(): StudySessionPreference? = when (this) {
-    is Mode -> DefaultStudyMode(draftState).takeIf { keepAsDefault }
-    is VoiceAnswering -> VoiceAnsweringEnabled(draftState).takeIf { keepAsDefault }
-    is Attempts -> RatedAttempts(draftState).takeIf { keepAsDefault }
-    is ReadAloud -> ReadAloudEnabled(draftState).takeIf { keepAsDefault }
-    is PartialRatingCardRequeueing -> PartialRatingCardRequeueingEnabled(draftState).takeIf { keepAsDefault }
-    is Length -> SessionLength(draftState).takeIf { keepAsDefault }
-    is Sort -> SortOrder(draftState).takeIf { keepAsDefault }
-    is SubcategoryCountRange -> SubcategoryCountRangePreference(draftState).takeIf { keepAsDefault }
-    is VoiceSettings -> VoicePlayback(draftState.toVoiceSettings()).takeIf { keepAsDefault }
+    is SessionMode -> DefaultStudyMode(draftState).takeIf { keepAsDefault }
+    is RatedSessionVoiceAnswering -> VoiceAnsweringEnabled(draftState).takeIf { keepAsDefault }
+    is RatedSessionMaxCardAttempts -> RatedAttempts(draftState).takeIf { keepAsDefault }
+    is FastSessionReadAloud -> ReadAloudEnabled(draftState).takeIf { keepAsDefault }
+    is RatedSessionPartialRatingCardRequeueing -> PartialRatingCardRequeueingEnabled(draftState).takeIf { keepAsDefault }
+    is SessionCardCount -> SessionLength(draftState).takeIf { keepAsDefault }
+    is SessionCardsSortingOrder -> SortOrder(draftState).takeIf { keepAsDefault }
+    is QuickSessionSubcategoryCountRange -> SubcategoryCountRangePreference(draftState).takeIf { keepAsDefault }
+    is SessionVoiceSettings -> VoicePlayback(draftState.toVoiceSettings()).takeIf { keepAsDefault }
     is Filters -> null
 }

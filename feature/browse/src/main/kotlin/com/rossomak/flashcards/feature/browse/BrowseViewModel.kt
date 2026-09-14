@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesParams
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 class BrowseViewModel @Inject constructor(
     private val getCategories: GetCategoriesUseCase,
     private val searchCategories: SearchCategoriesUseCase,
+    private val getProgressSummary: GetProgressSummaryUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BrowseScreenState())
@@ -37,6 +39,7 @@ class BrowseViewModel @Inject constructor(
     init {
         loadCategories()
         observeSearchQuery()
+        loadProgressSummary()
     }
 
     fun onCategoriesRefresh() {
@@ -201,6 +204,22 @@ class BrowseViewModel @Inject constructor(
     /** Whether [this], once trimmed, is long enough to actually run a search. */
     private fun String.meetsSearchMinimumLength(): Boolean =
         trim().length >= SearchCategoriesUseCase.MIN_QUERY_LENGTH
+
+    /**
+     * Runs independently of [loadCategories] and any search, so a slow or failed progress read
+     * never gates the category list or search results — same rule as
+     * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel.loadProgressSummary]. A failure leaves
+     * [BrowseScreenState.isProgressResolved] `false` forever: every matched topic's ring stays
+     * unknown, with no error surfaced.
+     */
+    private fun loadProgressSummary() {
+        viewModelScope.launch {
+            getProgressSummary()
+                .onSuccess { summary ->
+                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+                }
+        }
+    }
 
     private companion object {
         const val SEARCH_DEBOUNCE_MILLIS = 500L

@@ -2,7 +2,9 @@ package com.rossomak.flashcards.core.ui.composables.lists
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,7 +45,11 @@ private const val DISABLED_ALPHA = 0.6f
  * and TalkBack announces the row as a single checked/unchecked control rather than a row and a
  * checkbox announced separately. There is no second trailing slot — a row that needs to keep
  * showing e.g. a chevron alongside the checkbox isn't this row's shape.
+ *
+ * [subtitleContent] overrides [subtitle] when given, for a caller that needs more than a
+ * single-styled line — see [FlashcardsListRow]'s own `secondaryContent`.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FlashcardsSelectableListRow(
     title: String,
@@ -51,6 +57,7 @@ fun FlashcardsSelectableListRow(
     onSelectedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
     leading: @Composable (() -> Unit)? = null,
 ) {
@@ -91,12 +98,15 @@ fun FlashcardsSelectableListRow(
         ) {
             Text(
                 text = title,
+                modifier = Modifier.basicMarquee(),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
             )
-            if (subtitle != null) {
+            if (subtitleContent != null) {
+                subtitleContent()
+            } else if (subtitle != null) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelMedium,

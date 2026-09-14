@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
@@ -60,29 +58,15 @@ import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
-import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsIconButton
-import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import kotlinx.coroutines.launch
-
-/** Separator between Subcategory names in a category's chip line: `Compose · Coroutines · Testing`. */
-private const val SUBCATEGORY_SUMMARY_SEPARATOR = " · "
-
-/**
- * Mastery shown on every search result until the card-mastery rollup exists. The ring renders at
- * this value rather than being hidden, so the row's layout is already final when real progress
- * lands and only this call site has to change. See docs/design/category-search.md.
- */
-private const val PLACEHOLDER_MASTERY = 0f
-
-private const val PLACEHOLDER_MASTERY_PERCENT = 0
 
 @Composable
 fun BrowseScreen(
@@ -348,6 +332,8 @@ private fun ExpandedSearchContent(
 
         is SearchStatus.Results -> SearchResults(
             results = status.results,
+            categories = state.categories,
+            progressFor = state::progressFor,
             onCategoryClick = onCategoryClick,
             onSubcategoryClick = onSubcategoryClick,
             onSubcategorySessionStart = onSubcategorySessionStart,
@@ -431,6 +417,8 @@ internal fun CategoryList(
 @Composable
 internal fun SearchResults(
     results: CategorySearchResults,
+    categories: List<Category>,
+    progressFor: (String) -> SubcategoryProgress,
     onCategoryClick: (String, String) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
@@ -438,34 +426,44 @@ internal fun SearchResults(
     ScrollableSectionColumn {
         if (results.subcategories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_topics_label))
-            val masteryContentDescription = stringResource(
-                CoreUiR.string.common_mastery_progress_cd,
-                PLACEHOLDER_MASTERY_PERCENT,
-            )
-            FlashcardsListGroup(
-                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
-                items = results.subcategories.map { subcategory ->
-                    subcategory.toListGroupItem(
-                        parentLabel = stringResource(
-                            R.string.browse_search_topic_parent_label,
-                            subcategory.categoryName,
-                        ),
-                        masteryContentDescription = masteryContentDescription,
-                        startSessionContentDescription = stringResource(
-                            R.string.browse_search_start_session_cd,
-                            subcategory.name,
-                        ),
-                        onSubcategoryClick = onSubcategoryClick,
-                        onSubcategorySessionStart = onSubcategorySessionStart,
-                    )
-                },
-            )
+            SubcategoryListGroup(results, progressFor, categories, onSubcategoryClick, onSubcategorySessionStart)
         }
         if (results.categories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_categories_label))
             CategoryListGroup(categories = results.categories, onCategoryClick = onCategoryClick)
         }
     }
+}
+
+@Composable
+private fun SubcategoryListGroup(
+    results: CategorySearchResults,
+    progressFor: (String) -> SubcategoryProgress,
+    categories: List<Category>,
+    onSubcategoryClick: (Subcategory) -> Unit,
+    onSubcategorySessionStart: (Subcategory) -> Unit
+) {
+    val cardsStudiedSeparator = stringResource(R.string.browse_middle_dot_separator)
+    FlashcardsListGroup(
+        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+        items = results.subcategories.map { subcategory ->
+            val progress = progressFor(subcategory.id)
+            subcategory.toSearchResultListGroupItem(
+                progress = progress,
+                ringContentDescription = progress.searchRingContentDescription(subcategory.cardCount),
+                cardsStudiedText = subcategory.searchResultCardsStudiedText(progress = progress, separator = cardsStudiedSeparator),
+                // Not found only for a stale/inconsistent categoryId — falls back to the
+                // glyph's own generic icon, same as a category with no iconSvg curated yet.
+                iconSvg = categories.firstOrNull { it.id == subcategory.categoryId }?.iconSvg,
+                startSessionContentDescription = stringResource(
+                    R.string.browse_search_start_session_cd,
+                    subcategory.name,
+                ),
+                onSubcategoryClick = onSubcategoryClick,
+                onSubcategorySessionStart = onSubcategorySessionStart,
+            )
+        },
+    )
 }
 
 @Composable
@@ -486,6 +484,8 @@ private fun CategoryListGroup(
     categories: List<CategoryWithSubcategorySummary>,
     onCategoryClick: (String, String) -> Unit,
 ) {
+    val subcategorySummarySeparator = stringResource(R.string.browse_middle_dot_separator)
+    val placeholderSubtitle = stringResource(R.string.browse_category_placeholder_subtitle)
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
         items = categories.map { categoryWithSummary ->
@@ -495,7 +495,8 @@ private fun CategoryListGroup(
                     categoryWithSummary.category.subcategoryCount,
                     categoryWithSummary.category.subcategoryCount,
                 ),
-                placeholderSubtitle = stringResource(R.string.browse_category_placeholder_subtitle),
+                placeholderSubtitle = placeholderSubtitle,
+                subcategorySummarySeparator = subcategorySummarySeparator,
                 onCategoryClick = onCategoryClick,
             )
         },
@@ -503,18 +504,19 @@ private fun CategoryListGroup(
 }
 
 /**
- * The subtitle line is the category's subcategory-summary chip line. [placeholderSubtitle] only
- * shows for a category with no Subcategories to name at all — every other row names its most
- * prominent Subcategories.
+ * The subtitle line is the category's subcategory-summary chip line, e.g.
+ * `Compose · Coroutines · Testing`. [placeholderSubtitle] only shows for a category with no
+ * Subcategories to name at all — every other row names its most prominent Subcategories.
  */
 private fun CategoryWithSubcategorySummary.toListGroupItem(
     subcategoryCountText: String,
     placeholderSubtitle: String,
+    subcategorySummarySeparator: String,
     onCategoryClick: (String, String) -> Unit,
 ): FlashcardsListGroupItem = FlashcardsListGroupItem.DetailedRow(
     key = category.id,
     title = category.name,
-    subtitle = subcategorySummary.joinToString(SUBCATEGORY_SUMMARY_SEPARATOR).ifEmpty { placeholderSubtitle },
+    subtitle = subcategorySummary.joinToString(subcategorySummarySeparator).ifEmpty { placeholderSubtitle },
     secondaryText = subcategoryCountText,
     onClick = { onCategoryClick(category.id, category.name) },
     leading = {
@@ -526,47 +528,6 @@ private fun CategoryWithSubcategorySummary.toListGroupItem(
     },
     trailing = { FlashcardsChevron() },
 )
-
-/**
- * A matched Subcategory: mastery ring leading, its parent category named on the secondary line,
- * and two separate destinations trailing — the play button jumps straight into Study Creation
- * while the row itself drills into the Subcategory.
- */
-private fun Subcategory.toListGroupItem(
-    parentLabel: String,
-    masteryContentDescription: String,
-    startSessionContentDescription: String,
-    onSubcategoryClick: (Subcategory) -> Unit,
-    onSubcategorySessionStart: (Subcategory) -> Unit,
-): FlashcardsListGroupItem {
-    val subcategory = this
-    return FlashcardsListGroupItem.Row(
-        key = subcategory.id,
-        title = subcategory.name,
-        secondaryText = parentLabel,
-        onClick = { onSubcategoryClick(subcategory) },
-        leading = {
-            FlashcardsProgressRing(
-                progress = PLACEHOLDER_MASTERY,
-                contentDescription = masteryContentDescription,
-            )
-        },
-        trailing = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FlashcardsIconButton(
-                    icon = Icons.Default.PlayArrow,
-                    contentDescription = startSessionContentDescription,
-                    onClick = { onSubcategorySessionStart(subcategory) },
-                    size = FlashcardsComponentSize.Small,
-                )
-                FlashcardsChevron()
-            }
-        },
-    )
-}
 
 private val previewSearchActions = BrowseSearchActions(
     onQueryChange = {},
@@ -639,10 +600,20 @@ private fun BrowseContentPreview() {
 /**
  * Results preview the sections directly rather than through [BrowseContent]: they render inside
  * [ExpandedFullScreenSearchBar]'s dialog window at runtime, which a `@Preview` cannot show.
+ *
+ * [previewProgressFor] shows one topic resolved with real progress and one never studied, so both
+ * subtitle shapes are visible at once.
  */
 @Preview(showBackground = true)
 @Composable
 private fun SearchResultsPreview() {
+    val previewProgressFor: (String) -> SubcategoryProgress = { subcategoryId ->
+        if (subcategoryId == previewAndroidSubcategories.first().id) {
+            SubcategoryProgress.Resolved(studiedCount = 25, masteredCount = 10)
+        } else {
+            SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+        }
+    }
     SearchResults(
         results = CategorySearchResults(
             subcategories = previewAndroidSubcategories,
@@ -653,6 +624,8 @@ private fun SearchResultsPreview() {
                 ),
             ),
         ),
+        categories = previewCategories,
+        progressFor = previewProgressFor,
         onCategoryClick = { _, _ -> },
         onSubcategoryClick = {},
         onSubcategorySessionStart = {},

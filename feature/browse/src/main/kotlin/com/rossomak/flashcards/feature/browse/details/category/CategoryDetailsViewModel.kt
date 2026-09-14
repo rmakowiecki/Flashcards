@@ -1,11 +1,13 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.category
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
+import com.rossomak.flashcards.feature.browse.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 class CategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSubcategories: GetSubcategoriesUseCase,
+    private val getProgressSummary: GetProgressSummaryUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<CategoryDetailsRoute>()
@@ -40,6 +43,7 @@ class CategoryDetailsViewModel @Inject constructor(
 
     init {
         loadSubcategories()
+        loadProgressSummary()
     }
 
     /**
@@ -118,7 +122,7 @@ class CategoryDetailsViewModel @Inject constructor(
     }
 
     /**
-     * Deliberately fake, exactly like [SubcategoryDetailsViewModel.onFavoriteToggle]. This flips a
+     * Deliberately fake, exactly like [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsViewModel.onFavoriteToggle]. This flips a
      * flag that dies with the ViewModel and shows a snackbar, and **writes nothing anywhere** — no
      * repository, no use case, no preference. Do not wire it to storage on the assumption that it
      * is a half-finished integration; making favourites real is its own piece of work.
@@ -142,13 +146,29 @@ class CategoryDetailsViewModel @Inject constructor(
 
     private fun loadSubcategories() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, errorResId = null) }
             getSubcategories(route.categoryId)
                 .onSuccess { subcategories ->
                     _state.update { it.copy(isLoading = false, subcategories = subcategories) }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, error = "Could not load topics") }
+                    _state.update { it.copy(isLoading = false, errorResId = R.string.category_details_load_error) }
+                }
+        }
+    }
+
+    /**
+     * Runs independently of [loadSubcategories] so a slow or failed progress read never gates the
+     * topic list. A failure leaves [CategoryDetailsScreenState.isProgressResolved] `false`
+     * forever — every ring stays unknown and every subtitle simply drops its studied segment
+     * (same as a never-studied topic), with no error surfaced, per the ticket's "no error, no
+     * retry prompt, no snackbar" rule.
+     */
+    private fun loadProgressSummary() {
+        viewModelScope.launch {
+            getProgressSummary()
+                .onSuccess { summary ->
+                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
                 }
         }
     }

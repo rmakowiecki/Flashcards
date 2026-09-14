@@ -1,19 +1,11 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent
 
-/** The event type this screen's dialogs report through. See [DialogEvent]. */
 typealias SubcategoryDetailsDialogEvent = DialogEvent<SubcategoryDetailsDialog>
 
-/**
- * Which dialog Subcategory Details currently has open, and everything that dialog needs (ADR-0036).
- *
- * One sealed nullable field rather than a flag per dialog: two dialogs open at once becomes
- * unrepresentable, the call site is a single exhaustive `when`, and discard on dismiss is free —
- * the draft dies with the field.
- */
 sealed interface SubcategoryDetailsDialog {
 
     /**
@@ -22,7 +14,7 @@ sealed interface SubcategoryDetailsDialog {
      * Offered here because browsing and a Study Session share one notion of order (ADR-0038), so
      * this screen is a peer of the Preview screen rather than a separate setting.
      */
-    data class Sort(
+    data class CardsSortingOrder(
         val draftState: FlashcardSortOrder,
         val keepAsDefault: Boolean = false,
     ) : SubcategoryDetailsDialog

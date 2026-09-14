@@ -2,14 +2,20 @@ package com.rossomak.flashcards.feature.browse
 
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -26,6 +32,8 @@ class BrowseViewModelTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val getCategories = GetCategoriesUseCase(flashcardRepository)
     private val searchCategories = SearchCategoriesUseCase(flashcardRepository)
+    private val cardProgressRepository = FakeCardProgressRepository()
+    private val getProgressSummary = GetProgressSummaryUseCase(cardProgressRepository)
 
     private val categoryId = "cat-1"
     private val categoryName = "Android"
@@ -49,8 +57,17 @@ class BrowseViewModelTest {
         cardCount = 12,
     )
 
+    private val coroutines = Subcategory(
+        id = "android-coroutines",
+        name = "Coroutines",
+        categoryId = categoryId,
+        categoryName = categoryName,
+        order = 1,
+        cardCount = 8,
+    )
+
     private fun createViewModel(): BrowseViewModel =
-        BrowseViewModel(getCategories, searchCategories)
+        BrowseViewModel(getCategories, searchCategories, getProgressSummary)
 
     @Test
     fun `onCategorySelected emits CategoryDetails with id and name`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -235,6 +252,109 @@ class BrowseViewModelTest {
         viewModel.state.value.searchQuery shouldBe ""
         viewModel.state.value.isSearchActive shouldBe false
         viewModel.state.value.searchStatus shouldBe SearchStatus.Prompt
+    }
+
+    // --- progress rings/subtitle on matched topics (ADR-0016) ---
+
+    @Test
+    fun `a summary with counts resolves a matched topic's studied and mastered counts`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+            cardProgressRepository.seedSummary(
+                ProgressSummary(
+                    subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 4, masteredCount = 2)),
+                ),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSearchQueryChange("compose")
+            advanceUntilIdle()
+
+            viewModel.state.value.isProgressResolved shouldBe true
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 4, masteredCount = 2)
+        }
+
+    @Test
+    fun `a matched topic absent from the summary resolves to all-zero, not unknown`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+            // No seedSummary call: the fake returns Result.success(null), mirroring a User who has
+            // never finished a session.
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSearchQueryChange("compose")
+            advanceUntilIdle()
+
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+        }
+
+    @Test
+    fun `a failed summary read leaves search results intact with the matched topic unresolved and surfaces no error`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+            cardProgressRepository.summaryResultToReturn = Result.failure(IllegalStateException("boom"))
+            // Parks init's own loadProgressSummary() so the search below genuinely runs while the
+            // summary read is still in flight, rather than the fake resolving it up front.
+            val summaryGate = CompletableDeferred<Unit>()
+            cardProgressRepository.summaryReadGate = summaryGate
+
+            val viewModel = createViewModel()
+            viewModel.onSearchQueryChange("compose")
+            advanceUntilIdle()
+
+            val status = viewModel.state.value.searchStatus
+            status.shouldBeInstanceOf<SearchStatus.Results>()
+            status.results.subcategories shouldContainExactly listOf(compose)
+            viewModel.state.value.isProgressResolved shouldBe false
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Unresolved
+
+            summaryGate.complete(Unit)
+            advanceUntilIdle()
+
+            viewModel.state.value.isProgressResolved shouldBe false
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Unresolved
+        }
+
+    @Test
+    fun `progress arriving after results neither reorders them nor changes their identity`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["co"] = Result.success(listOf(compose, coroutines))
+            cardProgressRepository.seedSummary(
+                ProgressSummary(
+                    subcategories = mapOf(
+                        compose.id to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0),
+                        coroutines.id to SubcategoryProgressSummary(studiedCount = 3, masteredCount = 1),
+                    ),
+                ),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSearchQueryChange("co")
+            advanceUntilIdle()
+
+            val status = viewModel.state.value.searchStatus
+            status.shouldBeInstanceOf<SearchStatus.Results>()
+            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
+        }
+
+    /** Structural per ADR-0016, but a fixture bug producing the reverse must still fail loudly. */
+    @Test
+    fun `mastered is never greater than studied for a matched topic`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+        cardProgressRepository.seedSummary(
+            ProgressSummary(subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 5, masteredCount = 2))),
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onSearchQueryChange("compose")
+        advanceUntilIdle()
+
+        val progress = viewModel.state.value.progressFor(compose.id) as SubcategoryProgress.Resolved
+        (progress.masteredCount <= progress.studiedCount) shouldBe true
     }
 
     private companion object {

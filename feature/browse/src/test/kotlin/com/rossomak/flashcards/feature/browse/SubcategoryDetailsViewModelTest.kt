@@ -17,6 +17,13 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDestination
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDialog
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsScreenState
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsViewModel
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
@@ -186,8 +193,8 @@ class SubcategoryDetailsViewModelTest {
     fun `confirming the sort dialog reorders the list`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = startedViewModel()
 
-        viewModel.onDialogEvent(Open(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.Default)))
-        viewModel.onDialogEvent(DraftChange(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.EasiestFirst)))
+        viewModel.onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.Default)))
+        viewModel.onDialogEvent(DraftChange(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.EasiestFirst)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -202,8 +209,8 @@ class SubcategoryDetailsViewModelTest {
     fun `dismissing the sort dialog discards the draft`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = startedViewModel()
 
-        viewModel.onDialogEvent(Open(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.Default)))
-        viewModel.onDialogEvent(DraftChange(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.HardestFirst)))
+        viewModel.onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.Default)))
+        viewModel.onDialogEvent(DraftChange(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.HardestFirst)))
         viewModel.onDialogEvent(Dismiss)
 
         viewModel.state.assertValue {
@@ -218,7 +225,7 @@ class SubcategoryDetailsViewModelTest {
             val viewModel = startedViewModel()
 
             viewModel.onDialogEvent(
-                Open(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.HardestFirst, keepAsDefault = true))
+                Open(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.HardestFirst, keepAsDefault = true))
             )
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
@@ -232,7 +239,7 @@ class SubcategoryDetailsViewModelTest {
             val viewModel = startedViewModel()
 
             viewModel.onDialogEvent(
-                Open(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.HardestFirst, keepAsDefault = false))
+                Open(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.HardestFirst, keepAsDefault = false))
             )
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
@@ -292,7 +299,7 @@ class SubcategoryDetailsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = startedViewModel()
             viewModel.onDialogEvent(
-                Open(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.HardestFirst))
+                Open(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.HardestFirst))
             )
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
@@ -356,7 +363,7 @@ class SubcategoryDetailsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = startedViewModel()
             applyFilters(viewModel, tags = setOf("State"), difficultyRange = 2..7)
-            viewModel.onDialogEvent(Open(SubcategoryDetailsDialog.Sort(FlashcardSortOrder.EasiestFirst)))
+            viewModel.onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(FlashcardSortOrder.EasiestFirst)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 

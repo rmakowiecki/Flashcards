@@ -30,6 +30,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.caverock.androidsvg.SVG
+import com.rossomak.flashcards.core.ui.theme.AppSizes
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
@@ -93,6 +94,45 @@ fun FlashcardsVectorIconTile(
                 modifier = Modifier.size(ICON_CONTENT_SIZE),
             )
         }
+    }
+}
+
+/** Diameter of [FlashcardsInlineCategoryGlyph] — reuses the compact metadata-badge icon token. */
+private val INLINE_GLYPH_SIZE = AppSizes.metadataBadgeIconCompact
+
+/**
+ * Bare category glyph, no tile/background — a small inline icon meant to sit inside a text line
+ * (e.g. a search result's secondary line naming its parent category), sibling of
+ * [FlashcardsVectorIconTile] for callers that don't want its 40dp tinted-container tile. Always
+ * rendered in [tint] rather than the category's own [color] — a caller that wants the curated
+ * color reads [FlashcardsVectorIconTile] instead. [iconSvg] absent or malformed both land on the
+ * same generic fallback glyph, no crash either way — same handling [FlashcardsVectorIconTile]
+ * gives its tile, just without the container.
+ */
+@Composable
+fun FlashcardsInlineCategoryGlyph(
+    iconSvg: String?,
+    tint: Color,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    val svg = remember(iconSvg) {
+        iconSvg?.let { runCatching { it.toCategorySvg() }.getOrNull() }
+    }
+    if (svg == null) {
+        Icon(
+            imageVector = FallbackIcon,
+            contentDescription = contentDescription,
+            modifier = modifier.size(INLINE_GLYPH_SIZE),
+            tint = tint,
+        )
+    } else {
+        SvgGlyph(
+            svg = svg,
+            tint = tint,
+            contentDescription = contentDescription,
+            modifier = modifier.size(INLINE_GLYPH_SIZE),
+        )
     }
 }
 

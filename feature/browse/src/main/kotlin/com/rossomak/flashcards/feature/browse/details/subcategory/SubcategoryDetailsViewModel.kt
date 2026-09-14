@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -17,9 +17,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsDialog.Filters
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsDialog.Sort
-import com.rossomak.flashcards.feature.browse.SubcategoryDetailsScreenState.Companion.DIFFICULTY_BOUNDS
+import com.rossomak.flashcards.feature.browse.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -110,7 +108,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
     fun onResetFilters() {
         _state.update {
             it.copy(
-                filters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = DIFFICULTY_BOUNDS)
+                filters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = SubcategoryDetailsScreenState.DIFFICULTY_BOUNDS)
                     .selectAllTags(it.availableTags),
             )
         }
@@ -164,7 +162,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
     private fun onDialogConfirm() {
         when (val dialog = _state.value.activeDialog) {
             null -> return
-            is Sort -> {
+            is SubcategoryDetailsDialog.CardsSortingOrder -> {
                 if (dialog.keepAsDefault) {
                     viewModelScope.launch {
                         saveStudySessionPreference(StudySessionPreference.SortOrder(dialog.draftState))
@@ -172,7 +170,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
                 }
                 _state.update { it.copy(sortOrder = dialog.draftState, activeDialog = null) }
             }
-            is Filters -> _state.update { it.copy(filters = dialog.draftState, activeDialog = null) }
+            is SubcategoryDetailsDialog.Filters -> _state.update { it.copy(filters = dialog.draftState, activeDialog = null) }
         }
         renderContent()
     }

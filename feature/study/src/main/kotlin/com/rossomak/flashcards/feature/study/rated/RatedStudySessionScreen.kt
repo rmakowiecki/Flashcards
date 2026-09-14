@@ -63,9 +63,9 @@ import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExtendedContext
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionTopAppBar
@@ -230,7 +230,7 @@ fun RatedStudySessionContent(
                 },
                 onClose = { onDialogEvent(Open(ExitSession)) },
                 onReportProblem = { card ->
-                    onDialogEvent(Open(ReportProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
+                    onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
                 },
             )
         },
@@ -242,7 +242,7 @@ fun RatedStudySessionContent(
                 onVoicePlayPause = onVoicePlayPause,
                 onVoiceNext = onVoiceNext,
                 onVoicePrevious = onVoicePrevious,
-                onVoiceSettingsCogClick = { onDialogEvent(Open(VoiceSettings())) },
+                onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
                 onVoiceAnswerToggle = onVoiceAnswerToggle,
                 onResumeSession = onResumeSession,
             )
@@ -255,7 +255,7 @@ fun RatedStudySessionContent(
             currentCardIndex = state.currentCardIndex,
             isAnswerRevealed = state.isAnswerRevealed,
             innerPadding = innerPadding,
-            onExtendedContextClick = { onDialogEvent(Open(ExtendedContext(it))) },
+            onExtendedContextClick = { onDialogEvent(Open(CurrentCardExtendedContext(it))) },
         )
 
         StudySessionDialogHost(

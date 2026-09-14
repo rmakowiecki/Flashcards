@@ -3,7 +3,10 @@ package com.rossomak.flashcards.feature.browse
 import androidx.compose.runtime.Immutable
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CategorySearchResults
+import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
+import com.rossomak.flashcards.feature.browse.details.category.subcategoryProgressFor
 
 sealed interface BrowseNavigationDestination : NavigationEvent {
     data class CategoryDetails(val categoryId: String, val categoryName: String) : BrowseNavigationDestination
@@ -43,7 +46,7 @@ data class BrowseSearchActions(
 /**
  * The one thing the expanded search bar renders, replacing a nullable-results-plus-error-flag pair
  * so illegal combinations (an error alongside stale results, say) can't be represented. Mirrors
- * [com.rossomak.flashcards.feature.browse.SubcategoryDetailsContentState]'s flat-sealed style in
+ * [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState]'s flat-sealed style in
  * this same feature.
  *
  * [NoMatch] is deliberately distinct from [Error]: a query that ran cleanly and matched nothing is
@@ -76,6 +79,15 @@ sealed interface SearchStatus {
  * a flag rather than a message so the display copy stays in the UI layer as string resources, not
  * as hardcoded text in the ViewModel. It is orthogonal to [searchStatus]'s own [SearchStatus.Error]
  * — the category list and a single search query fail independently of each other.
+ *
+ * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), backing the ring
+ * and subtitle on every matched topic in [searchStatus]. `null` until [isProgressResolved] — and
+ * possibly still `null` after, for a User who has never finished a session. Never read directly by
+ * the screen; go through [progressFor]. Mirrors [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressSummary] — one
+ * summary document serves both screens' rings.
+ * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
+ * failed read leaves it `false` forever rather than surfacing an error, same as
+ * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.isProgressResolved]. Search results themselves never wait on this.
  */
 data class BrowseScreenState(
     val isLoading: Boolean = false,
@@ -84,4 +96,10 @@ data class BrowseScreenState(
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val searchStatus: SearchStatus = SearchStatus.Prompt,
-)
+    val progressSummary: ProgressSummary? = null,
+    val isProgressResolved: Boolean = false,
+) {
+
+    /** One matched topic's ring/subtitle data — see [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressFor]. */
+    fun progressFor(subcategoryId: String): SubcategoryProgress = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
+}

@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.yield
 
 class FakeCardProgressRepository : CardProgressRepository {
@@ -13,6 +14,14 @@ class FakeCardProgressRepository : CardProgressRepository {
 
     /** Overrides every [getProgressSummary] call when set, success or failure alike. */
     var summaryResultToReturn: Result<ProgressSummary?>? = null
+
+    /**
+     * When set, [getProgressSummary] suspends on this until the test completes it — lets a test
+     * park the summary read indefinitely to assert an in-between state (e.g. subcategories loaded,
+     * summary still pending) instead of only the states before and after `advanceUntilIdle()`
+     * drains everything at once. `null` (the default) keeps the old single-[yield] behavior.
+     */
+    var summaryReadGate: CompletableDeferred<Unit>? = null
 
     /** Every Subcategory id [getProgress] was actually called with, in call order. */
     val requestedSubcategoryIds: MutableList<String> = mutableListOf()
@@ -37,7 +46,7 @@ class FakeCardProgressRepository : CardProgressRepository {
     }
 
     override suspend fun getProgressSummary(): Result<ProgressSummary?> {
-        yield()
+        summaryReadGate?.await() ?: yield()
         return summaryResultToReturn ?: Result.success(summary)
     }
 }

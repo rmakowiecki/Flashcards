@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="subcategory_details_card_expanded_cd">Expanded</string>
     <string name="subcategory_details_card_collapsed_cd">Collapsed</string>
     <string name="subcategory_details_subtitle_label">%1$s · Topic</string>
@@ -9,7 +9,7 @@
     <string name="subcategory_details_more_options_cd">More options</string>
     <string name="subcategory_details_filter_cd">Filter cards</string>
     <string name="subcategory_details_sort_cd">Sort cards</string>
-    <plurals name="subcategory_details_card_count_label">
+    <plurals name="browse_card_count_label">
         <item quantity="one">%d card</item>
         <item quantity="other">%d cards</item>
     </plurals>
@@ -41,6 +41,10 @@
         <item quantity="one">%1$d of %2$d topic selected</item>
         <item quantity="other">%1$d of %2$d topics selected</item>
     </plurals>
+    <string name="category_details_topic_progress_cd">%1$d%% studied</string>
+    <string name="category_details_topic_progress_unavailable_cd">Studied progress unavailable</string>
+    <string name="category_details_load_error">Could not load topics</string>
+    <string name="category_details_topic_studied_label" tools:ignore="PluralsCandidate">%1$d studied</string>
     <string name="browse_category_placeholder_subtitle">Tap to explore</string>
     <string name="browse_search_hint">Search categories or topics…</string>
     <string name="browse_categories_label">Categories</string>
@@ -51,8 +55,10 @@
     <string name="browse_search_no_results_message">Nothing matches your search</string>
     <string name="browse_search_error_title">Search failed</string>
     <string name="browse_search_error_message">Could not run that search. Try again.</string>
-    <string name="browse_search_topic_parent_label">in %1$s</string>
     <string name="browse_search_start_session_cd">Study %1$s</string>
+    <string name="browse_search_topic_progress_cd">%1$d%% studied</string>
+    <string name="browse_search_topic_progress_unavailable_cd">Studied progress unavailable</string>
+    <string name="browse_middle_dot_separator"> · </string>
     <string name="browse_categories_error_title">Something went wrong</string>
     <string name="browse_categories_error_message">Couldn\'t load categories.\nCheck your connection and try again.</string>
     <string name="browse_categories_empty_title">No categories yet</string>
@@ -61,12 +67,6 @@
         <item quantity="one">%d topic</item>
         <item quantity="other">%d topics</item>
     </plurals>
-    <!--
-      Shared by CategoryDetailsScreen and SubcategoryDetailsScreen (ADR-0023's promotion rule is
-      about crossing module boundaries; both screens live in :feature:browse). Deliberately not
-      `browse_`-prefixed: that would read as BrowseScreen's own namespace and reintroduce the
-      collision ADR-0023's key pattern exists to avoid.
-    -->
     <string name="favorites_added_message">Added to favorites</string>
     <string name="favorites_removed_message">Removed from favorites</string>
     <string name="favorites_undo_button">Undo</string>

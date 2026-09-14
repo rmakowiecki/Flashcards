@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.Flashcard

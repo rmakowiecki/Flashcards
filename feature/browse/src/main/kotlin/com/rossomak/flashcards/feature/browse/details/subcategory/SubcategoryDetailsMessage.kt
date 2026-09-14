@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.browse
+package com.rossomak.flashcards.feature.browse.details.subcategory
 
 /**
  * One-shot snackbar messages from Subcategory Details, per the SharedFlow-for-transient-events rule.
