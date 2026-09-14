@@ -8,7 +8,7 @@ import androidx.work.ListenableWorker.Result
 import androidx.work.WorkerParameters
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDomain
-import com.rossomak.flashcards.core.data.repository.RemoteSessionSubmissionRepository
+import com.rossomak.flashcards.core.data.network.SessionSubmissionApi
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -25,8 +25,8 @@ import java.io.IOException
  *
  * [doWork] reads every entry [localDataSource] currently holds, sorts it FIFO by
  * [com.rossomak.flashcards.core.domain.model.SessionResult.startedAt] (oldest first), and submits
- * each one in turn to [remoteSessionSubmissionRepository] — the concrete, network-only repository,
- * constructor-injected by concrete type rather than through the
+ * each one in turn to [sessionSubmissionApi] — the network-only
+ * [com.rossomak.flashcards.core.data.network.SessionSubmissionApi], not the
  * [com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository] interface, so this
  * worker can never accidentally re-enqueue what it is itself draining. FIFO ordering is a
  * plausibility, not a correctness, requirement: the mastery/demastery/defense-bonus outcomes the
@@ -90,7 +90,7 @@ import java.io.IOException
 class SessionSubmissionDeliveryWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParameters: WorkerParameters,
-    private val remoteSessionSubmissionRepository: RemoteSessionSubmissionRepository,
+    private val sessionSubmissionApi: SessionSubmissionApi,
     private val localDataSource: PendingSessionSubmissionLocalDataSource,
 ) : CoroutineWorker(context, workerParameters) {
 
@@ -113,7 +113,7 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
                     localDataSource.remove(entry.id)
                     return@forEachIndexed
                 }
-                val submissionResult = remoteSessionSubmissionRepository.submitSession(domainSessionResult)
+                val submissionResult = sessionSubmissionApi.submitSession(domainSessionResult)
                 if (submissionResult.isFailure) {
                     if (index == 0 && runAttemptCount + 1 >= MAX_DELIVERY_ATTEMPTS) {
                         Log.e(

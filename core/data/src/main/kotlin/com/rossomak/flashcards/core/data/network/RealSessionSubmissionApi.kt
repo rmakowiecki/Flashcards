@@ -1,9 +1,8 @@
-package com.rossomak.flashcards.core.data.repository
+package com.rossomak.flashcards.core.data.network
 
 import com.google.firebase.functions.FirebaseFunctions
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -11,25 +10,13 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 /**
- * Wraps `httpsCallable("submitStudySession")`, following the existing
- * [com.rossomak.flashcards.core.data.network.RealVoiceGradingApi] pattern already in this codebase:
- * the endpoint resolves from the initialized `FirebaseApp` (`google-services.json`), not a base URL,
- * and the caller's Firebase ID token attaches automatically — no Retrofit, no `Authorization` header
- * to manage by hand.
+ * Wraps `httpsCallable("submitStudySession")`. the endpoint resolves from the initialized `FirebaseApp`
+ * (`google-services.json`), not a base URL, and the caller's Firebase ID token attaches
+ * automatically — no Retrofit, no `Authorization` header to manage by hand.
  *
  * The wire payload's field names mirror `functions/src/lib/submitStudySession.ts`'s own
- * `ValidatedSubmitStudySessionRequest` shape 1:1 — this is the one seam where those names must agree
+ * `ValidatedSubmitStudySessionRequest` shape 1:1 — this is the one seam where these contracts must agree
  * across languages with no compiler to enforce it.
- *
- * Deliberately carries no `newCardsStudied` count: unlike the old client-write path, the function
- * recomputes that itself from its own fresh Firestore reads and never trusts a client-reported count
- * for it.
- *
- * The raw network caller only — no longer bound to [SessionSubmissionRepository] itself.
- * [com.rossomak.flashcards.core.data.repository.DefaultSessionSubmissionRepository] now holds that
- * binding as a durable decorator; this class is injected by concrete type, directly, into
- * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] alone — nothing else in
- * the app needs "the network-only one".
  *
  * A field added to [SessionResult] needs updating here (`toPayload()`, this class's own network-wire
  * subset) **and independently** in [com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto]
@@ -37,11 +24,11 @@ import kotlinx.coroutines.withContext
  * full-fidelity shape — see that DTO's own class doc for why the two are deliberately not derived from
  * one another.
  */
-class RemoteSessionSubmissionRepository @Inject constructor(
+class RealSessionSubmissionApi @Inject constructor(
     private val functions: FirebaseFunctions,
-) : SessionSubmissionRepository {
+) : SessionSubmissionApi {
 
-    // Broad on purpose, a callable Task can fail with more than
+    // Broad on purpose - a callable Task can fail with more than
     // just FirebaseFunctionsException (a transport-layer error before the SDK wraps it, say), and
     // this call site has no surrounding try/catch of its own — narrowing this would let an
     // unanticipated exception type crash instead of surfacing as Result.failure.

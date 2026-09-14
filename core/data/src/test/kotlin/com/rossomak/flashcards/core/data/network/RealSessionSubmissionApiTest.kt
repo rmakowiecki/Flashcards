@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.repository
+package com.rossomak.flashcards.core.data.network
 
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
@@ -19,12 +19,12 @@ import java.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class RemoteSessionSubmissionRepositoryTest {
+class RealSessionSubmissionApiTest {
 
     private val functions: FirebaseFunctions = mockk()
     private val callableReference: HttpsCallableReference = mockk()
 
-    private fun createRepository(): RemoteSessionSubmissionRepository = RemoteSessionSubmissionRepository(functions)
+    private fun createApi(): RealSessionSubmissionApi = RealSessionSubmissionApi(functions)
 
     private fun stubCallable(result: Task<HttpsCallableResult>): CapturingSlot<Any> {
         val payloadSlot = slot<Any>()
@@ -77,7 +77,7 @@ class RemoteSessionSubmissionRepositoryTest {
         val cardResult = session.cardResults.single()
         val payloadSlot = stubCallable(Tasks.forResult(mockk()))
 
-        val result = createRepository().submitSession(session)
+        val result = createApi().submitSession(session)
 
         result.isSuccess shouldBe true
         @Suppress("UNCHECKED_CAST")
@@ -108,7 +108,7 @@ class RemoteSessionSubmissionRepositoryTest {
         val session = fastSessionResult()
         val payloadSlot = stubCallable(Tasks.forResult(mockk()))
 
-        createRepository().submitSession(session)
+        createApi().submitSession(session)
 
         @Suppress("UNCHECKED_CAST")
         val payload = payloadSlot.captured as Map<String, Any>
@@ -124,7 +124,7 @@ class RemoteSessionSubmissionRepositoryTest {
         val error: FirebaseFunctionsException = mockk()
         stubCallable(Tasks.forException(error))
 
-        val result = createRepository().submitSession(ratedSessionResult())
+        val result = createApi().submitSession(ratedSessionResult())
 
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error

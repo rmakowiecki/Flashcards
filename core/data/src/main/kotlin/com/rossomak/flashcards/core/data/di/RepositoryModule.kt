@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.core.data.di
 
+import com.rossomak.flashcards.core.data.network.RealSessionSubmissionApi
+import com.rossomak.flashcards.core.data.network.SessionSubmissionApi
 import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCurationRepository
@@ -47,6 +49,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSessionSubmissionRepository(defaultSessionSubmissionRepository: DefaultSessionSubmissionRepository): SessionSubmissionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSessionSubmissionApi(realSessionSubmissionApi: RealSessionSubmissionApi): SessionSubmissionApi
 
     @Binds
     @Singleton

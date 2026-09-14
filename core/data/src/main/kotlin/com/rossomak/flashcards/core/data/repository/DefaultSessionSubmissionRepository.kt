@@ -12,7 +12,9 @@ import kotlinx.coroutines.CancellationException
 /**
  * Durable decorator over [SessionSubmissionRepository] — the class
  * [com.rossomak.flashcards.core.data.di.RepositoryModule.bindSessionSubmissionRepository] now binds
- * to that interface, a role [RemoteSessionSubmissionRepository] held alone before.
+ * to that interface, a role the network-only predecessor of
+ * [com.rossomak.flashcards.core.data.network.SessionSubmissionApi] held alone before this queue
+ * existed.
  * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s call site is unaware of
  * any of this: it still just calls `submitSession`. This is the queue's *write* side —
  * [submitSession] appends the session to [localDataSource]'s local durable store and asks
@@ -34,7 +36,7 @@ class DefaultSessionSubmissionRepository @Inject constructor(
     private val drainScheduler: SessionSubmissionDrainScheduler,
 ) : SessionSubmissionRepository {
 
-    // Broad on purpose, matching RemoteSessionSubmissionRepository's own suppression: a local file
+    // Broad on purpose, matching RealSessionSubmissionApi's own suppression: a local file
     // write can fail with more than one anticipated exception type, and this call site has no
     // surrounding try/catch of its own — narrowing this would let an unanticipated exception type
     // crash instead of surfacing as a logged, non-fatal Result.failure.
