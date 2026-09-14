@@ -9,32 +9,33 @@ typealias SettingsDialogEvent = DialogEvent<SettingsDialog>
 
 sealed interface SettingsDialog {
 
-    data class Length(val draftState: Int) : SettingsDialog
+    data class SessionMode(val draftState: StudyMode) : SettingsDialog
 
-    data class Goal(val draftState: Int) : SettingsDialog
+    data class SessionCardCount(val draftState: Int) : SettingsDialog
 
-    data class Attempts(val draftState: Int) : SettingsDialog
+    data class DailyStudyGoal(val draftState: Int) : SettingsDialog
+
+    data class RatedSessionMaxCardAttempts(val draftState: Int) : SettingsDialog
 
     /**`draftState = true` (the default) re-queues a Partial-rated Rated mode card; `false` finishes it on the spot, recording Terminal Partial rather than Mastered (ADR-0044) */
-    data class PartialRatingCardRequeueing(val draftState: Boolean) : SettingsDialog
+    data class RatedSessionPartialRatingCardRequeueing(val draftState: Boolean) : SettingsDialog
 
-    data class Mode(val draftState: StudyMode) : SettingsDialog
+    data class SessionCardsSortingOrder(val draftState: FlashcardSortOrder) : SettingsDialog
 
-    data class Sort(val draftState: FlashcardSortOrder) : SettingsDialog
+    /** Quick Session only (regardless of Fast/Rated mode) — the row that opens it is not offered for a single-Subcategory or Custom session (ADR-0040) */
+    data class QuickSessionSubcategoryCountRange(val draftState: IntRange) : SettingsDialog
 
-    data class SubcategoryCountRange(val draftState: IntRange) : SettingsDialog
+    data class RatedSessionVoiceAnswering(val draftState: Boolean) : SettingsDialog
 
-    data class VoiceAnswering(val draftState: Boolean) : SettingsDialog
-
-    data class ReadAloud(val draftState: Boolean) : SettingsDialog
+    data class FastSessionReadAloud(val draftState: Boolean) : SettingsDialog
 
     /**
-     * The draft lives here like every other dialog's, but is the one this screen cannot seed at the call site: it comes from
+     * Offered for Fast mode, or Rated with voice answering on — the same gate the summary row
+     * itself uses (ADR-0030). The draft comes from
      * [VoiceSettingsController][com.rossomak.flashcards.core.ui.voice.VoiceSettingsController]'s
-     * saved settings and voice cache, which the row does not have. The ViewModel always replaces
-     * what it is handed, so the default here is a placeholder, never a value in use.
+     * voice cache plus this session's current settings, neither of which the row has, so the ViewModel always replaces what it is handed here.
      */
-    data class VoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState()) : SettingsDialog
+    data class SessionVoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState()) : SettingsDialog
 
     data object SignOut : SettingsDialog
 }

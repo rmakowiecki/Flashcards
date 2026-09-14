@@ -36,7 +36,7 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerState
@@ -147,9 +147,9 @@ class RatedStudySessionViewModelTest {
     )
 
     /** What the toolbar hands over: the report dialog seeded from the card on screen. */
-    private fun openReportProblem(viewModel: RatedStudySessionViewModel): ReportProblem {
+    private fun openReportProblem(viewModel: RatedStudySessionViewModel): ReportCurrentCardProblem {
         val card = requireNotNull(viewModel.state.value.currentCard)
-        return ReportProblem(cardId = card.id, subcategoryId = card.subcategoryId)
+        return ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)
     }
 
     private fun loadThreeCards() {
@@ -816,9 +816,9 @@ class RatedStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.onDialogEvent(Open(StudySessionDialog.VoiceSettings()))
+        viewModel.onDialogEvent(Open(StudySessionDialog.SessionVoiceSettings()))
 
-        viewModel.state.value.activeDialog.shouldBeInstanceOf<StudySessionDialog.VoiceSettings>()
+        viewModel.state.value.activeDialog.shouldBeInstanceOf<StudySessionDialog.SessionVoiceSettings>()
         verify(exactly = 1) { voiceSettingsController.seedDraft(sessionSettings) }
     }
 
@@ -830,10 +830,10 @@ class RatedStudySessionViewModelTest {
             advanceUntilIdle()
             voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
             advanceUntilIdle()
-            viewModel.onDialogEvent(Open(StudySessionDialog.VoiceSettings()))
-            val draft = (viewModel.state.value.activeDialog as StudySessionDialog.VoiceSettings).draftState
+            viewModel.onDialogEvent(Open(StudySessionDialog.SessionVoiceSettings()))
+            val draft = (viewModel.state.value.activeDialog as StudySessionDialog.SessionVoiceSettings).draftState
                 .copy(draftSpeed = 1.5f, draftVoiceId = "voice-1")
-            viewModel.onDialogEvent(DraftChange(StudySessionDialog.VoiceSettings(draft)))
+            viewModel.onDialogEvent(DraftChange(StudySessionDialog.SessionVoiceSettings(draft)))
 
             viewModel.onDialogEvent(Confirm)
 
@@ -848,8 +848,8 @@ class RatedStudySessionViewModelTest {
     fun `VoiceSettings confirm with keepAsDefault writes the preference`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(StudySessionDialog.VoiceSettings()))
-        val dialog = viewModel.state.value.activeDialog as StudySessionDialog.VoiceSettings
+        viewModel.onDialogEvent(Open(StudySessionDialog.SessionVoiceSettings()))
+        val dialog = viewModel.state.value.activeDialog as StudySessionDialog.SessionVoiceSettings
         viewModel.onDialogEvent(DraftChange(dialog.copy(keepAsDefault = true)))
 
         viewModel.onDialogEvent(Confirm)
@@ -862,7 +862,7 @@ class RatedStudySessionViewModelTest {
     fun `VoiceSettings Dismiss discards the draft through the controller`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(StudySessionDialog.VoiceSettings()))
+        viewModel.onDialogEvent(Open(StudySessionDialog.SessionVoiceSettings()))
 
         viewModel.onDialogEvent(Dismiss)
 
@@ -908,8 +908,8 @@ class RatedStudySessionViewModelTest {
             viewModel.state.value.isMicPermissionRequestPending shouldBe true
         }
 
-    private fun reportDraft(viewModel: RatedStudySessionViewModel): ReportProblem =
-        viewModel.state.value.activeDialog as ReportProblem
+    private fun reportDraft(viewModel: RatedStudySessionViewModel): ReportCurrentCardProblem =
+        viewModel.state.value.activeDialog as ReportCurrentCardProblem
 
     @Test
     fun `onCleared stops the voice gateway`() = runTest(mainDispatcherRule.testDispatcher) {

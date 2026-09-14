@@ -23,17 +23,17 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Attempts
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Goal
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Length
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Mode
-import com.rossomak.flashcards.feature.settings.SettingsDialog.PartialRatingCardRequeueing
-import com.rossomak.flashcards.feature.settings.SettingsDialog.ReadAloud
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionMaxCardAttempts
+import com.rossomak.flashcards.feature.settings.SettingsDialog.DailyStudyGoal
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionPartialRatingCardRequeueing
+import com.rossomak.flashcards.feature.settings.SettingsDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Sort
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SubcategoryCountRange
-import com.rossomak.flashcards.feature.settings.SettingsDialog.VoiceAnswering
-import com.rossomak.flashcards.feature.settings.SettingsDialog.VoiceSettings
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.settings.SettingsDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -107,7 +107,7 @@ class SettingsViewModel @Inject constructor(
      */
     private fun onDialogOpen(dialog: SettingsDialog) {
         when (dialog) {
-            is VoiceSettings -> onVoiceSettingsOpen()
+            is SessionVoiceSettings -> onVoiceSettingsOpen()
             else -> _state.update { it.copy(activeDialog = dialog) }
         }
     }
@@ -117,7 +117,7 @@ class SettingsViewModel @Inject constructor(
         val draft = voiceSettingsController.seedDraft(
             SavedVoiceSettings(speechRate = current.speechRate, voiceId = current.voiceId),
         )
-        _state.update { it.copy(activeDialog = VoiceSettings(draft)) }
+        _state.update { it.copy(activeDialog = SessionVoiceSettings(draft)) }
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
@@ -130,7 +130,7 @@ class SettingsViewModel @Inject constructor(
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
             val withVoices = state.copy(availableVoices = voices)
-            val dialog = withVoices.activeDialog as? VoiceSettings ?: return@update withVoices
+            val dialog = withVoices.activeDialog as? SessionVoiceSettings ?: return@update withVoices
             withVoices.copy(
                 activeDialog = dialog.copy(
                     draftState = dialog.draftState.copy(
@@ -150,8 +150,8 @@ class SettingsViewModel @Inject constructor(
     private fun onDraftChange(dialog: SettingsDialog) {
         val previous = _state.value.activeDialog
         _state.update { it.copy(activeDialog = dialog) }
-        if (previous is VoiceSettings &&
-            dialog is VoiceSettings &&
+        if (previous is SessionVoiceSettings &&
+            dialog is SessionVoiceSettings &&
             dialog.draftState != previous.draftState
         ) {
             voiceSettingsController.preview(dialog.draftState)
@@ -164,7 +164,7 @@ class SettingsViewModel @Inject constructor(
      * stopping the shared player from one of those could cut off audio this screen never began.
      */
     private fun onDialogDismiss() {
-        if (_state.value.activeDialog is VoiceSettings) {
+        if (_state.value.activeDialog is SessionVoiceSettings) {
             voiceSettingsController.stopPreview()
         }
         _state.update { it.copy(activeDialog = null) }
@@ -188,7 +188,7 @@ class SettingsViewModel @Inject constructor(
                 signOut()
                 return
             }
-            is VoiceSettings -> {
+            is SessionVoiceSettings -> {
                 voiceSettingsController.save(viewModelScope, dialog.draftState)
                 _state.update { it.copy(activeDialog = null) }
                 return
@@ -207,22 +207,22 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Lifted out of [onDialogConfirm] purely to keep that function under detekt's
-     * `CyclomaticComplexMethod` threshold — [SignOut] and [VoiceSettings] never reach here, both
+     * `CyclomaticComplexMethod` threshold — [SignOut] and [SessionVoiceSettings] never reach here, both
      * having already returned above.
      */
     private suspend fun saveDialogPreference(dialog: SettingsDialog): Result<Unit> = when (dialog) {
-        is Length -> saveStudySessionPreference(SessionLength(dialog.draftState))
-        is Attempts -> saveStudySessionPreference(RatedAttempts(dialog.draftState))
-        is PartialRatingCardRequeueing ->
+        is SessionCardCount -> saveStudySessionPreference(SessionLength(dialog.draftState))
+        is RatedSessionMaxCardAttempts -> saveStudySessionPreference(RatedAttempts(dialog.draftState))
+        is RatedSessionPartialRatingCardRequeueing ->
             saveStudySessionPreference(PartialRatingCardRequeueingEnabled(dialog.draftState))
-        is Mode -> saveStudySessionPreference(DefaultStudyMode(dialog.draftState))
-        is Sort -> saveStudySessionPreference(SortOrder(dialog.draftState))
-        is SubcategoryCountRange -> saveStudySessionPreference(SubcategoryCountRangePreference(dialog.draftState))
-        is VoiceAnswering -> saveStudySessionPreference(VoiceAnsweringEnabled(dialog.draftState))
-        is ReadAloud -> saveStudySessionPreference(ReadAloudEnabled(dialog.draftState))
-        is Goal -> saveUserPreference(DailyGoalMinutes(dialog.draftState))
+        is SessionMode -> saveStudySessionPreference(DefaultStudyMode(dialog.draftState))
+        is SessionCardsSortingOrder -> saveStudySessionPreference(SortOrder(dialog.draftState))
+        is QuickSessionSubcategoryCountRange -> saveStudySessionPreference(SubcategoryCountRangePreference(dialog.draftState))
+        is RatedSessionVoiceAnswering -> saveStudySessionPreference(VoiceAnsweringEnabled(dialog.draftState))
+        is FastSessionReadAloud -> saveStudySessionPreference(ReadAloudEnabled(dialog.draftState))
+        is DailyStudyGoal -> saveUserPreference(DailyGoalMinutes(dialog.draftState))
         // Both returned above; repeated only because the `when` is exhaustive.
-        is VoiceSettings, SignOut -> Result.success(Unit)
+        is SessionVoiceSettings, SignOut -> Result.success(Unit)
     }
 
     fun onSaveErrorDismissed() {

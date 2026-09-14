@@ -283,7 +283,7 @@ private fun SubcategoryDetailsBottomBar(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
                     )
                 },
-                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.Sort(state.sortOrder))) },
+                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) },
             )
         },
         trailing = {

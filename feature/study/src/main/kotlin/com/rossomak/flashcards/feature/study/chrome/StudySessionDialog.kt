@@ -13,14 +13,14 @@ sealed interface StudySessionDialog {
      * card's previous one, so an unchecked row is never ambiguous between "not a problem" and
      * "already reported" (ADR-0017).
      */
-    data class ReportProblem(
+    data class ReportCurrentCardProblem(
         val cardId: String,
         val subcategoryId: String,
         val selectedActions: Set<CurationAction> = emptySet(),
     ) : StudySessionDialog {
         val canSubmit: Boolean get() = selectedActions.isNotEmpty()
 
-        fun withAction(action: CurationAction, isChecked: Boolean): ReportProblem = copy(
+        fun withAction(action: CurationAction, isChecked: Boolean): ReportCurrentCardProblem = copy(
             selectedActions = if (isChecked) {
                 selectedActions + action - setOfNotNull(action.difficultyOpposite())
             } else {
@@ -29,14 +29,11 @@ sealed interface StudySessionDialog {
         )
     }
 
-    data class ExtendedContext(val text: String) : StudySessionDialog
+    data class CurrentCardExtendedContext(val text: String) : StudySessionDialog
 
     data object VoiceAnswerConsent : StudySessionDialog
 
-    data class VoiceSettings(
-        val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState(),
-        val keepAsDefault: Boolean = false,
-    ) : StudySessionDialog
+    data class SessionVoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState(), val keepAsDefault: Boolean = false) : StudySessionDialog
 
     data object ExitSession : StudySessionDialog
 }

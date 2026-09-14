@@ -34,10 +34,10 @@ import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExtendedContext
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
@@ -165,7 +165,7 @@ class RatedStudySessionViewModel @Inject constructor(
     private var sessionXpConfig: XpConfig = XpConfig()
 
     private val isExtendedContextDialogOpen: Boolean
-        get() = _state.value.activeDialog is ExtendedContext
+        get() = _state.value.activeDialog is CurrentCardExtendedContext
 
     // True only when the pause was caused by the dialog intercepting a natural between-card advance.
     // Gates auto-advance on dialog dismiss and changes play-button behavior.
@@ -595,7 +595,7 @@ class RatedStudySessionViewModel @Inject constructor(
         voiceGateway.setSpeechRate(rate)
     }
 
-    private fun onExtendedContextDialogOpen(dialog: ExtendedContext) {
+    private fun onExtendedContextDialogOpen(dialog: CurrentCardExtendedContext) {
         _state.update { it.copy(activeDialog = dialog) }
         val voiceState = voiceGateway.state.value
         if (voiceState.isInBetweenPause && voiceState.isPlaying) {
@@ -634,7 +634,7 @@ class RatedStudySessionViewModel @Inject constructor(
             voiceGateway.togglePlayPause()
         }
         _state.update {
-            it.copy(activeDialog = VoiceSettings(voiceSettingsController.seedDraft(sessionVoiceSettings)))
+            it.copy(activeDialog = SessionVoiceSettings(voiceSettingsController.seedDraft(sessionVoiceSettings)))
         }
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
@@ -646,7 +646,7 @@ class RatedStudySessionViewModel @Inject constructor(
      */
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
-            val dialog = state.activeDialog as? VoiceSettings ?: return@update state
+            val dialog = state.activeDialog as? SessionVoiceSettings ?: return@update state
             state.copy(
                 activeDialog = dialog.copy(
                     draftState = dialog.draftState.copy(
@@ -665,7 +665,7 @@ class RatedStudySessionViewModel @Inject constructor(
      * no other call into the controller left to do that.
      */
     private fun onVoiceSettingsSave() {
-        val dialog = _state.value.activeDialog as? VoiceSettings ?: return
+        val dialog = _state.value.activeDialog as? SessionVoiceSettings ?: return
         val settings = dialog.draftState.toVoiceSettings()
         sessionVoiceSettings = settings
         if (dialog.keepAsDefault) {
@@ -714,9 +714,9 @@ class RatedStudySessionViewModel @Inject constructor(
      */
     private fun onDialogOpen(dialog: StudySessionDialog) {
         when (dialog) {
-            is ReportProblem -> onReportProblemOpen(dialog)
-            is ExtendedContext -> onExtendedContextDialogOpen(dialog)
-            is VoiceSettings -> onVoiceSettingsOpen()
+            is ReportCurrentCardProblem -> onReportProblemOpen(dialog)
+            is CurrentCardExtendedContext -> onExtendedContextDialogOpen(dialog)
+            is SessionVoiceSettings -> onVoiceSettingsOpen()
             VoiceAnswerConsent, ExitSession ->
                 _state.update { it.copy(activeDialog = dialog) }
         }
@@ -733,8 +733,8 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onDraftChange(dialog: StudySessionDialog) {
         val previous = _state.value.activeDialog
         _state.update { it.copy(activeDialog = dialog) }
-        if (previous is VoiceSettings &&
-            dialog is VoiceSettings &&
+        if (previous is SessionVoiceSettings &&
+            dialog is SessionVoiceSettings &&
             dialog.draftState != previous.draftState
         ) {
             voiceSettingsController.preview(dialog.draftState)
@@ -743,15 +743,15 @@ class RatedStudySessionViewModel @Inject constructor(
 
     private fun onDialogConfirm() {
         when (_state.value.activeDialog) {
-            is ReportProblem -> onReportProblemSubmit()
+            is ReportCurrentCardProblem -> onReportProblemSubmit()
             VoiceAnswerConsent -> onVoiceAnswerConsentAccept()
-            is VoiceSettings -> onVoiceSettingsSave()
+            is SessionVoiceSettings -> onVoiceSettingsSave()
             ExitSession -> {
                 onDialogDismiss()
                 terminate(abandoned = true)
             }
             // "Got it" and a scrim tap are the same act on a single-action dialog.
-            is ExtendedContext, null -> onDialogDismiss()
+            is CurrentCardExtendedContext, null -> onDialogDismiss()
         }
     }
 
@@ -760,8 +760,8 @@ class RatedStudySessionViewModel @Inject constructor(
         val dialog = _state.value.activeDialog
         _state.update { it.copy(activeDialog = null) }
         when (dialog) {
-            is ExtendedContext -> onExtendedContextDialogDismissed()
-            is VoiceSettings -> onVoiceSettingsDismiss()
+            is CurrentCardExtendedContext -> onExtendedContextDialogDismissed()
+            is SessionVoiceSettings -> onVoiceSettingsDismiss()
             else -> Unit
         }
     }
@@ -770,13 +770,13 @@ class RatedStudySessionViewModel @Inject constructor(
      * Reporting pauses playback the way the old debug FAB did — the user stopped to read the card,
      * not to be read over. Resuming is a deliberate tap (ADR-0017).
      */
-    private fun onReportProblemOpen(dialog: ReportProblem) {
+    private fun onReportProblemOpen(dialog: ReportCurrentCardProblem) {
         if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
         _state.update { it.copy(activeDialog = dialog) }
     }
 
     private fun onReportProblemSubmit() {
-        val dialog = _state.value.activeDialog as? ReportProblem ?: return
+        val dialog = _state.value.activeDialog as? ReportCurrentCardProblem ?: return
         if (!dialog.canSubmit) return
         _state.update { it.copy(activeDialog = null) }
         viewModelScope.launch {

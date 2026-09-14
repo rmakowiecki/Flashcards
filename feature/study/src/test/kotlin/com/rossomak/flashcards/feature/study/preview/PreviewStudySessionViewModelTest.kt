@@ -25,16 +25,16 @@ import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Attempts
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Length
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Mode
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.PartialRatingCardRequeueing
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.ReadAloud
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Sort
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SubcategoryCountRange
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnswering
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
@@ -261,12 +261,12 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Mode(draftState = viewModel.state.value.config.mode)))
+        viewModel.onDialogEvent(Open(SessionMode(draftState = viewModel.state.value.config.mode)))
         viewModel.onDialogEvent(
-            DraftChange(Mode(draftState = StudyMode.Fast))
+            DraftChange(SessionMode(draftState = StudyMode.Fast))
         )
 
-        viewModel.state.value.activeDialog shouldBe Mode(draftState = StudyMode.Fast)
+        viewModel.state.value.activeDialog shouldBe SessionMode(draftState = StudyMode.Fast)
         viewModel.state.value.config.mode shouldBe StudyMode.Rated
     }
 
@@ -277,9 +277,9 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Sort(draftState = viewModel.state.value.config.sortOrder)))
+        viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = viewModel.state.value.config.sortOrder)))
         viewModel.onDialogEvent(
-            DraftChange(Sort(draftState = FlashcardSortOrder.HardestFirst))
+            DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.HardestFirst))
         )
         viewModel.onDialogEvent(Dismiss)
 
@@ -294,9 +294,9 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Mode(draftState = viewModel.state.value.config.mode)))
+        viewModel.onDialogEvent(Open(SessionMode(draftState = viewModel.state.value.config.mode)))
         viewModel.onDialogEvent(
-            DraftChange(Mode(draftState = StudyMode.Fast))
+            DraftChange(SessionMode(draftState = StudyMode.Fast))
         )
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
@@ -313,8 +313,8 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Length(draftState = viewModel.state.value.config.length)))
-        viewModel.onDialogEvent(DraftChange(Length(draftState = 10)))
+        viewModel.onDialogEvent(Open(SessionCardCount(draftState = viewModel.state.value.config.length)))
+        viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = 10)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -328,8 +328,8 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Attempts(draftState = viewModel.state.value.config.ratedAttempts)))
-        viewModel.onDialogEvent(DraftChange(Attempts(draftState = strictAttempts)))
+        viewModel.onDialogEvent(Open(RatedSessionMaxCardAttempts(draftState = viewModel.state.value.config.ratedAttempts)))
+        viewModel.onDialogEvent(DraftChange(RatedSessionMaxCardAttempts(draftState = strictAttempts)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -344,8 +344,8 @@ class PreviewStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
         val committedAttempts = viewModel.state.value.config.ratedAttempts
-        viewModel.onDialogEvent(Open(Attempts(draftState = committedAttempts)))
-        viewModel.onDialogEvent(DraftChange(Attempts(draftState = strictAttempts)))
+        viewModel.onDialogEvent(Open(RatedSessionMaxCardAttempts(draftState = committedAttempts)))
+        viewModel.onDialogEvent(DraftChange(RatedSessionMaxCardAttempts(draftState = strictAttempts)))
         viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
@@ -359,8 +359,8 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(ReadAloud(draftState = viewModel.state.value.config.readAloudEnabled)))
-        viewModel.onDialogEvent(DraftChange(ReadAloud(draftState = true)))
+        viewModel.onDialogEvent(Open(FastSessionReadAloud(draftState = viewModel.state.value.config.readAloudEnabled)))
+        viewModel.onDialogEvent(DraftChange(FastSessionReadAloud(draftState = true)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -376,9 +376,9 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             viewModel.onDialogEvent(
-                Open(PartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
+                Open(RatedSessionPartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
             )
-            viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false)))
+            viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -394,8 +394,8 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             val committed = viewModel.state.value.config.partialRatingCardRequeueingEnabled
-            viewModel.onDialogEvent(Open(PartialRatingCardRequeueing(draftState = committed)))
-            viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false)))
+            viewModel.onDialogEvent(Open(RatedSessionPartialRatingCardRequeueing(draftState = committed)))
+            viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false)))
             viewModel.onDialogEvent(Dismiss)
             advanceUntilIdle()
 
@@ -452,9 +452,9 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Sort(draftState = viewModel.state.value.config.sortOrder)))
+        viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = viewModel.state.value.config.sortOrder)))
         viewModel.onDialogEvent(
-            DraftChange(Sort(draftState = FlashcardSortOrder.EasiestFirst))
+            DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.EasiestFirst))
         )
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
@@ -480,9 +480,9 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Sort(draftState = viewModel.state.value.config.sortOrder)))
+        viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = viewModel.state.value.config.sortOrder)))
         viewModel.onDialogEvent(
-            DraftChange(Sort(draftState = FlashcardSortOrder.HardestFirst))
+            DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.HardestFirst))
         )
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
@@ -524,8 +524,8 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Length(draftState = viewModel.state.value.config.length)))
-        viewModel.onDialogEvent(DraftChange(Length(draftState = 10, keepAsDefault = true)))
+        viewModel.onDialogEvent(Open(SessionCardCount(draftState = viewModel.state.value.config.length)))
+        viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = 10, keepAsDefault = true)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -542,8 +542,8 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             val committedLength = studySessionPreferencesRepository.preferences.value.sessionLength
-            viewModel.onDialogEvent(Open(Length(draftState = viewModel.state.value.config.length)))
-            viewModel.onDialogEvent(DraftChange(Length(draftState = 10, keepAsDefault = false)))
+            viewModel.onDialogEvent(Open(SessionCardCount(draftState = viewModel.state.value.config.length)))
+            viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = 10, keepAsDefault = false)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -560,9 +560,9 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             viewModel.onDialogEvent(
-                Open(PartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
+                Open(RatedSessionPartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
             )
-            viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false, keepAsDefault = true)))
+            viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false, keepAsDefault = true)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -580,9 +580,9 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
             val committed = studySessionPreferencesRepository.preferences.value.partialRatingCardRequeueingEnabled
             viewModel.onDialogEvent(
-                Open(PartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
+                Open(RatedSessionPartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
             )
-            viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false, keepAsDefault = false)))
+            viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false, keepAsDefault = false)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -602,10 +602,10 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             val sampledIdsBeforeConfirm = viewModel.state.value.config.subcategoryIds
-            val draftDialog = SubcategoryCountRange(draftState = viewModel.state.value.config.subcategoryCountRange)
+            val draftDialog = QuickSessionSubcategoryCountRange(draftState = viewModel.state.value.config.subcategoryCountRange)
             viewModel.onDialogEvent(Open(draftDialog))
             viewModel.onDialogEvent(
-                DraftChange(SubcategoryCountRange(draftState = narrowerSubcategoryCountRange, keepAsDefault = true))
+                DraftChange(QuickSessionSubcategoryCountRange(draftState = narrowerSubcategoryCountRange, keepAsDefault = true))
             )
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
@@ -635,10 +635,10 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             val committedRange = studySessionPreferencesRepository.preferences.value.subcategoryCountRange
-            val draftDialog = SubcategoryCountRange(draftState = viewModel.state.value.config.subcategoryCountRange)
+            val draftDialog = QuickSessionSubcategoryCountRange(draftState = viewModel.state.value.config.subcategoryCountRange)
             viewModel.onDialogEvent(Open(draftDialog))
             viewModel.onDialogEvent(
-                DraftChange(SubcategoryCountRange(draftState = narrowerSubcategoryCountRange, keepAsDefault = false))
+                DraftChange(QuickSessionSubcategoryCountRange(draftState = narrowerSubcategoryCountRange, keepAsDefault = false))
             )
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
@@ -695,10 +695,10 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onDialogEvent(Open(VoiceSettings()))
-            val draft = (viewModel.state.value.activeDialog as VoiceSettings).draftState
+            viewModel.onDialogEvent(Open(SessionVoiceSettings()))
+            val draft = (viewModel.state.value.activeDialog as SessionVoiceSettings).draftState
                 .copy(draftSpeed = voiceSettings.speechRate, draftVoiceId = voiceSettings.voiceId)
-            viewModel.onDialogEvent(DraftChange(VoiceSettings(draftState = draft, keepAsDefault = true)))
+            viewModel.onDialogEvent(DraftChange(SessionVoiceSettings(draftState = draft, keepAsDefault = true)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -717,10 +717,10 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             val committedVoiceSettings = studySessionPreferencesRepository.preferences.value.voiceSettings
-            viewModel.onDialogEvent(Open(VoiceSettings()))
-            val draft = (viewModel.state.value.activeDialog as VoiceSettings).draftState
+            viewModel.onDialogEvent(Open(SessionVoiceSettings()))
+            val draft = (viewModel.state.value.activeDialog as SessionVoiceSettings).draftState
                 .copy(draftSpeed = voiceSettings.speechRate, draftVoiceId = voiceSettings.voiceId)
-            viewModel.onDialogEvent(DraftChange(VoiceSettings(draftState = draft, keepAsDefault = false)))
+            viewModel.onDialogEvent(DraftChange(SessionVoiceSettings(draftState = draft, keepAsDefault = false)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -738,18 +738,18 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onDialogEvent(Open(VoiceAnswering(draftState = viewModel.state.value.config.voiceAnsweringEnabled)))
+            viewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = viewModel.state.value.config.voiceAnsweringEnabled)))
             viewModel.onDialogEvent(
-                DraftChange(VoiceAnswering(draftState = true))
+                DraftChange(RatedSessionVoiceAnswering(draftState = true))
             )
             viewModel.onDialogEvent(Confirm)
-            viewModel.onDialogEvent(Open(Attempts(draftState = viewModel.state.value.config.ratedAttempts)))
-            viewModel.onDialogEvent(DraftChange(Attempts(draftState = 5)))
+            viewModel.onDialogEvent(Open(RatedSessionMaxCardAttempts(draftState = viewModel.state.value.config.ratedAttempts)))
+            viewModel.onDialogEvent(DraftChange(RatedSessionMaxCardAttempts(draftState = 5)))
             viewModel.onDialogEvent(Confirm)
             viewModel.onDialogEvent(
-                Open(PartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
+                Open(RatedSessionPartialRatingCardRequeueing(draftState = viewModel.state.value.config.partialRatingCardRequeueingEnabled))
             )
-            viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false)))
+            viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
             viewModel.onStartSession()
@@ -775,10 +775,10 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Mode(draftState = StudyMode.Fast)))
+        viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Fast)))
         viewModel.onDialogEvent(Confirm)
-        viewModel.onDialogEvent(Open(ReadAloud(draftState = viewModel.state.value.config.readAloudEnabled)))
-        viewModel.onDialogEvent(DraftChange(ReadAloud(draftState = true)))
+        viewModel.onDialogEvent(Open(FastSessionReadAloud(draftState = viewModel.state.value.config.readAloudEnabled)))
+        viewModel.onDialogEvent(DraftChange(FastSessionReadAloud(draftState = true)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
         viewModel.onStartSession()
@@ -802,10 +802,10 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(VoiceSettings()))
-        val draft = (viewModel.state.value.activeDialog as VoiceSettings).draftState
+        viewModel.onDialogEvent(Open(SessionVoiceSettings()))
+        val draft = (viewModel.state.value.activeDialog as SessionVoiceSettings).draftState
             .copy(draftSpeed = voiceSettings.speechRate, draftVoiceId = voiceSettings.voiceId)
-        viewModel.onDialogEvent(DraftChange(VoiceSettings(draftState = draft)))
+        viewModel.onDialogEvent(DraftChange(SessionVoiceSettings(draftState = draft)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
         viewModel.onStartSession()
@@ -823,7 +823,7 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(VoiceSettings()))
+        viewModel.onDialogEvent(Open(SessionVoiceSettings()))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -836,7 +836,7 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onDialogEvent(Open(Mode(draftState = StudyMode.Fast)))
+        viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Fast)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -1013,14 +1013,14 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
             val sampledIds = viewModel.state.value.config.subcategoryIds
 
-            viewModel.onDialogEvent(Open(Length(draftState = viewModel.state.value.config.length)))
-            viewModel.onDialogEvent(DraftChange(Length(draftState = 10)))
+            viewModel.onDialogEvent(Open(SessionCardCount(draftState = viewModel.state.value.config.length)))
+            viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = 10)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
             viewModel.state.value.config.subcategoryIds shouldBe sampledIds
 
-            viewModel.onDialogEvent(Open(Sort(draftState = viewModel.state.value.config.sortOrder)))
-            viewModel.onDialogEvent(DraftChange(Sort(draftState = FlashcardSortOrder.HardestFirst)))
+            viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = viewModel.state.value.config.sortOrder)))
+            viewModel.onDialogEvent(DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.HardestFirst)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
             viewModel.state.value.config.subcategoryIds shouldBe sampledIds
@@ -1155,8 +1155,8 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
             val cardIdsBeforeSort = viewModel.selectedCardIds.toSet()
 
-            viewModel.onDialogEvent(Open(Sort(draftState = viewModel.state.value.config.sortOrder)))
-            viewModel.onDialogEvent(DraftChange(Sort(draftState = FlashcardSortOrder.EasiestFirst)))
+            viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = viewModel.state.value.config.sortOrder)))
+            viewModel.onDialogEvent(DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.EasiestFirst)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 

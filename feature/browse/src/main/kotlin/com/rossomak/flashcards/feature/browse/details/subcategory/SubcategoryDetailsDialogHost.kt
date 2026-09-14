@@ -17,7 +17,7 @@ fun SubcategoryDetailsDialogHost(
 
     when (activeDialog) {
         null -> Unit
-        is SubcategoryDetailsDialog.Sort -> FlashcardSortOrderDialog(
+        is SubcategoryDetailsDialog.CardsSortingOrder -> FlashcardSortOrderDialog(
             draft = activeDialog.draftState,
             onDraftChange = { onDialogEvent(DraftChange(activeDialog.copy(draftState = it))) },
             onConfirm = onConfirm,

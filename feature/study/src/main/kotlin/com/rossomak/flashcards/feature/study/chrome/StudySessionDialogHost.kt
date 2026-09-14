@@ -10,10 +10,10 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExtendedContext
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.dialogs.ExtendedContextDialog
 import com.rossomak.flashcards.feature.study.dialogs.ReportProblemDialog
 
@@ -27,7 +27,7 @@ internal fun StudySessionDialogHost(
 
     when (activeDialog) {
         null -> Unit
-        is ReportProblem -> ReportProblemDialog(
+        is ReportCurrentCardProblem -> ReportProblemDialog(
             selectedActions = activeDialog.selectedActions,
             onActionCheckedChange = { action, isChecked ->
                 onDialogEvent(DraftChange(activeDialog.withAction(action, isChecked)))
@@ -35,7 +35,7 @@ internal fun StudySessionDialogHost(
             onSubmit = onConfirm,
             onCancel = onDismiss,
         )
-        is ExtendedContext -> ExtendedContextDialog(extendedContext = activeDialog.text, onDismiss = onDismiss)
+        is CurrentCardExtendedContext -> ExtendedContextDialog(extendedContext = activeDialog.text, onDismiss = onDismiss)
         VoiceAnswerConsent -> FlashcardsDecisionDialog(
             title = stringResource(R.string.study_session_voice_answer_consent_title),
             confirmLabel = stringResource(R.string.study_session_voice_answer_consent_accept_button),
@@ -44,7 +44,7 @@ internal fun StudySessionDialogHost(
             supportingText = stringResource(R.string.study_session_voice_answer_consent_message),
             cancelLabel = stringResource(R.string.study_session_voice_answer_consent_decline_button),
         )
-        is VoiceSettings -> VoiceSettingsDialog(
+        is SessionVoiceSettings -> VoiceSettingsDialog(
             availableVoices = activeDialog.draftState.availableVoices,
             draftVoiceId = activeDialog.draftState.draftVoiceId,
             onDraftVoiceChange = {

@@ -19,17 +19,17 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Attempts
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Goal
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Length
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Mode
-import com.rossomak.flashcards.feature.settings.SettingsDialog.PartialRatingCardRequeueing
-import com.rossomak.flashcards.feature.settings.SettingsDialog.ReadAloud
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionMaxCardAttempts
+import com.rossomak.flashcards.feature.settings.SettingsDialog.DailyStudyGoal
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionPartialRatingCardRequeueing
+import com.rossomak.flashcards.feature.settings.SettingsDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
-import com.rossomak.flashcards.feature.settings.SettingsDialog.Sort
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SubcategoryCountRange
-import com.rossomak.flashcards.feature.settings.SettingsDialog.VoiceAnswering
-import com.rossomak.flashcards.feature.settings.SettingsDialog.VoiceSettings
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.settings.SettingsDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -106,8 +106,8 @@ class SettingsViewModelTest {
     fun `confirming daily goal writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Goal(draftState = DailyGoal.DEFAULT_MINUTES)))
-        viewModel.onDialogEvent(DraftChange(Goal(draftState = LONGER_GOAL)))
+        viewModel.onDialogEvent(Open(DailyStudyGoal(draftState = DailyGoal.DEFAULT_MINUTES)))
+        viewModel.onDialogEvent(DraftChange(DailyStudyGoal(draftState = LONGER_GOAL)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -119,8 +119,8 @@ class SettingsViewModelTest {
     fun `dismissing daily goal writes nothing`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Goal(draftState = DailyGoal.DEFAULT_MINUTES)))
-        viewModel.onDialogEvent(DraftChange(Goal(draftState = LONGER_GOAL)))
+        viewModel.onDialogEvent(Open(DailyStudyGoal(draftState = DailyGoal.DEFAULT_MINUTES)))
+        viewModel.onDialogEvent(DraftChange(DailyStudyGoal(draftState = LONGER_GOAL)))
         viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
@@ -131,8 +131,8 @@ class SettingsViewModelTest {
     fun `confirming session length writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Length(draftState = DEFAULT_LENGTH)))
-        viewModel.onDialogEvent(DraftChange(Length(draftState = LONGER_LENGTH)))
+        viewModel.onDialogEvent(Open(SessionCardCount(draftState = DEFAULT_LENGTH)))
+        viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = LONGER_LENGTH)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -145,8 +145,8 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val committedLength = viewModel.state.value.sessionLength
 
-        viewModel.onDialogEvent(Open(Length(draftState = committedLength)))
-        viewModel.onDialogEvent(DraftChange(Length(draftState = LONGER_LENGTH)))
+        viewModel.onDialogEvent(Open(SessionCardCount(draftState = committedLength)))
+        viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = LONGER_LENGTH)))
         viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
@@ -158,8 +158,8 @@ class SettingsViewModelTest {
     fun `confirming rated attempts writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Attempts(draftState = DEFAULT_ATTEMPTS)))
-        viewModel.onDialogEvent(DraftChange(Attempts(draftState = FEWER_ATTEMPTS)))
+        viewModel.onDialogEvent(Open(RatedSessionMaxCardAttempts(draftState = DEFAULT_ATTEMPTS)))
+        viewModel.onDialogEvent(DraftChange(RatedSessionMaxCardAttempts(draftState = FEWER_ATTEMPTS)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -170,8 +170,8 @@ class SettingsViewModelTest {
     fun `confirming study mode writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Mode(draftState = StudyMode.Rated)))
-        viewModel.onDialogEvent(DraftChange(Mode(draftState = StudyMode.Fast)))
+        viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Rated)))
+        viewModel.onDialogEvent(DraftChange(SessionMode(draftState = StudyMode.Fast)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -183,8 +183,8 @@ class SettingsViewModelTest {
     fun `confirming sort order writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Sort(draftState = FlashcardSortOrder.Default)))
-        viewModel.onDialogEvent(DraftChange(Sort(draftState = FlashcardSortOrder.EasiestFirst)))
+        viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = FlashcardSortOrder.Default)))
+        viewModel.onDialogEvent(DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.EasiestFirst)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -197,8 +197,8 @@ class SettingsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createViewModel()
 
-            viewModel.onDialogEvent(Open(SubcategoryCountRange(draftState = DEFAULT_SUBCATEGORY_COUNT_RANGE)))
-            viewModel.onDialogEvent(DraftChange(SubcategoryCountRange(draftState = NARROWER_SUBCATEGORY_COUNT_RANGE)))
+            viewModel.onDialogEvent(Open(QuickSessionSubcategoryCountRange(draftState = DEFAULT_SUBCATEGORY_COUNT_RANGE)))
+            viewModel.onDialogEvent(DraftChange(QuickSessionSubcategoryCountRange(draftState = NARROWER_SUBCATEGORY_COUNT_RANGE)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -211,8 +211,8 @@ class SettingsViewModelTest {
     fun `confirming voice answering writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(VoiceAnswering(draftState = false)))
-        viewModel.onDialogEvent(DraftChange(VoiceAnswering(draftState = true)))
+        viewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = false)))
+        viewModel.onDialogEvent(DraftChange(RatedSessionVoiceAnswering(draftState = true)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -223,8 +223,8 @@ class SettingsViewModelTest {
     fun `confirming read-aloud writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(ReadAloud(draftState = false)))
-        viewModel.onDialogEvent(DraftChange(ReadAloud(draftState = true)))
+        viewModel.onDialogEvent(Open(FastSessionReadAloud(draftState = false)))
+        viewModel.onDialogEvent(DraftChange(FastSessionReadAloud(draftState = true)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -236,8 +236,8 @@ class SettingsViewModelTest {
     fun `dismissing read-aloud writes nothing`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(ReadAloud(draftState = false)))
-        viewModel.onDialogEvent(DraftChange(ReadAloud(draftState = true)))
+        viewModel.onDialogEvent(Open(FastSessionReadAloud(draftState = false)))
+        viewModel.onDialogEvent(DraftChange(FastSessionReadAloud(draftState = true)))
         viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
@@ -248,8 +248,8 @@ class SettingsViewModelTest {
     fun `confirming partial-rating-card-requeueing writes it to the store`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(PartialRatingCardRequeueing(draftState = true)))
-        viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false)))
+        viewModel.onDialogEvent(Open(RatedSessionPartialRatingCardRequeueing(draftState = true)))
+        viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -261,8 +261,8 @@ class SettingsViewModelTest {
     fun `dismissing partial-rating-card-requeueing writes nothing`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(PartialRatingCardRequeueing(draftState = true)))
-        viewModel.onDialogEvent(DraftChange(PartialRatingCardRequeueing(draftState = false)))
+        viewModel.onDialogEvent(Open(RatedSessionPartialRatingCardRequeueing(draftState = true)))
+        viewModel.onDialogEvent(DraftChange(RatedSessionPartialRatingCardRequeueing(draftState = false)))
         viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
@@ -275,8 +275,8 @@ class SettingsViewModelTest {
             studySessionPreferencesRepository.saveError = IllegalStateException("disk full")
             val viewModel = createViewModel()
 
-            viewModel.onDialogEvent(Open(Length(draftState = DEFAULT_LENGTH)))
-            viewModel.onDialogEvent(DraftChange(Length(draftState = LONGER_LENGTH)))
+            viewModel.onDialogEvent(Open(SessionCardCount(draftState = DEFAULT_LENGTH)))
+            viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = LONGER_LENGTH)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -291,8 +291,8 @@ class SettingsViewModelTest {
             userPreferencesRepository.saveError = IllegalStateException("disk full")
             val viewModel = createViewModel()
 
-            viewModel.onDialogEvent(Open(Goal(draftState = DailyGoal.DEFAULT_MINUTES)))
-            viewModel.onDialogEvent(DraftChange(Goal(draftState = LONGER_GOAL)))
+            viewModel.onDialogEvent(Open(DailyStudyGoal(draftState = DailyGoal.DEFAULT_MINUTES)))
+            viewModel.onDialogEvent(DraftChange(DailyStudyGoal(draftState = LONGER_GOAL)))
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
@@ -305,8 +305,8 @@ class SettingsViewModelTest {
     fun `a successful save leaves saveError untouched`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Goal(draftState = DailyGoal.DEFAULT_MINUTES)))
-        viewModel.onDialogEvent(DraftChange(Goal(draftState = LONGER_GOAL)))
+        viewModel.onDialogEvent(Open(DailyStudyGoal(draftState = DailyGoal.DEFAULT_MINUTES)))
+        viewModel.onDialogEvent(DraftChange(DailyStudyGoal(draftState = LONGER_GOAL)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
 
@@ -317,7 +317,7 @@ class SettingsViewModelTest {
     fun `onSaveErrorDismissed clears the error`() = runTest(mainDispatcherRule.testDispatcher) {
         userPreferencesRepository.saveError = IllegalStateException("disk full")
         val viewModel = createViewModel()
-        viewModel.onDialogEvent(Open(Goal(draftState = DailyGoal.DEFAULT_MINUTES)))
+        viewModel.onDialogEvent(Open(DailyStudyGoal(draftState = DailyGoal.DEFAULT_MINUTES)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
         viewModel.state.value.saveError shouldBe "Failed to save setting"
@@ -333,8 +333,8 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val editedDraft = VoiceSettingsDraftState(draftSpeed = FASTER_SPEECH_RATE)
 
-        viewModel.onDialogEvent(Open(VoiceSettings()))
-        viewModel.onDialogEvent(DraftChange(VoiceSettings(draftState = editedDraft)))
+        viewModel.onDialogEvent(Open(SessionVoiceSettings()))
+        viewModel.onDialogEvent(DraftChange(SessionVoiceSettings(draftState = editedDraft)))
 
         verify(exactly = 1) { voiceSettingsController.preview(editedDraft) }
     }
@@ -344,7 +344,7 @@ class SettingsViewModelTest {
         every { voiceSettingsController.seedDraft(any()) } returns VoiceSettingsDraftState()
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(VoiceSettings()))
+        viewModel.onDialogEvent(Open(SessionVoiceSettings()))
         viewModel.onDialogEvent(Dismiss)
 
         verify(exactly = 1) { voiceSettingsController.stopPreview() }
@@ -354,7 +354,7 @@ class SettingsViewModelTest {
     fun `dismissing a silent dialog leaves the shared player alone`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onDialogEvent(Open(Sort(draftState = FlashcardSortOrder.Default)))
+        viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = FlashcardSortOrder.Default)))
         viewModel.onDialogEvent(Dismiss)
 
         verify(exactly = 0) { voiceSettingsController.stopPreview() }

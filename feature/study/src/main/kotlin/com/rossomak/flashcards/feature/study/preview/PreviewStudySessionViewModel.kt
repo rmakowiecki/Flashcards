@@ -21,8 +21,8 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Sort
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -163,14 +163,14 @@ class PreviewStudySessionViewModel @Inject constructor(
 
     private fun onDialogOpen(dialog: PreviewDialog) {
         when (dialog) {
-            is VoiceSettings -> onVoiceSettingsOpen()
+            is SessionVoiceSettings -> onVoiceSettingsOpen()
             else -> _state.update { it.copy(activeDialog = dialog) }
         }
     }
 
     private fun onVoiceSettingsOpen() {
         val draftState = voiceSettingsController.seedDraft(_state.value.config.voiceSettings)
-        _state.update { it.copy(activeDialog = VoiceSettings(draftState)) }
+        _state.update { it.copy(activeDialog = SessionVoiceSettings(draftState)) }
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
@@ -183,7 +183,7 @@ class PreviewStudySessionViewModel @Inject constructor(
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
             val withVoices = state.copy(availableVoices = voices)
-            val dialog = withVoices.activeDialog as? VoiceSettings ?: return@update withVoices
+            val dialog = withVoices.activeDialog as? SessionVoiceSettings ?: return@update withVoices
             withVoices.copy(
                 activeDialog = dialog.copy(
                     draftState = dialog.draftState.copy(
@@ -202,7 +202,7 @@ class PreviewStudySessionViewModel @Inject constructor(
     private fun onDraftChange(dialog: PreviewDialog) {
         val previous = _state.value.activeDialog
         _state.update { it.copy(activeDialog = dialog) }
-        if (previous is VoiceSettings && dialog is VoiceSettings && dialog.draftState != previous.draftState) {
+        if (previous is SessionVoiceSettings && dialog is SessionVoiceSettings && dialog.draftState != previous.draftState) {
             voiceSettingsController.preview(dialog.draftState)
         }
     }
@@ -213,7 +213,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * stopping the shared player from one of those could cut off audio this screen never began.
      */
     private fun onDialogDismiss() {
-        if (_state.value.activeDialog is VoiceSettings) {
+        if (_state.value.activeDialog is SessionVoiceSettings) {
             voiceSettingsController.stopPreview()
         }
         _state.update { it.copy(activeDialog = null) }
@@ -233,7 +233,7 @@ class PreviewStudySessionViewModel @Inject constructor(
         dialog.toStudySessionPreferenceIfKept()?.let { preference ->
             viewModelScope.launch { saveStudySessionPreference(preference) }
         }
-        if (dialog is VoiceSettings) {
+        if (dialog is SessionVoiceSettings) {
             voiceSettingsController.stopPreview()
         }
         _state.update { it.copy(config = updatedConfig, activeDialog = null) }
@@ -249,7 +249,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * [onDialogConfirm]'s cyclomatic complexity under detekt's threshold.
      */
     private fun resolveSelectedCards(dialog: PreviewDialog) {
-        if (dialog is Sort) {
+        if (dialog is SessionCardsSortingOrder) {
             val reordered = lastDrawnCards.orderedBy(dialog.draftState)
             lastDrawnCards = reordered
             selectedCardIds = reordered.map { it.id }

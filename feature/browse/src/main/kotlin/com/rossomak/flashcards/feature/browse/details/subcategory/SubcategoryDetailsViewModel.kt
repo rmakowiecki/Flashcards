@@ -162,7 +162,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
     private fun onDialogConfirm() {
         when (val dialog = _state.value.activeDialog) {
             null -> return
-            is SubcategoryDetailsDialog.Sort -> {
+            is SubcategoryDetailsDialog.CardsSortingOrder -> {
                 if (dialog.keepAsDefault) {
                     viewModelScope.launch {
                         saveStudySessionPreference(StudySessionPreference.SortOrder(dialog.draftState))
