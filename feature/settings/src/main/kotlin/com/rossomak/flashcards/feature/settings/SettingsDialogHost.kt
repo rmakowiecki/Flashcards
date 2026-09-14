@@ -20,19 +20,19 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.VoiceSettingsDialog
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
-import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.settings.SettingsDialog.DailyStudyGoal
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
-import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.settings.SettingsDialog.FastSessionReadAloud
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.settings.SettingsDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionMaxCardAttempts
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 
-private val LENGTH_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
+private val SESSION_CARD_COUNT_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
 private val RATED_ATTEMPTS_RANGE = StudySessionConfig.MIN_RATED_ATTEMPTS..StudySessionConfig.MAX_RATED_ATTEMPTS
 private val SUBCATEGORY_COUNT_RANGE =
     StudySessionConfig.MIN_SUBCATEGORY_COUNT..StudySessionConfig.MAX_SUBCATEGORY_COUNT
@@ -50,7 +50,7 @@ internal fun SettingsDialogHost(
         null -> Unit
         is SessionCardCount -> SessionLengthDialog(
             draft = activeDialog.draftState,
-            range = LENGTH_RANGE,
+            range = SESSION_CARD_COUNT_RANGE,
             step = LENGTH_STEP,
             onDraftChange = { onDialogEvent(DraftChange(activeDialog.copy(draftState = it))) },
             onConfirm = onConfirm,

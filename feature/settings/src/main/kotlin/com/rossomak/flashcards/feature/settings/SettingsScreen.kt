@@ -58,17 +58,17 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.settings.SettingsDialog.DailyStudyGoal
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
-import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.settings.SettingsDialog.FastSessionReadAloud
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.settings.SettingsDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionMaxCardAttempts
+import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.settings.SettingsDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
+import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 
 @Composable
 fun SettingsScreen(

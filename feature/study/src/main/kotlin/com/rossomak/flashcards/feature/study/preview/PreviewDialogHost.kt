@@ -28,7 +28,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 
-private val LENGTH_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
+private val SESSION_CARD_COUNT_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
 private val RATED_ATTEMPTS_RANGE = StudySessionConfig.MIN_RATED_ATTEMPTS..StudySessionConfig.MAX_RATED_ATTEMPTS
 private val SUBCATEGORY_COUNT_RANGE =
     StudySessionConfig.MIN_SUBCATEGORY_COUNT..StudySessionConfig.MAX_SUBCATEGORY_COUNT
@@ -89,7 +89,7 @@ internal fun PreviewDialogHost(
         )
         is SessionCardCount -> SessionLengthDialog(
             draft = activeDialog.draftState,
-            range = LENGTH_RANGE,
+            range = SESSION_CARD_COUNT_RANGE,
             step = LENGTH_STEP,
             onDraftChange = { onDialogEvent(DraftChange(activeDialog.copy(draftState = it))) },
             onConfirm = onConfirm,
