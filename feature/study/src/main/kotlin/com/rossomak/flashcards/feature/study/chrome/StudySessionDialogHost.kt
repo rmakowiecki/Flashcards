@@ -17,21 +17,6 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSett
 import com.rossomak.flashcards.feature.study.dialogs.ExtendedContextDialog
 import com.rossomak.flashcards.feature.study.dialogs.ReportProblemDialog
 
-/**
- * Renders whichever dialog [activeDialog] names, or nothing when it is `null`.
- *
- * Shared unchanged by both the Fast and the Rated Study Session screens
- * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)) —
- * neither mode renders its dialogs any differently, only which cases it ever opens differs.
- *
- * Each branch emits a total `copy()` of the case the `when` already narrowed — no branching and no
- * arithmetic, because nothing unit-tests this file (ADR-0036). Everything a dialog needs to draw
- * itself travels inside its own case, so the host grows no parameter per dialog.
- *
- * "Exit session?" has no named wrapper by design — it is a title, a supporting line and two
- * labels, so wrapping [FlashcardsDecisionDialog] would be a pure rename. Confirming it commits no
- * draft; the ViewModel answers by emitting a navigation event (ADR-0019).
- */
 @Composable
 internal fun StudySessionDialogHost(
     activeDialog: StudySessionDialog?,

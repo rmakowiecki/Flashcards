@@ -14,6 +14,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
@@ -51,26 +52,22 @@ internal fun SubcategoryProgress.searchRingContentDescription(cardCount: Int): S
  * as never-studied rather than a dashed placeholder, same simplification CategoryDetailsScreen's
  * subtitle makes (see its `studiedLabel`), since a search result that resolves to zero moments
  * later looks identical anyway. The parent category itself is no longer named here as text — see
- * [SearchResultSubtitle]'s leading glyph.
+ * [SearchResultSubtitle]'s leading glyph. The separator itself is `R.string.browse_middle_dot_separator`,
+ * shared with [CategoryDetailsRowSubtitle] and the chip line in BrowseScreen. [separator] is
+ * resolved once by the caller and passed down rather than re-resolved per subcategory.
  */
 @Composable
-internal fun Subcategory.searchResultCardsStudiedText(progress: SubcategoryProgress): AnnotatedString {
-    val cardCountLabel = pluralStringResource(R.plurals.subcategory_details_card_count_label, cardCount, cardCount)
+internal fun Subcategory.searchResultCardsStudiedText(progress: SubcategoryProgress, separator: String): AnnotatedString {
+    val cardCountLabel = pluralStringResource(R.plurals.browse_card_count_label, cardCount, cardCount)
     val studiedCount = (progress as? SubcategoryProgress.Resolved)?.studiedCount ?: 0
     if (studiedCount <= 0) return buildAnnotatedString { append(cardCountLabel) }
 
     val studiedText = stringResource(R.string.category_details_topic_studied_label, studiedCount)
-    val combined = stringResource(R.string.browse_search_cards_studied_subtitle, cardCountLabel, studiedText)
     val studiedColor = MaterialTheme.colorScheme.primary
-    // Locate studiedText inside the localized, already-formatted combined string rather than
-    // assuming a fixed separator/ordering — keeps the color span correct under any translation
-    // that reorders %1$s/%2$s.
-    val studiedStart = combined.indexOf(studiedText)
     return buildAnnotatedString {
-        append(combined)
-        if (studiedStart >= 0) {
-            addStyle(SpanStyle(color = studiedColor), studiedStart, studiedStart + studiedText.length)
-        }
+        append(cardCountLabel)
+        append(separator)
+        withStyle(SpanStyle(color = studiedColor)) { append(studiedText) }
     }
 }
 

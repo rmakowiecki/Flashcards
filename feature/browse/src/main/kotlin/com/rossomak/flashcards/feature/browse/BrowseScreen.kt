@@ -68,9 +68,6 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import kotlinx.coroutines.launch
 
-/** Separator between Subcategory names in a category's chip line: `Compose · Coroutines · Testing`. */
-private const val SUBCATEGORY_SUMMARY_SEPARATOR = " · "
-
 @Composable
 fun BrowseScreen(
     modifier: Modifier = Modifier,
@@ -446,6 +443,7 @@ private fun SubcategoryListGroup(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit
 ) {
+    val cardsStudiedSeparator = stringResource(R.string.browse_middle_dot_separator)
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
         items = results.subcategories.map { subcategory ->
@@ -453,7 +451,7 @@ private fun SubcategoryListGroup(
             subcategory.toSearchResultListGroupItem(
                 progress = progress,
                 ringContentDescription = progress.searchRingContentDescription(subcategory.cardCount),
-                cardsStudiedText = subcategory.searchResultCardsStudiedText(progress = progress),
+                cardsStudiedText = subcategory.searchResultCardsStudiedText(progress = progress, separator = cardsStudiedSeparator),
                 // Not found only for a stale/inconsistent categoryId — falls back to the
                 // glyph's own generic icon, same as a category with no iconSvg curated yet.
                 iconSvg = categories.firstOrNull { it.id == subcategory.categoryId }?.iconSvg,
@@ -486,6 +484,8 @@ private fun CategoryListGroup(
     categories: List<CategoryWithSubcategorySummary>,
     onCategoryClick: (String, String) -> Unit,
 ) {
+    val subcategorySummarySeparator = stringResource(R.string.browse_middle_dot_separator)
+    val placeholderSubtitle = stringResource(R.string.browse_category_placeholder_subtitle)
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
         items = categories.map { categoryWithSummary ->
@@ -495,7 +495,8 @@ private fun CategoryListGroup(
                     categoryWithSummary.category.subcategoryCount,
                     categoryWithSummary.category.subcategoryCount,
                 ),
-                placeholderSubtitle = stringResource(R.string.browse_category_placeholder_subtitle),
+                placeholderSubtitle = placeholderSubtitle,
+                subcategorySummarySeparator = subcategorySummarySeparator,
                 onCategoryClick = onCategoryClick,
             )
         },
@@ -503,18 +504,19 @@ private fun CategoryListGroup(
 }
 
 /**
- * The subtitle line is the category's subcategory-summary chip line. [placeholderSubtitle] only
- * shows for a category with no Subcategories to name at all — every other row names its most
- * prominent Subcategories.
+ * The subtitle line is the category's subcategory-summary chip line, e.g.
+ * `Compose · Coroutines · Testing`. [placeholderSubtitle] only shows for a category with no
+ * Subcategories to name at all — every other row names its most prominent Subcategories.
  */
 private fun CategoryWithSubcategorySummary.toListGroupItem(
     subcategoryCountText: String,
     placeholderSubtitle: String,
+    subcategorySummarySeparator: String,
     onCategoryClick: (String, String) -> Unit,
 ): FlashcardsListGroupItem = FlashcardsListGroupItem.DetailedRow(
     key = category.id,
     title = category.name,
-    subtitle = subcategorySummary.joinToString(SUBCATEGORY_SUMMARY_SEPARATOR).ifEmpty { placeholderSubtitle },
+    subtitle = subcategorySummary.joinToString(subcategorySummarySeparator).ifEmpty { placeholderSubtitle },
     secondaryText = subcategoryCountText,
     onClick = { onCategoryClick(category.id, category.name) },
     leading = {

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -69,6 +68,8 @@ import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Resolved
+import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Unresolved
 import kotlinx.coroutines.launch
 
 @Composable
@@ -89,9 +90,8 @@ fun CategoryDetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Only the two session CTAs go through the ViewModel's event channel — they're the only
-    // navigations that aggregate state across rows. The row's own tap and its play button stay
-    // inline lambdas below: each already holds the Subcategory it needs.
+    // Only the two session CTAs go through the ViewModel's event channel — they're the only navigations that aggregate state across rows.
+    // The row's own tap and its play button stay inline lambdas below: each already holds the Subcategory it needs.
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             is CategoryDetailsDestination.PreviewStudySession ->
@@ -109,8 +109,6 @@ fun CategoryDetailsScreen(
     val removedFromFavorites = stringResource(R.string.favorites_removed_message)
     val undoLabel = stringResource(R.string.favorites_undo_button)
 
-    // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
-    // lambda, so the wait is launched rather than blocking the collector.
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         val text = when (message) {
@@ -174,13 +172,11 @@ fun CategoryDetailsContent(
     val scrollBehavior =
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
-    // Hoisted here, and never reset: the row set is identical in both modes and only the chrome
-    // changes, unlike Subcategory Details where filtering changes which items exist. Resetting on
-    // mode switch would throw a user who long-pressed halfway down the list back to the top.
+    // Hoisted here, and never reset: the row set is identical in both modes and only the chrome changes, unlike Subcategory Details where filtering changes which items exist.
+    // Resetting on list mode switch would throw a user who long-pressed halfway down the list back to the top.
     val listState = rememberLazyListState()
 
-    // System back leaves Selection Mode rather than the screen, same as the top app bar's back
-    // arrow below — cancelling a selection can never cost the user the whole Category.
+    // System back leaves Selection Mode (if active) rather than the screen, same as the top app bar's back arrow below
     BackHandler(enabled = state.isSelectionMode, onBack = onSelectionModeToggle)
 
     Scaffold(
@@ -289,7 +285,7 @@ private fun categoryDetailsOverline(state: CategoryDetailsScreenState): String =
     }
 
 /**
- * Default mode carries one control — the Selection Mode toggle — beside the **Quick session** CTA.
+ * Default list mode carries one control — the Selection Mode toggle — beside the **Quick session** CTA.
  * Selection Mode swaps it for exit plus select-all/deselect-all, beside **Custom session**. The bar
  * itself is always rendered (it holds the screen's primary action, per
  * [FlashcardsBottomToolbar]'s own contract) — availability is expressed through `enabled` instead,
@@ -351,7 +347,7 @@ private fun CategoryDetailsBottomBar(
  * one control with two meanings rather than two controls.
  */
 @Composable
-private fun RowScope.SelectionModeToolbarActions(
+private fun SelectionModeToolbarActions(
     isAllSelected: Boolean,
     onSelectionModeToggle: () -> Unit,
     onSelectAllToggle: () -> Unit,
@@ -380,7 +376,7 @@ private fun RowScope.SelectionModeToolbarActions(
  * Add-to-home-screen is still unwired, pending the dynamic launcher shortcut work.
  */
 @Composable
-private fun RowScope.CategoryDetailsActions(
+private fun CategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
 ) {
@@ -430,11 +426,8 @@ private fun SubcategoryList(
     onSubcategoryLongPress: (String) -> Unit,
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
 ) {
-    // The lazy content builder below is not a composable context (only each item's own composed
-    // slot is), so per-row formatted strings are resolved through Resources here rather than
-    // `stringResource` inside the `.map`. `LocalResources.current` (not `LocalContext.current`) so
-    // the read is invalidated on a Configuration change (locale, etc.), same as `stringResource`.
     val resources = LocalResources.current
+    val rowSubtitleSeparator = resources.getString(R.string.browse_middle_dot_separator)
     LazyColumn(
         state = listState,
         modifier = modifier
@@ -452,14 +445,13 @@ private fun SubcategoryList(
                     progress = progress,
                     playContentDescription = resources.getString(R.string.category_details_topic_play_cd, subcategory.name),
                     ringContentDescription = progress.ringContentDescription(resources, subcategory.cardCount),
-                    // Shared with Subcategory Details, hence the `subcategory_details_` name despite the
-                    // call site — see the `favorites_*` strings below for the same cross-screen pattern.
                     cardCountLabel = resources.getQuantityString(
-                        R.plurals.subcategory_details_card_count_label,
+                        R.plurals.browse_card_count_label,
                         subcategory.cardCount,
                         subcategory.cardCount,
                     ),
                     studiedText = progress.studiedLabel(resources),
+                    rowSubtitleSeparator = rowSubtitleSeparator,
                     onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
                     onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                     onLongPress = onSubcategoryLongPress,
@@ -471,7 +463,6 @@ private fun SubcategoryList(
 }
 
 private const val PROGRESS_PERCENT_SCALE = 100
-private const val ROW_SUBTITLE_SEPARATOR = " · "
 
 /**
  * `"12 studied"` once resolved with a nonzero count; `null` while [Unresolved] or
@@ -480,12 +471,8 @@ private const val ROW_SUBTITLE_SEPARATOR = " · "
  */
 private fun SubcategoryProgress.studiedLabel(resources: Resources): String? =
     when (this) {
-        SubcategoryProgress.Unresolved -> null
-        is SubcategoryProgress.Resolved -> if (studiedCount > 0) {
-            resources.getString(R.string.category_details_topic_studied_label, studiedCount)
-        } else {
-            null
-        }
+        Unresolved -> null
+        is Resolved -> if (studiedCount > 0) resources.getString(R.string.category_details_topic_studied_label, studiedCount) else null
     }
 
 /**
@@ -494,19 +481,19 @@ private fun SubcategoryProgress.studiedLabel(resources: Resources): String? =
  */
 private fun SubcategoryProgress.ringContentDescription(resources: Resources, cardCount: Int): String =
     when (this) {
-        SubcategoryProgress.Unresolved -> resources.getString(R.string.category_details_topic_progress_unavailable_cd)
-        is SubcategoryProgress.Resolved -> resources.getString(
+        Unresolved -> resources.getString(R.string.category_details_topic_progress_unavailable_cd)
+        is Resolved -> resources.getString(
             R.string.category_details_topic_progress_cd,
             (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).toInt(),
         )
     }
 
 /** The ring's fill, `0f` for a topic with no cards rather than dividing by zero. */
-private fun SubcategoryProgress.Resolved.studiedFraction(cardCount: Int): Float =
+private fun Resolved.studiedFraction(cardCount: Int): Float =
     if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 
 /**
- * A topic row, shaped by [isSelectionMode]:
+ * A subcategory (topic) row, shaped by [isSelectionMode]:
  *
  * - **Default mode** (ADR-0041): progress ring leading, two separate destinations trailing — the
  *   play button jumps straight into the Preview Study Session Screen for this one topic while the
@@ -528,13 +515,14 @@ private fun Subcategory.toListGroupItem(
     ringContentDescription: String,
     cardCountLabel: String,
     studiedText: String?,
+    rowSubtitleSeparator: String,
     onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
     onNavigateToPreviewStudySession: (Subcategory) -> Unit,
     onLongPress: (String) -> Unit,
     onSelectedChange: (String, Boolean) -> Unit,
 ): FlashcardsListGroupItem {
     val subcategory = this
-    val ringFraction = (progress as? SubcategoryProgress.Resolved)?.studiedFraction(subcategory.cardCount)
+    val ringFraction = (progress as? Resolved)?.studiedFraction(subcategory.cardCount)
     val ring: @Composable () -> Unit = {
         FlashcardsProgressRing(
             progress = ringFraction,
@@ -542,7 +530,7 @@ private fun Subcategory.toListGroupItem(
         )
     }
     val subtitle: @Composable () -> Unit = {
-        CategoryDetailsRowSubtitle(cardCountLabel = cardCountLabel, studiedText = studiedText)
+        CategoryDetailsRowSubtitle(cardCountLabel = cardCountLabel, studiedText = studiedText, separator = rowSubtitleSeparator)
     }
     return if (isSelectionMode) {
         FlashcardsListGroupItem.Selectable(
@@ -592,12 +580,12 @@ private fun Subcategory.toListGroupItem(
  * segment entirely rather than showing a dash or "0 studied": `"<cards>"` alone.
  */
 @Composable
-private fun CategoryDetailsRowSubtitle(cardCountLabel: String, studiedText: String?) {
+private fun CategoryDetailsRowSubtitle(cardCountLabel: String, studiedText: String?, separator: String) {
     val text = if (studiedText != null) {
         val studiedColor = MaterialTheme.colorScheme.primary
         buildAnnotatedString {
             append(cardCountLabel)
-            append(ROW_SUBTITLE_SEPARATOR)
+            append(separator)
             withStyle(SpanStyle(color = studiedColor)) { append(studiedText) }
         }
     } else {

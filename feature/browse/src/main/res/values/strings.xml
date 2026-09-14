@@ -9,7 +9,7 @@
     <string name="subcategory_details_more_options_cd">More options</string>
     <string name="subcategory_details_filter_cd">Filter cards</string>
     <string name="subcategory_details_sort_cd">Sort cards</string>
-    <plurals name="subcategory_details_card_count_label">
+    <plurals name="browse_card_count_label">
         <item quantity="one">%d card</item>
         <item quantity="other">%d cards</item>
     </plurals>
@@ -58,7 +58,7 @@
     <string name="browse_search_start_session_cd">Study %1$s</string>
     <string name="browse_search_topic_progress_cd">%1$d%% studied</string>
     <string name="browse_search_topic_progress_unavailable_cd">Studied progress unavailable</string>
-    <string name="browse_search_cards_studied_subtitle">%1$s · %2$s</string>
+    <string name="browse_middle_dot_separator"> · </string>
     <string name="browse_categories_error_title">Something went wrong</string>
     <string name="browse_categories_error_message">Couldn\'t load categories.\nCheck your connection and try again.</string>
     <string name="browse_categories_empty_title">No categories yet</string>
