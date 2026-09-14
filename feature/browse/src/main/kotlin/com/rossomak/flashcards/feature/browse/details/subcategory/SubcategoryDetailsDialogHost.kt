@@ -7,13 +7,6 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 
-/**
- * Renders whichever dialog this screen has open (ADR-0036).
- *
- * The `when` has already narrowed to a concrete case, so each branch emits a total `copy()` — no
- * per-field event type, and no cast. The host holds no state of its own: the draft lives in
- * [SubcategoryDetailsDialog] so dismissing discards it for free.
- */
 @Composable
 fun SubcategoryDetailsDialogHost(
     activeDialog: SubcategoryDetailsDialog?,

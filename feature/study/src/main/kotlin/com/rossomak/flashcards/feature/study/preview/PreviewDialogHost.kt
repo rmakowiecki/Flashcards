@@ -28,25 +28,12 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SubcategoryCo
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceSettings
 
-/** The one range each stepper dialog needs — named once so a call site never inlines the pair. */
 private val LENGTH_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
 private val RATED_ATTEMPTS_RANGE = StudySessionConfig.MIN_RATED_ATTEMPTS..StudySessionConfig.MAX_RATED_ATTEMPTS
 private val SUBCATEGORY_COUNT_RANGE =
     StudySessionConfig.MIN_SUBCATEGORY_COUNT..StudySessionConfig.MAX_SUBCATEGORY_COUNT
 private val DIFFICULTY_RANGE = StudySessionConfig.MIN_DIFFICULTY..StudySessionConfig.MAX_DIFFICULTY
 
-/**
- * Renders whichever dialog [activeDialog] names, or nothing when it is `null`.
- *
- * The exhaustive `when` is the point: a new [PreviewDialog] case does not compile until it is
- * wired here, so a dialog can never be added to the state and silently never shown.
- *
- * Takes nothing but the open dialog and the callback: everything a dialog needs to draw itself
- * travels inside its own case, so the host never grows a parameter per dialog.
- *
- * Each branch emits a total `copy()` of the case the `when` already narrowed — no branching and no
- * arithmetic, because nothing unit-tests this file (ADR-0036).
- */
 @Suppress("LongMethod")
 @Composable
 internal fun PreviewDialogHost(

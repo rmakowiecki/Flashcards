@@ -32,24 +32,11 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SubcategoryCountR
 import com.rossomak.flashcards.feature.settings.SettingsDialog.VoiceAnswering
 import com.rossomak.flashcards.feature.settings.SettingsDialog.VoiceSettings
 
-/** The one range each stepper dialog needs — named once so a call site never inlines the pair. */
 private val LENGTH_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
 private val RATED_ATTEMPTS_RANGE = StudySessionConfig.MIN_RATED_ATTEMPTS..StudySessionConfig.MAX_RATED_ATTEMPTS
 private val SUBCATEGORY_COUNT_RANGE =
     StudySessionConfig.MIN_SUBCATEGORY_COUNT..StudySessionConfig.MAX_SUBCATEGORY_COUNT
 
-/**
- * Renders whichever dialog [activeDialog] names, or nothing when it is `null`.
- *
- * The exhaustive `when` is the point: a new [SettingsDialog] case does not compile until it is
- * wired here, so a dialog can never be added to the state and silently never shown.
- *
- * Takes nothing but the open dialog and the callback: everything a dialog needs to draw itself
- * travels inside its own case, so the host never grows a parameter per dialog (ADR-0036).
- *
- * Every dialog here passes `keepAsDefault = null` — a Settings value *is* the default, so there is
- * nothing to promote.
- */
 @Suppress("LongMethod")
 @Composable
 internal fun SettingsDialogHost(

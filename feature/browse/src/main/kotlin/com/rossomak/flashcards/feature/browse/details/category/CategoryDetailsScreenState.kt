@@ -37,14 +37,13 @@ data class CategoryDetailsScreenState(
     val selectedCount: Int
         get() = selectedSubcategoryIds?.size ?: 0
 
-    /** Sum of [Subcategory.cardCount] across the selected Subcategories — the CTA's session size. */
+    /** Sum of [Subcategory.cardCount] across the selected Subcategories — the CTA button session size. */
     val selectedCardCount: Int
         get() {
             val selectedIds = selectedSubcategoryIds ?: return 0
             return subcategories.filter { it.id in selectedIds }.sumOf { it.cardCount }
         }
 
-    /** False for an empty Category, so select-all never claims everything is selected when nothing exists. */
     val isAllSelected: Boolean
         get() = subcategories.isNotEmpty() && selectedCount == subcategories.size
 

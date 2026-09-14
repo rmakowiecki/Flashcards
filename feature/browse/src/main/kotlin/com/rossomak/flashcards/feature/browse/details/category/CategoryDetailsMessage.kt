@@ -6,7 +6,6 @@ package com.rossomak.flashcards.feature.browse.details.category
  */
 sealed interface CategoryDetailsMessage {
 
-    /** Both favourite messages are cosmetic: nothing is persisted. See [CategoryDetailsViewModel.onFavoriteToggle]. */
     data object AddedToFavorites : CategoryDetailsMessage
 
     data object RemovedFromFavorites : CategoryDetailsMessage

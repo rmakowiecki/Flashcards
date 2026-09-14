@@ -254,7 +254,7 @@ private fun SubcategoryDetailsTopBar(
                     )
                 } else {
                     pluralStringResource(
-                        R.plurals.subcategory_details_card_count_label,
+                        R.plurals.browse_card_count_label,
                         state.totalCount,
                         state.totalCount,
                     )

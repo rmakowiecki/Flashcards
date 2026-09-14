@@ -4,16 +4,8 @@ import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent
 
-/** The event type this screen's dialogs report through. See [DialogEvent]. */
 typealias SubcategoryDetailsDialogEvent = DialogEvent<SubcategoryDetailsDialog>
 
-/**
- * Which dialog Subcategory Details currently has open, and everything that dialog needs (ADR-0036).
- *
- * One sealed nullable field rather than a flag per dialog: two dialogs open at once becomes
- * unrepresentable, the call site is a single exhaustive `when`, and discard on dismiss is free —
- * the draft dies with the field.
- */
 sealed interface SubcategoryDetailsDialog {
 
     /**
