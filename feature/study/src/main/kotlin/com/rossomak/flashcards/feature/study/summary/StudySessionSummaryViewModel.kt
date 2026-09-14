@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionXpResult
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.levelThreshold
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
@@ -53,6 +54,37 @@ class StudySessionSummaryViewModel @Inject constructor(
     val messages: SharedFlow<StudySessionSummaryMessage> = _messages.asSharedFlow()
 
     init {
+        // Written directly in init, not inside submitSession()'s coroutine: this must land before
+        // the ViewModel instance is handed back to hiltViewModel(), so the very first state Compose
+        // ever observes already carries the real mode/counts — never the StudySessionSummaryScreenState
+        // default. All five fields sit on `route` already (no dailyGoalMinutes/I-O dependency), so
+        // there is no reason to make them wait behind submitSession()'s async read. Getting this
+        // wrong previously let a screen-composition race latch the summary's Ring/XpPour phase (and
+        // its headline/meta text) onto the default StudyMode.Rated for one frame, e.g. flashing the
+        // mastery ring on a genuine Fast session before the real mode arrived.
+        //
+        // 0/0/0 for a Fast result is a UI-state convention only (see StudySessionSummaryScreenState's
+        // own KDoc) — the screen chooses its layout off `mode`, never off these being zero. The
+        // domain SessionResult itself has no such fields on its Fast branch at all (sealed).
+        val terminalStateCounts = when (route.mode) {
+            StudyMode.Rated -> Triple(
+                route.cardStates.count { it == FlashcardStudyProgressState.Mastered },
+                route.cardStates.count { it == FlashcardStudyProgressState.Partial },
+                route.cardStates.count { it == FlashcardStudyProgressState.Failed },
+            )
+            StudyMode.Fast -> Triple(0, 0, 0)
+        }
+        _state.update {
+            it.copy(
+                mode = route.mode,
+                durationSeconds = route.durationSeconds,
+                studiedCount = route.cardIds.size,
+                abandoned = route.abandoned,
+                masteredCount = terminalStateCounts.first,
+                partialCount = terminalStateCounts.second,
+                failedCount = terminalStateCounts.third,
+            )
+        }
         submitSession()
     }
 
@@ -75,31 +107,13 @@ class StudySessionSummaryViewModel @Inject constructor(
      * inspected (see that use case's own KDoc). Only a failed local read behind the preview itself —
      * this account's prior card progress or scoring state — surfaces [StudySessionSummaryMessage.SaveFailed]
      * and leaves [state]'s XP fields at their zero defaults; the counts derived from [SessionResult]
-     * itself are untouched either way.
+     * itself are untouched either way. [state]'s non-XP fields (mode, duration, counts, …) are already
+     * set synchronously in `init`, above, and are not touched again here.
      */
     private fun submitSession() {
         viewModelScope.launch {
             val dailyGoalMinutes = observeUserPreferences().first().dailyGoalMinutes
             val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
-
-            // 0/0/0 for a Fast result is a UI-state convention only (see StudySessionSummaryScreenState's
-            // own KDoc) — the screen already chooses its layout off `mode`, never off these being zero.
-            // The domain SessionResult itself has no such fields on its Fast branch at all (sealed).
-            val terminalStateCounts = when (result) {
-                is SessionResult.Rated -> Triple(result.masteredCount, result.partialCount, result.failedCount)
-                is SessionResult.Fast -> Triple(0, 0, 0)
-            }
-            _state.update {
-                it.copy(
-                    mode = result.mode,
-                    durationSeconds = result.durationSeconds,
-                    studiedCount = result.studiedCount,
-                    abandoned = result.abandoned,
-                    masteredCount = terminalStateCounts.first,
-                    partialCount = terminalStateCounts.second,
-                    failedCount = terminalStateCounts.third,
-                )
-            }
 
             submitStudySession(result) { previewResult ->
                 previewResult
@@ -114,6 +128,7 @@ class StudySessionSummaryViewModel @Inject constructor(
         _state.update {
             it.copy(
                 xpLines = buildXpBreakdownLines(result, xpResult),
+                isLoading = false,
                 xpTotal = xpResult.breakdown.xpTotal,
                 level = xpResult.newScoringState.level,
                 xpIntoCurrentLevel = xpResult.newScoringState.xpIntoCurrentLevel,
@@ -123,6 +138,7 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 
     private fun onPreviewFailed() {
+        _state.update { it.copy(isLoading = false) }
         _messages.tryEmit(StudySessionSummaryMessage.SaveFailed)
     }
 }

@@ -166,6 +166,73 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
+    fun `mode and Terminal State counts are already correct before the submission coroutine ever runs`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // Regression test: mode/durationSeconds/studiedCount/abandoned/the three Terminal State
+            // counts used to only get written inside submitSession()'s launched coroutine, after an
+            // observeUserPreferences().first() suspend — leaving state.value at its
+            // StudySessionSummaryScreenState default (StudyMode.Rated) until that coroutine ran. A
+            // config change or slow first composition could observe that default, e.g. latching the
+            // Ring/XpPour phase onto Rated and flashing the mastery ring on a genuine Fast session.
+            // StandardTestDispatcher never runs a launched coroutine body until the dispatcher is
+            // advanced, so reading state.value here — before any advanceUntilIdle() — exercises
+            // exactly the window a real screen's first composition would see.
+            stubRoute(ratedRoute())
+
+            val viewModel = createViewModel()
+
+            with(viewModel.state.value) {
+                mode shouldBe StudyMode.Rated
+                durationSeconds shouldBe 120
+                studiedCount shouldBe 4
+                abandoned shouldBe false
+                masteredCount shouldBe 2
+                partialCount shouldBe 1
+                failedCount shouldBe 1
+                // Still default: proves the assertions above were set independently of the
+                // (not-yet-run) async dailyGoalMinutes/XP path, not a byproduct of the test racing
+                // ahead of the whole coroutine.
+                xpTotal shouldBe 0
+                isLoading shouldBe true
+            }
+        }
+
+    @Test
+    fun `a Fast route's mode never reads as the Rated default before the submission coroutine ever runs`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val cardIds = listOf("card-1", "card-2")
+            stubRoute(
+                StudySessionSummaryRoute(
+                    sessionId = "session-2",
+                    mode = StudyMode.Fast,
+                    startedAtEpochSecond = 0L,
+                    studyDateUtcOffsetMinutes = -300,
+                    durationSeconds = 60,
+                    abandoned = false,
+                    categoryId = "cat-1",
+                    categoryName = "Category",
+                    subcategoryIds = listOf("sub-1"),
+                    subcategoryNames = listOf("Subcategory"),
+                    cardIds = cardIds,
+                    cardSubcategoryIds = cardIds.map { "sub-1" },
+                    cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
+                    cardAttemptsUsed = null,
+                    cardWasPreviouslyMastered = null,
+                ),
+            )
+
+            val viewModel = createViewModel()
+
+            with(viewModel.state.value) {
+                mode shouldBe StudyMode.Fast
+                studiedCount shouldBe 2
+                masteredCount shouldBe 0
+                partialCount shouldBe 0
+                failedCount shouldBe 0
+            }
+        }
+
+    @Test
     fun `arriving at the summary submits the session exactly once`() = runTest(mainDispatcherRule.testDispatcher) {
         val route = ratedRoute()
         stubRoute(route)
@@ -242,6 +309,7 @@ class StudySessionSummaryViewModelTest {
                 xpForNextLevel shouldBe config.levelThreshold(1)
                 xpLines.map { it.source } shouldNotContain XpAwardSource.MasteryDefended
                 xpLines.map { it.source } shouldNotContain XpAwardSource.MasteryLost
+                isLoading shouldBe false
             }
         }
 
@@ -257,6 +325,7 @@ class StudySessionSummaryViewModelTest {
             xpTotal shouldBe 0
             level shouldBe 1
             xpLines shouldBe emptyList()
+            isLoading shouldBe false
         }
     }
 

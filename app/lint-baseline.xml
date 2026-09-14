@@ -2,43 +2,138 @@
 <issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
 
     <issue
-        id="EmptySuperCall"
-        message="No need to call `super.onCleared`; the super method is defined to be empty"
-        errorLine1="        super.onCleared()"
-        errorLine2="              ~~~~~~~~~">
+        id="MissingKeepAnnotation"
+        message="To prevent this Enum&apos;s serializer from being obfuscated in minified builds, annotate it with @androidx.annotation.Keep">
         <location
-            file="src/main/java/com/rossomak/flashcards/presentation/voicedebug/VoiceDebugViewModel.kt"
-            line="244"
-            column="15"/>
+            file="$HOME/AndroidStudioProjects/Flashcards/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/FlashcardSortOrder.class"/>
     </issue>
 
     <issue
         id="MissingKeepAnnotation"
         message="To prevent this Enum&apos;s serializer from being obfuscated in minified builds, annotate it with @androidx.annotation.Keep">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/StudyMode.class"/>
+            file="$HOME/AndroidStudioProjects/Flashcards/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/StudyMode.class"/>
     </issue>
 
     <issue
         id="AndroidGradlePluginVersion"
-        message="A newer version of Gradle than 9.4.1 is available: 9.6.1"
+        message="A newer version of Gradle than 9.4.1 is available: 9.7.1"
         errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-9.4.1-bin.zip"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/wrapper/gradle-wrapper.properties"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/wrapper/gradle-wrapper.properties"
             line="4"
             column="17"/>
     </issue>
 
     <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 9.2.1 is available: 9.4.0"
+        errorLine1="agp = &quot;9.2.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.library than 9.2.1 is available: 9.4.0"
+        errorLine1="agp = &quot;9.2.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.tools.build:gradle than 9.2.1 is available: 9.4.0"
+        errorLine1="agp = &quot;9.2.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
         id="GradleDependency"
-        message="A newer version of com.google.firebase:firebase-bom than 34.15.0 is available: 34.16.0"
+        message="A newer version of androidx.compose:compose-bom than 2026.08.00 is available: 2026.09.00"
+        errorLine1="composeBom = &quot;2026.08.00&quot;"
+        errorLine2="             ~~~~~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="13"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose.material3:material3 than 1.5.0-alpha23 is available: 1.5.0-alpha28"
+        errorLine1="material3 = &quot;1.5.0-alpha23&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="14"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-compose than 2.9.8 is available: 2.10.1"
+        errorLine1="navigationCompose = &quot;2.9.8&quot;"
+        errorLine2="                    ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="18"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.firebase:firebase-bom than 34.15.0 is available: 34.19.0"
         errorLine1="firebaseBom = &quot;34.15.0&quot;"
         errorLine2="              ~~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
-            line="17"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="19"
             column="15"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.media3:media3-common than 1.10.1 is available: 1.11.0"
+        errorLine1="media3 = &quot;1.10.1&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="32"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.media3:media3-session than 1.10.1 is available: 1.11.0"
+        errorLine1="media3 = &quot;1.10.1&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="32"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.microsoft.onnxruntime:onnxruntime-android than 1.27.0 is available: 1.29.0"
+        errorLine1="onnxruntimeAndroid = &quot;1.27.0&quot;"
+        errorLine2="                     ~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="4"
+            column="22"/>
     </issue>
 
     <issue
@@ -47,7 +142,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -58,7 +153,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -69,7 +164,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -80,97 +175,152 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.android than 2.3.21 is available: 2.4.0"
+        message="A newer version of org.jetbrains.kotlin.android than 2.3.21 is available: 2.4.20"
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.jvm than 2.3.21 is available: 2.4.0"
+        message="A newer version of org.jetbrains.kotlin.jvm than 2.3.21 is available: 2.4.20"
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.kapt than 2.3.21 is available: 2.4.0"
+        message="A newer version of org.jetbrains.kotlin.kapt than 2.3.21 is available: 2.4.20"
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.3.21 is available: 2.4.0"
+        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.3.21 is available: 2.4.20"
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.plugin.serialization than 2.3.21 is available: 2.4.0"
+        message="A newer version of org.jetbrains.kotlin.plugin.serialization than 2.3.21 is available: 2.4.20"
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of io.kotest:kotest-assertions-core than 5.9.1 is available: 6.2.2"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-collections-immutable than 0.4.0 is available: 0.5.2"
+        errorLine1="kotlinxCollectionsImmutable = &quot;0.4.0&quot;"
+        errorLine2="                              ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="16"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of io.coil-kt.coil3:coil-compose than 3.5.0 is available: 3.6.2"
+        errorLine1="coil = &quot;3.5.0&quot;"
+        errorLine2="       ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="23"
+            column="8"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of io.coil-kt.coil3:coil-network-okhttp than 3.5.0 is available: 3.6.2"
+        errorLine1="coil = &quot;3.5.0&quot;"
+        errorLine2="       ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="23"
+            column="8"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of io.kotest:kotest-assertions-core than 5.9.1 is available: 6.2.4"
         errorLine1="kotestAssertions = &quot;5.9.1&quot;"
         errorLine2="                   ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
-            line="24"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="27"
             column="20"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.squareup.okhttp3:okhttp than 5.1.0 is available: 5.4.0"
+        message="A newer version of com.squareup.okhttp3:okhttp than 5.1.0 is available: 5.5.0"
         errorLine1="okhttp = &quot;5.1.0&quot;"
         errorLine2="         ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
-            line="36"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="40"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.diffplug.spotless:spotless-plugin-gradle than 7.0.4 is available: 8.8.0"
+        message="A newer version of com.diffplug.spotless than 7.0.4 is available: 8.10.2"
         errorLine1="spotless = &quot;7.0.4&quot;"
         errorLine2="           ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/static-analysis/gradle/libs.versions.toml"
-            line="37"
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="41"
             column="12"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.diffplug.spotless:spotless-plugin-gradle than 7.0.4 is available: 8.10.2"
+        errorLine1="spotless = &quot;7.0.4&quot;"
+        errorLine2="           ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="41"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.google.guava:listenablefuture than 1.0 is available: 9999.0-empty-to-avoid-conflict-with-guava"
+        errorLine1="google-guava-listenablefuture = { group = &quot;com.google.guava&quot;, name = &quot;listenablefuture&quot;, version = &quot;1.0&quot; }"
+        errorLine2="                                                                                                   ~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            line="123"
+            column="100"/>
     </issue>
 
     <issue
@@ -559,12 +709,22 @@
     </issue>
 
     <issue
+        id="ExportedContentProvider"
+        message="Exported content providers can provide access to potentially sensitive data"
+        errorLine1="        &lt;provider"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="37"
+            column="10"/>
+    </issue>
+
+    <issue
         id="ObsoleteSdkInt"
         message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 26. Merge all the resources in this folder into `mipmap-anydpi`.">
         <location
             file="src/main/res/mipmap-anydpi-v26"/>
     </issue>
-
 
     <issue
         id="VectorPath"
