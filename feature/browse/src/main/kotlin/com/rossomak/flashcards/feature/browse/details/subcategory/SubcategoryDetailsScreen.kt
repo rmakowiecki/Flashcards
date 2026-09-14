@@ -148,10 +148,9 @@ fun SubcategoryDetailsContent(
     onResetFilters: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    snackbarHostState: SnackbarHostState,
 ) {
-    val scrollBehavior =
-        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     // Hoisted out of FlashcardList so it survives the Cards -> NoMatches -> Cards round trip, which
     // would otherwise drop the state and hide the reset below.
@@ -189,17 +188,18 @@ fun SubcategoryDetailsContent(
             SubcategoryDetailsContentState.Loading -> CenteredContent(modifier = Modifier.padding(innerPadding)) {
                 CircularProgressIndicator()
             }
+
             is SubcategoryDetailsContentState.Error -> CenteredContent(modifier = Modifier.padding(innerPadding)) {
                 Text(text = stringResource(content.messageRes))
             }
+
             is SubcategoryDetailsContentState.Cards -> FlashcardList(
                 modifier = Modifier.padding(innerPadding),
                 flashcards = content.flashcards,
                 listState = listState,
             )
-            // Resetting restores every tag and the difficulty range but deliberately leaves the
-            // sort order alone — sort cannot cause an empty result, so resetting it here would
-            // undo an unrelated choice (ADR-0022).
+            // Resetting restores every tag and the difficulty range but deliberately leaves the sort order alone
+            // sort cannot cause an empty result, so resetting it here would undo an unrelated choice (ADR-0022).
             SubcategoryDetailsContentState.NoMatches -> CenteredContent(modifier = Modifier.padding(innerPadding)) {
                 FlashcardsEmptyState(
                     icon = Icons.Filled.SearchOff,
@@ -254,7 +254,7 @@ private fun SubcategoryDetailsTopBar(
                     )
                 } else {
                     pluralStringResource(
-                        R.plurals.subcategory_details_card_count_label,
+                        R.plurals.browse_card_count_label,
                         state.totalCount,
                         state.totalCount,
                     )
@@ -283,7 +283,7 @@ private fun SubcategoryDetailsBottomBar(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
                     )
                 },
-                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.Sort(state.sortOrder))) },
+                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) },
             )
         },
         trailing = {

@@ -76,11 +76,11 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Length
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Mode
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.ReadAloud
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SubcategoryCountRange
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnswering
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import kotlinx.coroutines.delay
 
 @Composable
@@ -426,7 +426,7 @@ private fun ScopeHeroBody(
                 ),
                 icon = Icons.Default.Style,
                 style = OnGradient,
-                onClick = { onOpenSettingsDialog(Length(draftState = state.config.length)) },
+                onClick = { onOpenSettingsDialog(SessionCardCount(draftState = state.config.length)) },
             )
             if (!state.isSingleSubcategory) {
                 FlashcardsMetadataBadge(
@@ -442,7 +442,7 @@ private fun ScopeHeroBody(
                         // subcategories are hand-picked outside this screen, so no dialog matches
                         // them — the badge falls back to just revealing the sheet (ticket per grill).
                         if (state.isQuickSession) {
-                            onOpenSettingsDialog(SubcategoryCountRange(draftState = state.config.subcategoryCountRange))
+                            onOpenSettingsDialog(QuickSessionSubcategoryCountRange(draftState = state.config.subcategoryCountRange))
                         } else {
                             onOpenSettings()
                         }
@@ -482,7 +482,7 @@ private fun SettingsBadgeRow(
             label = state.config.mode.label(),
             icon = if (isRated) Icons.Default.Star else Icons.Default.Bolt,
             style = OnGradient,
-            onClick = { onOpenSettingsDialog(Mode(draftState = state.config.mode)) },
+            onClick = { onOpenSettingsDialog(SessionMode(draftState = state.config.mode)) },
         )
         val interactionBadge = interactionBadgeContent(isRated = isRated, enabled = interactionEnabled)
         FlashcardsMetadataBadge(
@@ -492,9 +492,9 @@ private fun SettingsBadgeRow(
             onClick = {
                 onOpenSettingsDialog(
                     if (isRated) {
-                        VoiceAnswering(draftState = state.config.voiceAnsweringEnabled)
+                        RatedSessionVoiceAnswering(draftState = state.config.voiceAnsweringEnabled)
                     } else {
-                        ReadAloud(draftState = state.config.readAloudEnabled)
+                        FastSessionReadAloud(draftState = state.config.readAloudEnabled)
                     },
                 )
             },

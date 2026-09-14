@@ -27,16 +27,16 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsSettingRow
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Attempts
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Length
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Mode
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.PartialRatingCardRequeueing
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.ReadAloud
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Sort
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SubcategoryCountRange
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnswering
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 
 /**
  * The settings sheet itself: [FlashcardsBottomSheet] docked over the ready screen, hidden until
@@ -92,7 +92,7 @@ private fun SessionSettingRows(
         FlashcardsSettingRow(
             label = stringResource(R.string.preview_session_mode_label),
             valueText = state.config.mode.label(),
-            onClick = { onDialogEvent(Open(Mode(draftState = state.config.mode))) },
+            onClick = { onDialogEvent(Open(SessionMode(draftState = state.config.mode))) },
         )
         if (state.config.mode == StudyMode.Rated) {
             FlashcardsSettingRow(
@@ -100,7 +100,7 @@ private fun SessionSettingRows(
                 valueText = voiceAnsweringLabel(state.config.voiceAnsweringEnabled),
                 onClick = {
                     onDialogEvent(
-                        Open(VoiceAnswering(draftState = state.config.voiceAnsweringEnabled))
+                        Open(RatedSessionVoiceAnswering(draftState = state.config.voiceAnsweringEnabled))
                     )
                 },
             )
@@ -111,14 +111,14 @@ private fun SessionSettingRows(
                     state.config.ratedAttempts,
                     state.config.ratedAttempts,
                 ),
-                onClick = { onDialogEvent(Open(Attempts(draftState = state.config.ratedAttempts))) },
+                onClick = { onDialogEvent(Open(RatedSessionMaxCardAttempts(draftState = state.config.ratedAttempts))) },
             )
             FlashcardsSettingRow(
                 label = stringResource(R.string.preview_session_partial_rating_card_requeueing_label),
                 valueText = partialRatingCardRequeueingLabel(state.config.partialRatingCardRequeueingEnabled),
                 onClick = {
                     onDialogEvent(
-                        Open(PartialRatingCardRequeueing(draftState = state.config.partialRatingCardRequeueingEnabled))
+                        Open(RatedSessionPartialRatingCardRequeueing(draftState = state.config.partialRatingCardRequeueingEnabled))
                     )
                 },
             )
@@ -126,7 +126,7 @@ private fun SessionSettingRows(
             FlashcardsSettingRow(
                 label = stringResource(R.string.preview_session_read_aloud_label),
                 valueText = readAloudLabel(state.config.readAloudEnabled),
-                onClick = { onDialogEvent(Open(ReadAloud(draftState = state.config.readAloudEnabled))) },
+                onClick = { onDialogEvent(Open(FastSessionReadAloud(draftState = state.config.readAloudEnabled))) },
             )
         }
         val fastModeSpeaksAloud = state.config.mode == StudyMode.Fast && state.config.readAloudEnabled
@@ -134,7 +134,7 @@ private fun SessionSettingRows(
             FlashcardsSettingRow(
                 label = stringResource(R.string.preview_session_voice_settings_label),
                 valueText = voicePlaybackSummary(state),
-                onClick = { onDialogEvent(Open(VoiceSettings())) },
+                onClick = { onDialogEvent(Open(SessionVoiceSettings())) },
             )
         }
         FlashcardsSettingRow(
@@ -144,7 +144,7 @@ private fun SessionSettingRows(
                 state.config.length,
                 state.config.length,
             ),
-            onClick = { onDialogEvent(Open(Length(draftState = state.config.length))) },
+            onClick = { onDialogEvent(Open(SessionCardCount(draftState = state.config.length))) },
         )
         if (state.isQuickSession) {
             SubcategoryCountRangeSettingRow(state = state, onDialogEvent = onDialogEvent)
@@ -153,7 +153,7 @@ private fun SessionSettingRows(
         FlashcardsSettingRow(
             label = stringResource(R.string.preview_session_sort_label),
             valueText = state.config.sortOrder.label(),
-            onClick = { onDialogEvent(Open(Sort(draftState = state.config.sortOrder))) },
+            onClick = { onDialogEvent(Open(SessionCardsSortingOrder(draftState = state.config.sortOrder))) },
         )
     }
 }
@@ -174,7 +174,7 @@ private fun SubcategoryCountRangeSettingRow(
             state.config.subcategoryCountRange.first,
             state.config.subcategoryCountRange.last,
         ),
-        onClick = { onDialogEvent(Open(SubcategoryCountRange(draftState = state.config.subcategoryCountRange))) },
+        onClick = { onDialogEvent(Open(QuickSessionSubcategoryCountRange(draftState = state.config.subcategoryCountRange))) },
     )
 }
 

@@ -27,10 +27,10 @@ import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExtendedContext
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportProblem
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceSettings
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import com.rossomak.flashcards.feature.study.voice.VoiceGateway
@@ -87,7 +87,7 @@ class FastStudySessionViewModel @Inject constructor(
     private var lastObservedCardIndex = -1
 
     private val isExtendedContextDialogOpen: Boolean
-        get() = _state.value.activeDialog is ExtendedContext
+        get() = _state.value.activeDialog is CurrentCardExtendedContext
 
     // True only when the pause was caused by the dialog intercepting a natural between-card advance.
     // Gates auto-advance on dialog dismiss and changes play-button behavior.
@@ -353,7 +353,7 @@ class FastStudySessionViewModel @Inject constructor(
         voiceGateway.setSpeechRate(rate)
     }
 
-    private fun onExtendedContextDialogOpen(dialog: ExtendedContext) {
+    private fun onExtendedContextDialogOpen(dialog: CurrentCardExtendedContext) {
         _state.update { it.copy(activeDialog = dialog) }
         val voiceState = voiceGateway.state.value
         if (voiceState.isInBetweenPause && voiceState.isPlaying) {
@@ -392,7 +392,7 @@ class FastStudySessionViewModel @Inject constructor(
             voiceGateway.togglePlayPause()
         }
         _state.update {
-            it.copy(activeDialog = VoiceSettings(voiceSettingsController.seedDraft(sessionVoiceSettings)))
+            it.copy(activeDialog = SessionVoiceSettings(voiceSettingsController.seedDraft(sessionVoiceSettings)))
         }
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
@@ -404,7 +404,7 @@ class FastStudySessionViewModel @Inject constructor(
      */
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
-            val dialog = state.activeDialog as? VoiceSettings ?: return@update state
+            val dialog = state.activeDialog as? SessionVoiceSettings ?: return@update state
             state.copy(
                 activeDialog = dialog.copy(
                     draftState = dialog.draftState.copy(
@@ -423,7 +423,7 @@ class FastStudySessionViewModel @Inject constructor(
      * no other call into the controller left to do that.
      */
     private fun onVoiceSettingsSave() {
-        val dialog = _state.value.activeDialog as? VoiceSettings ?: return
+        val dialog = _state.value.activeDialog as? SessionVoiceSettings ?: return
         val settings = dialog.draftState.toVoiceSettings()
         sessionVoiceSettings = settings
         if (dialog.keepAsDefault) {
@@ -473,9 +473,9 @@ class FastStudySessionViewModel @Inject constructor(
      */
     private fun onDialogOpen(dialog: StudySessionDialog) {
         when (dialog) {
-            is ReportProblem -> onReportProblemOpen(dialog)
-            is ExtendedContext -> onExtendedContextDialogOpen(dialog)
-            is VoiceSettings -> onVoiceSettingsOpen()
+            is ReportCurrentCardProblem -> onReportProblemOpen(dialog)
+            is CurrentCardExtendedContext -> onExtendedContextDialogOpen(dialog)
+            is SessionVoiceSettings -> onVoiceSettingsOpen()
             VoiceAnswerConsent, ExitSession ->
                 _state.update { it.copy(activeDialog = dialog) }
         }
@@ -492,8 +492,8 @@ class FastStudySessionViewModel @Inject constructor(
     private fun onDraftChange(dialog: StudySessionDialog) {
         val previous = _state.value.activeDialog
         _state.update { it.copy(activeDialog = dialog) }
-        if (previous is VoiceSettings &&
-            dialog is VoiceSettings &&
+        if (previous is SessionVoiceSettings &&
+            dialog is SessionVoiceSettings &&
             dialog.draftState != previous.draftState
         ) {
             voiceSettingsController.preview(dialog.draftState)
@@ -502,15 +502,15 @@ class FastStudySessionViewModel @Inject constructor(
 
     private fun onDialogConfirm() {
         when (_state.value.activeDialog) {
-            is ReportProblem -> onReportProblemSubmit()
-            is VoiceSettings -> onVoiceSettingsSave()
+            is ReportCurrentCardProblem -> onReportProblemSubmit()
+            is SessionVoiceSettings -> onVoiceSettingsSave()
             ExitSession -> {
                 onDialogDismiss()
                 terminate(abandoned = true)
             }
             // Unreachable in Fast (VoiceAnswerConsent is never opened, ADR-0025); "Got it" and a
             // scrim tap on the single-action Extended Context dialog are the same act.
-            VoiceAnswerConsent, is ExtendedContext, null -> onDialogDismiss()
+            VoiceAnswerConsent, is CurrentCardExtendedContext, null -> onDialogDismiss()
         }
     }
 
@@ -519,8 +519,8 @@ class FastStudySessionViewModel @Inject constructor(
         val dialog = _state.value.activeDialog
         _state.update { it.copy(activeDialog = null) }
         when (dialog) {
-            is ExtendedContext -> onExtendedContextDialogDismissed()
-            is VoiceSettings -> onVoiceSettingsDismiss()
+            is CurrentCardExtendedContext -> onExtendedContextDialogDismissed()
+            is SessionVoiceSettings -> onVoiceSettingsDismiss()
             else -> Unit
         }
     }
@@ -529,13 +529,13 @@ class FastStudySessionViewModel @Inject constructor(
      * Reporting pauses playback the way the old debug FAB did — the user stopped to read the card,
      * not to be read over. Resuming is a deliberate tap (ADR-0017).
      */
-    private fun onReportProblemOpen(dialog: ReportProblem) {
+    private fun onReportProblemOpen(dialog: ReportCurrentCardProblem) {
         if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
         _state.update { it.copy(activeDialog = dialog) }
     }
 
     private fun onReportProblemSubmit() {
-        val dialog = _state.value.activeDialog as? ReportProblem ?: return
+        val dialog = _state.value.activeDialog as? ReportCurrentCardProblem ?: return
         if (!dialog.canSubmit) return
         _state.update { it.copy(activeDialog = null) }
         viewModelScope.launch {
