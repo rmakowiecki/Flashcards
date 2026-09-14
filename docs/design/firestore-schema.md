@@ -41,11 +41,17 @@ users/{uid}/entitlement/premium                       → { isPremium }  // Admi
 
 - **Scoring state is deliberately NOT on `users/{uid}`.** Entitlement is a separate document, `users/{uid}/entitlement/premium` (`functions/src/lib/entitlement.ts`), written only by the Admin SDK and read server-side by the premium Cloud Function; that subcollection is default-denied regardless of any rule on the parent `users/{uid}` document. The real reason scoring state lives under `progress/` instead is separation of concerns, not privilege escalation: `users/{uid}` is reserved for identity/admin-managed data, while `progress/user-stats` is the one document a session commit needs to touch and nothing else. `dailyGoalMinutes` is likewise absent — it is device-scoped local state that Settings already owns.
 
-## Subcategory favorites
+## Favorites
 
 ```
-users/{uid}/favorites/{subcategoryId}                 → { createdAt }
+users/{uid}/favorites/state                           → { categories: { "<categoryId>": Timestamp, ... },
+                                                          subcategories: { "<subcategoryId>": Timestamp, ... } }
 ```
+
+- **`favorites/state` is a single document per user** holding both category and subcategory favorites as two independent id → `Timestamp` maps — favoriting or unfavoriting any number of items, and reading every favorite a user has, each costs exactly one write/read, regardless of how many ids are involved. `categories` and `subcategories` never cascade into each other: favoriting a category does not favorite its subcategories, and vice versa. The map value is the bare `FieldValue.serverTimestamp()` set when the id was added — no nested object — and unfavoriting deletes the key (`FieldValue.delete()`) rather than writing a tombstone, so a key's presence alone is the favorited/not-favorited signal.
+- Single-document shape was chosen specifically so an offline multi-add (e.g. onboarding's favorite-topics step, which can favorite several subcategories at once) stays correct once connectivity returns: every mutation targets the same document, so Firestore's offline write queue coalesces and replays same-document writes in order, unlike N separate per-item documents which could partially fail or race independently.
+- **Client-writable directly** — favorites are non-sensitive by design, so unlike `sessions`/`progress` there is no Cloud Function gating; the security rule matches `curationRequests`' `request.auth.uid == uid` pattern. See `firestore.rules`.
+- A write's returned Task is wrapped with a timeout on the Android client rather than awaited unboundedly: Firestore's offline persistence applies a write to the local cache immediately but leaves the Task itself pending until the server acks, so an offline caller would otherwise hang forever (see [onboarding-flow.md](onboarding-flow.md)). A timeout treats the already-applied local write as success; a genuine failure (e.g. permission-denied) still surfaces normally since it throws before the timeout elapses.
 
 ## Study sessions
 
