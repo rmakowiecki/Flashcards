@@ -13,15 +13,15 @@ import com.rossomak.flashcards.core.domain.model.StudySessionPreference.Subcateg
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoiceAnsweringEnabled
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePlayback
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 
 /**

@@ -6,6 +6,7 @@ import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.functions.StreamResponse
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
+import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -44,6 +45,11 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
             .catch { throwable -> throw throwable.mapEntitlementRejection() }
     }
 
+    // Broad on purpose - the callable stream can fail with more than just FirebaseFunctionsException
+    // (a transport-layer error before the SDK wraps it, say), and this call site has no surrounding
+    // try/catch of its own - narrowing this would let an unanticipated exception type crash instead
+    // of surfacing as Result.failure.
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun transcribeAndSanitize(wavBytes: ByteArray): Result<String> = try {
         val payload = mapOf(FIELD_AUDIO_BASE64 to encodeWav(wavBytes))
         val firstChunk = streamCallable(payload)
@@ -65,7 +71,9 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
         val result = functions.getHttpsCallable(ENTITLEMENT_FUNCTION_NAME).call().await()
         val data = result.data as? Map<*, *>
             ?: error("Unexpected entitlement result shape: ${result.data}")
-        return EntitlementDto(isPremium = data[FIELD_IS_PREMIUM] as? Boolean ?: false)
+        val isPremium = data[FIELD_IS_PREMIUM] as? Boolean
+            ?: error("Entitlement result missing is_premium: ${result.data}")
+        return EntitlementDto(isPremium = isPremium)
     }
 
     private fun streamCallable(payload: Map<String, Any>): Flow<StreamResponse> =

@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
+import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import java.io.IOException
 import kotlin.random.Random
 import kotlinx.coroutines.delay

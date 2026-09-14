@@ -26,10 +26,11 @@ class FirestoreCurationRemoteDataSource @Inject constructor(
 
     override suspend fun getCurationRequests(cardIds: List<String>): Map<String, CurationRequestDto> {
         if (cardIds.isEmpty()) return emptyMap()
+        val userCollection = collection()
         return cardIds
             .chunked(WHEREIN_BATCH_SIZE)
             .flatMap { chunk ->
-                collection()
+                userCollection
                     .whereIn(FieldPath.documentId(), chunk)
                     .get()
                     .await()

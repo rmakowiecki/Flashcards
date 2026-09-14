@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.source
 
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
+import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import io.kotest.matchers.ints.shouldBeInRange
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest

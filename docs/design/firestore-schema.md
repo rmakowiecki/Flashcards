@@ -58,7 +58,7 @@ users/{uid}/favorites/state                           → { categories: { "<cate
 ```
 // Written server-side by the submitStudySession Cloud Function, queued durably client-side
 // (SubmitStudySessionUseCase → DefaultSessionSubmissionRepository → SessionSubmissionDeliveryWorker
-// → RealSessionSubmissionApi). Shape follows studyMode: RATED carries the four counters and full
+// → SessionSubmissionRemoteDataSource). Shape follows studyMode: RATED carries the four counters and full
 // cardResults entries below; FAST has none of the RATED-only fields at all — not zeroed, genuinely absent.
 users/{uid}/sessions/{sessionId}                      → { sessionId, startTimestamp, durationSeconds,
                                                           studyMode: "rated"|"fast", isAbandoned,

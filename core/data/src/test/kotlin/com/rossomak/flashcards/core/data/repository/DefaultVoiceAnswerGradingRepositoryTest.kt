@@ -3,10 +3,10 @@ package com.rossomak.flashcards.core.data.repository
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
-import com.rossomak.flashcards.core.data.source.VoiceGradingEntitlementException
 import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify

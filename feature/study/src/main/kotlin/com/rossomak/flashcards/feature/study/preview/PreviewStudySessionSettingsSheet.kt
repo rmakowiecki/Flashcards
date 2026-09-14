@@ -27,15 +27,15 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsSettingRow
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
-import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 
 /**

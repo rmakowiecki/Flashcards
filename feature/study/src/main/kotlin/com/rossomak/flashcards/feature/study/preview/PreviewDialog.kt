@@ -34,7 +34,7 @@ sealed interface PreviewDialog {
      * [VoiceSettingsController][com.rossomak.flashcards.core.ui.voice.VoiceSettingsController]'s
      * voice cache plus this session's current settings, neither of which the row has, so the ViewModel always replaces what it is handed here.
      */
-    data class SessionVoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState(), val keepAsDefault: Boolean = false, ) : PreviewDialog
+    data class SessionVoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState(), val keepAsDefault: Boolean = false,) : PreviewDialog
 
     /**
      * No `keepAsDefault` option: tags belong to one subcategory and cannot carry to another, so filters are session-scoped by definition (ADR-0030).
