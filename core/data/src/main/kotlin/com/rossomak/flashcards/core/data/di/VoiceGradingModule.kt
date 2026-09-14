@@ -1,8 +1,8 @@
 package com.rossomak.flashcards.core.data.di
 
-import com.rossomak.flashcards.core.data.network.RealVoiceGradingApi
-import com.rossomak.flashcards.core.data.network.VoiceGradingApi
 import com.rossomak.flashcards.core.data.repository.DefaultVoiceAnswerGradingRepository
+import com.rossomak.flashcards.core.data.source.FirebaseVoiceGradingRemoteDataSource
+import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
 import dagger.Binds
 import dagger.Module
@@ -16,7 +16,7 @@ abstract class VoiceGradingModule {
 
     @Binds
     @Singleton
-    abstract fun bindVoiceGradingApi(impl: RealVoiceGradingApi): VoiceGradingApi
+    abstract fun bindVoiceGradingRemoteDataSource(impl: FirebaseVoiceGradingRemoteDataSource): VoiceGradingRemoteDataSource
 
     @Binds
     @Singleton

@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import android.util.Base64
 import com.google.firebase.functions.FirebaseFunctions
@@ -23,9 +23,9 @@ import kotlinx.coroutines.tasks.await
  * connection (ADR-0028); `transcribeAndSanitize` rides the same callable with no question/answer
  * and reads only the first streamed chunk; `checkEntitlement` is a plain unary callable.
  */
-class RealVoiceGradingApi @Inject constructor(
+class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
     private val functions: FirebaseFunctions,
-) : VoiceGradingApi {
+) : VoiceGradingRemoteDataSource {
 
     override fun transcribeAndGradeSpokenAnswer(
         cardId: String,

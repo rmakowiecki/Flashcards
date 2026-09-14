@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
@@ -7,9 +7,9 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class FakeVoiceGradingApiTest {
+class FakeVoiceGradingRemoteDataSourceTest {
 
-    private val fakeApi = FakeVoiceGradingApi().apply {
+    private val fakeApi = FakeVoiceGradingRemoteDataSource().apply {
         isTransientFailureInjectionEnabled = false
         isLatencySimulationEnabled = false
     }

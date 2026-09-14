@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
@@ -10,12 +10,12 @@ import kotlinx.coroutines.flow.Flow
  * transcribe+sanitize path — the mode is inferred server-side from the payload. The client
  * surfaces the two modes as two intent-revealing methods so the mode is legible at the call site.
  *
- * [RealVoiceGradingApi] talks to the deployment via Firebase callables; [FakeVoiceGradingApi] is a
+ * [FirebaseVoiceGradingRemoteDataSource] talks to the deployment via Firebase callables; [FakeVoiceGradingRemoteDataSource] is a
  * test-only double (`core/data/src/test`). The proxy verifies the Firebase ID token and premium
  * entitlement server-side, forwards the WAV to ElevenLabs Scribe, runs the sanitize then grade LLM
  * calls, and never persists audio.
  */
-interface VoiceGradingApi {
+interface VoiceGradingRemoteDataSource {
 
     /**
      * Full pipeline call, streamed over one Firebase Callable connection (ADR-0028): obfuscated

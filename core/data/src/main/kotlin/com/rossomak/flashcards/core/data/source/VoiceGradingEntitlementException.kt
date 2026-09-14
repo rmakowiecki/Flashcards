@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 /**
  * Thrown when the backend (real or simulated) rejects a voice grading request because the
