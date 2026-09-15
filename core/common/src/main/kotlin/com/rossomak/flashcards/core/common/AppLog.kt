@@ -2,26 +2,26 @@ package com.rossomak.flashcards.core.common
 
 import timber.log.Timber
 
-fun logv(message: () -> String) {
+inline fun logv(message: () -> String) {
     Timber.v(message())
 }
 
-fun logd(message: () -> String) {
+inline fun logd(message: () -> String) {
     Timber.d(message())
 }
 
-fun logi(message: () -> String) {
+inline fun logi(message: () -> String) {
     Timber.i(message())
 }
 
-fun logw(
+inline fun logw(
     throwable: Throwable? = null,
     message: () -> String,
 ) {
     Timber.w(throwable, message())
 }
 
-fun loge(
+inline fun loge(
     throwable: Throwable? = null,
     message: () -> String,
 ) {
