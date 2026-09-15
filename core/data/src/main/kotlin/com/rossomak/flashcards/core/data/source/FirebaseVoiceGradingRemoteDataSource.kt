@@ -114,7 +114,7 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
         if (this is FirebaseFunctionsException &&
             code == FirebaseFunctionsException.Code.PERMISSION_DENIED
         ) {
-            VoiceGradingEntitlementException()
+            VoiceGradingEntitlementException(cause = this)
         } else {
             this
         }

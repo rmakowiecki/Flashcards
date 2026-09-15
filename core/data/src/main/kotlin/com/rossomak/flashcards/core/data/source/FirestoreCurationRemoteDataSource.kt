@@ -61,7 +61,7 @@ class FirestoreCurationRemoteDataSource @Inject constructor(
      * exclusive in storage as well as in the draft.
      */
     override suspend fun upsertCurationActions(cardId: String, subcategoryId: String, actions: Set<CurationAction>) {
-        if (actions.isEmpty()) return
+        if (actions.isEmpty()) return // unreachable via SubmitCurationReportUseCase's additive design (ADR-0017)
         val actionUpdates = mutableMapOf<String, Any>()
         actions.forEach { action ->
             actionUpdates[action.name] = mapOf(FIELD_FLAGGED_AT to FieldValue.serverTimestamp())

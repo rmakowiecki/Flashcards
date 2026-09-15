@@ -8,5 +8,5 @@ package com.rossomak.flashcards.core.domain.model
  * [com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository]'s documented
  * failure contract, and feature layers must be able to catch it without depending on `core:data`.
  */
-class VoiceGradingEntitlementException :
-    Exception("Voice grading rejected: no active premium entitlement")
+class VoiceGradingEntitlementException(cause: Throwable? = null) :
+    Exception("Voice grading rejected: no active premium entitlement", cause)
