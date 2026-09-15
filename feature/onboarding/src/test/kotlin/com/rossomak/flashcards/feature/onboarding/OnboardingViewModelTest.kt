@@ -3,8 +3,8 @@ package com.rossomak.flashcards.feature.onboarding
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DailyGoal
-import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeOnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository

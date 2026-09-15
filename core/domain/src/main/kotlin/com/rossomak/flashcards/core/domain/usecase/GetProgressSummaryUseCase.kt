@@ -8,8 +8,8 @@ import javax.inject.Inject
 /**
  * Thin wrapper around [CardProgressRepository.getProgressSummary], mirroring
  * [GetSubcategoryProgressUseCase]'s shape. Category Details fans this out once per screen open to
- * draw every topic's ring and subtitle from the one summary document, rather than reading each
- * topic's packed progress document individually.
+ * draw every subcategory's ring and subtitle from the one summary document, rather than reading each
+ * subcategory's packed progress document individually.
  */
 class GetProgressSummaryUseCase @Inject constructor(
     private val repository: CardProgressRepository,

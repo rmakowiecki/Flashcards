@@ -388,8 +388,8 @@ private fun HeroTop(modifier: Modifier = Modifier) {
 }
 
 /**
- * The scope sentence and its read-only badges — minutes, cards, then topics for a multi-subcategory
- * or Quick session (today's code emitted topics before cards; the design calls for this order) —
+ * The scope sentence and its read-only badges — minutes, cards, then subcategories for a multi-subcategory
+ * or Quick session (today's code emitted subcategories before cards; the design calls for this order) —
  * plus [SettingsBadgeRow] on its own line beneath them. This half of the hero always survives
  * [AdaptiveHero]'s adaptation.
  */
@@ -438,7 +438,7 @@ private fun ScopeHeroBody(
                     icon = Icons.Default.List,
                     style = OnGradient,
                     onClick = {
-                        // Quick's topics count is the SubcategoryCountRange setting; Custom's
+                        // Quick's subcategory count is the SubcategoryCountRange setting; Custom's
                         // subcategories are hand-picked outside this screen, so no dialog matches
                         // them — the badge falls back to just revealing the sheet (ticket per grill).
                         if (state.isQuickSession) {
@@ -731,7 +731,7 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
 /**
  * Names past this count stop being useful to read at a glance and collapse into a count instead.
  * Pinned to [StudySessionConfig.MAX_SUBCATEGORY_COUNT] — Quick's subcategory-count cap — so a
- * Quick session, whose topics the user did not choose, making naming them the whole point of a
+ * Quick session, whose subcategories the user did not choose, making naming them the whole point of a
  * preview, never truncates. Custom sessions, unbounded, still collapse once they cross it.
  */
 private val SUBCATEGORY_LIST_TRUNCATION_THRESHOLD = StudySessionConfig.MAX_SUBCATEGORY_COUNT

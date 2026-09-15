@@ -163,7 +163,7 @@ class CategoryDetailsViewModelTest {
     // --- Selection Mode ---
 
     @Test
-    fun `long-pressing a topic enters Selection Mode with exactly that topic selected`() =
+    fun `long-pressing a subcategory enters Selection Mode with exactly that subcategory selected`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -212,7 +212,7 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `selecting and deselecting individual topics adds to and removes from the set`() =
+    fun `selecting and deselecting individual subcategories adds to and removes from the set`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -230,7 +230,7 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `select-all from a partial selection selects every topic`() =
+    fun `select-all from a partial selection selects every subcategory`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -269,7 +269,7 @@ class CategoryDetailsViewModelTest {
     }
 
     @Test
-    fun `select-all with nothing selected selects every topic`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `select-all with nothing selected selects every subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
         val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
         flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
         val viewModel = createViewModel()
@@ -305,7 +305,7 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `selecting everything via select-all and starting a Custom session covers every topic, unsampled`() =
+    fun `selecting everything via select-all and starting a Custom session covers every subcategory, unsampled`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -343,7 +343,7 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `the Custom CTA emits only the selected topics, unsampled`() =
+    fun `the Custom CTA emits only the selected subcategories, unsampled`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -404,7 +404,7 @@ class CategoryDetailsViewModelTest {
     // --- progress rings/subtitle (ADR-0016) ---
 
     @Test
-    fun `a summary with counts resolves each topic's studied and mastered counts`() =
+    fun `a summary with counts resolves each subcategory's studied and mastered counts`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -428,7 +428,7 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `a topic absent from the summary resolves to all-zero, not unknown`() =
+    fun `a subcategory absent from the summary resolves to all-zero, not unknown`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -445,7 +445,7 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `a User with no summary document at all resolves every topic to all-zero`() =
+    fun `a User with no summary document at all resolves every subcategory to all-zero`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -465,7 +465,7 @@ class CategoryDetailsViewModelTest {
 
     /** Structural per ADR-0016, but a fixture bug producing the reverse must still fail loudly. */
     @Test
-    fun `mastered is never greater than studied for any topic`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `mastered is never greater than studied for any subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
         val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
         flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
         cardProgressRepository.seedSummary(
@@ -487,7 +487,7 @@ class CategoryDetailsViewModelTest {
     }
 
     @Test
-    fun `a failed summary read leaves the topic list intact with every topic unresolved and surfaces no error`() =
+    fun `a failed summary read leaves the subcategory list intact with every subcategory unresolved and surfaces no error`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
@@ -506,13 +506,13 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `every topic is unresolved before the summary read completes`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `every subcategory is unresolved before the summary read completes`() = runTest(mainDispatcherRule.testDispatcher) {
         val subcategories = listOf(subcategory("sub-1"))
         flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
         cardProgressRepository.seedSummary(
             ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
         )
-        // Parks the summary read so it genuinely stays in flight past the point the topic list
+        // Parks the summary read so it genuinely stays in flight past the point the subcategory list
         // has already resolved, instead of relying on both never having been dispatched yet.
         val summaryGate = CompletableDeferred<Unit>()
         cardProgressRepository.summaryReadGate = summaryGate
@@ -545,7 +545,7 @@ class CategoryDetailsViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // Topic list is in, summary is still parked: rows exist but every one is unresolved.
+            // Subcategory list is in, summary is still parked: rows exist but every one is unresolved.
             viewModel.state.value.subcategories shouldBe subcategories
             subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgress.Unresolved }
 

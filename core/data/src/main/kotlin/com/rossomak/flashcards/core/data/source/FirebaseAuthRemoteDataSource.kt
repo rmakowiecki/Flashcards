@@ -25,7 +25,7 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
             val result = if (guest != null) {
                 try {
                     guest.linkWithCredential(credential).await()
-                } catch (collision: FirebaseAuthUserCollisionException) {
+                } catch (@Suppress("SwallowedException") collision: FirebaseAuthUserCollisionException) {
                     firebaseAuth.signInWithCredential(credential).await()
                 }
             } else {

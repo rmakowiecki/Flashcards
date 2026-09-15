@@ -37,7 +37,7 @@ private const val DISABLED_ALPHA = 0.6f
 /**
  * The generic design-system list row: an optional [leading] slot, a title with optional
  * [secondaryText] label, and an optional [trailing] slot — one or two lines. Settings, category,
- * and topic rows are all this row composed with different slots (icon tile / play button
+ * and subcategory rows are all this row composed with different slots (icon tile / play button
  * leading; chevron / switch / stepper trailing). A row that also needs a wrapping description
  * line is [FlashcardsDetailedListRow] instead — this row has no `subtitle` slot, so the two
  * shapes can't be conflated at a call site.

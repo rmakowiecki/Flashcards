@@ -601,7 +601,7 @@ private fun BrowseContentPreview() {
  * Results preview the sections directly rather than through [BrowseContent]: they render inside
  * [ExpandedFullScreenSearchBar]'s dialog window at runtime, which a `@Preview` cannot show.
  *
- * [previewProgressFor] shows one topic resolved with real progress and one never studied, so both
+ * [previewProgressFor] shows one subcategory resolved with real progress and one never studied, so both
  * subtitle shapes are visible at once.
  */
 @Preview(showBackground = true)

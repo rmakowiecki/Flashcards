@@ -488,7 +488,7 @@ private fun SubcategoryProgress.ringContentDescription(resources: Resources, car
         )
     }
 
-/** The ring's fill, `0f` for a topic with no cards rather than dividing by zero. */
+/** The ring's fill, `0f` for a subcategory with no cards rather than dividing by zero. */
 private fun Resolved.studiedFraction(cardCount: Int): Float =
     if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 
@@ -496,14 +496,14 @@ private fun Resolved.studiedFraction(cardCount: Int): Float =
  * A subcategory (topic) row, shaped by [isSelectionMode]:
  *
  * - **Default mode** (ADR-0041): progress ring leading, two separate destinations trailing — the
- *   play button jumps straight into the Preview Study Session Screen for this one topic while the
+ *   play button jumps straight into the Preview Study Session Screen for this one subcategory while the
  *   row itself drills into Subcategory Details and starts nothing. Long-pressing enters Selection
- *   Mode with this topic selected.
- * - **Selection Mode**: the play button and chevron are gone — starting a single-topic session
+ *   Mode with this subcategory selected.
+ * - **Selection Mode**: the play button and chevron are gone — starting a single-subcategory session
  *   mid-selection would throw away the selection being assembled — and the row becomes a
  *   checkbox, still leading with the same ring, so its identity doesn't jump as the mode changes.
  *
- * The ring and the subtitle both derive from [progress] and this topic's own
+ * The ring and the subtitle both derive from [progress] and this subcategory's own
  * [cardCount] — see [CategoryDetailsScreenState.progressFor].
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
