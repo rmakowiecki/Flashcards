@@ -5,14 +5,14 @@
         id="MissingKeepAnnotation"
         message="To prevent this Enum&apos;s serializer from being obfuscated in minified builds, annotate it with @androidx.annotation.Keep">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/FlashcardSortOrder.class"/>
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/FlashcardSortOrder.class"/>
     </issue>
 
     <issue
         id="MissingKeepAnnotation"
         message="To prevent this Enum&apos;s serializer from being obfuscated in minified builds, annotate it with @androidx.annotation.Keep">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/StudyMode.class"/>
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/core/domain/build/libs/domain.jar!/com/rossomak/flashcards/core/domain/model/StudyMode.class"/>
     </issue>
 
     <issue
@@ -21,7 +21,7 @@
         errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-9.4.1-bin.zip"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/wrapper/gradle-wrapper.properties"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/wrapper/gradle-wrapper.properties"
             line="4"
             column="17"/>
     </issue>
@@ -32,7 +32,7 @@
         errorLine1="agp = &quot;9.2.1&quot;"
         errorLine2="      ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="2"
             column="7"/>
     </issue>
@@ -43,7 +43,7 @@
         errorLine1="agp = &quot;9.2.1&quot;"
         errorLine2="      ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="2"
             column="7"/>
     </issue>
@@ -54,7 +54,7 @@
         errorLine1="agp = &quot;9.2.1&quot;"
         errorLine2="      ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="2"
             column="7"/>
     </issue>
@@ -65,7 +65,7 @@
         errorLine1="composeBom = &quot;2026.08.00&quot;"
         errorLine2="             ~~~~~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="13"
             column="14"/>
     </issue>
@@ -76,7 +76,7 @@
         errorLine1="material3 = &quot;1.5.0-alpha23&quot;"
         errorLine2="            ~~~~~~~~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="14"
             column="13"/>
     </issue>
@@ -87,7 +87,7 @@
         errorLine1="navigationCompose = &quot;2.9.8&quot;"
         errorLine2="                    ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="18"
             column="21"/>
     </issue>
@@ -98,40 +98,40 @@
         errorLine1="firebaseBom = &quot;34.15.0&quot;"
         errorLine2="              ~~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="19"
             column="15"/>
     </issue>
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.media3:media3-common than 1.10.1 is available: 1.11.0"
+        message="A newer version of androidx.media3:media3-common than 1.10.1 is available: 1.11.1"
         errorLine1="media3 = &quot;1.10.1&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="32"
             column="10"/>
     </issue>
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.media3:media3-session than 1.10.1 is available: 1.11.0"
+        message="A newer version of androidx.media3:media3-session than 1.10.1 is available: 1.11.1"
         errorLine1="media3 = &quot;1.10.1&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="32"
             column="10"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.microsoft.onnxruntime:onnxruntime-android than 1.27.0 is available: 1.29.0"
+        message="A newer version of com.microsoft.onnxruntime:onnxruntime-android than 1.27.0 is available: 1.30.0"
         errorLine1="onnxruntimeAndroid = &quot;1.27.0&quot;"
         errorLine2="                     ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="4"
             column="22"/>
     </issue>
@@ -142,7 +142,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -153,7 +153,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -164,7 +164,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -175,7 +175,7 @@
         errorLine1="hiltAndroid = &quot;2.60&quot;"
         errorLine2="              ~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="5"
             column="15"/>
     </issue>
@@ -186,7 +186,7 @@
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
@@ -197,7 +197,7 @@
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
@@ -208,7 +208,7 @@
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
@@ -219,7 +219,7 @@
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
@@ -230,7 +230,7 @@
         errorLine1="kotlin = &quot;2.3.21&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="11"
             column="10"/>
     </issue>
@@ -241,7 +241,7 @@
         errorLine1="kotlinxCollectionsImmutable = &quot;0.4.0&quot;"
         errorLine2="                              ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="16"
             column="31"/>
     </issue>
@@ -252,7 +252,7 @@
         errorLine1="coil = &quot;3.5.0&quot;"
         errorLine2="       ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="23"
             column="8"/>
     </issue>
@@ -263,18 +263,18 @@
         errorLine1="coil = &quot;3.5.0&quot;"
         errorLine2="       ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="23"
             column="8"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of io.kotest:kotest-assertions-core than 5.9.1 is available: 6.2.4"
+        message="A newer version of io.kotest:kotest-assertions-core than 5.9.1 is available: 6.2.5"
         errorLine1="kotestAssertions = &quot;5.9.1&quot;"
         errorLine2="                   ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="27"
             column="20"/>
     </issue>
@@ -285,7 +285,7 @@
         errorLine1="okhttp = &quot;5.1.0&quot;"
         errorLine2="         ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="40"
             column="10"/>
     </issue>
@@ -296,7 +296,7 @@
         errorLine1="spotless = &quot;7.0.4&quot;"
         errorLine2="           ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="41"
             column="12"/>
     </issue>
@@ -307,7 +307,7 @@
         errorLine1="spotless = &quot;7.0.4&quot;"
         errorLine2="           ~~~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="41"
             column="12"/>
     </issue>
@@ -318,7 +318,7 @@
         errorLine1="google-guava-listenablefuture = { group = &quot;com.google.guava&quot;, name = &quot;listenablefuture&quot;, version = &quot;1.0&quot; }"
         errorLine2="                                                                                                   ~~~~~">
         <location
-            file="$HOME/AndroidStudioProjects/Flashcards/gradle/libs.versions.toml"
+            file="$HOME/AndroidStudioProjects/Flashcards-worktrees/feat-onboarding-before-login/gradle/libs.versions.toml"
             line="123"
             column="100"/>
     </issue>
