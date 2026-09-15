@@ -4,13 +4,19 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.repository.FakeOnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
+import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,6 +34,8 @@ class OnboardingViewModelTest {
     private val authRepository = FakeAuthRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
+    private val onboardingSubcategoriesRepository = FakeOnboardingSubcategoriesRepository()
+    private val userFavoritesRepository = FakeUserFavoritesRepository()
 
     private fun createViewModel(): OnboardingViewModel = OnboardingViewModel(
         getCurrentAuthUser = GetCurrentAuthUserUseCase(authRepository),
@@ -35,6 +43,9 @@ class OnboardingViewModelTest {
             saveStudySessionPreference = SaveStudySessionPreferenceUseCase(studySessionPreferencesRepository),
             saveUserPreference = SaveUserPreferenceUseCase(userPreferencesRepository),
         ),
+        getOnboardingSubcategories = GetOnboardingSubcategoriesUseCase(onboardingSubcategoriesRepository),
+        setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
+        signInAnonymously = SignInAnonymouslyUseCase(authRepository),
     )
 
     private fun authUser(displayName: String?, email: String?) = AuthUser(
@@ -42,6 +53,15 @@ class OnboardingViewModelTest {
         email = email,
         displayName = displayName,
         photoUrl = null,
+    )
+
+    private fun subcategory(id: String) = OnboardingSubcategory(
+        id = id,
+        name = "Compose",
+        categoryId = "android",
+        categoryName = "Android",
+        order = 0,
+        iconSvg = "<svg/>",
     )
 
     @Test
@@ -87,15 +107,75 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `toggling a favorite topic twice deselects it`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `toggling a favorite subcategory twice deselects it`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
         val viewModel = createViewModel()
-        val topicId = viewModel.state.value.favoriteTopicOptions.first().id
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+        val subcategoryId = viewModel.state.value.favoriteSubcategoryOptions.first().id
 
-        viewModel.onFavoriteTopicToggle(topicId)
-        viewModel.state.value.selectedFavoriteTopicIds shouldBe setOf(topicId)
+        viewModel.onFavoriteSubcategoryToggle(subcategoryId)
+        viewModel.state.value.selectedFavoriteSubcategoriesIds shouldBe setOf(subcategoryId)
 
-        viewModel.onFavoriteTopicToggle(topicId)
-        viewModel.state.value.selectedFavoriteTopicIds shouldBe emptySet()
+        viewModel.onFavoriteSubcategoryToggle(subcategoryId)
+        viewModel.state.value.selectedFavoriteSubcategoriesIds shouldBe emptySet()
+    }
+
+    @Test
+    fun `favorites step entry shows loading then the fetched options`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+        val viewModel = createViewModel()
+
+        viewModel.onFavoritesStepEntered()
+        viewModel.state.value.isFavoriteSubcategoriesLoading shouldBe true
+
+        advanceUntilIdle()
+
+        viewModel.state.value.isFavoriteSubcategoriesLoading shouldBe false
+        viewModel.state.value.favoriteSubcategoryOptions.map { it.id } shouldBe listOf("android-compose")
+    }
+
+    @Test
+    fun `favorites step entry surfaces a load failure`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn = Result.failure(IllegalStateException("offline"))
+        val viewModel = createViewModel()
+
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+
+        viewModel.state.value.isFavoriteSubcategoriesLoading shouldBe false
+        viewModel.state.value.favoriteSubcategoriesLoadingFailed shouldBe true
+        viewModel.state.value.favoriteSubcategoryOptions shouldBe emptyList()
+    }
+
+    @Test
+    fun `favorites step entry does not refetch once options are loaded`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+        val viewModel = createViewModel()
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+
+        onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("kotlin-coroutines")))
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+
+        viewModel.state.value.favoriteSubcategoryOptions.map { it.id } shouldBe listOf("android-compose")
+    }
+
+    @Test
+    fun `retry after a load failure fetches again`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn = Result.failure(IllegalStateException("offline"))
+        val viewModel = createViewModel()
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+        viewModel.state.value.favoriteSubcategoriesLoadingFailed shouldBe true
+
+        onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+        viewModel.onFavoriteSubcategoriesRetry()
+        advanceUntilIdle()
+
+        viewModel.state.value.favoriteSubcategoriesLoadingFailed shouldBe false
+        viewModel.state.value.favoriteSubcategoryOptions.map { it.id } shouldBe listOf("android-compose")
     }
 
     @Test
@@ -196,4 +276,92 @@ class OnboardingViewModelTest {
 
         userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe true
     }
+
+    @Test
+    fun `finish with no favorites picked never starts an anonymous session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+
+            viewModel.onFinish()
+            advanceUntilIdle()
+
+            authRepository.signInAnonymouslyCallCount shouldBe 0
+            userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe true
+        }
+
+    @Test
+    fun `finish with a favorite picked signs in anonymously and writes the pick`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+            authRepository.signInAnonymouslyResult = Result.success(
+                AuthUser(uid = "anon-uid", email = null, displayName = null, photoUrl = null, isAnonymous = true),
+            )
+            val viewModel = createViewModel()
+            viewModel.onFavoritesStepEntered()
+            advanceUntilIdle()
+            viewModel.onFavoriteSubcategoryToggle("android-compose")
+
+            viewModel.onFinish()
+            advanceUntilIdle()
+
+            authRepository.signInAnonymouslyCallCount shouldBe 1
+            userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe (setOf("android-compose") to true)
+            userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe true
+        }
+
+    @Test
+    fun `finish leaves the seen flag unset when the anonymous sign-in fails`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+            authRepository.signInAnonymouslyResult = Result.failure(IllegalStateException("offline"))
+            val viewModel = createViewModel()
+            viewModel.onFavoritesStepEntered()
+            advanceUntilIdle()
+            viewModel.onFavoriteSubcategoryToggle("android-compose")
+
+            viewModel.onFinish()
+            advanceUntilIdle()
+
+            userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe false
+            userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe null
+        }
+
+    @Test
+    fun `finish leaves the seen flag unset when the favorites write fails`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+            authRepository.signInAnonymouslyResult = Result.success(
+                AuthUser(uid = "anon-uid", email = null, displayName = null, photoUrl = null, isAnonymous = true),
+            )
+            userFavoritesRepository.setSubcategoriesFavoriteResult = Result.failure(IllegalStateException("offline"))
+            val viewModel = createViewModel()
+            viewModel.onFavoritesStepEntered()
+            advanceUntilIdle()
+            viewModel.onFavoriteSubcategoryToggle("android-compose")
+
+            viewModel.onFinish()
+            advanceUntilIdle()
+
+            userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe false
+        }
+
+    @Test
+    fun `finish leaves the seen flag unset when the anonymous sign-in times out`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+            authRepository.signInAnonymouslyResult = Result.success(
+                AuthUser(uid = "anon-uid", email = null, displayName = null, photoUrl = null, isAnonymous = true),
+            )
+            authRepository.signInAnonymouslyDelayMs = 10_000L
+            val viewModel = createViewModel()
+            viewModel.onFavoritesStepEntered()
+            advanceUntilIdle()
+            viewModel.onFavoriteSubcategoryToggle("android-compose")
+
+            viewModel.onFinish()
+            advanceUntilIdle()
+
+            userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe false
+            userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe null
+        }
 }

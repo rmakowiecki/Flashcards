@@ -5,12 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
-import com.rossomak.flashcards.feature.onboarding.model.FavoriteTopicOption
+import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
+import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.collections.immutable.persistentListOf
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,16 +23,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val getCurrentAuthUser: GetCurrentAuthUserUseCase,
     private val saveOnboardingPreferences: SaveOnboardingPreferencesUseCase,
+    private val getOnboardingSubcategories: GetOnboardingSubcategoriesUseCase,
+    private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
+    private val signInAnonymously: SignInAnonymouslyUseCase,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(
-        OnboardingScreenState(favoriteTopicOptions = SAMPLE_FAVORITE_TOPIC_OPTIONS),
-    )
+    private val _state = MutableStateFlow(OnboardingScreenState())
     val state: StateFlow<OnboardingScreenState> = _state.asStateFlow()
 
     private val eventChannel = Channel<OnboardingDestination>(Channel.BUFFERED)
@@ -53,11 +60,50 @@ class OnboardingViewModel @Inject constructor(
         _state.update { it.copy(dailyGoalMinutes = DailyGoal.coerce(it.dailyGoalMinutes + DailyGoal.STEP_MINUTES)) }
     }
 
-    fun onFavoriteTopicToggle(topicId: String) {
+    fun onFavoriteSubcategoryToggle(subcategoryId: String) {
         _state.update { current ->
-            val selected = current.selectedFavoriteTopicIds
-            val updated = if (topicId in selected) selected - topicId else selected + topicId
-            current.copy(selectedFavoriteTopicIds = updated.toPersistentSet())
+            val selected = current.selectedFavoriteSubcategoriesIds
+            val updated = if (subcategoryId in selected) selected - subcategoryId else selected + subcategoryId
+            current.copy(selectedFavoriteSubcategoriesIds = updated.toPersistentSet())
+        }
+    }
+
+    /**
+     * Fires the curated Favorites list fetch the first time the step is actually reached — never
+     * prefetched in [init], since the list is meaningless until the user gets there. A no-op on any
+     * later re-entry (e.g. swiping back and forth): once a load has settled, success or failure,
+     * only [onFavoriteSubcategoriesRetry] fires another attempt.
+     */
+    fun onFavoritesStepEntered() {
+        val current = _state.value
+        if (current.isFavoriteSubcategoriesLoading || current.favoriteSubcategoryOptions.isNotEmpty() || current.favoriteSubcategoriesLoadingFailed) {
+            return
+        }
+        loadFavoriteSubcategoryOptions()
+    }
+
+    fun onFavoriteSubcategoriesRetry() {
+        loadFavoriteSubcategoryOptions()
+    }
+
+    private fun loadFavoriteSubcategoryOptions() {
+        _state.update { it.copy(isFavoriteSubcategoriesLoading = true, favoriteSubcategoriesLoadingFailed = false) }
+        viewModelScope.launch {
+            getOnboardingSubcategories()
+                .onSuccess { subcategories ->
+                    val options = subcategories.map { subcategory ->
+                        FavoriteSubcategoryOption(
+                            id = subcategory.id,
+                            name = subcategory.name,
+                            categoryName = subcategory.categoryName,
+                            iconSvg = subcategory.iconSvg,
+                        )
+                    }.toPersistentList()
+                    _state.update { it.copy(favoriteSubcategoryOptions = options, isFavoriteSubcategoriesLoading = false) }
+                }
+                .onFailure {
+                    _state.update { it.copy(isFavoriteSubcategoriesLoading = false, favoriteSubcategoriesLoadingFailed = true) }
+                }
         }
     }
 
@@ -66,10 +112,21 @@ class OnboardingViewModel @Inject constructor(
      * call — Skip jumps to the final page rather than leaving, so there is exactly one place where
      * preferences are written.
      *
-     * The completion flag is flipped only after the preferences write succeeds, so a failed write
-     * leaves the flow pending rather than silently losing the user's choices. Navigation happens
-     * either way: nothing the user can do from this screen would fix a local storage failure, and
-     * trapping them on the last page of onboarding is worse than re-showing the flow next launch.
+     * When at least one favorite was picked, a transient anonymous Firebase session (the **Guest**
+     * entity, CONTEXT.md) is started and the picks are written under its uid *before* preferences
+     * are saved — each step gates the next via `Result.getOrThrow()`, same chained style
+     * [SaveOnboardingPreferencesUseCase] itself uses, so a failure anywhere in that lead-in leaves
+     * `hasSeenOnboarding` unset exactly like a failure inside [saveOnboardingPreferences] already
+     * does. Skip (or picking nothing) never starts a Guest session at all — `favoriteCount == 0`
+     * skips the whole lead-in. Both the sign-in and the favorites write are bounded by
+     * [withTimeoutOrNull]: Firestore's offline persistence resolves a write locally but leaves the
+     * returned Task pending until the server acks, so an unbounded await would hang an offline user
+     * on this screen; a timeout here counts as failure for the gate above.
+     *
+     * The completion flag is flipped only after every write above succeeds, so a failed step leaves
+     * the flow pending rather than silently losing the user's choices. Navigation happens either
+     * way: nothing the user can do from this screen would fix a write failure, and trapping them on
+     * the last page of onboarding is worse than re-showing the flow next launch.
      *
      * Onboarding now runs before Login (see docs/temp/onboarding-before-login-spec.md), so finishing
      * it does not guarantee a signed-in user: an anonymous session does not count, since sign-in is
@@ -77,6 +134,9 @@ class OnboardingViewModel @Inject constructor(
      * signed-in user (e.g. Replay onboarding on an authenticated device); everyone else is sent to
      * Login, which already routes back to Main afterwards since `hasSeenOnboarding` is now true.
      */
+    // Generic catch is deliberate: any failure anywhere in the lead-in chain above collapses to the
+    // same "leave hasSeenOnboarding unset, navigate anyway" outcome, same as SaveOnboardingPreferencesUseCase's own boundary.
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     fun onFinish() {
         if (_state.value.isCommitting) {
             return
@@ -84,15 +144,25 @@ class OnboardingViewModel @Inject constructor(
         _state.update { it.copy(isCommitting = true) }
 
         viewModelScope.launch {
-            val params = SaveOnboardingPreferencesUseCase.Params(
-                defaultStudyMode = _state.value.defaultStudyMode,
-                dailyGoalMinutes = _state.value.dailyGoalMinutes,
-            )
-            // TODO(favorites): persist state.selectedFavoriteTopicIds to users/{uid}/favorites here.
-            //  Firestore's offline persistence resolves a write locally but leaves the returned
-            //  Task pending until the server acks, so that call must not be awaited unbounded — a
-            //  withTimeout, or no await at all, otherwise an offline user hangs on this screen.
-            saveOnboardingPreferences(params)
+            val selectedIds = _state.value.selectedFavoriteSubcategoriesIds
+            try {
+                if (selectedIds.isNotEmpty()) {
+                    withOnboardingTimeout(SIGN_IN_ANONYMOUSLY_TIMEOUT_MS) { signInAnonymously() }.getOrThrow()
+                    withOnboardingTimeout(SET_FAVORITES_TIMEOUT_MS) {
+                        setFavoriteSubcategories(SetFavoriteSubcategoriesUseCase.Params(selectedIds))
+                    }.getOrThrow()
+                }
+                val params = SaveOnboardingPreferencesUseCase.Params(
+                    defaultStudyMode = _state.value.defaultStudyMode,
+                    dailyGoalMinutes = _state.value.dailyGoalMinutes,
+                )
+                saveOnboardingPreferences(params).getOrThrow()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                // Swallowed deliberately: hasSeenOnboarding stays unset, so the flow replays next
+                // launch (see this function's doc comment) rather than trapping the user here.
+            }
             val authUser = getCurrentAuthUser()
             val authenticated = authUser != null && !authUser.isAnonymous
             _state.update { it.copy(isCommitting = false) }
@@ -100,24 +170,12 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
+    private suspend fun <T> withOnboardingTimeout(timeoutMs: Long, block: suspend () -> Result<T>): Result<T> =
+        withTimeoutOrNull(timeoutMs.milliseconds) { block() }
+            ?: Result.failure(IllegalStateException("Onboarding commit step timed out"))
+
     private companion object {
-        /**
-         * Stand-in for the Favorites step's topic grid. Real Subcategories are not fetched yet —
-         * favourites are not persisted in this release, so querying them would add loading and
-         * error states to a screen whose selections currently go nowhere.
-         */
-        // TODO(favorites): replace with a real featured-subcategory query once favourites persist.
-        val SAMPLE_FAVORITE_TOPIC_OPTIONS = persistentListOf(
-            FavoriteTopicOption(id = "compose", name = "Compose", categoryName = "Android"),
-            FavoriteTopicOption(id = "coroutines", name = "Coroutines", categoryName = "Kotlin"),
-            FavoriteTopicOption(id = "compose-navigation", name = "Compose Navigation", categoryName = "Android"),
-            FavoriteTopicOption(id = "async", name = "Async", categoryName = "Python"),
-            FavoriteTopicOption(id = "typing", name = "Typing", categoryName = "Python"),
-            FavoriteTopicOption(id = "standard-library", name = "Standard Library", categoryName = "Python"),
-            FavoriteTopicOption(id = "swiftui", name = "SwiftUI", categoryName = "iOS"),
-            FavoriteTopicOption(id = "combine", name = "Combine", categoryName = "iOS"),
-            FavoriteTopicOption(id = "collections", name = "Collections", categoryName = "Kotlin"),
-            FavoriteTopicOption(id = "workmanager", name = "WorkManager", categoryName = "Android"),
-        )
+        const val SIGN_IN_ANONYMOUSLY_TIMEOUT_MS = 8000L
+        const val SET_FAVORITES_TIMEOUT_MS = 8000L
     }
 }
