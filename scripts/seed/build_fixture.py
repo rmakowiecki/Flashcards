@@ -15,6 +15,13 @@ Schema (see ADR-0007, ADR-0037):
                                                      order, cardCount }
   subcategories/{categoryId-subSlug}/shards/{n}  → { flashcards: { "<cardId>": { id, question,
                                                      answer, tags[], createdAt, ... }, ... } }
+  onboarding/subcategories                       → { subcategories: { "{categoryId-subSlug}": {
+                                                     order, categoryId, categoryName, subcategoryId,
+                                                     subcategoryName, iconSvg }, ... } } — one
+                                                     document, denormalized+trimmed for the
+                                                     admin-curated id allowlist in
+                                                     curated_onboarding_topics.py (publicly readable,
+                                                     see docs/design/firestore-schema.md)
 
 Cards are packed into byte-budgeted shard docs instead of one Firestore document per card
 (ADR-0037) — each Subcategory's cards are sorted by id, then greedily accumulated into a shard
@@ -43,6 +50,7 @@ Dropped: subcategoryId field on card, source (PII), status (capture lifecycle).
 from __future__ import annotations
 import argparse, glob, json, os, random, sys
 from collections import Counter, defaultdict
+from curated_onboarding_topics import CURATED_ONBOARDING_SUBCATEGORY_IDS
 
 DEFAULT_SRC = os.path.expanduser("~/.claude/flashcards")
 DEFAULT_OUT = os.path.join(os.path.dirname(__file__), ".tmp", "fixture.json")
@@ -304,10 +312,46 @@ def build(
                 "cardCount": sub_counts[sid],
             })
 
+    # onboarding/subcategories: a small, admin-curated subset of `subcategories`
+    # (curated_onboarding_topics.py, docs/design/firestore-schema.md), denormalized and trimmed
+    # down to exactly what onboarding needs, packed into ONE document's `subcategories` map so the
+    # whole curated list costs a single Firestore read. `iconSvg` is joined in from each entry's
+    # parent category — onboarding never reads `categories` itself. `order` is this curated list's
+    # own fresh sequential order, not each subcategory's order within its real parent category. A
+    # curated id that no longer exists in the built taxonomy fails the run loudly rather than
+    # silently seeding a shorter list than intended.
+    subcategories_by_id = {sub["id"]: sub for sub in subcategories}
+    categories_by_id = {category["id"]: category for category in categories}
+    missing_curated_ids = [
+        sid for sid in CURATED_ONBOARDING_SUBCATEGORY_IDS if sid not in subcategories_by_id
+    ]
+    if missing_curated_ids:
+        sys.exit(
+            "curated_onboarding_topics.py lists subcategory ids that no longer exist in the "
+            f"built taxonomy: {missing_curated_ids} — update the allowlist"
+        )
+    onboarding_subcategories_doc = {
+        "subcategories": {
+            sid: {
+                "order": order,
+                "categoryId": subcategories_by_id[sid]["categoryId"],
+                "categoryName": subcategories_by_id[sid]["categoryName"],
+                "subcategoryId": sid,
+                "subcategoryName": subcategories_by_id[sid]["name"],
+                "iconSvg": categories_by_id[subcategories_by_id[sid]["categoryId"]].get("iconSvg"),
+            }
+            for order, sid in enumerate(CURATED_ONBOARDING_SUBCATEGORY_IDS)
+        }
+    }
+
     shards = pack_shards(cards)
 
-    return {"categories": categories, "subcategories": subcategories, "shards": shards}, \
-           cat_counts, sub_counts
+    return {
+        "categories": categories,
+        "subcategories": subcategories,
+        "onboardingSubcategories": onboarding_subcategories_doc,
+        "shards": shards,
+    }, cat_counts, sub_counts
 
 
 def main():
@@ -334,6 +378,7 @@ def main():
     print(f"wrote {args.out}")
     print(f"  categories:    {len(fixture['categories'])}")
     print(f"  subcategories: {len(fixture['subcategories'])}")
+    print(f"  onboarding:    {len(fixture['onboardingSubcategories']['subcategories'])}")
     print(f"  cards:         {total_cards}")
     print(f"  shards:        {len(fixture['shards'])}"
           + (f" ({total_cards / len(fixture['shards']):.1f} cards/shard avg)" if fixture['shards'] else ""))
