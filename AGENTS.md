@@ -216,14 +216,14 @@ override suspend fun submitResponse(cardId: String, audioFile: File): Result<Eva
 
 ## Logging
 
-Use `AppLog` (`core/common`, `com.rossomak.flashcards.core.common.AppLog.kt`), never `Timber` or `println` directly. Lambda-message helpers, one per level: `logv`, `logd`, `logi`, `logw`, `loge`. `logw`/`loge` take an optional leading `Throwable?`.
+Use `AppLog` (`core/common`), never `Timber` or `println` directly: `logv`, `logd`, `logi`, `logw`, `loge` (lambda-message; `logw`/`loge` take optional leading `Throwable?`).
 
 ```kotlin
 logd { "App start: scheduling session submission drain for recovery" }
 loge(exception) { "Failed to submit response for card $cardId" }
 ```
 
-`AppLog` wraps Timber (`Timber.plant(Timber.DebugTree())` only in debug builds, in `FlashcardsApplication.onCreate`). Lambda form defers string building until the log level is actually enabled.
+Log sparingly. Only at points that matter for diagnosing prod issues: final state of an IO operation (network call result, DB write, file op), errors/exceptions, key lifecycle transitions. Do not log every branch or intermediate step — no logging for its own sake inside ordinary business logic.
 
 ## Static Analysis
 
