@@ -2,10 +2,12 @@ package com.rossomak.flashcards.core.data.mapper
 
 import com.rossomak.flashcards.core.data.model.CategoryDto
 import com.rossomak.flashcards.core.data.model.FlashcardDto
+import com.rossomak.flashcards.core.data.model.OnboardingSubcategoryDto
 import com.rossomak.flashcards.core.data.model.SubcategoryDto
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CodeBlock
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 
 fun CategoryDto.toDomain() = Category(
@@ -26,6 +28,26 @@ fun SubcategoryDto.toDomain() = Subcategory(
     order = order,
     cardCount = cardCount
 )
+
+// Nullable return mirrors FlashcardDto.toDomain() below: reject an incomplete Firestore entry
+// here rather than let an empty id/name reach the domain model.
+fun OnboardingSubcategoryDto.toDomain(): OnboardingSubcategory? {
+    val id = subcategoryId?.takeIf { it.isNotBlank() }
+    val name = subcategoryName?.takeIf { it.isNotBlank() }
+    val resolvedCategoryId = categoryId?.takeIf { it.isNotBlank() }
+    val resolvedCategoryName = categoryName?.takeIf { it.isNotBlank() }
+    if (id == null || name == null || resolvedCategoryId == null || resolvedCategoryName == null) {
+        return null
+    }
+    return OnboardingSubcategory(
+        id = id,
+        name = name,
+        categoryId = resolvedCategoryId,
+        categoryName = resolvedCategoryName,
+        order = order,
+        iconSvg = iconSvg,
+    )
+}
 
 fun FlashcardDto.toDomain(subcategoryId: String): Flashcard? = difficulty?.let {
     Flashcard(

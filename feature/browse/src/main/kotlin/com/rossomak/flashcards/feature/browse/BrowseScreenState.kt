@@ -81,7 +81,7 @@ sealed interface SearchStatus {
  * — the category list and a single search query fail independently of each other.
  *
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), backing the ring
- * and subtitle on every matched topic in [searchStatus]. `null` until [isProgressResolved] — and
+ * and subtitle on every matched subcategory in [searchStatus]. `null` until [isProgressResolved] — and
  * possibly still `null` after, for a User who has never finished a session. Never read directly by
  * the screen; go through [progressFor]. Mirrors [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressSummary] — one
  * summary document serves both screens' rings.
@@ -100,6 +100,6 @@ data class BrowseScreenState(
     val isProgressResolved: Boolean = false,
 ) {
 
-    /** One matched topic's ring/subtitle data — see [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressFor]. */
+    /** One matched subcategory's ring/subtitle data — see [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressFor]. */
     fun progressFor(subcategoryId: String): SubcategoryProgress = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
 }

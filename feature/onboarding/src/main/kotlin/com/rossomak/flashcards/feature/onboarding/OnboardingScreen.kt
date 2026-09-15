@@ -58,6 +58,21 @@ private const val COPY_REVEAL_MS = 450
 /** Fade-in of Skip and the CTA, the last thing to arrive. */
 private const val CHROME_REVEAL_MS = 300
 
+/**
+ * Every callback [OnboardingContent] and [OnboardingStepPage] hand down into a step — bundled
+ * rather than passed as individual lambdas so growing the flow by another step's callback doesn't
+ * grow either function's own parameter list.
+ */
+private data class OnboardingActions(
+    val onStudyModeSelect: (StudyMode) -> Unit,
+    val onDailyGoalDecrement: () -> Unit,
+    val onDailyGoalIncrement: () -> Unit,
+    val onFavoriteSubcategoryToggle: (String) -> Unit,
+    val onFavoritesStepEntered: () -> Unit,
+    val onFavoriteSubcategoriesRetry: () -> Unit,
+    val onFinish: () -> Unit,
+)
+
 @Composable
 fun OnboardingScreen(
     modifier: Modifier = Modifier,
@@ -77,11 +92,15 @@ fun OnboardingScreen(
     OnboardingContent(
         modifier = modifier,
         state = state,
-        onStudyModeSelect = viewModel::onStudyModeSelect,
-        onDailyGoalDecrement = viewModel::onDailyGoalDecrement,
-        onDailyGoalIncrement = viewModel::onDailyGoalIncrement,
-        onFavoriteTopicToggle = viewModel::onFavoriteTopicToggle,
-        onFinish = viewModel::onFinish,
+        actions = OnboardingActions(
+            onStudyModeSelect = viewModel::onStudyModeSelect,
+            onDailyGoalDecrement = viewModel::onDailyGoalDecrement,
+            onDailyGoalIncrement = viewModel::onDailyGoalIncrement,
+            onFavoriteSubcategoryToggle = viewModel::onFavoriteSubcategoryToggle,
+            onFavoritesStepEntered = viewModel::onFavoritesStepEntered,
+            onFavoriteSubcategoriesRetry = viewModel::onFavoriteSubcategoriesRetry,
+            onFinish = viewModel::onFinish,
+        ),
     )
 }
 
@@ -95,17 +114,22 @@ fun OnboardingScreen(
  */
 @Composable
 private fun OnboardingContent(
-    modifier: Modifier = Modifier,
     state: OnboardingScreenState,
-    onStudyModeSelect: (StudyMode) -> Unit,
-    onDailyGoalDecrement: () -> Unit,
-    onDailyGoalIncrement: () -> Unit,
-    onFavoriteTopicToggle: (String) -> Unit,
-    onFinish: () -> Unit,
+    actions: OnboardingActions,
+    modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState { OnboardingStep.entries.size }
     val coroutineScope = rememberCoroutineScope()
     val currentStep = OnboardingStep.atPage(pagerState.currentPage)
+
+    // Fires the curated Favorites list fetch the moment that step is actually reached — never
+    // prefetched, since the list is meaningless until the user gets there. The view model itself
+    // no-ops any call past the first, so re-entering by swiping back and forth is harmless.
+    LaunchedEffect(currentStep) {
+        if (currentStep == OnboardingStep.Favorites) {
+            actions.onFavoritesStepEntered()
+        }
+    }
 
     // The entrance runs once per visit to the flow, staged behind the logo the splash screen hands
     // over: the logo settles first, then the cover's copy rises into place, then the buttons appear.
@@ -153,10 +177,7 @@ private fun OnboardingContent(
                     step = OnboardingStep.atPage(page),
                     state = state,
                     copyRevealProgress = copyReveal.value,
-                    onStudyModeSelect = onStudyModeSelect,
-                    onDailyGoalDecrement = onDailyGoalDecrement,
-                    onDailyGoalIncrement = onDailyGoalIncrement,
-                    onFavoriteTopicToggle = onFavoriteTopicToggle,
+                    actions = actions,
                 )
             }
             OnboardingCta(
@@ -167,7 +188,7 @@ private fun OnboardingContent(
                 enabled = !state.isCommitting && chromeReveal.value > 0f,
                 onClick = {
                     if (currentStep == OnboardingStep.LAST) {
-                        onFinish()
+                        actions.onFinish()
                     } else {
                         coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                     }
@@ -256,10 +277,7 @@ private fun OnboardingStepPage(
     step: OnboardingStep,
     state: OnboardingScreenState,
     copyRevealProgress: Float,
-    onStudyModeSelect: (StudyMode) -> Unit,
-    onDailyGoalDecrement: () -> Unit,
-    onDailyGoalIncrement: () -> Unit,
-    onFavoriteTopicToggle: (String) -> Unit,
+    actions: OnboardingActions,
     modifier: Modifier = Modifier,
 ) {
     when (step) {
@@ -268,15 +286,15 @@ private fun OnboardingStepPage(
         OnboardingStep.Mastery -> MasteryStep(modifier = modifier)
         OnboardingStep.SessionModes -> SessionModesStep(
             selectedStudyMode = state.defaultStudyMode,
-            onStudyModeSelect = onStudyModeSelect,
+            onStudyModeSelect = actions.onStudyModeSelect,
             modifier = modifier,
         )
         OnboardingStep.DailyGoal -> DailyGoalStep(
             dailyGoalMinutes = state.dailyGoalMinutes,
             canDecrement = state.canDecrementDailyGoal,
             canIncrement = state.canIncrementDailyGoal,
-            onDecrement = onDailyGoalDecrement,
-            onIncrement = onDailyGoalIncrement,
+            onDecrement = actions.onDailyGoalDecrement,
+            onIncrement = actions.onDailyGoalIncrement,
             modifier = modifier,
         )
         OnboardingStep.VoicePrivacy -> VoicePrivacyStep(
@@ -286,16 +304,19 @@ private fun OnboardingStepPage(
             modifier = modifier,
         )
         OnboardingStep.Favorites -> FavoritesStep(
-            options = state.favoriteTopicOptions,
-            selectedIds = state.selectedFavoriteTopicIds,
-            onTopicToggle = onFavoriteTopicToggle,
+            options = state.favoriteSubcategoryOptions,
+            selectedIds = state.selectedFavoriteSubcategoriesIds,
+            isLoading = state.isFavoriteSubcategoriesLoading,
+            loadFailed = state.favoriteSubcategoriesLoadingFailed,
+            onSubcategoryToggle = actions.onFavoriteSubcategoryToggle,
+            onRetry = actions.onFavoriteSubcategoriesRetry,
             modifier = modifier,
         )
         OnboardingStep.AllSet -> AllSetStep(
             userName = state.userName,
             defaultStudyMode = state.defaultStudyMode,
             dailyGoalMinutes = state.dailyGoalMinutes,
-            favoriteCount = state.selectedFavoriteTopicIds.size,
+            favoriteCount = state.selectedFavoriteSubcategoriesIds.size,
             modifier = modifier,
         )
     }
@@ -307,11 +328,15 @@ private fun OnboardingContentPreview() {
     FlashcardsTheme {
         OnboardingContent(
             state = remember { OnboardingScreenState(userName = "Radek") },
-            onStudyModeSelect = {},
-            onDailyGoalDecrement = {},
-            onDailyGoalIncrement = {},
-            onFavoriteTopicToggle = {},
-            onFinish = {},
+            actions = OnboardingActions(
+                onStudyModeSelect = {},
+                onDailyGoalDecrement = {},
+                onDailyGoalIncrement = {},
+                onFavoriteSubcategoryToggle = {},
+                onFavoritesStepEntered = {},
+                onFavoriteSubcategoriesRetry = {},
+                onFinish = {},
+            ),
         )
     }
 }

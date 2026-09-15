@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.onboarding.component
+package com.rossomak.flashcards.core.ui.composables
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -15,20 +15,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
@@ -36,13 +36,17 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Side of this card's leading glyph tile — smaller than the shared
- * [com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile] (40dp): the grid packs six-plus
+ * [FlashcardsIconTile] (40dp): the grid packs six-plus
  * cards on screen at once, so the standard tile reads oversized here.
  */
-private val TopicIconTileSize = 28.dp
+private val SubcategoryIconTileSize = 28.dp
+
+/** Fixed card size used only in the previews below — the real grid sizes cards via [Modifier.weight]. */
+private val ShowcaseCardWidth = 140.dp
+private val ShowcaseCardHeight = 96.dp
 
 /**
- * A topic the user can favourite during onboarding: a leading category glyph, the topic name, its
+ * A subcategory the user can favourite during onboarding: a leading category glyph, the subcategory name, its
  * parent category, and a trailing bookmark that fills once picked.
  *
  * Unselected cards sit in the same translucent-on-gradient treatment as
@@ -55,10 +59,10 @@ private val TopicIconTileSize = 28.dp
  * the bookmark is decoration and TalkBack announces the card once.
  */
 @Composable
-fun FavoriteTopicCard(
+fun FavoriteSubcategoryCard(
     name: String,
     categoryName: String,
-    icon: ImageVector,
+    iconSvg: String?,
     selected: Boolean,
     onSelectedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -90,10 +94,10 @@ fun FavoriteTopicCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 if (selected) {
-                    TopicIconTile(icon = icon)
+                    SubcategoryIconTile(iconSvg = iconSvg)
                 } else {
-                    TopicIconTile(
-                        icon = icon,
+                    SubcategoryIconTile(
+                        iconSvg = iconSvg,
                         contentColor = brandColors.onGradientContent,
                         containerColor = brandColors.onGradientBorder,
                     )
@@ -123,32 +127,69 @@ fun FavoriteTopicCard(
     }
 }
 
-/** A [TopicIconTileSize] glyph tile — see that constant for why this isn't [FlashcardsIconTile]. */
+/**
+ * A [SubcategoryIconTileSize] glyph tile — see that constant for why this isn't [FlashcardsIconTile].
+ * Renders [iconSvg] via [FlashcardsInlineCategoryGlyph] (fallback glyph if absent/malformed),
+ * tinted [contentColor] — same fallback handling [FlashcardsVectorIconTile] gives category tiles
+ * elsewhere, just without its own container: [containerColor] is this card's own selected/
+ * unselected surface treatment, not derived from the icon's tint.
+ */
 @Composable
-private fun TopicIconTile(
-    icon: ImageVector,
+private fun SubcategoryIconTile(
+    iconSvg: String?,
     modifier: Modifier = Modifier,
     contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
     containerColor: Color = contentColor.copy(alpha = DEFAULT_CONTAINER_ALPHA),
 ) {
     Box(
         modifier = modifier
-            .size(TopicIconTileSize)
+            .size(SubcategoryIconTileSize)
             .background(
                 color = containerColor,
                 shape = RoundedCornerShape(MaterialTheme.cornerRadius.small),
             ),
         contentAlignment = Alignment.Center,
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(MaterialTheme.sizes.metadataBadgeIcon),
+        FlashcardsInlineCategoryGlyph(
+            iconSvg = iconSvg,
+            tint = contentColor,
+            contentDescription = null,
+        )
+    }
+}
+
+@ShowkaseComposable(name = "Favorite subcategory card", group = "Onboarding")
+@Composable
+fun FavoriteSubcategoryCardShowcase() {
+    FlashcardsTheme {
+        Row(
+            modifier = Modifier
+                .background(MaterialTheme.brandColors.topBarGradient)
+                .padding(MaterialTheme.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+        ) {
+            FavoriteSubcategoryCard(
+                name = "Coroutines",
+                categoryName = "Kotlin",
+                iconSvg = null,
+                selected = false,
+                onSelectedChange = {},
+                modifier = Modifier.size(ShowcaseCardWidth, ShowcaseCardHeight),
+            )
+            FavoriteSubcategoryCard(
+                name = "Coroutines",
+                categoryName = "Kotlin",
+                iconSvg = null,
+                selected = true,
+                onSelectedChange = {},
+                modifier = Modifier.size(ShowcaseCardWidth, ShowcaseCardHeight),
             )
         }
     }
 }
 
-/** Opacity of [MaterialTheme.colorScheme.secondaryContainer] used as [TopicIconTile]'s default fill. */
-private const val DEFAULT_CONTAINER_ALPHA = 0.12f
+@PreviewLightDark
+@Composable
+private fun FavoriteSubcategoryCardPreview() {
+    FavoriteSubcategoryCardShowcase()
+}

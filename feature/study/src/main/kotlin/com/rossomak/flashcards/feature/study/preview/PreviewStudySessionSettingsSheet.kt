@@ -46,7 +46,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceS
  * Every row renders at once — no manual pagination or lazy list here — and
  * [FlashcardsBottomSheet]'s own default `maxHeightFraction` caps and internally scrolls the whole
  * thing once a Rated quick session's full row set (mode, voice answering, attempts, voice settings,
- * length, topics, filters, sort — up to eight rows) runs taller than that cap, e.g. in landscape or
+ * length, subcategories, filters, sort — up to eight rows) runs taller than that cap, e.g. in landscape or
  * at a large font scale. See [FlashcardsBottomSheet]'s own doc for how that cap and scroll actually
  * work, and why [FlashcardsBottomSheetState] only ever enables hidden/expanded, never a partial peek.
  */

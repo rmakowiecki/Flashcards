@@ -57,7 +57,7 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    /** Long-pressing a topic enters Selection Mode **and** selects the pressed topic, in one update. */
+    /** Long-pressing a subcategory enters Selection Mode **and** selects the pressed subcategory, in one update. */
     fun onSubcategoryLongPress(subcategoryId: String) {
         _state.update { it.copy(selectedSubcategoryIds = setOf(subcategoryId)) }
     }
@@ -73,7 +73,7 @@ class CategoryDetailsViewModel @Inject constructor(
 
     /**
      * Two-state on [CategoryDetailsScreenState.isAllSelected]: all selected clears to empty,
-     * anything else — including a partial selection — selects every topic. There is no
+     * anything else — including a partial selection — selects every subcategory. There is no
      * indeterminate third state; the partial case and the empty case both want "select everything".
      */
     fun onSelectAllToggle() {
@@ -95,7 +95,7 @@ class CategoryDetailsViewModel @Inject constructor(
 
     /**
      * Exactly the selected Subcategories, honoured literally — not sampled. Emitted in **list
-     * order, not selection order**, so a session's topic order does not depend on the order the
+     * order, not selection order**, so a session's subcategory order does not depend on the order the
      * user happened to tap.
      */
     fun onCustomSessionStart() {
@@ -159,9 +159,9 @@ class CategoryDetailsViewModel @Inject constructor(
 
     /**
      * Runs independently of [loadSubcategories] so a slow or failed progress read never gates the
-     * topic list. A failure leaves [CategoryDetailsScreenState.isProgressResolved] `false`
+     * subcategory list. A failure leaves [CategoryDetailsScreenState.isProgressResolved] `false`
      * forever — every ring stays unknown and every subtitle simply drops its studied segment
-     * (same as a never-studied topic), with no error surfaced, per the ticket's "no error, no
+     * (same as a never-studied subcategory), with no error surfaced, per the ticket's "no error, no
      * retry prompt, no snackbar" rule.
      */
     private fun loadProgressSummary() {

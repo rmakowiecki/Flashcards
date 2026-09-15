@@ -71,6 +71,9 @@
     <string name="favorites_eyebrow_label">Convenient bookmarks</string>
     <string name="favorites_headline_title">Make it truly yours</string>
     <string name="favorites_intro_message">Pin favorite topics for easy access.</string>
+    <string name="favorites_load_error_title">Couldn\'t load topics</string>
+    <string name="favorites_load_error_message">Check your connection and try again.</string>
+    <string name="favorites_load_error_retry_button">Retry</string>
 
     <!-- 8 · All set -->
     <string name="all_set_headline_title">You\'re all set, %1$s!</string>

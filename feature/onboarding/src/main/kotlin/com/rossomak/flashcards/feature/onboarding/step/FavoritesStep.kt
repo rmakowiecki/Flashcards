@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.onboarding.step
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -9,33 +10,36 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DataObject
-import androidx.compose.material.icons.filled.PhoneIphone
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.ui.composables.FavoriteSubcategoryCard
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsScrollFadeHeight
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.flashcardsGridScrollFade
+import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
-import com.rossomak.flashcards.feature.onboarding.component.FavoriteTopicCard
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
-import com.rossomak.flashcards.feature.onboarding.model.FavoriteTopicOption
+import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 
 private const val FAVORITE_GRID_COLUMNS = 2
 
 /**
- * Target height of the topic grid — about 3.5 rows, so a peek of the next row shows under the
+ * Target height of the subcategory grid — about 3.5 rows, so a peek of the next row shows under the
  * bottom fade and hints the grid scrolls. [FavoritesStepLayout] only grants this in full when the
  * header leaves enough room; on a short screen or a large font scale it shrinks the grid instead
  * of letting the step overflow.
@@ -50,9 +54,12 @@ private val FavoriteGridHeight = 372.dp
  */
 @Composable
 internal fun FavoritesStep(
-    options: ImmutableList<FavoriteTopicOption>,
+    options: ImmutableList<FavoriteSubcategoryOption>,
     selectedIds: ImmutableSet<String>,
-    onTopicToggle: (String) -> Unit,
+    isLoading: Boolean,
+    loadFailed: Boolean,
+    onSubcategoryToggle: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FavoritesStepLayout(
@@ -68,25 +75,47 @@ internal fun FavoritesStep(
             )
         },
         grid = {
-            val gridState = rememberLazyGridState()
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(FAVORITE_GRID_COLUMNS),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .flashcardsGridScrollFade(gridState),
-                contentPadding = PaddingValues(bottom = FlashcardsScrollFadeHeight),
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
-                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
-            ) {
-                items(items = options, key = { option -> option.id }) { option ->
-                    FavoriteTopicCard(
-                        name = option.name,
-                        categoryName = option.categoryName,
-                        icon = option.categoryName.categoryIcon(),
-                        selected = option.id in selectedIds,
-                        onSelectedChange = { onTopicToggle(option.id) },
-                    )
+            when {
+                isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
+                }
+                loadFailed -> FlashcardsEmptyState(
+                    icon = Icons.Default.ErrorOutline,
+                    title = stringResource(R.string.favorites_load_error_title),
+                    supportingText = stringResource(R.string.favorites_load_error_message),
+                    modifier = Modifier.fillMaxSize(),
+                    tone = FlashcardsEmptyStateTone.Error,
+                    style = FlashcardsComponentStyle.OnGradient,
+                    button = {
+                        FlashcardsFilledButton(
+                            text = stringResource(R.string.favorites_load_error_retry_button),
+                            onClick = onRetry,
+                            style = FlashcardsComponentStyle.OnGradient,
+                        )
+                    },
+                )
+                else -> {
+                    val gridState = rememberLazyGridState()
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(FAVORITE_GRID_COLUMNS),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .flashcardsGridScrollFade(gridState),
+                        contentPadding = PaddingValues(bottom = FlashcardsScrollFadeHeight),
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+                        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+                    ) {
+                        items(items = options, key = { option -> option.id }) { option ->
+                            FavoriteSubcategoryCard(
+                                name = option.name,
+                                categoryName = option.categoryName,
+                                iconSvg = option.iconSvg,
+                                selected = option.id in selectedIds,
+                                onSelectedChange = { onSubcategoryToggle(option.id) },
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -142,16 +171,4 @@ private fun FavoritesStepLayout(
             gridPlaceable.placeRelative(0, top + headerPlaceable.height + spacingPx)
         }
     }
-}
-
-/**
- * Placeholder glyph mapping. Categories carry their own remote icon (`Category.iconSvg`), but this
- * step runs on a hardcoded option list that has no Category attached yet.
- */
-// TODO(favorites): drop this in favour of Category.iconSvg once real subcategories are fetched.
-private fun String.categoryIcon(): ImageVector = when (this) {
-    "Android" -> Icons.Default.Android
-    "iOS" -> Icons.Default.PhoneIphone
-    "Python" -> Icons.Default.DataObject
-    else -> Icons.Default.Code
 }

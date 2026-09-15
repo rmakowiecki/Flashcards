@@ -2,7 +2,7 @@ package com.rossomak.flashcards.feature.onboarding
 
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.StudyMode
-import com.rossomak.flashcards.feature.onboarding.model.FavoriteTopicOption
+import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
@@ -18,8 +18,11 @@ data class OnboardingScreenState(
     val userName: String? = null,
     val defaultStudyMode: StudyMode = StudyMode.Rated,
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
-    val favoriteTopicOptions: ImmutableList<FavoriteTopicOption> = persistentListOf(),
-    val selectedFavoriteTopicIds: ImmutableSet<String> = persistentSetOf(),
+    val favoriteSubcategoryOptions: ImmutableList<FavoriteSubcategoryOption> = persistentListOf(),
+    val isFavoriteSubcategoriesLoading: Boolean = false,
+    val favoriteSubcategoriesLoaded: Boolean = false,
+    val favoriteSubcategoriesLoadingFailed: Boolean = false,
+    val selectedFavoriteSubcategoriesIds: ImmutableSet<String> = persistentSetOf(),
     val isCommitting: Boolean = false,
 ) {
     val canDecrementDailyGoal: Boolean

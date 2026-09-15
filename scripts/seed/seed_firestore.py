@@ -8,6 +8,9 @@ Schema written (see ADR-0007, ADR-0037):
   categories/{categoryId}                               → { name, order, subcategoryCount, iconSvg, color, featuredSubcategoryNames[] }
   subcategories/{categoryId-subSlug}                    → { name, nameLower, categoryId, categoryName, order, cardCount }
   subcategories/{categoryId-subSlug}/shards/{n}         → { flashcards: { "<cardId>": { id, question, answer, tags[], createdAt, ... }, ... } }
+  onboarding/subcategories                              → { subcategories: { "{categoryId-subSlug}": { order, categoryId, categoryName,
+                                                            subcategoryId, subcategoryName, iconSvg }, ... } } — one singleton document,
+                                                            fully overwritten every run (see write_onboarding_subcategories)
 
 The `subcategoryId` field carried in the fixture is used to route each shard into the correct
 subcollection path — it is NOT written as a Firestore document field.
@@ -89,6 +92,7 @@ def load_fixtures(fixtures_dir: str):
     if not paths:
         sys.exit(f"no *.json fixtures in {fixtures_dir} — run build_fixture.py first")
     categories, subcategories, shards = [], [], []
+    onboarding_subcategories_doc: dict = {"subcategories": {}}
     # Shard doc ids ("0", "1", ...) are only unique within their subcategory, so the collision
     # key is the (subcategoryId, id) pair, not the bare shard id. Every real run consumes a
     # single fixture file (build_fixture.py always writes one canonical .tmp/fixture.json), so
@@ -102,6 +106,9 @@ def load_fixtures(fixtures_dir: str):
             data = json.load(f)
         categories += data.get("categories", [])
         subcategories += data.get("subcategories", [])
+        onboarding_subcategories_doc["subcategories"].update(
+            data.get("onboardingSubcategories", {}).get("subcategories", {})
+        )
         for s in data.get("shards", []):
             key = (s["subcategoryId"], s["id"])
             if key in seen_shard_keys:
@@ -111,7 +118,7 @@ def load_fixtures(fixtures_dir: str):
                 )
             seen_shard_keys.add(key)
             shards.append(s)
-    return paths, categories, subcategories, shards
+    return paths, categories, subcategories, onboarding_subcategories_doc, shards
 
 
 def init_db(cred_path: str | None):
@@ -304,6 +311,19 @@ def refresh_card_counts(db, subcategories: list[dict], *, dry_run: bool) -> int:
     return written
 
 
+def write_onboarding_subcategories(db, doc: dict, *, dry_run: bool) -> int:
+    """Overwrites the singleton `onboarding/subcategories` document in full every run — same
+    get-then-set write shape as `bump_cache_seed`'s `meta/seed` doc (same accepted non-atomic risk:
+    a solo, manually-run pipeline). Unlike `categories.iconSvg`/`color`, nothing in this doc is
+    ever hand-curated directly in Firestore, so there is no sticky-field check to make: the fixture
+    is the single source of truth and a reseed always fully replaces it. Returns the number of
+    curated entries written (or, under `--dry-run`, the number that would have been written).
+    """
+    if not dry_run:
+        db.collection("onboarding").document("subcategories").set(doc)
+    return len(doc.get("subcategories", {}))
+
+
 def bump_cache_seed(db, *, dry_run: bool) -> int:
     """Increments `meta/seed.value` by 1, creating the doc at 1 if absent (ADR-0039). Must be
     called only after every other write in this run has committed — see the module docstring —
@@ -344,10 +364,11 @@ def main():
     args = ap.parse_args()
     overwrite = bool(args.overwrite)
 
-    paths, categories, subcategories, shards = load_fixtures(args.fixtures_dir)
+    paths, categories, subcategories, onboarding_subcategories_doc, shards = load_fixtures(args.fixtures_dir)
     total_cards = sum(len(s["flashcards"]) for s in shards)
     print(f"fixtures: {', '.join(os.path.relpath(p) for p in paths)}")
     print(f"  categories={len(categories)} subcategories={len(subcategories)} "
+          f"onboardingSubcategories={len(onboarding_subcategories_doc['subcategories'])} "
           f"shards={len(shards)} cards={total_cards}")
     print(f"mode: {'OVERWRITE' if overwrite else 'skip-existing'} (shards always overwrite)"
           f"{' (DRY-RUN)' if args.dry_run else ''}\n")
@@ -358,6 +379,7 @@ def main():
     sw, ss = upsert(db, "subcategories", subcategories, overwrite=overwrite, dry_run=args.dry_run)
     cc = refresh_card_counts(db, subcategories, dry_run=args.dry_run)
     hw, hd = upsert_shards(db, shards, {s["id"] for s in subcategories}, dry_run=args.dry_run)
+    oc = write_onboarding_subcategories(db, onboarding_subcategories_doc, dry_run=args.dry_run)
     # Last write of the run, deliberately — see bump_cache_seed's docstring.
     seed_value = bump_cache_seed(db, dry_run=args.dry_run)
 
@@ -367,6 +389,7 @@ def main():
     print(f"subcategories/                 {verb} {sw}, skipped {ss}")
     print(f"subcategories/.cardCount       refreshed {cc}")
     print(f"subcategories/*/shards/        {verb} {hw}, {del_verb} {hd} orphaned")
+    print(f"onboarding/subcategories       {verb} 1 doc, {oc} entries")
     print(f"meta/seed                      {verb} value={seed_value}")
     if args.dry_run:
         print("\n(dry-run — nothing written)")

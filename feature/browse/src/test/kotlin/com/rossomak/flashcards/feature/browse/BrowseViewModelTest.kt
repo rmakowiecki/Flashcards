@@ -254,10 +254,10 @@ class BrowseViewModelTest {
         viewModel.state.value.searchStatus shouldBe SearchStatus.Prompt
     }
 
-    // --- progress rings/subtitle on matched topics (ADR-0016) ---
+    // --- progress rings/subtitle on matched subcategories (ADR-0016) ---
 
     @Test
-    fun `a summary with counts resolves a matched topic's studied and mastered counts`() =
+    fun `a summary with counts resolves a matched subcategory's studied and mastered counts`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
             cardProgressRepository.seedSummary(
@@ -276,7 +276,7 @@ class BrowseViewModelTest {
         }
 
     @Test
-    fun `a matched topic absent from the summary resolves to all-zero, not unknown`() =
+    fun `a matched subcategory absent from the summary resolves to all-zero, not unknown`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
             // No seedSummary call: the fake returns Result.success(null), mirroring a User who has
@@ -291,7 +291,7 @@ class BrowseViewModelTest {
         }
 
     @Test
-    fun `a failed summary read leaves search results intact with the matched topic unresolved and surfaces no error`() =
+    fun `a failed summary read leaves search results intact with the matched subcategory unresolved and surfaces no error`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
             cardProgressRepository.summaryResultToReturn = Result.failure(IllegalStateException("boom"))
@@ -342,7 +342,7 @@ class BrowseViewModelTest {
 
     /** Structural per ADR-0016, but a fixture bug producing the reverse must still fail loudly. */
     @Test
-    fun `mastered is never greater than studied for a matched topic`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `mastered is never greater than studied for a matched subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
         flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
         cardProgressRepository.seedSummary(
             ProgressSummary(subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 5, masteredCount = 2))),

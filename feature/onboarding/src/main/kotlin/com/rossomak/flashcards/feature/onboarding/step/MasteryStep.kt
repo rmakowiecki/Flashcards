@@ -57,7 +57,7 @@ private const val ILLUSTRATED_DIFFICULTY = 4
  *
  * Illustrated as three stacked cards — attempt/difficulty and the question, then the rating
  * prompt, then the mastery result — connected by the same chevron used to walk the Category →
- * Topic → Flashcard hierarchy in [StructureStep], since both are a sequence of steps rather than
+ * Subcategory → Flashcard hierarchy in [StructureStep], since both are a sequence of steps rather than
  * one flat card.
  */
 @Composable

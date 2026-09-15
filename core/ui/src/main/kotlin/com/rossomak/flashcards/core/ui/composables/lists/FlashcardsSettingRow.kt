@@ -34,7 +34,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
  * intrinsically-sized `Row` instead, typeset at the same `titleSmall`/`labelMedium` pairing
  * [FlashcardsDetailedListRow] and [FlashcardsSelectableListRow] already use for their own
  * title/count text — the compact scale a details/settings-style row reads at elsewhere in the
- * app (e.g. Category Details' topic rows), rather than the larger scale a primary navigation
+ * app (e.g. Category Details' subcategory rows), rather than the larger scale a primary navigation
  * row's title needs.
  *
  * **The Edit button is the tap target, not the row.** This deliberately departs from

@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
 
 private const val PROGRESS_PERCENT_SCALE = 100
 
-/** The ring's fill, `0f` for a topic with no cards rather than dividing by zero. */
+/** The ring's fill, `0f` for a subcategory with no cards rather than dividing by zero. */
 private fun SubcategoryProgress.Resolved.studiedFraction(cardCount: Int): Float =
     if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 

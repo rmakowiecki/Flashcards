@@ -209,7 +209,7 @@ class BrowseViewModel @Inject constructor(
      * Runs independently of [loadCategories] and any search, so a slow or failed progress read
      * never gates the category list or search results — same rule as
      * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel.loadProgressSummary]. A failure leaves
-     * [BrowseScreenState.isProgressResolved] `false` forever: every matched topic's ring stays
+     * [BrowseScreenState.isProgressResolved] `false` forever: every matched subcategory's ring stays
      * unknown, with no error surfaced.
      */
     private fun loadProgressSummary() {

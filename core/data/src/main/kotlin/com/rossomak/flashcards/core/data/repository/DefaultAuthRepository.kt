@@ -14,5 +14,7 @@ class DefaultAuthRepository @Inject constructor(
     override suspend fun signInWithGoogleIdToken(idToken: String): Result<AuthUser> =
         remoteDataSource.signInWithGoogleIdToken(idToken)
 
+    override suspend fun signInAnonymously(): Result<AuthUser> = remoteDataSource.signInAnonymously()
+
     override fun signOut() = remoteDataSource.signOut()
 }
