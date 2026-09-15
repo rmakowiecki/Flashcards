@@ -35,7 +35,7 @@ service cloud.firestore {
       // category and subcategory favorites as id -> serverTimestamp maps, so one rule covers both.
       // Client-writable directly, same reasoning as curationRequests above — favorites are
       // non-sensitive by design, no Cloud Function gating needed.
-      match /favorites/{docId} {
+      match /favorites/state {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
