@@ -26,6 +26,18 @@ service cloud.firestore {
       }
     }
 
+    // onboarding/subcategories: a single document holding a map of a small, admin-curated
+    // subcategory subset, denormalized (parent Category's iconSvg joined in) so the whole curated
+    // list costs one read (see scripts/seed/curated_onboarding_topics.py and
+    // firestore-schema.md), backing onboarding's Favorites step before any auth exists —
+    // Onboarding now runs before Login, so this read must work with no signed-in user, anonymous
+    // or otherwise. Deliberately public, unlike every other document in this file: no owner
+    // field, no sensitive content, curated shared content same as categories/subcategories but
+    // with a wider read boundary. Written only by the Admin SDK.
+    match /onboarding/subcategories {
+      allow read: if true;
+    }
+
     match /users/{uid} {
       match /curationRequests/{requestId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
