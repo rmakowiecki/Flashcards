@@ -2,10 +2,12 @@ package com.rossomak.flashcards.core.data.mapper
 
 import com.rossomak.flashcards.core.data.model.CategoryDto
 import com.rossomak.flashcards.core.data.model.FlashcardDto
+import com.rossomak.flashcards.core.data.model.OnboardingSubcategoryDto
 import com.rossomak.flashcards.core.data.model.SubcategoryDto
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CodeBlock
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 
 fun CategoryDto.toDomain() = Category(
@@ -25,6 +27,15 @@ fun SubcategoryDto.toDomain() = Subcategory(
     categoryName = categoryName,
     order = order,
     cardCount = cardCount
+)
+
+fun OnboardingSubcategoryDto.toDomain() = OnboardingSubcategory(
+    id = subcategoryId,
+    name = subcategoryName,
+    categoryId = categoryId,
+    categoryName = categoryName,
+    order = order,
+    iconSvg = iconSvg,
 )
 
 fun FlashcardDto.toDomain(subcategoryId: String): Flashcard? = difficulty?.let {
