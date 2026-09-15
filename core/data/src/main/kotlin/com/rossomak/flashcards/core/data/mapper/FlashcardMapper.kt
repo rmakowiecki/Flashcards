@@ -29,14 +29,25 @@ fun SubcategoryDto.toDomain() = Subcategory(
     cardCount = cardCount
 )
 
-fun OnboardingSubcategoryDto.toDomain() = OnboardingSubcategory(
-    id = subcategoryId,
-    name = subcategoryName,
-    categoryId = categoryId,
-    categoryName = categoryName,
-    order = order,
-    iconSvg = iconSvg,
-)
+// Nullable return mirrors FlashcardDto.toDomain() below: reject an incomplete Firestore entry
+// here rather than let an empty id/name reach the domain model.
+fun OnboardingSubcategoryDto.toDomain(): OnboardingSubcategory? {
+    val id = subcategoryId?.takeIf { it.isNotBlank() }
+    val name = subcategoryName?.takeIf { it.isNotBlank() }
+    val resolvedCategoryId = categoryId?.takeIf { it.isNotBlank() }
+    val resolvedCategoryName = categoryName?.takeIf { it.isNotBlank() }
+    if (id == null || name == null || resolvedCategoryId == null || resolvedCategoryName == null) {
+        return null
+    }
+    return OnboardingSubcategory(
+        id = id,
+        name = name,
+        categoryId = resolvedCategoryId,
+        categoryName = resolvedCategoryName,
+        order = order,
+        iconSvg = iconSvg,
+    )
+}
 
 fun FlashcardDto.toDomain(subcategoryId: String): Flashcard? = difficulty?.let {
     Flashcard(

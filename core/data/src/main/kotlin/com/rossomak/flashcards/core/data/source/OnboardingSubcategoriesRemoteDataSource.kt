@@ -18,16 +18,17 @@ class OnboardingSubcategoriesRemoteDataSource @Inject constructor(
     private val firestore: FirebaseFirestore,
 ) {
 
-    suspend fun getOnboardingSubcategories(): List<OnboardingSubcategoryDto> =
-        firestore.collection(COLLECTION_ONBOARDING)
+    suspend fun getOnboardingSubcategories(): List<OnboardingSubcategoryDto> {
+        val document = firestore.collection(COLLECTION_ONBOARDING)
             .document(DOCUMENT_SUBCATEGORIES)
             .get()
             .await()
             .toObject(OnboardingSubcategoriesDocument::class.java)
-            ?.subcategories
-            ?.values
-            ?.sortedBy { it.order }
-            .orEmpty()
+            // A missing singleton doc is a backend misconfiguration, not an empty curated list —
+            // throwing here surfaces the loader's retry state instead of a false "loaded, nothing to show".
+            ?: error("Missing required onboarding/subcategories document")
+        return document.subcategories.values.sortedBy { it.order }
+    }
 
     private companion object {
         const val COLLECTION_ONBOARDING = "onboarding"

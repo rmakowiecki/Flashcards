@@ -310,6 +310,24 @@ class OnboardingViewModelTest {
         }
 
     @Test
+    fun `finish with a favorite picked as an authenticated user does not start an anonymous session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
+            authRepository.userToReturn = authUser(displayName = "Ada", email = "ada@example.com")
+            val viewModel = createViewModel()
+            viewModel.onFavoritesStepEntered()
+            advanceUntilIdle()
+            viewModel.onFavoriteSubcategoryToggle("android-compose")
+
+            viewModel.onFinish()
+            advanceUntilIdle()
+
+            authRepository.signInAnonymouslyCallCount shouldBe 0
+            userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe (setOf("android-compose") to true)
+            userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe true
+        }
+
+    @Test
     fun `finish leaves the seen flag unset when the anonymous sign-in fails`() =
         runTest(mainDispatcherRule.testDispatcher) {
             onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))

@@ -18,7 +18,7 @@ class DefaultOnboardingSubcategoriesRepository @Inject constructor(
     @Suppress("TooGenericExceptionCaught")
     override suspend fun fetchOnboardingSubcategories(): Result<List<OnboardingSubcategory>> = withContext(Dispatchers.IO) {
         try {
-            Result.success(remoteDataSource.getOnboardingSubcategories().map { it.toDomain() })
+            Result.success(remoteDataSource.getOnboardingSubcategories().mapNotNull { it.toDomain() })
         } catch (exception: CancellationException) {
             throw exception
         } catch (exception: Exception) {

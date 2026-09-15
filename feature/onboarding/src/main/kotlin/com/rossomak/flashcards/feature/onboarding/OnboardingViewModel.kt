@@ -153,7 +153,9 @@ class OnboardingViewModel @Inject constructor(
             val selectedIds = _state.value.selectedFavoriteSubcategoriesIds
             try {
                 if (selectedIds.isNotEmpty()) {
-                    withOnboardingTimeout(SIGN_IN_ANONYMOUSLY_TIMEOUT_MS) { signInAnonymously() }.getOrThrow()
+                    if (getCurrentAuthUser() == null) {
+                        withOnboardingTimeout(SIGN_IN_ANONYMOUSLY_TIMEOUT_MS) { signInAnonymously() }.getOrThrow()
+                    }
                     withOnboardingTimeout(SET_FAVORITES_TIMEOUT_MS) {
                         setFavoriteSubcategories(SetFavoriteSubcategoriesUseCase.Params(selectedIds))
                     }.getOrThrow()
