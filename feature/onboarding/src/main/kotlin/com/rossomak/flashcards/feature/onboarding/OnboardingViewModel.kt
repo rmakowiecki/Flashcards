@@ -70,6 +70,12 @@ class OnboardingViewModel @Inject constructor(
      * leaves the flow pending rather than silently losing the user's choices. Navigation happens
      * either way: nothing the user can do from this screen would fix a local storage failure, and
      * trapping them on the last page of onboarding is worse than re-showing the flow next launch.
+     *
+     * Onboarding now runs before Login (see docs/temp/onboarding-before-login-spec.md), so finishing
+     * it does not guarantee a signed-in user: an anonymous session does not count, since sign-in is
+     * mandatory, never a standing alternative to it. Main is reachable only for an already-real
+     * signed-in user (e.g. Replay onboarding on an authenticated device); everyone else is sent to
+     * Login, which already routes back to Main afterwards since `hasSeenOnboarding` is now true.
      */
     fun onFinish() {
         if (_state.value.isCommitting) {
@@ -87,8 +93,10 @@ class OnboardingViewModel @Inject constructor(
             //  Task pending until the server acks, so that call must not be awaited unbounded — a
             //  withTimeout, or no await at all, otherwise an offline user hangs on this screen.
             saveOnboardingPreferences(params)
+            val authUser = getCurrentAuthUser()
+            val authenticated = authUser != null && !authUser.isAnonymous
             _state.update { it.copy(isCommitting = false) }
-            eventChannel.send(OnboardingDestination.Main)
+            eventChannel.send(if (authenticated) OnboardingDestination.Main else OnboardingDestination.Login)
         }
     }
 
