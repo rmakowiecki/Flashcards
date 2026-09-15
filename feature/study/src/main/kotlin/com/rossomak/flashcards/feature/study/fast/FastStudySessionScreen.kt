@@ -55,8 +55,8 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
