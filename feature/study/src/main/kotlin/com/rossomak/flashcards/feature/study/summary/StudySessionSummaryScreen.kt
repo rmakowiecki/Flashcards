@@ -86,9 +86,9 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A Rated or Fast Study Session's mandatory egress — natural end or premature exit alike. Its own
@@ -172,7 +172,7 @@ private const val MASTERY_RING_SWEEP_ANGLE = 360f
 
 private const val BADGE_ROW_ENTRANCE_DELAY_MS = 450L
 
-@Suppress("LongMethod")
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun StudySessionSummaryContent(
     modifier: Modifier = Modifier,

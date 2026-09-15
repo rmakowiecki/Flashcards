@@ -253,7 +253,8 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 
 ## Project Documentation
 
-- `SYSTEMDESIGN.md` — product design, screens, flows, Firestore schema
+- `SYSTEMDESIGN.md` — product design, screens, flows (being split into smaller docs under `docs/design/`)
+- `docs/design/firestore-schema.md` — Firestore data schema. Read this if task needs current Firestore data schema knowledge — single source of truth, don't reconstruct schema from ADRs
 - `CONTEXT.md` — domain vocabulary glossary
 - `TESTING.md` — testing conventions
 - `docs/navigation-pattern.md` — state-based navigation pattern (why no SharedFlow)

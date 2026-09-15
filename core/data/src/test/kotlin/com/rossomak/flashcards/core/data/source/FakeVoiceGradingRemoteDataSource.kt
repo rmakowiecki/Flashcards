@@ -1,7 +1,8 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
+import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import java.io.IOException
 import kotlin.random.Random
 import kotlinx.coroutines.delay
@@ -9,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * Test-only [VoiceGradingApi] double (ADR-0029 §7): the runtime fake/real router is gone, so this
+ * Test-only [VoiceGradingRemoteDataSource] double (ADR-0029 §7): the runtime fake/real router is gone, so this
  * survives purely as a DI stand-in in unit tests. Offline / no-cost manual iteration is now the
  * Firebase emulator's job (deferred), not an in-app fake.
  *
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.flow
  * get exercised. Entitlement rejection mirrors the server-side PERMISSION_DENIED via
  * [VoiceGradingEntitlementException] — the client never gates on a local premium flag.
  */
-class FakeVoiceGradingApi : VoiceGradingApi {
+class FakeVoiceGradingRemoteDataSource : VoiceGradingRemoteDataSource {
 
     // Unit tests disable failure/latency injection so assertions on response shape stay
     // deterministic.

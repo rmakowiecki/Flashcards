@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import com.google.firebase.functions.FirebaseFunctions
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
@@ -24,9 +24,9 @@ import kotlinx.coroutines.withContext
  * full-fidelity shape — see that DTO's own class doc for why the two are deliberately not derived from
  * one another.
  */
-class RealSessionSubmissionApi @Inject constructor(
+class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
     private val functions: FirebaseFunctions,
-) : SessionSubmissionApi {
+) : SessionSubmissionRemoteDataSource {
 
     // Broad on purpose - a callable Task can fail with more than
     // just FirebaseFunctionsException (a transport-layer error before the SDK wraps it, say), and

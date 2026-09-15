@@ -1,8 +1,9 @@
 # Card Progress and Persistent Mastery
 
-**Status:** Design only — not yet implemented. No progress writes, Session Summary screen, or
-session-stats persistence exist in code yet. This doc is written at implementation-ready detail so it
-can be built directly from.
+**Status: SUPERSEDED.** This design shipped as [ADR-0016](../adr/0016-card-progress-model.md) —
+`users/{uid}/progress/details/subcategories/{subcategoryId}` and `progress/summary` are live, see
+[firestore-schema.md](firestore-schema.md). This doc is kept only
+as historical design rationale; do not treat its "not yet implemented" framing below as current.
 
 ## Overview
 

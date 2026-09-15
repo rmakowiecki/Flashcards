@@ -3,10 +3,10 @@ package com.rossomak.flashcards.core.data.repository
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
-import com.rossomak.flashcards.core.data.network.VoiceGradingApi
-import com.rossomak.flashcards.core.data.network.VoiceGradingEntitlementException
+import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -19,7 +19,7 @@ import org.junit.Test
 
 class DefaultVoiceAnswerGradingRepositoryTest {
 
-    private val voiceGradingApi: VoiceGradingApi = mockk()
+    private val voiceGradingRemoteDataSource: VoiceGradingRemoteDataSource = mockk()
 
     private val cardId = "card-1"
     private val question = "What is a foreground service?"
@@ -33,7 +33,7 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     )
 
     private fun createRepository(): DefaultVoiceAnswerGradingRepository =
-        DefaultVoiceAnswerGradingRepository(voiceGradingApi)
+        DefaultVoiceAnswerGradingRepository(voiceGradingRemoteDataSource)
 
     private fun successfulStream() = flow {
         emit(VoiceGradingStreamEventDto.TranscriptChunk(sanitizedTranscript))
@@ -43,7 +43,7 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     @Test
     fun `transcribeAndGradeSpokenAnswer streams transcript then grade`() = runTest {
         every {
-            voiceGradingApi.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         } returns successfulStream()
 
         createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
@@ -56,7 +56,7 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     @Test
     fun `transcribeAndGradeSpokenAnswer retries the whole call on transient io failures before succeeding`() = runTest {
         every {
-            voiceGradingApi.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> {
             throw IOException("flaky")
         } andThen flow<VoiceGradingStreamEventDto> {
@@ -74,7 +74,7 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     fun `transcribeAndGradeSpokenAnswer gives up after exhausting retries and surfaces the failure`() = runTest {
         val error = IOException("network down")
         every {
-            voiceGradingApi.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> { throw error }
 
         createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
@@ -86,7 +86,7 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     fun `transcribeAndGradeSpokenAnswer surfaces entitlement rejection without retrying`() = runTest {
         val error = VoiceGradingEntitlementException()
         every {
-            voiceGradingApi.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> { throw error }
 
         createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
@@ -97,45 +97,45 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     @Test
     fun `transcribeAndSanitize returns the sanitized transcript from the api`() = runTest {
         val transcript = "A service with a notification"
-        coEvery { voiceGradingApi.transcribeAndSanitize(wavBytes) } returns Result.success(transcript)
+        coEvery { voiceGradingRemoteDataSource.transcribeAndSanitize(wavBytes) } returns Result.success(transcript)
 
         val result = createRepository().transcribeAndSanitize(wavBytes)
 
         result.getOrThrow() shouldBe transcript
-        coVerify(exactly = 1) { voiceGradingApi.transcribeAndSanitize(wavBytes) }
+        coVerify(exactly = 1) { voiceGradingRemoteDataSource.transcribeAndSanitize(wavBytes) }
     }
 
     @Test
     fun `transcribeAndSanitize wraps api failure in failure result`() = runTest {
         val error = IOException("boom")
-        coEvery { voiceGradingApi.transcribeAndSanitize(wavBytes) } throws error
+        coEvery { voiceGradingRemoteDataSource.transcribeAndSanitize(wavBytes) } throws error
 
         val result = createRepository().transcribeAndSanitize(wavBytes)
 
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
-        coVerify(exactly = 1) { voiceGradingApi.transcribeAndSanitize(wavBytes) }
+        coVerify(exactly = 1) { voiceGradingRemoteDataSource.transcribeAndSanitize(wavBytes) }
     }
 
     @Test
     fun `checkEntitlement returns the premium verdict`() = runTest {
-        coEvery { voiceGradingApi.checkEntitlement() } returns EntitlementDto(isPremium = true)
+        coEvery { voiceGradingRemoteDataSource.checkEntitlement() } returns EntitlementDto(isPremium = true)
 
         val result = createRepository().checkEntitlement()
 
         result.getOrThrow() shouldBe true
-        coVerify(exactly = 1) { voiceGradingApi.checkEntitlement() }
+        coVerify(exactly = 1) { voiceGradingRemoteDataSource.checkEntitlement() }
     }
 
     @Test
     fun `checkEntitlement wraps api failure in failure result`() = runTest {
         val error = IllegalStateException("boom")
-        coEvery { voiceGradingApi.checkEntitlement() } throws error
+        coEvery { voiceGradingRemoteDataSource.checkEntitlement() } throws error
 
         val result = createRepository().checkEntitlement()
 
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
-        coVerify(exactly = 1) { voiceGradingApi.checkEntitlement() }
+        coVerify(exactly = 1) { voiceGradingRemoteDataSource.checkEntitlement() }
     }
 }

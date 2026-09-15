@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
@@ -19,12 +19,12 @@ import java.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class RealSessionSubmissionApiTest {
+class FirebaseSessionSubmissionRemoteDataSourceTest {
 
     private val functions: FirebaseFunctions = mockk()
     private val callableReference: HttpsCallableReference = mockk()
 
-    private fun createApi(): RealSessionSubmissionApi = RealSessionSubmissionApi(functions)
+    private fun createApi(): FirebaseSessionSubmissionRemoteDataSource = FirebaseSessionSubmissionRemoteDataSource(functions)
 
     private fun stubCallable(result: Task<HttpsCallableResult>): CapturingSlot<Any> {
         val payloadSlot = slot<Any>()

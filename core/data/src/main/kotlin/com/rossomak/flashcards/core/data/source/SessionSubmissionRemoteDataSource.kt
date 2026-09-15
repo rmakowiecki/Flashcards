@@ -1,10 +1,10 @@
-package com.rossomak.flashcards.core.data.network
+package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.domain.model.SessionResult
 
 /**
  * Client-side contract for the `submitStudySession` Firebase Callable — the raw network leg only,
- * following the same split as [VoiceGradingApi] already in this codebase: [RealSessionSubmissionApi]
+ * following the same split as [VoiceGradingRemoteDataSource] already in this codebase: [FirebaseSessionSubmissionRemoteDataSource]
  * talks to the deployment; nothing else in this module needs to depend on
  * [com.google.firebase.functions.FirebaseFunctions] directly.
  *
@@ -14,7 +14,7 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
  * [com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository] binding) never calls
  * this itself: its job stops at durably enqueuing, not delivering.
  */
-interface SessionSubmissionApi {
+interface SessionSubmissionRemoteDataSource {
 
     /** Submits [sessionResult] to the `submitStudySession` callable. */
     suspend fun submitSession(sessionResult: SessionResult): Result<Unit>
