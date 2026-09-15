@@ -49,11 +49,24 @@ class SplashViewModelTest {
         }
 
     @Test
-    fun `unauthenticated user who has not seen onboarding still emits Login first`() =
+    fun `unauthenticated user who has not seen onboarding emits Onboarding before Login`() =
         runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getCurrentAuthUserUseCase() } returns null
 
             val viewModel = createViewModel(hasSeenOnboarding = false)
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.Onboarding
+            }
+        }
+
+    @Test
+    fun `anonymous user who has seen onboarding still emits Login`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns testUser.copy(isAnonymous = true)
+
+            val viewModel = createViewModel(hasSeenOnboarding = true)
             viewModel.onAnimationCompleted()
 
             viewModel.events.test {

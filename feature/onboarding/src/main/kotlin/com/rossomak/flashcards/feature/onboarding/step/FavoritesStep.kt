@@ -43,7 +43,7 @@ private const val FAVORITE_GRID_COLUMNS = 2
 private val FavoriteGridHeight = 372.dp
 
 /**
- * Lets the user pin topics for quick access from Home.
+ * Lets the user pin subcategories from a short, curated list as favorites
  *
  * Unlike every other step this one scrolls a grid rather than a column, so it hosts its own
  * [LazyVerticalGrid] instead of the shared [com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn].

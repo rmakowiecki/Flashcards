@@ -23,9 +23,8 @@ class SaveOnboardingPreferencesUseCase @Inject constructor(
 
     data class Params(val defaultStudyMode: StudyMode, val dailyGoalMinutes: Int)
 
-    // Not `mapCatching`, chained: it catches `CancellationException` same as any other `Throwable`
-    // and boxes it into `Result.failure` instead of letting it propagate, which would break
-    // structured concurrency for a cancelled onboarding coroutine.
+    // Not `mapCatching`, chained: it catches `CancellationException` same as any other `Throwable` and boxes it into `Result.failure`
+    // instead of letting it propagate, which would break structured concurrency for a cancelled onboarding coroutine.
     override suspend operator fun invoke(params: Params): Result<Unit> =
         try {
             saveStudySessionPreference(DefaultStudyMode(params.defaultStudyMode)).getOrThrow()

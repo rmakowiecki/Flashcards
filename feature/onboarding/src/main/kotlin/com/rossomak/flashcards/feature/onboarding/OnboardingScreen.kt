@@ -63,12 +63,14 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier,
     viewModel: OnboardingViewModel = hiltViewModel(),
     onNavigateToMain: () -> Unit,
+    onNavigateToLogin: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             OnboardingDestination.Main -> onNavigateToMain()
+            OnboardingDestination.Login -> onNavigateToLogin()
         }
     }
 

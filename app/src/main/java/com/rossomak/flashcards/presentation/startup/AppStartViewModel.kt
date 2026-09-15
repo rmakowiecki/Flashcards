@@ -22,8 +22,10 @@ class AppStartViewModel @Inject constructor(
 
     val startupState: StateFlow<AppStartupState> =
         flow {
+            // Anonymous sessions don't count: sign-in is mandatory, so an anonymous Firebase user must still be routed through Login
             val authenticated = withTimeoutOrNull(STARTUP_AUTH_TIMEOUT_MS.milliseconds) {
-                getCurrentAuthUser() != null
+                val authUser = getCurrentAuthUser()
+                authUser != null && !authUser.isAnonymous
             } ?: false
             emit(AppStartupState.Ready(authenticated = authenticated))
         }.stateIn(
@@ -33,16 +35,6 @@ class AppStartViewModel @Inject constructor(
         )
 
     init {
-        // Decoupled from startupState on purpose (ADR-0039): this check has zero influence on
-        // Ready's value, so it runs as its own side effect rather than racing the auth check
-        // inside the same flow, where a future edit could accidentally make it gate startup.
-        // No artificial timeout either — a cold-start Firestore SERVER read (TLS + gRPC channel
-        // setup + auth token attach) routinely runs past the 800ms the auth check bounds itself
-        // to, and unlike that check, nothing here is waiting on the result: viewModelScope already
-        // cancels this coroutine when the ViewModel clears, which is bound enough.
-        // No try/catch either — SyncFlashcardCacheGenerationUseCase owns "never throws" as its own
-        // contract (best-effort by design), so this call site trusts it rather than duplicating
-        // the guard.
         viewModelScope.launch {
             syncFlashcardCacheGeneration()
         }

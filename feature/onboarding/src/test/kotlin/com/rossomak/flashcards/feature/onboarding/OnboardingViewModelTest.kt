@@ -140,7 +140,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `finish navigates to Main even when the preferences write fails`() =
+    fun `finish navigates onward even when the preferences write fails`() =
         runTest(mainDispatcherRule.testDispatcher) {
             studySessionPreferencesRepository.saveError = IllegalStateException("disk full")
             val viewModel = createViewModel()
@@ -149,7 +149,39 @@ class OnboardingViewModelTest {
                 viewModel.onFinish()
                 advanceUntilIdle()
 
+                // No user configured, same as a genuine first-time run: Login, not Main.
+                awaitItem() shouldBe OnboardingDestination.Login
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `finish navigates to Main for an already authenticated user`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.userToReturn = authUser(displayName = "Radek", email = "radek@example.com")
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onFinish()
+                advanceUntilIdle()
+
                 awaitItem() shouldBe OnboardingDestination.Main
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `finish navigates to Login for an anonymous user`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.userToReturn =
+                authUser(displayName = "Radek", email = "radek@example.com").copy(isAnonymous = true)
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onFinish()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe OnboardingDestination.Login
                 cancelAndIgnoreRemainingEvents()
             }
         }
