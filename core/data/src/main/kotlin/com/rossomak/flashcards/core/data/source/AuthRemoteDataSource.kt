@@ -8,5 +8,7 @@ interface AuthRemoteDataSource {
 
     suspend fun signInWithGoogleIdToken(idToken: String): Result<AuthUser>
 
+    suspend fun signInAnonymously(): Result<AuthUser>
+
     fun signOut()
 }
