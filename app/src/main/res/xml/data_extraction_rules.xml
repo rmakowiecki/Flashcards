@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   allowBackup="false" only disables cloud backup on API 31+; some OEMs still allow
+   device-to-device transfer unless excluded here too. Excludes everything at root so the
+   Firebase Auth session and Firestore's offline cache never leave the device either way.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+    </device-transfer>
+</data-extraction-rules>

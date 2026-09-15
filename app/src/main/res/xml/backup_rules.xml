@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Android 11 (API 30) and lower's counterpart to data_extraction_rules.xml — allowBackup="false"
+   already disables Auto Backup on these versions, this only silences the "no rules file" lint.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+</full-backup-content>
