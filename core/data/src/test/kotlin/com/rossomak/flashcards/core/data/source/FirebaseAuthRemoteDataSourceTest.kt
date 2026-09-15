@@ -30,11 +30,13 @@ class FirebaseAuthRemoteDataSourceTest {
         email: String? = "user@example.com",
         displayName: String? = "Alex",
         photoUri: Uri? = null,
+        isAnonymous: Boolean = false,
     ): FirebaseUser = mockk {
         every { this@mockk.uid } returns uid
         every { this@mockk.email } returns email
         every { this@mockk.displayName } returns displayName
         every { this@mockk.photoUrl } returns photoUri
+        every { this@mockk.isAnonymous } returns isAnonymous
     }
 
     @After

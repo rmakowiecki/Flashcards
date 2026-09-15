@@ -34,5 +34,6 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
         email = email,
         displayName = displayName,
         photoUrl = photoUrl?.toString(),
+        isAnonymous = isAnonymous,
     )
 }

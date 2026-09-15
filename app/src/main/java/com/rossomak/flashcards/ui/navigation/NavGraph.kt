@@ -220,6 +220,11 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
                         popUpTo(OnboardingRoute) { inclusive = true }
                     }
                 },
+                onNavigateToLogin = {
+                    navController.navigate(AuthRoute) {
+                        popUpTo(OnboardingRoute) { inclusive = true }
+                    }
+                },
             )
         }
     }

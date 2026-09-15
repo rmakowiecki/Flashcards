@@ -30,18 +30,25 @@ class SplashViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // Anonymous sessions don't count: sign-in is mandatory, so an anonymous Firebase user
+            // (see docs/temp/onboarding-before-login-spec.md) must still be routed through Login,
+            // same as no user at all. Unreachable this PR — nothing creates an anonymous session
+            // yet — but landing the check now means the follow-up PR that does doesn't have to
+            // re-touch this routing decision.
             val authenticated = withTimeoutOrNull(AUTH_TIMEOUT_MS) {
-                getCurrentAuthUser() != null
+                val authUser = getCurrentAuthUser()
+                authUser != null && !authUser.isAnonymous
             } ?: false
             _authenticated.value = authenticated
         }
         viewModelScope.launch {
-            // Falls back to "already seen" on a read that stalls, for the same reason the auth read
-            // falls back to unauthenticated: a slow local read must not hold the splash open, and
-            // wrongly re-showing onboarding to an existing user is the worse of the two mistakes.
+            // Falls back to "not seen" on a read that stalls: a slow local read must not hold the
+            // splash open, and under onboarding-before-login (docs/temp/onboarding-before-login-spec.md)
+            // skipping Onboarding for a genuine first-time user is the worse of the two mistakes —
+            // worse than a returning user occasionally seeing it again on a slow read.
             _hasSeenOnboarding.value = withTimeoutOrNull(PREFERENCES_TIMEOUT_MS) {
                 observeUserPreferences().first().hasSeenOnboarding
-            } ?: true
+            } ?: false
         }
         viewModelScope.launch {
             val destination = combine(
@@ -52,9 +59,13 @@ class SplashViewModel @Inject constructor(
                 if (!animationCompleted || authenticated == null || hasSeenOnboarding == null) {
                     null
                 } else {
+                    // Onboarding-before-login (docs/temp/onboarding-before-login-spec.md): a
+                    // first-time device always sees Onboarding first, authenticated or not.
+                    // Onboarding itself routes on to Login afterwards when still unauthenticated,
+                    // so this check only needs to place returning devices correctly.
                     when {
-                        !authenticated -> SplashDestination.Login
                         !hasSeenOnboarding -> SplashDestination.Onboarding
+                        !authenticated -> SplashDestination.Login
                         else -> SplashDestination.Main
                     }
                 }

@@ -22,8 +22,12 @@ class AppStartViewModel @Inject constructor(
 
     val startupState: StateFlow<AppStartupState> =
         flow {
+            // Anonymous sessions don't count as authenticated here either, for the same reason as
+            // SplashViewModel (see docs/temp/onboarding-before-login-spec.md) — kept consistent
+            // even though this field only gates the system splash screen today, not routing.
             val authenticated = withTimeoutOrNull(STARTUP_AUTH_TIMEOUT_MS.milliseconds) {
-                getCurrentAuthUser() != null
+                val authUser = getCurrentAuthUser()
+                authUser != null && !authUser.isAnonymous
             } ?: false
             emit(AppStartupState.Ready(authenticated = authenticated))
         }.stateIn(
