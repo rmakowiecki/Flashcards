@@ -20,19 +20,18 @@ class AppStartViewModel @Inject constructor(
     private val syncFlashcardCacheGeneration: SyncFlashcardCacheGenerationUseCase,
 ) : ViewModel() {
 
-    val startupState: StateFlow<AppStartupState> =
-        flow {
-            // Anonymous sessions don't count: sign-in is mandatory, so an anonymous Firebase user must still be routed through Login
-            val authenticated = withTimeoutOrNull(STARTUP_AUTH_TIMEOUT_MS.milliseconds) {
-                val authUser = getCurrentAuthUser()
-                authUser != null && !authUser.isAnonymous
-            } ?: false
-            emit(AppStartupState.Ready(authenticated = authenticated))
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = AppStartupState.Loading
-        )
+    val startupState: StateFlow<AppStartupState> = flow {
+        // Anonymous sessions don't count: sign-in is mandatory, so an anonymous Firebase user must still be routed through Login
+        val authenticated = withTimeoutOrNull(STARTUP_AUTH_TIMEOUT_MS.milliseconds) {
+            val authUser = getCurrentAuthUser()
+            authUser != null && !authUser.isAnonymous
+        } ?: false
+        emit(AppStartupState.Ready(authenticated = authenticated))
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AppStartupState.Loading
+    )
 
     init {
         viewModelScope.launch {

@@ -38,7 +38,6 @@ class DataStoreUserPreferencesLocalDataSource @Inject constructor(
                 hasSeenOnboarding = prefs[HAS_SEEN_ONBOARDING_KEY] ?: DEFAULT_HAS_SEEN_ONBOARDING,
                 dailyGoalMinutes = prefs[DAILY_GOAL_MINUTES_KEY] ?: DailyGoal.DEFAULT_MINUTES,
                 voiceAnswerConsentGranted = prefs[VOICE_ANSWER_CONSENT_KEY] ?: DEFAULT_VOICE_ANSWER_CONSENT_GRANTED,
-                // No default: absent unambiguously means "never checked" (ADR-0039), never coerced to 0.
                 localCacheSeed = prefs[CACHE_SEED_KEY],
             )
         }

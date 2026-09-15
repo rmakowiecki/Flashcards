@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -14,7 +15,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
@@ -39,9 +39,10 @@ class SplashViewModel @Inject constructor(
             _authenticated.value = authenticated
         }
         viewModelScope.launch {
-            _hasSeenOnboarding.value = withTimeoutOrNull(PREFERENCES_TIMEOUT_MS.milliseconds) {
+            val hasSeenValue = withTimeoutOrNull(PREFERENCES_TIMEOUT_MS.milliseconds) {
                 observeUserPreferences().first().hasSeenOnboarding
             } ?: false
+            _hasSeenOnboarding.value = hasSeenValue
         }
         viewModelScope.launch {
             val destination = combine(
@@ -52,7 +53,6 @@ class SplashViewModel @Inject constructor(
                 if (!animationCompleted || authenticated == null || hasSeenOnboarding == null) {
                     null
                 } else {
-                    // Onboarding-before-login (docs/temp/onboarding-before-login-spec.md): a
                     // first-time device always sees Onboarding first, authenticated or not.
                     // Onboarding itself routes on to Login afterwards when still unauthenticated,
                     // so this check only needs to place returning devices correctly.
