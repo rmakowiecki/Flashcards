@@ -70,6 +70,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
     implementation(project(":core:data"))
@@ -105,6 +106,7 @@ dependencies {
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.timber)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)

@@ -76,4 +76,16 @@ class ArchitectureKonsistTest {
                 file.imports.none { import -> import.name.startsWith("com.rossomak.flashcards.feature.") }
             }
     }
+
+    @Test
+    fun `no file uses Timber directly outside AppLog`() {
+        // AGENTS.md mandates AppLog (logv/logd/logi/logw/loge) over raw Timber calls, so the
+        // wrapper's caller-attribution fix (inline fns) stays the only place touching Timber.
+        projectScope
+            .files
+            .filter { !it.path.endsWith("/AppLog.kt") && !it.path.endsWith("/FlashcardsApplication.kt") }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name.startsWith("timber.log") }
+            }
+    }
 }

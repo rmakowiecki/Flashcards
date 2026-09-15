@@ -1,12 +1,13 @@
 package com.rossomak.flashcards
 
 import android.app.Application
-import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import timber.log.Timber
 
 /**
  * [Configuration.Provider] wires WorkManager to Hilt's [HiltWorkerFactory]: the default,
@@ -36,11 +37,10 @@ class FlashcardsApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "App start: scheduling session submission drain for recovery")
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
+        logd { "App start: scheduling session submission drain for recovery" }
         sessionSubmissionDrainScheduler.scheduleDrain()
-    }
-
-    private companion object {
-        const val TAG = "FlashcardsApplication"
     }
 }

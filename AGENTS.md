@@ -214,6 +214,17 @@ override suspend fun submitResponse(cardId: String, audioFile: File): Result<Eva
 }
 ```
 
+## Logging
+
+Use `AppLog` (`core/common`), never `Timber` or `println` directly: `logv`, `logd`, `logi`, `logw`, `loge` (lambda-message; `logw`/`loge` take optional leading `Throwable?`).
+
+```kotlin
+logd { "App start: scheduling session submission drain for recovery" }
+loge(exception) { "Failed to submit response for card $cardId" }
+```
+
+Log sparingly. Only at points that matter for diagnosing prod issues: final state of an IO operation (network call result, DB write, file op), errors/exceptions, key lifecycle transitions. Do not log every branch or intermediate step — no logging for its own sake inside ordinary business logic.
+
 ## Static Analysis
 
 Four tools, one job each, wired via the `android-quality` convention plugin (applied by every module's convention plugin). Config lives at the repo root (`.editorconfig`, `config/detekt/detekt.yml`).
