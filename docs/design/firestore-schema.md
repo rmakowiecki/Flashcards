@@ -24,6 +24,39 @@ subcategories/{categoryId-subSlug}/shards/{n}         → { flashcards: { "<card
 - **Tags are flat untyped strings** in `tags[]` on each Flashcard. No `tags/` collection. See [ADR-0006](../adr/0006-flat-denormalized-tags.md).
 - **Category `iconSvg`**: inline plain SVG text (not a URL), rendered on-device via `androidsvg`. No Firebase Storage SDK dependency. Nullable alongside `color`, since the seed pipeline may auto-create a category before either is curated. See [category-icon-color.md](category-icon-color.md).
 
+## Onboarding's curated Subcategory picker
+
+```
+// Single document, publicly readable (firestore.rules: allow read: if true) — onboarding's
+// Favorites step runs before Login, so this must be readable with no signed-in user at all,
+// anonymous or otherwise. One document, one read: every curated entry lives in the `subcategories`
+// map field, keyed by subcategory id.
+onboarding/subcategories                                    → { subcategories: {
+                                                                "{categoryId-subSlug}": {
+                                                                  order, categoryId, categoryName,
+                                                                  subcategoryId, subcategoryName,
+                                                                  iconSvg
+                                                                }, ...
+                                                              } }
+```
+
+- **Denormalized and trimmed, not the `subcategories` document shape verbatim**: each entry drops
+  `nameLower`/`cardCount` (onboarding never needs them) and adds `iconSvg`, joined in at seed time
+  from the subcategory's parent Category doc — onboarding never reads `categories` itself. Maps
+  onto its own domain type, `OnboardingSubcategory`, not `Subcategory`.
+- **One document, not a collection**: every curated subcategory lives in the single
+  `onboarding/subcategories` doc's `subcategories` map, so the whole Favorites step's content costs
+  exactly one Firestore read. `scripts/seed/curated_onboarding_topics.py` holds the admin-picked
+  allowlist of subcategory ids; `build_fixture.py` cross-references it, joins in each entry's
+  parent-category `iconSvg`, and `seed_firestore.py` overwrites the doc in full every run (no
+  sticky/merge fields, unlike `categories.iconSvg`/`color`).
+- **A separate document, not a wider rule on `subcategories`**: the full taxonomy stays
+  `request.auth != null`-gated; only this small curated subset is public, so widening onboarding's
+  read boundary never widens the real taxonomy's.
+- No cache-generation/freshness tracking — a plain one-shot fetch, deliberately: the `meta/seed`
+  signal `subcategories` reads check against is itself auth-gated, and this payload is small and
+  changes rarely.
+
 ## Cache freshness signal
 
 ```
