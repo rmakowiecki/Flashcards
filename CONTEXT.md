@@ -50,6 +50,17 @@ _Avoid_: Starred, Saved, Liked
 A past Study Session surfaced on the Home screen as a carousel card. Renders as one of two variants: a **single-subcategory Recent** (session had one Subcategory — shows Subcategory + Category name, taps into Subcategory Details) or a **composite Recent** (session spanned multiple Subcategories — shows Category name only, taps into Category Details).
 _Avoid_: History, Last session
 
+**Guest**:
+A transient, pre-link Firebase Anonymous Auth session — never a standing alternate identity, never a
+permanent or optional mode. Started only at the moment onboarding's final step is committed, and only
+if the user picked at least one Favorite, so a uid exists to write that pick under before real sign-in.
+Always resolves into a real **User** via `linkWithCredential` at Login, which keeps the same uid and
+everything written under it (e.g. the Favorite); on a linking collision (the credential is already
+tied to a different existing User — a returning user on a new device) the session and anything written
+under it are discarded outright, not merged. Sign-in stays mandatory: nothing reachable past onboarding
+treats a Guest as authenticated.
+_Avoid_: Anonymous user, Temp user
+
 **User**:
 An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl`.
 _Avoid_: Account, Player, Learner
