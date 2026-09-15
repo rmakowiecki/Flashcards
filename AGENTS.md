@@ -214,6 +214,17 @@ override suspend fun submitResponse(cardId: String, audioFile: File): Result<Eva
 }
 ```
 
+## Logging
+
+Use `AppLog` (`core/common`, `com.rossomak.flashcards.core.common.AppLog.kt`), never `Timber` or `println` directly. Lambda-message helpers, one per level: `logv`, `logd`, `logi`, `logw`, `loge`. `logw`/`loge` take an optional leading `Throwable?`.
+
+```kotlin
+logd { "App start: scheduling session submission drain for recovery" }
+loge(exception) { "Failed to submit response for card $cardId" }
+```
+
+`AppLog` wraps Timber (`Timber.plant(Timber.DebugTree())` only in debug builds, in `FlashcardsApplication.onCreate`). Lambda form defers string building until the log level is actually enabled.
+
 ## Static Analysis
 
 Four tools, one job each, wired via the `android-quality` convention plugin (applied by every module's convention plugin). Config lives at the repo root (`.editorconfig`, `config/detekt/detekt.yml`).
