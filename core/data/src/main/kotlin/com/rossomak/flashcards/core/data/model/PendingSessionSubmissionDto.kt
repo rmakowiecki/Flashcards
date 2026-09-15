@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
  * Full-fidelity, lossless mirror of a domain
  * [com.rossomak.flashcards.core.domain.model.SessionResult] for the local durable delivery queue
  * — carries every field the domain type carries, both `Rated`/`Fast` variants, including
- * [xpConfig]. **Independent of** [com.rossomak.flashcards.core.data.network.RealSessionSubmissionApi]'s
+ * [xpConfig]. **Independent of** [com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource]'s
  * own wire payload: that one is a network-wire subset (no `xpConfig`); this DTO's job is a lossless
  * round trip through an app restart, not matching what the network call sends.
  *
@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
  *
  * **A field added to [com.rossomak.flashcards.core.domain.model.SessionResult] needs updating in two
  * independent places, not just one**: here (plus [PendingSessionSubmissionMapper]) for the durable
- * queue, and separately in [com.rossomak.flashcards.core.data.network.RealSessionSubmissionApi]'s
+ * queue, and separately in [com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource]'s
  * own `toPayload()` for the network wire shape — the two are deliberately different subsets (this one
  * is full-fidelity, that one omits `xpConfig`), so neither can be derived from the other, and nothing
  * enforces they stay in sync beyond this note.
