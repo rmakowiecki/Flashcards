@@ -20,6 +20,7 @@ data class OnboardingScreenState(
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
     val favoriteSubcategoryOptions: ImmutableList<FavoriteSubcategoryOption> = persistentListOf(),
     val isFavoriteSubcategoriesLoading: Boolean = false,
+    val favoriteSubcategoriesLoaded: Boolean = false,
     val favoriteSubcategoriesLoadingFailed: Boolean = false,
     val selectedFavoriteSubcategoriesIds: ImmutableSet<String> = persistentSetOf(),
     val isCommitting: Boolean = false,

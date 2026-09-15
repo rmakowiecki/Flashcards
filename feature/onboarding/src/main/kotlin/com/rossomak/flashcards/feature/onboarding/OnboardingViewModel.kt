@@ -76,7 +76,7 @@ class OnboardingViewModel @Inject constructor(
      */
     fun onFavoritesStepEntered() {
         val current = _state.value
-        if (current.isFavoriteSubcategoriesLoading || current.favoriteSubcategoryOptions.isNotEmpty() || current.favoriteSubcategoriesLoadingFailed) {
+        if (current.isFavoriteSubcategoriesLoading || current.favoriteSubcategoriesLoaded || current.favoriteSubcategoriesLoadingFailed) {
             return
         }
         loadFavoriteSubcategoryOptions()
@@ -99,7 +99,13 @@ class OnboardingViewModel @Inject constructor(
                             iconSvg = subcategory.iconSvg,
                         )
                     }.toPersistentList()
-                    _state.update { it.copy(favoriteSubcategoryOptions = options, isFavoriteSubcategoriesLoading = false) }
+                    _state.update {
+                        it.copy(
+                            favoriteSubcategoryOptions = options,
+                            isFavoriteSubcategoriesLoading = false,
+                            favoriteSubcategoriesLoaded = true,
+                        )
+                    }
                 }
                 .onFailure {
                     _state.update { it.copy(isFavoriteSubcategoriesLoading = false, favoriteSubcategoriesLoadingFailed = true) }
