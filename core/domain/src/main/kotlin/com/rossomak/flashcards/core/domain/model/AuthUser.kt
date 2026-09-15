@@ -5,7 +5,5 @@ data class AuthUser(
     val email: String?,
     val displayName: String?,
     val photoUrl: String?,
-    // Firebase Anonymous Auth session, pre-link (see docs/temp/onboarding-before-login-spec.md).
-    // Defaults to false so existing call sites naming a real signed-in user are unaffected.
-    val isAnonymous: Boolean = false,
+    val isAnonymous: Boolean = false, // Firebase Anonymous Auth session
 )

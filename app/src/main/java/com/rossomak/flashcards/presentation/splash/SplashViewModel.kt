@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
@@ -30,23 +31,15 @@ class SplashViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            // Anonymous sessions don't count: sign-in is mandatory, so an anonymous Firebase user
-            // (see docs/temp/onboarding-before-login-spec.md) must still be routed through Login,
-            // same as no user at all. Unreachable this PR — nothing creates an anonymous session
-            // yet — but landing the check now means the follow-up PR that does doesn't have to
-            // re-touch this routing decision.
-            val authenticated = withTimeoutOrNull(AUTH_TIMEOUT_MS) {
+            // Anonymous sessions don't count: sign-in is mandatory, so an anonymous Firebase user must still be routed through Login
+            val authenticated = withTimeoutOrNull(AUTH_TIMEOUT_MS.milliseconds) {
                 val authUser = getCurrentAuthUser()
                 authUser != null && !authUser.isAnonymous
             } ?: false
             _authenticated.value = authenticated
         }
         viewModelScope.launch {
-            // Falls back to "not seen" on a read that stalls: a slow local read must not hold the
-            // splash open, and under onboarding-before-login (docs/temp/onboarding-before-login-spec.md)
-            // skipping Onboarding for a genuine first-time user is the worse of the two mistakes —
-            // worse than a returning user occasionally seeing it again on a slow read.
-            _hasSeenOnboarding.value = withTimeoutOrNull(PREFERENCES_TIMEOUT_MS) {
+            _hasSeenOnboarding.value = withTimeoutOrNull(PREFERENCES_TIMEOUT_MS.milliseconds) {
                 observeUserPreferences().first().hasSeenOnboarding
             } ?: false
         }
