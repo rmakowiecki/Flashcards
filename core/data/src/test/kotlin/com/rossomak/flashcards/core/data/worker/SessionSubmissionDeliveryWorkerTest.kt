@@ -7,9 +7,9 @@ import androidx.work.WorkerParameters
 import com.rossomak.flashcards.core.data.model.PendingFlashcardResultDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingXpConfigDto
-import com.rossomak.flashcards.core.data.network.SessionSubmissionApi
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -35,7 +35,7 @@ import org.junit.Test
  */
 class SessionSubmissionDeliveryWorkerTest {
 
-    private val sessionSubmissionApi: SessionSubmissionApi = mockk()
+    private val sessionSubmissionRemoteDataSource: SessionSubmissionRemoteDataSource = mockk()
     private val localDataSource = FakePendingSessionSubmissionLocalDataSource()
 
     @Before
@@ -60,7 +60,7 @@ class SessionSubmissionDeliveryWorkerTest {
         return SessionSubmissionDeliveryWorker(
             mockk<Context>(),
             workerParameters,
-            sessionSubmissionApi,
+            sessionSubmissionRemoteDataSource,
             localDataSource,
         )
     }
@@ -104,13 +104,13 @@ class SessionSubmissionDeliveryWorkerTest {
         val first = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         localDataSource.seed(second)
         localDataSource.seed(first)
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.success(Unit)
 
         createWorker().doWork()
 
         coVerifySequence {
-            sessionSubmissionApi.submitSession(withArg { it.id shouldBe "session-1" })
-            sessionSubmissionApi.submitSession(withArg { it.id shouldBe "session-2" })
+            sessionSubmissionRemoteDataSource.submitSession(withArg { it.id shouldBe "session-1" })
+            sessionSubmissionRemoteDataSource.submitSession(withArg { it.id shouldBe "session-2" })
         }
     }
 
@@ -118,7 +118,7 @@ class SessionSubmissionDeliveryWorkerTest {
     fun `doWork clears every entry that was delivered successfully`() = runTest {
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -134,22 +134,22 @@ class SessionSubmissionDeliveryWorkerTest {
         localDataSource.seed(first)
         localDataSource.seed(second)
         localDataSource.seed(third)
-        coEvery { sessionSubmissionApi.submitSession(match { it.id == "session-1" }) } returns kotlin.Result.success(Unit)
-        coEvery { sessionSubmissionApi.submitSession(match { it.id == "session-2" }) } returns
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-1" }) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-2" }) } returns
             kotlin.Result.failure(IllegalStateException("network error"))
 
         val result = createWorker().doWork()
 
         result shouldBe Result.retry()
         localDataSource.listAll().map { it.id } shouldBe listOf("session-2", "session-3")
-        coVerify(exactly = 0) { sessionSubmissionApi.submitSession(match { it.id == "session-3" }) }
+        coVerify(exactly = 0) { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-3" }) }
     }
 
     @Test
     fun `a single-entry drain returns retry on failure without clearing the entry`() = runTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         localDataSource.seed(entry)
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.failure(IllegalStateException("offline"))
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.failure(IllegalStateException("offline"))
 
         val result = createWorker().doWork()
 
@@ -161,7 +161,7 @@ class SessionSubmissionDeliveryWorkerTest {
     fun `a single-entry drain clears the pending record on success`() = runTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         localDataSource.seed(entry)
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -174,14 +174,14 @@ class SessionSubmissionDeliveryWorkerTest {
         val result = createWorker().doWork()
 
         result shouldBe Result.success()
-        coVerify(exactly = 0) { sessionSubmissionApi.submitSession(any()) }
+        coVerify(exactly = 0) { sessionSubmissionRemoteDataSource.submitSession(any()) }
     }
 
     @Test
     fun `a failure below the attempt limit still retries without dropping the entry`() = runTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         localDataSource.seed(entry)
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.failure(IllegalStateException("offline"))
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.failure(IllegalStateException("offline"))
 
         // Attempt 4 of 5 (runAttemptCount is 0-indexed) — still under the limit.
         val result = createWorker(runAttemptCount = 3).doWork()
@@ -196,16 +196,16 @@ class SessionSubmissionDeliveryWorkerTest {
         val second = pendingSubmission("session-2", startedAtEpochMillis = 2_000L)
         localDataSource.seed(first)
         localDataSource.seed(second)
-        coEvery { sessionSubmissionApi.submitSession(match { it.id == "session-1" }) } returns
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-1" }) } returns
             kotlin.Result.failure(IllegalStateException("permanently rejected"))
-        coEvery { sessionSubmissionApi.submitSession(match { it.id == "session-2" }) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-2" }) } returns kotlin.Result.success(Unit)
 
         // Attempt 5 of 5 (runAttemptCount 4, 0-indexed) — the limit.
         val result = createWorker(runAttemptCount = 4).doWork()
 
         result shouldBe Result.success()
         localDataSource.listAll() shouldBe emptyList()
-        coVerify(exactly = 1) { sessionSubmissionApi.submitSession(match { it.id == "session-2" }) }
+        coVerify(exactly = 1) { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-2" }) }
     }
 
     @Test
@@ -218,7 +218,7 @@ class SessionSubmissionDeliveryWorkerTest {
         localDataSource.seed(first)
         localDataSource.seed(second)
         localDataSource.seed(third)
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns
             kotlin.Result.failure(IllegalStateException("backend unavailable"))
 
         // Attempt 5 of 5 (runAttemptCount 4, 0-indexed) — the limit.
@@ -226,8 +226,8 @@ class SessionSubmissionDeliveryWorkerTest {
 
         result shouldBe Result.retry()
         localDataSource.listAll().map { it.id } shouldBe listOf("session-2", "session-3")
-        coVerify(exactly = 1) { sessionSubmissionApi.submitSession(match { it.id == "session-2" }) }
-        coVerify(exactly = 0) { sessionSubmissionApi.submitSession(match { it.id == "session-3" }) }
+        coVerify(exactly = 1) { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-2" }) }
+        coVerify(exactly = 0) { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-3" }) }
     }
 
     @Test
@@ -239,13 +239,13 @@ class SessionSubmissionDeliveryWorkerTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         coEvery { unreliableLocalDataSource.listAll() } returns listOf(entry)
         coEvery { unreliableLocalDataSource.remove(any()) } throws IOException("queue file unreadable")
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.success(Unit)
         val workerParameters: WorkerParameters = mockk()
         every { workerParameters.runAttemptCount } returns 0
         val worker = SessionSubmissionDeliveryWorker(
             mockk<Context>(),
             workerParameters,
-            sessionSubmissionApi,
+            sessionSubmissionRemoteDataSource,
             unreliableLocalDataSource,
         )
 
@@ -266,14 +266,14 @@ class SessionSubmissionDeliveryWorkerTest {
         val worker = SessionSubmissionDeliveryWorker(
             mockk<Context>(),
             workerParameters,
-            sessionSubmissionApi,
+            sessionSubmissionRemoteDataSource,
             unreliableLocalDataSource,
         )
 
         val result = worker.doWork()
 
         result shouldBe Result.retry()
-        coVerify(exactly = 0) { sessionSubmissionApi.submitSession(any()) }
+        coVerify(exactly = 0) { sessionSubmissionRemoteDataSource.submitSession(any()) }
     }
 
     @Test
@@ -282,13 +282,13 @@ class SessionSubmissionDeliveryWorkerTest {
         val valid = pendingSubmission("session-2", startedAtEpochMillis = 2_000L)
         localDataSource.seed(malformed)
         localDataSource.seed(valid)
-        coEvery { sessionSubmissionApi.submitSession(any()) } returns kotlin.Result.success(Unit)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
         result shouldBe Result.success()
         localDataSource.listAll() shouldBe emptyList()
-        coVerify(exactly = 0) { sessionSubmissionApi.submitSession(match { it.id == "session-1" }) }
-        coVerify(exactly = 1) { sessionSubmissionApi.submitSession(match { it.id == "session-2" }) }
+        coVerify(exactly = 0) { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-1" }) }
+        coVerify(exactly = 1) { sessionSubmissionRemoteDataSource.submitSession(match { it.id == "session-2" }) }
     }
 }

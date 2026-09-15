@@ -172,7 +172,7 @@ private const val MASTERY_RING_SWEEP_ANGLE = 360f
 
 private const val BADGE_ROW_ENTRANCE_DELAY_MS = 450L
 
-@Suppress("LongMethod")
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun StudySessionSummaryContent(
     modifier: Modifier = Modifier,

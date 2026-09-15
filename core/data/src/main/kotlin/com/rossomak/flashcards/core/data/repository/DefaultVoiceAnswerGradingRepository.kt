@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
-import com.rossomak.flashcards.core.data.network.VoiceGradingApi
+import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
  * pipeline (ADR-0016/ADR-0026).
  */
 class DefaultVoiceAnswerGradingRepository @Inject constructor(
-    private val voiceGradingApi: VoiceGradingApi,
+    private val voiceGradingRemoteDataSource: VoiceGradingRemoteDataSource,
 ) : VoiceAnswerGradingRepository {
 
     /**
@@ -43,7 +43,7 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
         while (true) {
             var sanitizedTranscript: String? = null
             try {
-                voiceGradingApi.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, obfuscatedAnswerWav)
+                voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, obfuscatedAnswerWav)
                     .collect { event ->
                         when (event) {
                             is VoiceGradingStreamEventDto.TranscriptChunk -> {
@@ -79,7 +79,7 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
     override suspend fun transcribeAndSanitize(obfuscatedAnswerWav: ByteArray): Result<String> =
         withContext(Dispatchers.IO) {
             try {
-                voiceGradingApi.transcribeAndSanitize(obfuscatedAnswerWav)
+                voiceGradingRemoteDataSource.transcribeAndSanitize(obfuscatedAnswerWav)
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -89,7 +89,7 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
 
     override suspend fun checkEntitlement(): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            Result.success(voiceGradingApi.checkEntitlement().isPremium)
+            Result.success(voiceGradingRemoteDataSource.checkEntitlement().isPremium)
         } catch (exception: CancellationException) {
             throw exception
         } catch (exception: Exception) {

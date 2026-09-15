@@ -13,7 +13,7 @@ data class EntitlementDto(
  * Ordered wire events for the streamed `transcribeAndGradeSpokenAnswer` callable (ADR-0028). Not
  * `@Serializable`/kotlinx.serialization-backed like [EntitlementDto] — the Firebase Functions
  * callable SDK decodes `StreamResponse.Message`/`StreamResponse.Result` payloads into raw
- * `Map<String, Any?>` itself, so [com.rossomak.flashcards.core.data.network.RealVoiceGradingApi]
+ * `Map<String, Any?>` itself, so [com.rossomak.flashcards.core.data.source.FirebaseVoiceGradingRemoteDataSource]
  * builds these by hand from that map.
  */
 sealed interface VoiceGradingStreamEventDto {

@@ -62,7 +62,7 @@ so stale card content never lingers. Three collections are written:
 - Display names come from titlecased slugs; acronym/multi-word fixes live in
   `NAME_OVERRIDES` in `build_fixture.py`. Category/subcategory `order` is assigned
   by card volume — adjust in the Firebase console afterward if desired.
-- Schema + projection rules: see `SYSTEMDESIGN.md` (Firestore Schema section),
+- Schema + projection rules: see `../../docs/design/firestore-schema.md`,
   `docs/adr/0007-firestore-collection-structure.md`, and
   `docs/adr/0037-flashcard-content-sharded-by-byte-budget.md`.
 - Two-stage tooling rationale: see `docs/adr/0008-two-stage-firestore-seed-tooling.md`.
