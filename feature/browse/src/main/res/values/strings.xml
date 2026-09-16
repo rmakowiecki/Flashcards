@@ -43,7 +43,7 @@
     </plurals>
     <string name="category_details_topic_progress_cd">%1$d%% studied</string>
     <string name="category_details_topic_progress_unavailable_cd">Studied progress unavailable</string>
-    <string name="category_details_load_error">Could not load topics</string>
+    <string name="category_details_load_error">Could not load topics. Check your internet connection and try again</string>
     <string name="category_details_topic_studied_label" tools:ignore="PluralsCandidate">%1$d studied</string>
     <string name="browse_category_placeholder_subtitle">Tap to explore</string>
     <string name="browse_search_hint">Search categories or topics…</string>
