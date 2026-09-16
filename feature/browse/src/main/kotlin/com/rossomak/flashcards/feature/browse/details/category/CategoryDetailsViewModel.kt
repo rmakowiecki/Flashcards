@@ -129,11 +129,17 @@ class CategoryDetailsViewModel @Inject constructor(
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
         _state.update { it.copy(isFavorite = isFavorite) }
-        _messages.tryEmit(
-            if (isFavorite) CategoryDetailsMessage.AddedToFavorites else CategoryDetailsMessage.RemovedFromFavorites
-        )
         viewModelScope.launch {
-            setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
+            val result = setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
+            if (result.isSuccess) {
+                _messages.tryEmit(
+                    if (isFavorite) {
+                        CategoryDetailsMessage.AddedToFavorites
+                    } else {
+                        CategoryDetailsMessage.RemovedFromFavorites
+                    },
+                )
+            }
         }
     }
 
