@@ -12,6 +12,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import java.time.Instant
 import java.util.Date
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,8 +38,11 @@ class DefaultUserFavoritesRepositoryTest {
 
         createRepository().observeFavorites().test {
             val favorites = awaitItem()
-            favorites.categoryIds shouldBe setOf("android")
-            favorites.subcategoryIds shouldBe setOf("android-testing", "kotlin-coroutines")
+            favorites.categoryIds shouldBe mapOf("android" to Instant.ofEpochMilli(1_000L))
+            favorites.subcategoryIds shouldBe mapOf(
+                "android-testing" to Instant.ofEpochMilli(2_000L),
+                "kotlin-coroutines" to Instant.ofEpochMilli(3_000L),
+            )
             awaitComplete()
         }
     }

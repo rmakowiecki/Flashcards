@@ -15,10 +15,10 @@ fun SubcategoryProgressDto.toDomain(subcategoryId: String): SubcategoryProgress 
 
 private fun CardProgressEntryDto.toDomain(): CardProgressEntry? {
     val resolvedState = runCatching { FlashcardStudyProgressState.valueOf(state) }.getOrNull() ?: return null
-    val resolvedFirstStudiedAt = firstStudiedAt?.toDate()?.toInstant() ?: return null
+    val resolvedFirstStudiedAt = firstStudiedAt?.toInstant() ?: return null
     return CardProgressEntry(
         state = resolvedState,
         firstStudiedAt = resolvedFirstStudiedAt,
-        masteredAt = masteredAt?.toDate()?.toInstant(),
+        masteredAt = masteredAt?.toInstant(),
     )
 }
