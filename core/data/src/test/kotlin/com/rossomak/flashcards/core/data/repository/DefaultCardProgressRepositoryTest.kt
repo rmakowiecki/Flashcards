@@ -1,6 +1,8 @@
 package com.rossomak.flashcards.core.data.repository
 
+import app.cash.turbine.test
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.ProgressSummaryDto
 import com.rossomak.flashcards.core.data.model.SubcategoryProgressDto
@@ -11,10 +13,14 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import java.util.Date
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -88,54 +94,65 @@ class DefaultCardProgressRepositoryTest {
     }
 
     @Test
-    fun `getProgressSummary maps the dto to domain keyed by subcategory id`() = runTest {
+    fun `observeProgressSummary maps the dto to domain keyed by subcategory id`() = runTest {
         val subcategoryId = "sub-1"
         val masteredCount = 3
         val studiedCount = 5
         val dto = ProgressSummaryDto(
             subcategories = mapOf(subcategoryId to SubcategoryProgressSummaryDto(masteredCount = masteredCount, studiedCount = studiedCount)),
         )
-        coEvery { progressSummaryRemoteDataSource.getSummary() } returns dto
+        every { progressSummaryRemoteDataSource.observeSummary() } returns flowOf(dto)
 
-        val result = createRepository().getProgressSummary()
-
-        result.isSuccess shouldBe true
-        val subcategory = result.getOrThrow()?.subcategories?.getValue(subcategoryId)
-        subcategory?.masteredCount shouldBe masteredCount
-        subcategory?.studiedCount shouldBe studiedCount
-        coVerify(exactly = 1) { progressSummaryRemoteDataSource.getSummary() }
+        createRepository().observeProgressSummary().test {
+            val subcategory = awaitItem()?.subcategories?.getValue(subcategoryId)
+            subcategory?.masteredCount shouldBe masteredCount
+            subcategory?.studiedCount shouldBe studiedCount
+            awaitComplete()
+        }
     }
 
     @Test
-    fun `getProgressSummary returns success with null for an absent document`() = runTest {
-        coEvery { progressSummaryRemoteDataSource.getSummary() } returns null
+    fun `observeProgressSummary emits null for an absent document`() = runTest {
+        every { progressSummaryRemoteDataSource.observeSummary() } returns flowOf(null)
 
-        val result = createRepository().getProgressSummary()
-
-        result.isSuccess shouldBe true
-        result.getOrThrow() shouldBe null
-        coVerify(exactly = 1) { progressSummaryRemoteDataSource.getSummary() }
+        createRepository().observeProgressSummary().test {
+            awaitItem() shouldBe null
+            awaitComplete()
+        }
     }
 
     @Test
-    fun `getProgressSummary wraps a data source failure in a failure result`() = runTest {
-        val error = IllegalStateException("firestore down")
-        coEvery { progressSummaryRemoteDataSource.getSummary() } throws error
+    fun `observeProgressSummary completes silently on permission denied without retrying`() = runTest {
+        val attempts = AtomicInteger(0)
+        every { progressSummaryRemoteDataSource.observeSummary() } returns flow {
+            attempts.incrementAndGet()
+            throw FirebaseFirestoreException("sign-out", FirebaseFirestoreException.Code.PERMISSION_DENIED)
+        }
 
-        val result = createRepository().getProgressSummary()
-
-        result.isFailure shouldBe true
-        result.exceptionOrNull() shouldBe error
-        coVerify(exactly = 1) { progressSummaryRemoteDataSource.getSummary() }
+        createRepository().observeProgressSummary().test {
+            awaitComplete()
+        }
+        attempts.get() shouldBe 1
     }
 
     @Test
-    fun `getProgressSummary rethrows cancellation instead of wrapping it`() = runTest {
-        coEvery { progressSummaryRemoteDataSource.getSummary() } throws CancellationException("cancelled")
+    fun `observeProgressSummary retries and recovers after a non-permission listener failure`() = runTest {
+        val subcategoryId = "sub-1"
+        val attempts = AtomicInteger(0)
+        every { progressSummaryRemoteDataSource.observeSummary() } returns flow {
+            if (attempts.getAndIncrement() == 0) {
+                throw FirebaseFirestoreException("listener dropped", FirebaseFirestoreException.Code.UNAVAILABLE)
+            } else {
+                emit(ProgressSummaryDto(subcategories = mapOf(subcategoryId to SubcategoryProgressSummaryDto(masteredCount = 1, studiedCount = 2))))
+            }
+        }
 
-        val thrown = runCatching { createRepository().getProgressSummary() }.exceptionOrNull()
-
-        (thrown is CancellationException) shouldBe true
-        coVerify(exactly = 1) { progressSummaryRemoteDataSource.getSummary() }
+        createRepository().observeProgressSummary().test {
+            val subcategory = awaitItem()?.subcategories?.getValue(subcategoryId)
+            subcategory?.masteredCount shouldBe 1
+            subcategory?.studiedCount shouldBe 2
+            awaitComplete()
+        }
+        attempts.get() shouldBe 2
     }
 }
