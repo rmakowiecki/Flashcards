@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "com.rossomak.flashcards.core.data"
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

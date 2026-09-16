@@ -7,10 +7,13 @@ import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveSubcategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
+import com.rossomak.flashcards.core.domain.usecase.SetSubcategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -49,6 +52,9 @@ class SubcategoryDetailsViewModelTest {
     private val savedStateHandle: SavedStateHandle = mockk()
     private val flashcardRepository = FakeFlashcardRepository()
     private val preferencesRepository = FakeStudySessionPreferencesRepository()
+    private val userFavoritesRepository = FakeUserFavoritesRepository()
+    private val observeSubcategoryFavoriteState = ObserveSubcategoryFavoriteStateUseCase(userFavoritesRepository)
+    private val setSubcategoryFavorite = SetSubcategoryFavoriteUseCase(userFavoritesRepository)
 
     private val route = SubcategoryDetailsRoute(
         categoryId = "cat-1",
@@ -82,6 +88,8 @@ class SubcategoryDetailsViewModelTest {
         filterFlashcards = FilterFlashcardsUseCase(),
         observeStudySessionPreferences = ObserveStudySessionPreferencesUseCase(preferencesRepository),
         saveStudySessionPreference = SaveStudySessionPreferenceUseCase(preferencesRepository),
+        observeSubcategoryFavoriteState = observeSubcategoryFavoriteState,
+        setSubcategoryFavorite = setSubcategoryFavorite,
     )
 
     private fun flashcard(
@@ -325,6 +333,7 @@ class SubcategoryDetailsViewModelTest {
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe SubcategoryDetailsMessage.AddedToFavorites
                 viewModel.state.value.isFavorite shouldBe true
@@ -347,9 +356,11 @@ class SubcategoryDetailsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = startedViewModel()
             viewModel.onFavoriteToggle()
+            advanceUntilIdle()
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe SubcategoryDetailsMessage.RemovedFromFavorites
                 viewModel.state.value.isFavorite shouldBe false

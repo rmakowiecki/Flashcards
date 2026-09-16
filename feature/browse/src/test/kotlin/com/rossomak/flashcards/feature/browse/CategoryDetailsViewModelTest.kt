@@ -7,8 +7,11 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage
@@ -42,6 +45,9 @@ class CategoryDetailsViewModelTest {
     private val getSubcategories = GetSubcategoriesUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
     private val getProgressSummary = GetProgressSummaryUseCase(cardProgressRepository)
+    private val userFavoritesRepository = FakeUserFavoritesRepository()
+    private val observeCategoryFavoriteState = ObserveCategoryFavoriteStateUseCase(userFavoritesRepository)
+    private val setCategoryFavorite = SetCategoryFavoriteUseCase(userFavoritesRepository)
 
     private val route = CategoryDetailsRoute(categoryId = "android", categoryName = "Android")
 
@@ -57,7 +63,13 @@ class CategoryDetailsViewModelTest {
     }
 
     private fun createViewModel(): CategoryDetailsViewModel =
-        CategoryDetailsViewModel(savedStateHandle, getSubcategories, getProgressSummary)
+        CategoryDetailsViewModel(
+            savedStateHandle,
+            getSubcategories,
+            getProgressSummary,
+            observeCategoryFavoriteState,
+            setCategoryFavorite,
+        )
 
     private fun subcategory(id: String): Subcategory = Subcategory(
         id = id,
@@ -114,6 +126,7 @@ class CategoryDetailsViewModelTest {
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe CategoryDetailsMessage.AddedToFavorites
                 viewModel.state.value.isFavorite shouldBe true
@@ -135,9 +148,11 @@ class CategoryDetailsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createViewModel()
             viewModel.onFavoriteToggle()
+            advanceUntilIdle()
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe CategoryDetailsMessage.RemovedFromFavorites
                 viewModel.state.value.isFavorite shouldBe false

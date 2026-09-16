@@ -167,6 +167,7 @@ fun MainScreen(
                 composable<HomeRoot> {
                     HomeScreen(
                         onNavigateToCategoryDetails = onNavigateToCategoryDetails,
+                        onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
                     )
                 }
             }

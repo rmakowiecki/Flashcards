@@ -9,7 +9,9 @@ import com.rossomak.flashcards.core.domain.model.orderedBy
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveSubcategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
+import com.rossomak.flashcards.core.domain.usecase.SetSubcategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.composables.dialogs.selectAllTags
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -39,6 +41,8 @@ class SubcategoryDetailsViewModel @Inject constructor(
     private val filterFlashcards: FilterFlashcardsUseCase,
     private val observeStudySessionPreferences: ObserveStudySessionPreferencesUseCase,
     private val saveStudySessionPreference: SaveStudySessionPreferenceUseCase,
+    private val observeSubcategoryFavoriteState: ObserveSubcategoryFavoriteStateUseCase,
+    private val setSubcategoryFavorite: SetSubcategoryFavoriteUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<SubcategoryDetailsRoute>()
@@ -85,6 +89,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
             _state.update { it.copy(sortOrder = defaults.sortOrder) }
             loadFlashcards()
         }
+        observeFavoriteState()
     }
 
     /** Single entry point for every dialog on this screen (ADR-0036). */
@@ -115,18 +120,21 @@ class SubcategoryDetailsViewModel @Inject constructor(
         renderContent()
     }
 
-    /**
-     * Deliberately fake. There is no favourites feature: this flips a flag that dies with the
-     * ViewModel and shows a snackbar, and **writes nothing anywhere** — no repository, no use case,
-     * no preference. Do not wire it to storage on the assumption that it is a half-finished
-     * integration; making favourites real is its own piece of work.
-     */
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
         _state.update { it.copy(isFavorite = isFavorite) }
-        _messages.tryEmit(
-            if (isFavorite) SubcategoryDetailsMessage.AddedToFavorites else SubcategoryDetailsMessage.RemovedFromFavorites
-        )
+        viewModelScope.launch {
+            val result = setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, isFavorite))
+            if (result.isSuccess) {
+                _messages.tryEmit(
+                    if (isFavorite) {
+                        SubcategoryDetailsMessage.AddedToFavorites
+                    } else {
+                        SubcategoryDetailsMessage.RemovedFromFavorites
+                    },
+                )
+            }
+        }
     }
 
     /**
@@ -136,6 +144,17 @@ class SubcategoryDetailsViewModel @Inject constructor(
      */
     fun onFavoriteUndo(restoreTo: Boolean) {
         _state.update { it.copy(isFavorite = restoreTo) }
+        viewModelScope.launch {
+            setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, restoreTo))
+        }
+    }
+
+    private fun observeFavoriteState() {
+        viewModelScope.launch {
+            observeSubcategoryFavoriteState(route.subcategoryId).collect { isFavorite ->
+                _state.update { it.copy(isFavorite = isFavorite) }
+            }
+        }
     }
 
     fun onStartSession() {

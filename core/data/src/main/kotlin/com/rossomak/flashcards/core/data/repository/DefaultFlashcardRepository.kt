@@ -74,6 +74,26 @@ class DefaultFlashcardRepository @Inject constructor(
         }
     }
 
+    override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> = withContext(Dispatchers.IO) {
+        try {
+            Result.success(remoteDataSource.getCategoriesByIds(ids).map { it.toDomain() })
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            Result.failure(exception)
+        }
+    }
+
+    override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> = withContext(Dispatchers.IO) {
+        try {
+            Result.success(remoteDataSource.getSubcategoriesByIds(ids).map { it.toDomain() })
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            Result.failure(exception)
+        }
+    }
+
     override suspend fun searchSubcategories(namePrefix: String): Result<List<Subcategory>> = withContext(Dispatchers.IO) {
         try {
             Result.success(

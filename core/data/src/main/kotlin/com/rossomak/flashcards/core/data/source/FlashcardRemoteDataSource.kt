@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.data.source
 
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.CategoryDto
@@ -31,6 +32,36 @@ class FlashcardRemoteDataSource @Inject constructor(
         .mapNotNull { document ->
             document.toObject(SubcategoryDto::class.java)?.copy(id = document.id)
         }
+
+    suspend fun getCategoriesByIds(ids: Set<String>): List<CategoryDto> {
+        if (ids.isEmpty()) return emptyList()
+        val collection = firestore.collection(COLLECTION_CATEGORIES)
+        return ids.chunked(WHEREIN_BATCH_SIZE).flatMap { chunk ->
+            collection
+                .whereIn(FieldPath.documentId(), chunk)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { document ->
+                    document.toObject(CategoryDto::class.java)?.copy(id = document.id)
+                }
+        }
+    }
+
+    suspend fun getSubcategoriesByIds(ids: Set<String>): List<SubcategoryDto> {
+        if (ids.isEmpty()) return emptyList()
+        val collection = firestore.collection(COLLECTION_SUBCATEGORIES)
+        return ids.chunked(WHEREIN_BATCH_SIZE).flatMap { chunk ->
+            collection
+                .whereIn(FieldPath.documentId(), chunk)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { document ->
+                    document.toObject(SubcategoryDto::class.java)?.copy(id = document.id)
+                }
+        }
+    }
 
     /**
      * Prefix search over the whole flat `subcategories` collection, never a bulk load. Firestore
@@ -117,5 +148,8 @@ class FlashcardRemoteDataSource @Inject constructor(
          * 30 values. See docs/design/category-search.md.
          */
         const val SEARCH_RESULT_LIMIT = 20L
+
+        /** Firestore `whereIn` caps at 30 values; larger id sets are split into batches of this size. */
+        const val WHEREIN_BATCH_SIZE = 30
     }
 }

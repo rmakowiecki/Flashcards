@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,6 +24,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,7 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.FavoriteItem
+import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile
 import com.rossomak.flashcards.core.ui.theme.brandColors
 
 @Composable
@@ -49,13 +58,84 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     onNavigateToCategoryDetails: (String, String) -> Unit = { _, _ -> },
+    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit = { _, _, _, _ -> },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxSize()) {
         HomeTopBar()
         UserGreetingSection(userName = "Ross")
-        HomeEmptyState(modifier = Modifier.weight(1f))
+        if (state.favoriteItems.isNotEmpty()) {
+            FavoritesCarousel(
+                items = state.favoriteItems,
+                onCategoryClick = { category -> onNavigateToCategoryDetails(category.id, category.name) },
+                onSubcategoryClick = { subcategory ->
+                    onNavigateToSubcategoryDetails(
+                        subcategory.categoryId,
+                        subcategory.categoryName,
+                        subcategory.id,
+                        subcategory.name,
+                    )
+                },
+            )
+        } else {
+            HomeEmptyState(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun FavoritesCarousel(
+    items: List<FavoriteItem>,
+    onCategoryClick: (Category) -> Unit,
+    onSubcategoryClick: (Subcategory) -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(items) { item ->
+            when (item) {
+                is FavoriteItem.FavoriteCategory -> FavoriteCard(
+                    name = item.category.name,
+                    iconSvg = item.category.iconSvg,
+                    color = item.category.color,
+                    onClick = { onCategoryClick(item.category) },
+                )
+                is FavoriteItem.FavoriteSubcategory -> FavoriteCard(
+                    name = item.subcategory.name,
+                    iconSvg = item.parentCategory.iconSvg,
+                    color = item.parentCategory.color,
+                    onClick = { onSubcategoryClick(item.subcategory) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteCard(name: String, iconSvg: String?, color: String?, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.width(140.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        ) {
+            FlashcardsVectorIconTile(
+                iconSvg = iconSvg,
+                color = color,
+                contentDescription = null,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
     }
 }
 

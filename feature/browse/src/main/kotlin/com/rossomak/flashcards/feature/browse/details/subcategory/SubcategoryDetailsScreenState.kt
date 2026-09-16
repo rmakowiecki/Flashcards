@@ -21,7 +21,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
  * @param availableTags the tag vocabulary of the whole pool, so a chip never vanishes because the
  * user filtered it out.
  * @param totalCount unfiltered pool size, the second number in "filtered to 4 of 80".
- * @param isFavorite deliberately fake — see [SubcategoryDetailsViewModel.onFavoriteToggle].
+ * @param isFavorite live from [UserFavoritesRepository.observeFavorites][com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository.observeFavorites], written via [SubcategoryDetailsViewModel.onFavoriteToggle].
  */
 data class SubcategoryDetailsScreenState(
     val categoryName: String = "",
