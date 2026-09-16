@@ -31,7 +31,6 @@ import androidx.compose.material3.SearchBarState
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopSearchBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -198,11 +197,7 @@ fun BrowseContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopSearchBar(state = searchBarState, inputField = inputField, colors = barColors)
-        PullToRefreshBox(
-            isRefreshing = state.isLoading,
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize(),
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             CategoryListContent(state = state, onRefresh = onRefresh, onCategoryClick = onCategoryClick)
         }
     }
@@ -224,11 +219,10 @@ fun BrowseContent(
 }
 
 /**
- * The four things [PullToRefreshBox]'s content slot can show: a spinner during the initial or
- * refresh load, an error card, an empty-but-successful load, or the category list.
- * [BrowseScreenState.hasLoadError] is the only signal that reads as failure — a successfully-empty
- * category list (expected to never materialize in practice; categories are seeded data) gets its
- * own informational empty state instead, since retrying can't fix a load that already succeeded.
+ * The three things this content slot can show: a spinner during the initial load, an error card,
+ * or the category list. An empty [BrowseScreenState.categories] always reads as failure — whether
+ * a real load error or genuinely zero categories, there's nothing useful to show and retry is the
+ * only recourse — so both collapse into the same error state.
  */
 @Composable
 private fun BoxScope.CategoryListContent(
@@ -238,7 +232,7 @@ private fun BoxScope.CategoryListContent(
 ) {
     when {
         state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        state.hasLoadError -> CenteredEmptyState(
+        state.categories.isEmpty() -> CenteredEmptyState(
             icon = Icons.Filled.ErrorOutline,
             title = stringResource(R.string.browse_categories_error_title),
             supportingText = stringResource(R.string.browse_categories_error_message),
@@ -250,11 +244,6 @@ private fun BoxScope.CategoryListContent(
                     icon = Icons.Filled.Refresh,
                 )
             },
-        )
-        state.categories.isEmpty() -> CenteredEmptyState(
-            icon = Icons.Filled.Search,
-            title = stringResource(R.string.browse_categories_empty_title),
-            supportingText = stringResource(R.string.browse_categories_empty_message),
         )
         else -> CategoryList(categories = state.categories, onCategoryClick = onCategoryClick)
     }
@@ -386,7 +375,7 @@ private fun CenteredEmptyState(
  * `flashcardsListGroupItems` inside a `LazyColumn` instead.
  *
  * Callers only reach this with a non-empty [categories]: the empty case is handled upstream in
- * [BrowseContent], alongside [BrowseScreenState.hasLoadError].
+ * [CategoryListContent] as an error state.
  */
 @Composable
 internal fun CategoryList(

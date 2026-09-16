@@ -61,8 +61,6 @@
     <string name="browse_middle_dot_separator"> · </string>
     <string name="browse_categories_error_title">Something went wrong</string>
     <string name="browse_categories_error_message">Couldn\'t load categories.\nCheck your connection and try again.</string>
-    <string name="browse_categories_empty_title">No categories yet</string>
-    <string name="browse_categories_empty_message">Check back later.</string>
     <plurals name="browse_category_topic_count">
         <item quantity="one">%d topic</item>
         <item quantity="other">%d topics</item>

@@ -75,10 +75,9 @@ sealed interface SearchStatus {
  * renders from is Material 3's own `SearchBarState`; this mirrors it so the ViewModel can clear the
  * query on dismissal without reaching into the UI.
  *
- * [hasLoadError] means the category list itself could not load and there is nothing to show; it is
- * a flag rather than a message so the display copy stays in the UI layer as string resources, not
- * as hardcoded text in the ViewModel. It is orthogonal to [searchStatus]'s own [SearchStatus.Error]
- * — the category list and a single search query fail independently of each other.
+ * An empty [categories] always renders as an error, whether the load actually failed or merely
+ * hasn't happened yet — there is no separate flag for it. Defaulting [isLoading] to `true` keeps
+ * that from flashing on the very first composition, before [categories] loads.
  *
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), backing the ring
  * and subtitle on every matched subcategory in [searchStatus]. `null` until [isProgressResolved] — and
@@ -90,9 +89,8 @@ sealed interface SearchStatus {
  * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.isProgressResolved]. Search results themselves never wait on this.
  */
 data class BrowseScreenState(
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val categories: List<Category> = emptyList(),
-    val hasLoadError: Boolean = false,
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val searchStatus: SearchStatus = SearchStatus.Prompt,

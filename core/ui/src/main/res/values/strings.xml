@@ -13,6 +13,7 @@
     <string name="common_close_cd">Close</string>
     <string name="common_edit_button">Edit</string>
     <string name="common_retry_button">Retry</string>
+    <string name="common_load_error_title">Something went wrong</string>
     <string name="common_start_session_button">Start session</string>
     <string name="common_search_clear_cd">Clear search</string>
     <string name="common_search_dismiss_cd">Close search</string>
