@@ -6,9 +6,9 @@ import kotlinx.coroutines.flow.Flow
 interface UserFavoritesRepository {
 
     /**
-     * One Firestore listener backs both category and subcategory favorites (single-document
-     * design) — every screen that surfaces favorite state (Home, Category Details, Subcategory
-     * Details, onboarding) observes this same document rather than issuing its own per-item read.
+     * One Firestore listener backs both category and subcategory favorites (single-document design)
+     * Every screen that surfaces favorite state (Home, Category Details, Subcategory Details, onboarding) observes this same document rather than issuing its own per-item read.
+     * Caller UseCases might need just the IDs model, or want to merge the IDs with full e.g. Subcategory and Category models and resolve them, it's up to their discretion.
      */
     fun observeFavorites(): Flow<UserFavorites>
 
