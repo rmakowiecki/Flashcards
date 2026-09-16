@@ -7,6 +7,8 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 class FakeFlashcardRepository : FlashcardRepository {
     var categoriesToReturn: Result<List<Category>> = Result.success(emptyList())
     var subcategoriesToReturn: Result<List<Subcategory>> = Result.success(emptyList())
+    var categoriesByIdsToReturn: Result<List<Category>> = Result.success(emptyList())
+    var subcategoriesByIdsToReturn: Result<List<Subcategory>> = Result.success(emptyList())
     var flashcardsToReturn: Result<List<Flashcard>> = Result.success(emptyList())
     val flashcardsBySubcategory: MutableMap<String, Result<List<Flashcard>>> = mutableMapOf()
 
@@ -29,6 +31,10 @@ class FakeFlashcardRepository : FlashcardRepository {
     override suspend fun fetchCategories(): Result<List<Category>> = categoriesToReturn
 
     override suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>> = subcategoriesToReturn
+
+    override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> = categoriesByIdsToReturn
+
+    override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> = subcategoriesByIdsToReturn
 
     override suspend fun searchSubcategories(namePrefix: String): Result<List<Subcategory>> {
         searchedPrefixes += namePrefix

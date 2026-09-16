@@ -8,7 +8,13 @@ interface FlashcardRepository {
 
     suspend fun fetchCategories(): Result<List<Category>>
 
+    /** Categories matching [ids], in no particular order. Ids with no matching document are omitted. */
+    suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>>
+
     suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>>
+
+    /** Subcategories matching [ids], in no particular order. Ids with no matching document are omitted. */
+    suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>>
 
     /**
      * Subcategories across every category whose name starts with [namePrefix], ordered by name
