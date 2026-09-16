@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlin.math.min
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -10,7 +11,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
 
 private const val INITIAL_RETRY_BACKOFF_MILLIS = 1_000L
 private const val MAX_RETRY_BACKOFF_MILLIS = 30_000L
