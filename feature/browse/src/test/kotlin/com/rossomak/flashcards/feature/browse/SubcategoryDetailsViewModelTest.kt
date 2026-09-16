@@ -333,6 +333,7 @@ class SubcategoryDetailsViewModelTest {
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe SubcategoryDetailsMessage.AddedToFavorites
                 viewModel.state.value.isFavorite shouldBe true
@@ -355,9 +356,11 @@ class SubcategoryDetailsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = startedViewModel()
             viewModel.onFavoriteToggle()
+            advanceUntilIdle()
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe SubcategoryDetailsMessage.RemovedFromFavorites
                 viewModel.state.value.isFavorite shouldBe false

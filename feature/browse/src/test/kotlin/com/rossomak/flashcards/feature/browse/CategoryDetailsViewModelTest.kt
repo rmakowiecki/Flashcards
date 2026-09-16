@@ -126,6 +126,7 @@ class CategoryDetailsViewModelTest {
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe CategoryDetailsMessage.AddedToFavorites
                 viewModel.state.value.isFavorite shouldBe true
@@ -147,9 +148,11 @@ class CategoryDetailsViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createViewModel()
             viewModel.onFavoriteToggle()
+            advanceUntilIdle()
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
+                advanceUntilIdle()
 
                 awaitItem() shouldBe CategoryDetailsMessage.RemovedFromFavorites
                 viewModel.state.value.isFavorite shouldBe false
