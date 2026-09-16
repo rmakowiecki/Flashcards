@@ -20,7 +20,7 @@
     <string name="subcategory_details_no_matches_title">No cards match your filters</string>
     <string name="subcategory_details_no_matches_message">Try different tags or widen the difficulty range.</string>
     <string name="subcategory_details_reset_filters_button">Reset filters</string>
-    <string name="subcategory_details_load_error_message">Could not load flashcards</string>
+    <string name="subcategory_details_load_error_message">Could not load flashcards. Check your internet connection and try again</string>
     <string name="category_details_subtitle_label">Category</string>
     <string name="category_details_bookmark_label">Bookmark</string>
     <string name="category_details_add_shortcut_label">Add to home screen</string>
