@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.data.repository
 
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.source.UserFavoritesRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.UserFavorites
@@ -8,6 +9,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -19,6 +21,16 @@ class DefaultUserFavoritesRepository @Inject constructor(
     override fun observeFavorites(): Flow<UserFavorites> =
         remoteDataSource.observeFavorites()
             .map { it.toDomain() }
+            .catch { exception ->
+                // Firestore rejects the listener with PERMISSION_DENIED once sign-out clears auth
+                // mid-collection; swallow just that case here so it never leaks past this boundary.
+                if (exception is FirebaseFirestoreException &&
+                    exception.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+                ) {
+                    return@catch
+                }
+                throw exception
+            }
             .flowOn(Dispatchers.IO)
 
     override suspend fun setCategoryFavorite(categoryId: String, isFavorite: Boolean): Result<Unit> =

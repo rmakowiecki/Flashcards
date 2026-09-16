@@ -8,7 +8,6 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -22,10 +21,6 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             observeFavoriteItems()
-                // Firestore rejects the listener with PERMISSION_DENIED once sign-out clears
-                // auth mid-collection; viewModelScope isn't tied to auth state, so swallow it
-                // here instead of crashing — the screen is about to navigate away anyway.
-                .catch { }
                 .collect { favoriteItems ->
                     _state.value = _state.value.copy(favoriteItems = favoriteItems)
                 }
