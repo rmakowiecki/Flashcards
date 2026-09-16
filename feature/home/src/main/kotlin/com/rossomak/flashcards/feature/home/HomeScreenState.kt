@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.feature.home
 
+import com.rossomak.flashcards.core.domain.model.FavoriteItem
+
 data class HomeScreenState(
-    val title: String = "Home - NYI"
+    val favoriteItems: List<FavoriteItem> = emptyList(),
 )
