@@ -5,8 +5,12 @@ import com.rossomak.flashcards.core.domain.model.FavoriteItem
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+
+private const val FETCH_RETRY_ATTEMPTS = 2
+private const val FETCH_RETRY_BASE_DELAY_MILLIS = 300L
 
 /**
  * Resolves [UserFavoritesRepository.observeFavorites] ids into full [FavoriteItem]s, sorted
@@ -24,14 +28,14 @@ class ObserveFavoriteItemsUseCase @Inject constructor(
 ) {
     operator fun invoke(): Flow<List<FavoriteItem>> =
         userFavoritesRepository.observeFavorites().map { favorites ->
-            val subcategories = flashcardRepository.fetchSubcategoriesByIds(favorites.subcategoryIds.keys)
-                .getOrDefault(emptyList())
+            val subcategories = retryFetch {
+                flashcardRepository.fetchSubcategoriesByIds(favorites.subcategoryIds.keys)
+            }
 
             // One fetch for both directly-favorited categories and favorited subcategories'
             // parent categories, rather than two separate `whereIn` calls.
             val categoryIdsToFetch = favorites.categoryIds.keys + subcategories.map { it.categoryId }
-            val categoriesById = flashcardRepository.fetchCategoriesByIds(categoryIdsToFetch)
-                .getOrDefault(emptyList())
+            val categoriesById = retryFetch { flashcardRepository.fetchCategoriesByIds(categoryIdsToFetch) }
                 .associateBy(Category::id)
 
             val favoriteCategories = favorites.categoryIds.keys
@@ -53,4 +57,14 @@ class ObserveFavoriteItemsUseCase @Inject constructor(
 
             (favoriteCategories + favoriteSubcategories).sortedByDescending { it.favoritedAt }
         }
+
+    // Transient one-shot fetch failures (e.g. reconnect race) get a few bounded retries before
+    // degrading to empty, since unlike observeFavorites() these calls have no listener to retry them.
+    private suspend fun <T> retryFetch(block: suspend () -> Result<List<T>>): List<T> {
+        repeat(FETCH_RETRY_ATTEMPTS) { attempt ->
+            block().getOrNull()?.let { return it }
+            delay(FETCH_RETRY_BASE_DELAY_MILLIS * (attempt + 1))
+        }
+        return block().getOrDefault(emptyList())
+    }
 }
