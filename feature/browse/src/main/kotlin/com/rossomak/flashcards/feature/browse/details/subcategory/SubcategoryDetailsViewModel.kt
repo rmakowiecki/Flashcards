@@ -194,7 +194,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
         renderContent()
     }
 
-    private fun loadFlashcards() {
+    internal fun loadFlashcards() {
         viewModelScope.launch {
             pool = null
             _state.update { it.copy(content = SubcategoryDetailsContentState.Loading) }
@@ -244,7 +244,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
                     content = if (filtered.cards.isEmpty()) {
                         SubcategoryDetailsContentState.NoMatches
                     } else {
-                        SubcategoryDetailsContentState.Cards(filtered.cards.orderedBy(it.sortOrder))
+                        SubcategoryDetailsContentState.Flashcards(filtered.cards.orderedBy(it.sortOrder))
                     },
                     availableTags = filtered.poolTags,
                     totalCount = filtered.totalCount,

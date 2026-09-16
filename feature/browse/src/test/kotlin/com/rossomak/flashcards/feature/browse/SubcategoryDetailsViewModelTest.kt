@@ -117,7 +117,7 @@ class SubcategoryDetailsViewModelTest {
     )
 
     private fun cards(state: SubcategoryDetailsScreenState): List<String> =
-        (state.content as SubcategoryDetailsContentState.Cards).flashcards.map { it.id }
+        (state.content as SubcategoryDetailsContentState.Flashcards).flashcards.map { it.id }
 
     /** Open → edit → confirm → settle, the sequence every filter test repeats. */
     private fun TestScope.applyFilters(

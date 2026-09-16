@@ -20,7 +20,7 @@
     <string name="subcategory_details_no_matches_title">No cards match your filters</string>
     <string name="subcategory_details_no_matches_message">Try different tags or widen the difficulty range.</string>
     <string name="subcategory_details_reset_filters_button">Reset filters</string>
-    <string name="subcategory_details_load_error_message">Could not load flashcards</string>
+    <string name="subcategory_details_load_error_message">Could not load flashcards. Check your internet connection and try again</string>
     <string name="category_details_subtitle_label">Category</string>
     <string name="category_details_bookmark_label">Bookmark</string>
     <string name="category_details_add_shortcut_label">Add to home screen</string>
@@ -43,7 +43,7 @@
     </plurals>
     <string name="category_details_topic_progress_cd">%1$d%% studied</string>
     <string name="category_details_topic_progress_unavailable_cd">Studied progress unavailable</string>
-    <string name="category_details_load_error">Could not load topics</string>
+    <string name="category_details_load_error">Could not load topics. Check your internet connection and try again</string>
     <string name="category_details_topic_studied_label" tools:ignore="PluralsCandidate">%1$d studied</string>
     <string name="browse_category_placeholder_subtitle">Tap to explore</string>
     <string name="browse_search_hint">Search categories or topics…</string>
@@ -61,8 +61,6 @@
     <string name="browse_middle_dot_separator"> · </string>
     <string name="browse_categories_error_title">Something went wrong</string>
     <string name="browse_categories_error_message">Couldn\'t load categories.\nCheck your connection and try again.</string>
-    <string name="browse_categories_empty_title">No categories yet</string>
-    <string name="browse_categories_empty_message">Check back later.</string>
     <plurals name="browse_category_topic_count">
         <item quantity="one">%d topic</item>
         <item quantity="other">%d topics</item>

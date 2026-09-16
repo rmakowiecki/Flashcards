@@ -7,24 +7,25 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 /**
  * @param selectedSubcategoryIds **one nullable field, not a boolean plus a set.** `null` means
  * default mode; a set (possibly empty) means Selection Mode, so "not in selection mode but three
- * subcategories  selected" is unrepresentable — the same discipline that makes
- * [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState] sealed rather than a loading flag plus a nullable error plus a
- * list.
+ * subcategories  selected" is unrepresentable — the same discipline [content] applies to the list
+ * area itself.
+ * @param content what the subcategory list area is showing. Sealed rather than a loading flag plus
+ * a nullable error id plus a list, so "loading and failed at once" is unrepresentable and the
+ * screen's `when` cannot silently depend on branch order — see
+ * [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState], which this mirrors.
  * @param isFavorite live from [UserFavoritesRepository.observeFavorites][com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository.observeFavorites], written via [CategoryDetailsViewModel.onFavoriteToggle].
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), `null` until
  * [isProgressResolved] — and possibly still `null` after, for a User who has never finished a
  * session. Never read directly by the screen; go through [progressFor].
  * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
  * failed read leaves it `false` forever rather than surfacing an error, per the ticket's "no error,
- * no retry prompt" rule. The subcategory list itself never waits on this: [subcategories] renders as soon
- * as it loads, independent of [isLoading].
+ * no retry prompt" rule. The subcategory list itself never waits on this: [content] resolves to
+ * [CategoryDetailsContentState.Subcategories] as soon as it loads, independent of the progress read.
  */
 data class CategoryDetailsScreenState(
     val categoryId: String = "",
     val categoryName: String = "",
-    val isLoading: Boolean = false,
-    val subcategories: List<Subcategory> = emptyList(),
-    @param:StringRes val errorResId: Int? = null,
+    val content: CategoryDetailsContentState = CategoryDetailsContentState.Loading,
     val selectedSubcategoryIds: Set<String>? = null,
     val isFavorite: Boolean = false,
     val progressSummary: ProgressSummary? = null,
@@ -36,6 +37,9 @@ data class CategoryDetailsScreenState(
 
     val selectedCount: Int
         get() = selectedSubcategoryIds?.size ?: 0
+
+    private val subcategories: List<Subcategory>
+        get() = (content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: emptyList()
 
     /** Sum of [Subcategory.cardCount] across the selected Subcategories — the CTA button session size. */
     val selectedCardCount: Int
@@ -56,6 +60,26 @@ data class CategoryDetailsScreenState(
      * same normal (not "unknown") rendering as any other subcategory.
      */
     fun progressFor(subcategoryId: String): SubcategoryProgress = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
+}
+
+/**
+ * The subcategory list area's three situations.
+ *
+ * There is deliberately **no case for a Category that holds no Subcategories**: a Category always
+ * contains at least one (see `CONTEXT.md`), so an empty result can only mean the read failed or the
+ * data is corrupt — [Error], never a fourth "empty" case.
+ */
+sealed interface CategoryDetailsContentState {
+
+    data object Loading : CategoryDetailsContentState
+
+    /**
+     * Carries a resource id rather than a built string: the ViewModel has no business holding
+     * user-facing English, and lint cannot see a hardcoded one there (ADR-0023).
+     */
+    data class Error(@param:StringRes val messageRes: Int) : CategoryDetailsContentState
+
+    data class Subcategories(val subcategories: List<Subcategory>) : CategoryDetailsContentState
 }
 
 /** See [CategoryDetailsScreenState.progressFor]. */

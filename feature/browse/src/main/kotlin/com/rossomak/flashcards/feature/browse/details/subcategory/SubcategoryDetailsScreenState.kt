@@ -51,7 +51,7 @@ data class SubcategoryDetailsScreenState(
      * (ADR-0038).
      */
     val sessionCardCount: Int
-        get() = (content as? SubcategoryDetailsContentState.Cards)?.flashcards?.size ?: 0
+        get() = (content as? SubcategoryDetailsContentState.Flashcards)?.flashcards?.size ?: 0
 
     companion object {
         val DIFFICULTY_BOUNDS: IntRange =
@@ -76,9 +76,9 @@ sealed interface SubcategoryDetailsContentState {
      * Carries a resource id rather than a built string: the ViewModel has no business holding
      * user-facing English, and lint cannot see a hardcoded one there (ADR-0023).
      */
-    data class Error(@StringRes val messageRes: Int) : SubcategoryDetailsContentState
+    data class Error(@param:StringRes val messageRes: Int) : SubcategoryDetailsContentState
 
-    data class Cards(val flashcards: List<Flashcard>) : SubcategoryDetailsContentState
+    data class Flashcards(val flashcards: List<Flashcard>) : SubcategoryDetailsContentState
 
     /** Filters excluded every card in the pool. */
     data object NoMatches : SubcategoryDetailsContentState
