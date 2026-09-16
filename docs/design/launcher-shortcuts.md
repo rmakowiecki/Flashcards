@@ -21,9 +21,9 @@ Future: destinations may change to Preview Study Session Screen (with the Catego
 - **Category Details screen** → `ShortcutManagerCompat.requestPinShortcut` for a Category shortcut
 - **Subcategory Details screen** → `ShortcutManagerCompat.requestPinShortcut` for a Subcategory shortcut
 
-(Supersedes the original overflow-menu (⋮) plan — the dedicated icon is what shipped and is the surface going forward.) The system shows its own placement-confirmation dialog; this is Android-native behavior and cannot be bypassed.
+(Supersedes the original overflow-menu (⋮) plan — the dedicated icon is what shipped and is the surface going forward.) The system shows its own placement-confirmation dialog; this is Android-native behavior and cannot be bypassed. Not every launcher supports pinning: `AppShortcutsGateway` checks `ShortcutManagerCompat.isRequestPinShortcutSupported` before requesting, and shows a one-shot snackbar (existing SharedFlow event-channel pattern) when unsupported, rather than silently doing nothing.
 
-**Dynamic** — no user-facing creation action. The dynamic shortcut set is derived automatically from the user's favorited categories/subcategories (existing `onFavoriteToggle`), ranked most-recently-favorited first, truncated to `ShortcutManagerCompat.maxShortcutCountPerActivity` (queried at runtime, never hardcoded). Rebuilt from a fresh favorites read on every app start in `AppStartViewModel`, so removed/renamed favorites self-heal without any explicit cleanup step.
+**Dynamic** — no user-facing creation action. The dynamic shortcut set is derived automatically from the user's favorited categories/subcategories, ranked most-recently-favorited first, truncated to `ShortcutManagerCompat.maxShortcutCountPerActivity` (queried at runtime, never hardcoded). Rebuilt on every app start in `AppStartViewModel` by consuming `ObserveFavoriteHomeItemsUseCase` (delivered by `feat/home-favorites-logic`, which resolves favorited ids to full `Category`/`Subcategory` objects with a `favoritedAt: Instant` and returns them already sorted most-recent-first) — shortcuts logic does no ranking or id-resolution of its own, it maps `HomeFavoriteItem`s straight to `ShortcutTarget`s. Since the set is rebuilt fresh every launch, removed/renamed favorites self-heal without any explicit cleanup step. `setDynamicShortcuts` returning `false` (rate-limited or over-limit) is logged and otherwise ignored — no retry — since the next app launch supersedes it anyway.
 
 No dedicated shortcut management screen for either type.
 
@@ -36,7 +36,9 @@ No URI scheme, App Links, or `NavDeepLink` infrastructure — there is exactly o
 
 These routes resolve to the same `CategoryDetails` and `SubcategoryDetails` composables used in normal navigation.
 
-**Stale target:** if the id no longer resolves (category/subcategory deleted or renamed server-side), fail silently and land on BrowseScreen — no error toast. The dynamic set self-heals on the next rebuild; pinned shortcuts to deleted content are left dangling until the OS/user removes them (no programmatic cleanup planned — content deletion is an admin-driven, rare event).
+**Stale target:** if the id no longer resolves (category/subcategory deleted server-side), fail silently and land on BrowseScreen — no error toast. The dynamic set self-heals on the next rebuild; pinned shortcuts to deleted content are left dangling until the OS/user removes them (no programmatic cleanup planned — content deletion is an admin-driven, rare event).
+
+**Rename (id preserved, name changed):** routing is unaffected — routes are id-based, so a renamed Category/Subcategory still resolves correctly. A **pinned** shortcut's label was baked in at pin time and is not refreshed on rename (accepted MVP limitation, no `updateShortcuts` call planned — there's no rename-event source to trigger it from). Dynamic shortcuts get the current name for free since the whole set is rebuilt from live data every launch.
 
 **Auth gate:** if the user is logged out when a shortcut is tapped, the pending route is carried through Splash → Login, and applied once login succeeds. If the user backs out of Login without completing it, the pending route is discarded — no retry, no persistence across later sessions.
 
