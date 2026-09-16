@@ -2,7 +2,6 @@ package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -305,8 +304,7 @@ private fun SubcategoryDetailsBottomBar(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
                     )
                 },
-                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) },
-            )
+            ) { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) }
         },
         trailing = {
             FlashcardsFilledButton(
@@ -329,16 +327,8 @@ private fun SubcategoryDetailsBottomBar(
     )
 }
 
-/**
- * Bookmark stays in the bar; anything past it falls into the overflow menu, which is how
- * [AppBarRow] renders `maxItemCount - 1` items inline.
- *
- * The bookmark is **deliberately cosmetic** — see
- * [SubcategoryDetailsViewModel.onFavoriteToggle]. Add-to-home-screen is still unwired, pending the
- * dynamic launcher shortcut work.
- */
 @Composable
-private fun RowScope.SubcategoryDetailsActions(
+private fun SubcategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
 ) {
@@ -383,7 +373,7 @@ private fun RowScope.SubcategoryDetailsActions(
  * they could never clear from this screen (ADR-0038).
  */
 @Composable
-private fun RowScope.SubcategoryDetailsToolbarActions(
+private fun SubcategoryDetailsToolbarActions(
     hasActiveFilters: Boolean,
     enabled: Boolean,
     onFilterClick: () -> Unit,
