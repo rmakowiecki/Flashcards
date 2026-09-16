@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +28,8 @@ class CategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSubcategories: GetSubcategoriesUseCase,
     private val getProgressSummary: GetProgressSummaryUseCase,
+    private val observeCategoryFavoriteState: ObserveCategoryFavoriteStateUseCase,
+    private val setCategoryFavorite: SetCategoryFavoriteUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<CategoryDetailsRoute>()
@@ -44,6 +48,7 @@ class CategoryDetailsViewModel @Inject constructor(
     init {
         loadSubcategories()
         loadProgressSummary()
+        observeFavoriteState()
     }
 
     /**
@@ -121,18 +126,15 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Deliberately fake, exactly like [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsViewModel.onFavoriteToggle]. This flips a
-     * flag that dies with the ViewModel and shows a snackbar, and **writes nothing anywhere** — no
-     * repository, no use case, no preference. Do not wire it to storage on the assumption that it
-     * is a half-finished integration; making favourites real is its own piece of work.
-     */
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
         _state.update { it.copy(isFavorite = isFavorite) }
         _messages.tryEmit(
             if (isFavorite) CategoryDetailsMessage.AddedToFavorites else CategoryDetailsMessage.RemovedFromFavorites
         )
+        viewModelScope.launch {
+            setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
+        }
     }
 
     /**
@@ -142,6 +144,17 @@ class CategoryDetailsViewModel @Inject constructor(
      */
     fun onFavoriteUndo(restoreTo: Boolean) {
         _state.update { it.copy(isFavorite = restoreTo) }
+        viewModelScope.launch {
+            setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, restoreTo))
+        }
+    }
+
+    private fun observeFavoriteState() {
+        viewModelScope.launch {
+            observeCategoryFavoriteState(route.categoryId).collect { isFavorite ->
+                _state.update { it.copy(isFavorite = isFavorite) }
+            }
+        }
     }
 
     private fun loadSubcategories() {

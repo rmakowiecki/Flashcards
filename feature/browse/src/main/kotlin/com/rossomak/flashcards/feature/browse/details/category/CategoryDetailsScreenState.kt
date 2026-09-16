@@ -10,7 +10,7 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
  * subcategories  selected" is unrepresentable — the same discipline that makes
  * [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState] sealed rather than a loading flag plus a nullable error plus a
  * list.
- * @param isFavorite deliberately fake — see [CategoryDetailsViewModel.onFavoriteToggle].
+ * @param isFavorite live from [UserFavoritesRepository.observeFavorites][com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository.observeFavorites], written via [CategoryDetailsViewModel.onFavoriteToggle].
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), `null` until
  * [isProgressResolved] — and possibly still `null` after, for a User who has never finished a
  * session. Never read directly by the screen; go through [progressFor].
