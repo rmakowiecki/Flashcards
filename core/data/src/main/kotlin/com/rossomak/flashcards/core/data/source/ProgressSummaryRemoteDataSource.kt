@@ -22,10 +22,7 @@ class ProgressSummaryRemoteDataSource @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
 ) {
 
-    private val uid: String
-        get() = requireNotNull(firebaseAuth.currentUser?.uid) { "No authenticated user" }
-
-    private fun document() = firestore.document(DOCUMENT_PATH_TEMPLATE.format(uid))
+    private fun document(uid: String) = firestore.document(DOCUMENT_PATH_TEMPLATE.format(uid))
 
     /**
      * A missing document (nobody has finished a session yet) reads back as a `null` emission, not
@@ -33,15 +30,16 @@ class ProgressSummaryRemoteDataSource @Inject constructor(
      *
      * No authenticated user (e.g. collection starting right after sign-out) completes silently
      * instead of registering a listener — mirrors the PERMISSION_DENIED-during-sign-out teardown
-     * path, rather than crashing on the [uid] getter's `requireNotNull`.
+     * path. Captured once here rather than reread later, so a sign-out racing the flow's launch
+     * can't throw partway into the `callbackFlow` builder.
      */
     fun observeSummary(): Flow<ProgressSummaryDto?> = flow {
-        if (firebaseAuth.currentUser == null) return@flow
-        emitAll(observeAuthenticatedSummary())
+        val uid = firebaseAuth.currentUser?.uid ?: return@flow
+        emitAll(observeAuthenticatedSummary(uid))
     }
 
-    private fun observeAuthenticatedSummary(): Flow<ProgressSummaryDto?> = callbackFlow {
-        val registration = document().addSnapshotListener { snapshot, error ->
+    private fun observeAuthenticatedSummary(uid: String): Flow<ProgressSummaryDto?> = callbackFlow {
+        val registration = document(uid).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener

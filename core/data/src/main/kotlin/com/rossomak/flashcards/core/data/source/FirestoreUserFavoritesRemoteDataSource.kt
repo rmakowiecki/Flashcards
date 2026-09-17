@@ -25,7 +25,7 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
     private val uid: String
         get() = requireNotNull(firebaseAuth.currentUser?.uid) { "No authenticated user" }
 
-    private fun document() = firestore.document(DOCUMENT_PATH_TEMPLATE.format(uid))
+    private fun document(uid: String) = firestore.document(DOCUMENT_PATH_TEMPLATE.format(uid))
 
     /**
      * One listener on the single `favorites/state` document backs both category and subcategory
@@ -34,15 +34,17 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
      *
      * No authenticated user (e.g. collection starting right after sign-out) completes silently
      * instead of registering a listener — mirrors the PERMISSION_DENIED-during-sign-out teardown
-     * path, rather than crashing on the [uid] getter's `requireNotNull`.
+     * path, rather than crashing on the [uid] getter's `requireNotNull`. Captured once here rather
+     * than reread later, so a sign-out racing the flow's launch can't throw the `requireNotNull`
+     * out of the `callbackFlow` builder.
      */
     override fun observeFavorites(): Flow<UserFavoritesDto> = flow {
-        if (firebaseAuth.currentUser == null) return@flow
-        emitAll(observeAuthenticatedFavorites())
+        val uid = firebaseAuth.currentUser?.uid ?: return@flow
+        emitAll(observeAuthenticatedFavorites(uid))
     }
 
-    private fun observeAuthenticatedFavorites(): Flow<UserFavoritesDto> = callbackFlow {
-        val registration = document().addSnapshotListener { snapshot, error ->
+    private fun observeAuthenticatedFavorites(uid: String): Flow<UserFavoritesDto> = callbackFlow {
+        val registration = document(uid).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener
@@ -76,7 +78,7 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
     private suspend fun writeEntries(field: String, ids: Set<String>, isFavorite: Boolean) {
         val value: Any = if (isFavorite) FieldValue.serverTimestamp() else FieldValue.delete()
         val update = mapOf(field to ids.associateWith { value })
-        awaitWithOfflineTimeout(document().set(update, SetOptions.merge()))
+        awaitWithOfflineTimeout(document(uid).set(update, SetOptions.merge()))
     }
 
     /**
