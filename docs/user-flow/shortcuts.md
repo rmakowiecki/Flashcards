@@ -48,7 +48,7 @@ StillValid -->|yes| SignedIn2{Signed in?}
 
 SignedIn2 -->|yes| DirectOpen([Opens directly at\nCategory/Subcategory Details])
 SignedIn2 -->|no| LoginScreen(LOGIN SCREEN)
-LoginScreen -->|signs in| DirectOpen
+LoginScreen -->|signs in| Home2(HOME SCREEN\npendingRoute not resolved after sign-in NYI)
 
 
 ShortcutTap -.->|"app already running\n(warm start)"| WarmNYI{{Tapping a shortcut while the app\nis already open does nothing special yet\nNYI}}
