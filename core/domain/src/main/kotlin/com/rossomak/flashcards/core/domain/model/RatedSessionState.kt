@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.domain.model
 
+import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
 import kotlin.random.Random
 
 /**
@@ -77,6 +78,9 @@ data class RatedSessionState(
          * this: the flag rides along on the record for [sealRatedCardResults] to carry into
          * [FlashcardResult.Rated.wasPreviouslyMastered], display and Mastery Defense only.
          */
+        // TODO: take an injected Random from the caller instead of defaulting here, then drop
+        // this exemption (see ADR-0020 randomizing-logic convention).
+        @ArchConventionExempt()
         fun seed(
             cards: List<Flashcard>,
             attemptsLimit: Int,
