@@ -99,12 +99,14 @@ private fun SearchResultSubtitle(iconSvg: String?, categoryName: String, text: A
     }
 }
 
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 internal fun Subcategory.toSearchResultListGroupItem(
     progress: SubcategoryProgress,
     ringContentDescription: String,
     cardsStudiedText: AnnotatedString,
     iconSvg: String?,
     startSessionContentDescription: String,
+    isFavorited: Boolean,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ): FlashcardsListGroupItem {
@@ -117,6 +119,7 @@ internal fun Subcategory.toSearchResultListGroupItem(
             SearchResultSubtitle(iconSvg = iconSvg, categoryName = subcategory.categoryName, text = cardsStudiedText)
         },
         onClick = { onSubcategoryClick(subcategory) },
+        isFavorited = isFavorited,
         leading = {
             FlashcardsProgressRing(
                 progress = ringFraction,
