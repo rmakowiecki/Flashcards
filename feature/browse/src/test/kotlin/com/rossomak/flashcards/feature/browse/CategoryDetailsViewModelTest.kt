@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.domain.repository.FakeAppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -13,6 +14,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepositor
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
@@ -54,6 +56,7 @@ class CategoryDetailsViewModelTest {
     private val setCategoryFavorite = SetCategoryFavoriteUseCase(userFavoritesRepository)
     private val appShortcutsRepository = FakeAppShortcutsRepository()
     private val pinCategoryShortcut = PinCategoryShortcutUseCase(flashcardRepository, appShortcutsRepository)
+    private val observeUserFavorites = ObserveUserFavoritesUseCase(userFavoritesRepository)
 
     private val route = CategoryDetailsRoute(categoryId = "android", categoryName = "Android")
 
@@ -76,6 +79,7 @@ class CategoryDetailsViewModelTest {
             observeCategoryFavoriteState,
             setCategoryFavorite,
             pinCategoryShortcut,
+            observeUserFavorites,
         )
 
     private fun subcategory(id: String): Subcategory = Subcategory(
@@ -104,7 +108,7 @@ class CategoryDetailsViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.assertValue {
-            content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
+            content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
         }
     }
 
@@ -229,6 +233,50 @@ class CategoryDetailsViewModelTest {
         color = null,
         featuredSubcategoryNames = emptyList(),
     )
+
+    // --- per-row favorites badging ---
+
+    @Test
+    fun `state favorites reflects only the ids favorited via the shared favorites repository`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            userFavoritesRepository.setSubcategoryFavorite("sub-1", isFavorite = true)
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                favorites.subcategoryIds.keys shouldBe setOf("sub-1")
+            }
+        }
+
+    @Test
+    fun `favorites arriving after the list neither reorders it nor changes row identity`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"), subcategory("sub-3"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            userFavoritesRepository.setSubcategoryFavorite("sub-2", isFavorite = true)
+            // Parks the favorites read so it genuinely stays in flight past the point the subcategory
+            // list has already resolved, instead of relying on both never having been dispatched yet.
+            val favoritesGate = CompletableDeferred<Unit>()
+            userFavoritesRepository.favoritesReadGate = favoritesGate
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // Subcategory list is in, favorites are still parked: rows exist but none is badged yet.
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
+            viewModel.state.value.favorites shouldBe UserFavorites.EMPTY
+
+            favoritesGate.complete(Unit)
+            advanceUntilIdle()
+
+            // Releasing favorites changes only the badge data, never the list itself.
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
+            viewModel.state.value.favorites.subcategoryIds.keys shouldBe setOf("sub-2")
+        }
 
     // --- Selection Mode ---
 
@@ -576,7 +624,7 @@ class CategoryDetailsViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.assertValue {
-                content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
+                content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
                 progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 5, masteredCount = 3)
             }
         }
@@ -596,7 +644,7 @@ class CategoryDetailsViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
+        viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
         viewModel.state.value.isProgressResolved shouldBe false
         viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
 
@@ -622,14 +670,14 @@ class CategoryDetailsViewModelTest {
             advanceUntilIdle()
 
             // Subcategory list is in, summary is still parked: rows exist but every one is unresolved.
-            viewModel.state.value.content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
             subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgress.Unresolved }
 
             summaryGate.complete(Unit)
             advanceUntilIdle()
 
             // Releasing the summary changes only the progress values, never the list itself.
-            viewModel.state.value.content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
         }
 
     @Test
