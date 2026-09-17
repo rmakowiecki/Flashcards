@@ -64,27 +64,31 @@ class SettingsViewModel @Inject constructor(
     val events = eventChannel.receiveAsFlow()
 
     init {
-        observeUserPreferences()
-            .onEach { preferences -> _state.update { it.copy(dailyGoalMinutes = preferences.dailyGoalMinutes) } }
-            .launchIn(viewModelScope)
-        observeStudySessionPreferences()
-            .onEach { preferences ->
-                _state.update {
-                    it.copy(
-                        sessionLength = preferences.sessionLength,
-                        ratedAttempts = preferences.ratedAttempts,
-                        partialRatingCardRequeueingEnabled = preferences.partialRatingCardRequeueingEnabled,
-                        defaultStudyMode = preferences.defaultStudyMode,
-                        sortOrder = preferences.sortOrder,
-                        subcategoryCountRange = preferences.subcategoryCountRange,
-                        voiceAnsweringEnabled = preferences.voiceAnsweringEnabled,
-                        readAloudEnabled = preferences.readAloudEnabled,
-                        speechRate = preferences.voiceSettings.speechRate,
-                        voiceId = preferences.voiceSettings.voiceId,
-                    )
+        viewModelScope.launch {
+            observeUserPreferences()
+                .onEach { preferences -> _state.update { it.copy(dailyGoalMinutes = preferences.dailyGoalMinutes) } }
+                .launchIn(viewModelScope)
+        }
+        viewModelScope.launch {
+            observeStudySessionPreferences()
+                .onEach { preferences ->
+                    _state.update {
+                        it.copy(
+                            sessionLength = preferences.sessionLength,
+                            ratedAttempts = preferences.ratedAttempts,
+                            partialRatingCardRequeueingEnabled = preferences.partialRatingCardRequeueingEnabled,
+                            defaultStudyMode = preferences.defaultStudyMode,
+                            sortOrder = preferences.sortOrder,
+                            subcategoryCountRange = preferences.subcategoryCountRange,
+                            voiceAnsweringEnabled = preferences.voiceAnsweringEnabled,
+                            readAloudEnabled = preferences.readAloudEnabled,
+                            speechRate = preferences.voiceSettings.speechRate,
+                            voiceId = preferences.voiceSettings.voiceId,
+                        )
+                    }
                 }
-            }
-            .launchIn(viewModelScope)
+                .launchIn(viewModelScope)
+        }
         // The row shows the voice's name, not its id, so the list is needed before the dialog is
         // ever opened. Cached afterwards, so opening the dialog costs no second platform query.
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
