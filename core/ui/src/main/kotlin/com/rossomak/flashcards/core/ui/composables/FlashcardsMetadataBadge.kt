@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.List as AutoMirroredList
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.List
@@ -238,7 +239,7 @@ private fun MetadataBadgeGradientSampleRow(modifier: Modifier = Modifier) {
         )
         FlashcardsMetadataBadge(
             label = "3 topics",
-            icon = Icons.Default.List,
+            icon = Icons.AutoMirrored.Filled.List,
             style = OnGradient,
         )
         FlashcardsMetadataBadge(

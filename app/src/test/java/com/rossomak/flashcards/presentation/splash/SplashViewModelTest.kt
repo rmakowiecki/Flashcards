@@ -240,6 +240,22 @@ class SplashViewModelTest {
         }
 
     @Test
+    fun `authenticated user with a subcategory route whose category id mismatches falls back to Main silently`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns testUser
+            flashcardRepository.subcategoriesByIdsToReturn = Result.success(
+                listOf(subcategory(id = "kotlin-coroutines", categoryId = "android", categoryName = "Android", name = "Coroutines")),
+            )
+
+            val viewModel = createViewModel(pendingRoute = "/study/category/wrong/subcategory/kotlin-coroutines")
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.Main
+            }
+        }
+
+    @Test
     fun `unauthenticated user with a shortcut route still emits plain Login, route dropped`() =
         runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getCurrentAuthUserUseCase() } returns null

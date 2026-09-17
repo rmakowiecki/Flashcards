@@ -3,6 +3,7 @@ package com.rossomak.flashcards.presentation.splash
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.ShortcutRoute
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
@@ -87,7 +88,9 @@ class SplashViewModel @Inject constructor(
             }.filterNotNull().first()
 
             val destination = if (baseDestination == SplashDestination.Main && pendingRoute != null) {
-                resolvePendingRoute(pendingRoute) ?: SplashDestination.Main
+                withTimeoutOrNull(RESOLVE_PENDING_ROUTE_TIMEOUT_MS.milliseconds) {
+                    resolvePendingRoute(pendingRoute)
+                } ?: SplashDestination.Main
             } else {
                 baseDestination
             }
@@ -107,21 +110,26 @@ class SplashViewModel @Inject constructor(
      * below always returns the current name.
      */
     private suspend fun resolvePendingRoute(route: String): SplashDestination? {
-        val subcategoryMatch = SUBCATEGORY_ROUTE_REGEX.matchEntire(route)
+        val subcategoryMatch = ShortcutRoute.SUBCATEGORY_ROUTE_REGEX.matchEntire(route)
         if (subcategoryMatch != null) {
-            return resolveSubcategoryRoute(subcategoryMatch.groupValues[1])
+            return resolveSubcategoryRoute(
+                categoryId = subcategoryMatch.groupValues[1],
+                subcategoryId = subcategoryMatch.groupValues[2],
+            )
         }
-        val categoryMatch = CATEGORY_ROUTE_REGEX.matchEntire(route)
+        val categoryMatch = ShortcutRoute.CATEGORY_ROUTE_REGEX.matchEntire(route)
         if (categoryMatch != null) {
             return resolveCategoryRoute(categoryMatch.groupValues[1])
         }
         return null
     }
 
-    private suspend fun resolveSubcategoryRoute(subcategoryId: String): SplashDestination? {
+    /** Rejects a route whose subcategory resolves under a different category than the route names — a malformed or stale-reorg route, not a valid one. */
+    private suspend fun resolveSubcategoryRoute(categoryId: String, subcategoryId: String): SplashDestination? {
         val subcategory = flashcardRepository.fetchSubcategoriesByIds(setOf(subcategoryId))
             .getOrNull()
             ?.firstOrNull()
+            ?.takeIf { it.categoryId == categoryId }
             ?: return null
         return SplashDestination.ToSubcategoryDetails(
             SubcategoryDetailsRoute(
@@ -146,8 +154,6 @@ class SplashViewModel @Inject constructor(
     private companion object {
         const val AUTH_TIMEOUT_MS = 1000L
         const val PREFERENCES_TIMEOUT_MS = 1000L
-
-        val SUBCATEGORY_ROUTE_REGEX = Regex("^/study/category/[^/]+/subcategory/([^/]+)$")
-        val CATEGORY_ROUTE_REGEX = Regex("^/study/category/([^/]+)$")
+        const val RESOLVE_PENDING_ROUTE_TIMEOUT_MS = 1000L
     }
 }

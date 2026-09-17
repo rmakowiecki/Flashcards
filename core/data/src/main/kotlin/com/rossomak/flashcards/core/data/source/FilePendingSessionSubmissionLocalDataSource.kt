@@ -64,7 +64,7 @@ import kotlinx.serialization.json.Json
  * records" step.
  */
 class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : PendingSessionSubmissionLocalDataSource {
 
     private val mutex = Mutex()

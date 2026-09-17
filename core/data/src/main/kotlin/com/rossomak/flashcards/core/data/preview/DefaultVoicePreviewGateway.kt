@@ -12,7 +12,7 @@ import javax.inject.Singleton
 
 @Singleton
 class DefaultVoicePreviewGateway @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : VoicePreviewGateway {
 
     @Volatile private var tts: TextToSpeech? = null

@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 class DataStoreUserPreferencesLocalDataSource @Inject constructor(
-    @UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
+    @param:UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
 ) : UserPreferencesLocalDataSource {
 
     // Any read failure — not just IOException — falls back to defaults rather than propagating: a

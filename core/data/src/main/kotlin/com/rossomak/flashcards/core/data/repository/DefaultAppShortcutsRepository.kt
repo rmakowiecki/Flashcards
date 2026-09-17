@@ -20,10 +20,10 @@ import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.ShortcutTarget
 import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Wires [AppShortcutsRepository] to `ShortcutManagerCompat`. Icon rasterization reuses the same

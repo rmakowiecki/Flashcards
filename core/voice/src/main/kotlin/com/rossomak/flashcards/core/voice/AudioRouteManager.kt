@@ -79,7 +79,7 @@ data class CaptureRoute(
  */
 @Singleton
 class AudioRouteManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
 
     private val _route = MutableStateFlow(CaptureRoute(CaptureRouteType.None))
