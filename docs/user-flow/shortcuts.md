@@ -16,7 +16,8 @@ flowchart TD
     Supported -->|no| Snackbar[Snackbar: can't pin a shortcut here]
     Supported -->|yes| PinDialog(Android system\nshortcut pin dialog)
     PinDialog -->|user confirms| Pinned([Shortcut placed\non home screen])
-    PinDialog -->|user cancels| CatDetails
+    PinDialog -->|user cancels, from category| CatDetails
+    PinDialog -->|user cancels, from subcategory| SubcatDetails
 ```
 
 ## Keeping shortcuts in sync

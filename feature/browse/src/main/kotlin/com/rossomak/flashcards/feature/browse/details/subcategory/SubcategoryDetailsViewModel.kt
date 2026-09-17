@@ -154,7 +154,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             when (pinSubcategoryShortcut(route.subcategoryId)) {
                 PinShortcutResult.Pinned -> Unit
-                PinShortcutResult.EntityNotFound -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinFailed)
+                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinFailed)
                 PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinUnsupported)
             }
         }

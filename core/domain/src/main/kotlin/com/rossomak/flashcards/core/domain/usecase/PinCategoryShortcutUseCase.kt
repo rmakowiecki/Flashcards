@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.core.domain.usecase
 
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
-import com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityNotFound
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityResolutionError
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult.Pinned
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult.UnsupportedLauncher
 import com.rossomak.flashcards.core.domain.model.ShortcutRoute
@@ -25,7 +25,7 @@ class PinCategoryShortcutUseCase @Inject constructor(
         val category = flashcardRepository.fetchCategoriesByIds(setOf(params))
             .getOrNull()
             ?.firstOrNull()
-            ?: return EntityNotFound
+            ?: return EntityResolutionError
         val pinningResult = appShortcutsRepository.pinShortcut(
             ShortcutTarget(
                 id = "category:${category.id}",
