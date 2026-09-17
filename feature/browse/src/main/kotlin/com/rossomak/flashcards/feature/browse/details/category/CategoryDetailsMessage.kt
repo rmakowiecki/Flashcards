@@ -13,6 +13,6 @@ sealed interface CategoryDetailsMessage {
     /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.UnsupportedLauncher] — no OS placement dialog appeared. */
     data object ShortcutPinUnsupported : CategoryDetailsMessage
 
-    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityNotFound] — the Category no longer resolves. */
+    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityResolutionError] — the Category no longer resolves. */
     data object ShortcutPinFailed : CategoryDetailsMessage
 }

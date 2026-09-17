@@ -13,6 +13,6 @@ sealed interface SubcategoryDetailsMessage {
     /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.UnsupportedLauncher] — no OS placement dialog appeared. */
     data object ShortcutPinUnsupported : SubcategoryDetailsMessage
 
-    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityNotFound] — the Subcategory/parent Category no longer resolves. */
+    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityResolutionError] — the Subcategory/parent Category no longer resolves. */
     data object ShortcutPinFailed : SubcategoryDetailsMessage
 }
