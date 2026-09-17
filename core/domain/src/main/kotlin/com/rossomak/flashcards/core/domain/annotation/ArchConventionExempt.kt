@@ -6,4 +6,4 @@ package com.rossomak.flashcards.core.domain.annotation
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
-annotation class ArchConventionExempt()
+annotation class ArchConventionExempt(val reason: String)
