@@ -105,10 +105,15 @@ class DefaultAppShortcutsRepository @Inject constructor(
 
     /** Keeps the glyph's hue/saturation; shifts lightness away from the glyph's own so a light glyph gets a darker tonal bg and vice versa — a fixed direction (always lighten/darken) fails at either end of the palette. */
     private fun tonalBackgroundColor(glyphColor: Int): Int {
-        val hsl = FloatArray(3)
+        val hsl = FloatArray(HSL_COMPONENT_COUNT)
         ColorUtils.colorToHSL(glyphColor, hsl)
         val glyphLightness = hsl[2]
-        val shifted = if (glyphLightness > 0.5f) glyphLightness - BG_LIGHTNESS_DELTA else glyphLightness + BG_LIGHTNESS_DELTA
+        val shifted =
+            if (glyphLightness > MID_LIGHTNESS) {
+                glyphLightness - BG_LIGHTNESS_DELTA
+            } else {
+                glyphLightness + BG_LIGHTNESS_DELTA
+            }
         hsl[2] = shifted.coerceIn(BG_LIGHTNESS_MIN, BG_LIGHTNESS_MAX)
         return ColorUtils.HSLToColor(hsl)
     }
@@ -127,6 +132,12 @@ class DefaultAppShortcutsRepository @Inject constructor(
 
         /** Glyph content-area ratio, relative to the full canvas — sized to sit well inside [BG_CIRCLE_RATIO]. */
         private const val ICON_SAFE_ZONE_RATIO = 0.4f
+
+        /** Size of the HSL float array (hue, saturation, lightness) used by [ColorUtils]. */
+        private const val HSL_COMPONENT_COUNT = 3
+
+        /** Lightness threshold separating "light glyph" from "dark glyph". */
+        private const val MID_LIGHTNESS = 0.5f
 
         /** How far the tonal background's HSL lightness is pushed away from the glyph's own. */
         private const val BG_LIGHTNESS_DELTA = 0.35f
