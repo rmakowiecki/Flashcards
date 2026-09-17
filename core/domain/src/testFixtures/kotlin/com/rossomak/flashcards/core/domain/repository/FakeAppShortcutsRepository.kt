@@ -17,6 +17,6 @@ class FakeAppShortcutsRepository : AppShortcutsRepository {
     }
 
     override suspend fun syncDynamicShortcuts(favorites: List<ShortcutTarget>) {
-        syncedFavorites += favorites
+        syncedFavorites += favorites.toList()
     }
 }
