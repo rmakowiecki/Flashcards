@@ -9,6 +9,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 /**
  * Observes the User's per-Subcategory progress-summary singleton, `users/{uid}/progress/summary`
@@ -28,8 +30,17 @@ class ProgressSummaryRemoteDataSource @Inject constructor(
     /**
      * A missing document (nobody has finished a session yet) reads back as a `null` emission, not
      * an error — mirrors [getSummary]'s old contract for an absent document.
+     *
+     * No authenticated user (e.g. collection starting right after sign-out) completes silently
+     * instead of registering a listener — mirrors the PERMISSION_DENIED-during-sign-out teardown
+     * path, rather than crashing on the [uid] getter's `requireNotNull`.
      */
-    fun observeSummary(): Flow<ProgressSummaryDto?> = callbackFlow {
+    fun observeSummary(): Flow<ProgressSummaryDto?> = flow {
+        if (firebaseAuth.currentUser == null) return@flow
+        emitAll(observeAuthenticatedSummary())
+    }
+
+    private fun observeAuthenticatedSummary(): Flow<ProgressSummaryDto?> = callbackFlow {
         val registration = document().addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)

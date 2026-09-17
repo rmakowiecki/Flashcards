@@ -136,6 +136,36 @@ class DefaultCardProgressRepositoryTest {
     }
 
     @Test
+    fun `observeProgressSummary does not retry a non-transient Firestore failure and propagates it`() = runTest {
+        val attempts = AtomicInteger(0)
+        val error = FirebaseFirestoreException("bad query", FirebaseFirestoreException.Code.INVALID_ARGUMENT)
+        every { progressSummaryRemoteDataSource.observeSummary() } returns flow {
+            attempts.incrementAndGet()
+            throw error
+        }
+
+        createRepository().observeProgressSummary().test {
+            awaitError() shouldBe error
+        }
+        attempts.get() shouldBe 1
+    }
+
+    @Test
+    fun `observeProgressSummary does not retry a non-Firestore failure and propagates it`() = runTest {
+        val attempts = AtomicInteger(0)
+        val error = IllegalStateException("No authenticated user")
+        every { progressSummaryRemoteDataSource.observeSummary() } returns flow {
+            attempts.incrementAndGet()
+            throw error
+        }
+
+        createRepository().observeProgressSummary().test {
+            awaitError() shouldBe error
+        }
+        attempts.get() shouldBe 1
+    }
+
+    @Test
     fun `observeProgressSummary retries and recovers after a non-permission listener failure`() = runTest {
         val subcategoryId = "sub-1"
         val attempts = AtomicInteger(0)

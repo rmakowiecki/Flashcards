@@ -16,22 +16,33 @@ private const val INITIAL_RETRY_BACKOFF_MILLIS = 1_000L
 private const val MAX_RETRY_BACKOFF_MILLIS = 30_000L
 private const val MAX_RETRY_BACKOFF_SHIFT = 5L
 
+private val TRANSIENT_FIRESTORE_CODES = setOf(
+    FirebaseFirestoreException.Code.UNAVAILABLE,
+    FirebaseFirestoreException.Code.ABORTED,
+    FirebaseFirestoreException.Code.DEADLINE_EXCEEDED,
+    FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED,
+)
+
 private fun Throwable.isPermissionDenied(): Boolean =
     this is FirebaseFirestoreException && code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+
+private fun Throwable.isTransientFirestoreFailure(): Boolean =
+    this is FirebaseFirestoreException && code in TRANSIENT_FIRESTORE_CODES
 
 private fun retryBackoffMillis(attempt: Long): Long =
     min(INITIAL_RETRY_BACKOFF_MILLIS shl attempt.coerceAtMost(MAX_RETRY_BACKOFF_SHIFT).toInt(), MAX_RETRY_BACKOFF_MILLIS)
 
 fun <T> Flow<T>.retryOnFirestorePermissionDenied(): Flow<T> =
     retryWhen { cause, attempt ->
-        // Sign-out clears auth mid-collection and Firestore rejects the listener with
-        // PERMISSION_DENIED; that's an intentional teardown, not a transient failure, so
-        // let it fall through to .catch below instead of reopening a now-unauthenticated listener.
-        if (cause.isPermissionDenied()) {
-            false
-        } else {
+        // Only known-transient Firestore failures are worth retrying. Everything else — permanent
+        // Firestore errors (including PERMISSION_DENIED, an intentional sign-out teardown, not a
+        // transient failure) and non-Firestore failures (e.g. a mapper crash) — falls through to
+        // .catch below instead of retrying forever.
+        if (cause.isTransientFirestoreFailure()) {
             delay(retryBackoffMillis(attempt).milliseconds)
             true
+        } else {
+            false
         }
     }
         .catch { exception ->

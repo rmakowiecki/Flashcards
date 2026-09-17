@@ -4,15 +4,14 @@ import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.yield
 
 class FakeCardProgressRepository : CardProgressRepository {
     private val progressBySubcategoryId: MutableMap<String, SubcategoryProgress> = mutableMapOf()
-    private var currentSummary: ProgressSummary? = null
-    private val summaryUpdates = MutableSharedFlow<ProgressSummary?>(extraBufferCapacity = 1)
+    private val summaryUpdates = MutableStateFlow<ProgressSummary?>(null)
 
     /** Overrides every [getProgress] call when set, success or failure alike. */
     var resultToReturn: Result<SubcategoryProgress?>? = null
@@ -38,8 +37,7 @@ class FakeCardProgressRepository : CardProgressRepository {
      * update — mirroring a real Firestore snapshot listener re-firing after a change.
      */
     fun seedSummary(summary: ProgressSummary) {
-        currentSummary = summary
-        summaryUpdates.tryEmit(summary)
+        summaryUpdates.value = summary
     }
 
     /**
@@ -55,7 +53,6 @@ class FakeCardProgressRepository : CardProgressRepository {
 
     override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {
         summaryReadGate?.await() ?: yield()
-        emit(currentSummary)
         emitAll(summaryUpdates)
     }
 }

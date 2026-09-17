@@ -12,6 +12,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -29,8 +31,17 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
      * One listener on the single `favorites/state` document backs both category and subcategory
      * favorites — no favorites doc yet (nobody has favorited anything) reads back as an empty
      * [UserFavoritesDto], not an error.
+     *
+     * No authenticated user (e.g. collection starting right after sign-out) completes silently
+     * instead of registering a listener — mirrors the PERMISSION_DENIED-during-sign-out teardown
+     * path, rather than crashing on the [uid] getter's `requireNotNull`.
      */
-    override fun observeFavorites(): Flow<UserFavoritesDto> = callbackFlow {
+    override fun observeFavorites(): Flow<UserFavoritesDto> = flow {
+        if (firebaseAuth.currentUser == null) return@flow
+        emitAll(observeAuthenticatedFavorites())
+    }
+
+    private fun observeAuthenticatedFavorites(): Flow<UserFavoritesDto> = callbackFlow {
         val registration = document().addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
