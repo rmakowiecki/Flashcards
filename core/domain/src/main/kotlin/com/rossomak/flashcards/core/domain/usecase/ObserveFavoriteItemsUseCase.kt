@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.FavoriteItem
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository
+import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -25,8 +26,8 @@ private const val FETCH_RETRY_BASE_DELAY_MILLIS = 300L
 class ObserveFavoriteItemsUseCase @Inject constructor(
     private val userFavoritesRepository: UserFavoritesRepository,
     private val flashcardRepository: FlashcardRepository,
-) {
-    operator fun invoke(): Flow<List<FavoriteItem>> =
+) : NoParamUseCase<Flow<List<FavoriteItem>>> {
+    override suspend operator fun invoke(): Flow<List<FavoriteItem>> =
         userFavoritesRepository.observeFavorites().map { favorites ->
             val subcategories = retryFetch {
                 flashcardRepository.fetchSubcategoriesByIds(favorites.subcategoryIds.keys)

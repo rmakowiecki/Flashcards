@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.domain.usecase
 
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository
+import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
@@ -11,6 +12,6 @@ import kotlinx.coroutines.flow.Flow
  */
 class ObserveUserFavoritesUseCase @Inject constructor(
     private val userFavoritesRepository: UserFavoritesRepository,
-) {
-    operator fun invoke(): Flow<UserFavorites> = userFavoritesRepository.observeFavorites()
+) : NoParamUseCase<Flow<UserFavorites>> {
+    override suspend operator fun invoke(): Flow<UserFavorites> = userFavoritesRepository.observeFavorites()
 }
