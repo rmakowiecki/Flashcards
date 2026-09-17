@@ -2,7 +2,6 @@ package com.rossomak.flashcards.core.ui.composables.lists
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +69,7 @@ fun FlashcardsListRow(
     secondaryText: String? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    isFavorited: Boolean = false,
     role: Role = Role.Button,
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
@@ -106,14 +106,7 @@ fun FlashcardsListRow(
                 .padding(start = if (leading != null) MaterialTheme.spacing.xxsmall else MaterialTheme.spacing.none),
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.none),
         ) {
-            Text(
-                text = title,
-                modifier = Modifier.basicMarquee(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Clip,
-            )
+            FlashcardsRowTitleText(title = title, isFavorited = isFavorited)
             if (secondaryContent != null) {
                 secondaryContent()
             } else if (secondaryText != null) {

@@ -124,6 +124,9 @@ object AppSizes {
 
     /** Diameter of the striped placeholder avatar on [com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard]. */
     val levelCardAvatar: Dp = 56.dp
+
+    /** Glyph inlined at the end of a favorited row's title text (see `FlashcardsRowTitleText`). */
+    val favoriteInlineIcon: Dp = 16.dp
 }
 
 val MaterialTheme.sizes: AppSizes
