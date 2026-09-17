@@ -44,14 +44,12 @@ fun <T> Flow<T>.retryOnFirestorePermissionDenied(): Flow<T> =
         } else {
             false
         }
-    }
-        .catch { exception ->
-            if (exception.isPermissionDenied()) {
-                return@catch
-            }
-            throw exception
+    }.catch { exception ->
+        if (exception.isPermissionDenied()) {
+            return@catch
         }
-        .flowOn(Dispatchers.IO)
+        throw exception
+    }.flowOn(Dispatchers.IO)
 
 // Generic catch is deliberate: this is the repository boundary converting any Firestore/task failure into Result.failure
 @Suppress("TooGenericExceptionCaught")
