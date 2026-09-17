@@ -11,6 +11,9 @@ android {
 
 dependencies {
     implementation(project(":core:domain"))
+    implementation(project(":core:common"))
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidsvg)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)

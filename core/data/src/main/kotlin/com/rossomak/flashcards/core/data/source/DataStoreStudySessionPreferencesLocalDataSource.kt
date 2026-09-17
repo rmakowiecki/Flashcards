@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 class DataStoreStudySessionPreferencesLocalDataSource @Inject constructor(
-    @UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
+    @param:UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
 ) : StudySessionPreferencesLocalDataSource {
 
     override fun studySessionPreferences(): Flow<StudySessionPreferences> = dataStore.data

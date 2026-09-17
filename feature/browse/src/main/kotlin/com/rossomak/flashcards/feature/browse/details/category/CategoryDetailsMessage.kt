@@ -9,4 +9,10 @@ sealed interface CategoryDetailsMessage {
     data object AddedToFavorites : CategoryDetailsMessage
 
     data object RemovedFromFavorites : CategoryDetailsMessage
+
+    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.UnsupportedLauncher] — no OS placement dialog appeared. */
+    data object ShortcutPinUnsupported : CategoryDetailsMessage
+
+    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityResolutionError] — the Category no longer resolves. */
+    data object ShortcutPinFailed : CategoryDetailsMessage
 }

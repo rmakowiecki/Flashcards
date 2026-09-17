@@ -68,4 +68,6 @@
     <string name="favorites_added_message">Added to favorites</string>
     <string name="favorites_removed_message">Removed from favorites</string>
     <string name="favorites_undo_button">Undo</string>
+    <string name="shortcut_pin_unsupported_message">Could not add the shortcut to your home screen</string>
+    <string name="shortcut_pin_failed_message">Could not add the shortcut because this item is no longer available</string>
 </resources>

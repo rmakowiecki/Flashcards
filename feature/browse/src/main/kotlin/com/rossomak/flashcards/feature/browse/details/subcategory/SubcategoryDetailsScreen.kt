@@ -74,6 +74,8 @@ import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDet
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.NoMatches
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinFailed
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinUnsupported
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
@@ -113,23 +115,36 @@ fun SubcategoryDetailsScreen(
     val addedToFavoritesText = stringResource(R.string.favorites_added_message)
     val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
     val undoLabelText = stringResource(R.string.favorites_undo_button)
+    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
+    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
 
     // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
     // lambda, so the wait is launched rather than blocking the collector.
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
-        val text = when (message) {
-            AddedToFavorites -> addedToFavoritesText
-            RemovedFromFavorites -> removedFromFavoritesText
-        }
-        snackbarScope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = text,
-                actionLabel = undoLabelText,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
+        when (message) {
+            AddedToFavorites, RemovedFromFavorites -> {
+                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
+                snackbarScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = text,
+                        actionLabel = undoLabelText,
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
+                    }
+                }
+            }
+            ShortcutPinUnsupported -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
+                }
+            }
+            ShortcutPinFailed -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -141,6 +156,7 @@ fun SubcategoryDetailsScreen(
         onStartSession = viewModel::onStartSession,
         onResetFilters = viewModel::onResetFilters,
         onFavoriteToggle = viewModel::onFavoriteToggle,
+        onAddShortcut = viewModel::onAddShortcutClick,
         onRetry = viewModel::loadFlashcards,
         onDialogEvent = viewModel::onDialogEvent,
         snackbarHostState = snackbarHostState,
@@ -157,19 +173,18 @@ fun SubcategoryDetailsContent(
     onStartSession: () -> Unit,
     onResetFilters: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
     onRetry: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
     // Hoisted out of FlashcardList so it survives the Cards -> NoMatches -> Cards round trip, which
     // would otherwise drop the state and hide the reset below.
     val listState = rememberLazyListState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     // Filtering or re-sorting yields a different list, so a retained offset would leave the user
     // mid-list on cards they never scrolled to. Both land them back at the top.
-    //
     // Only the list resets: `scrollBehavior.state` is deliberately left alone, so a collapsed top
     // app bar stays collapsed rather than springing back open on every filter tweak.
     LaunchedEffect(state.filters, state.sortOrder) {
@@ -185,6 +200,7 @@ fun SubcategoryDetailsContent(
                 scrollBehavior = scrollBehavior,
                 onNavigateBack = onNavigateBack,
                 onFavoriteToggle = onFavoriteToggle,
+                onAddShortcut = onAddShortcut,
             )
         },
         bottomBar = {
@@ -249,6 +265,7 @@ private fun SubcategoryDetailsTopBar(
     scrollBehavior: TopAppBarScrollBehavior,
     onNavigateBack: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
 ) {
     Column(modifier = modifier) {
         FlashcardsTopAppBar(
@@ -260,6 +277,7 @@ private fun SubcategoryDetailsTopBar(
                 SubcategoryDetailsActions(
                     isFavorite = state.isFavorite,
                     onFavoriteToggle = onFavoriteToggle,
+                    onAddShortcut = onAddShortcut,
                 )
             },
         )
@@ -331,6 +349,7 @@ private fun SubcategoryDetailsBottomBar(
 private fun SubcategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
 ) {
     val bookmarkLabel = stringResource(R.string.subcategory_details_bookmark_label)
     val addShortcutLabel = stringResource(R.string.subcategory_details_add_shortcut_label)
@@ -357,7 +376,7 @@ private fun SubcategoryDetailsActions(
             label = bookmarkLabel,
         )
         clickableItem(
-            onClick = {},
+            onClick = onAddShortcut,
             icon = { Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null) },
             label = addShortcutLabel,
         )

@@ -10,7 +10,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 class VoiceOptionsDataSource @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     suspend fun getAvailableVoices(): List<VoiceOption> = suspendCancellableCoroutine { continuation ->
         var tts: TextToSpeech? = null

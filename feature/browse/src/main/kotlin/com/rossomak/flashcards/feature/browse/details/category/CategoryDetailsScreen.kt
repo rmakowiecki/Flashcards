@@ -76,6 +76,8 @@ import com.rossomak.flashcards.feature.browse.R
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.PreviewStudySession
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinFailed
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinUnsupported
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Resolved
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Unresolved
 import kotlinx.coroutines.launch
@@ -116,21 +118,34 @@ fun CategoryDetailsScreen(
     val addedToFavoritesText = stringResource(R.string.favorites_added_message)
     val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
     val undoLabelText = stringResource(R.string.favorites_undo_button)
+    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
+    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
 
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
-        val text = when (message) {
-            AddedToFavorites -> addedToFavoritesText
-            RemovedFromFavorites -> removedFromFavoritesText
-        }
-        snackbarScope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = text,
-                actionLabel = undoLabelText,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
+        when (message) {
+            AddedToFavorites, RemovedFromFavorites -> {
+                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
+                snackbarScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = text,
+                        actionLabel = undoLabelText,
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
+                    }
+                }
+            }
+            ShortcutPinUnsupported -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
+                }
+            }
+            ShortcutPinFailed -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -155,6 +170,7 @@ fun CategoryDetailsScreen(
         onQuickSessionStart = viewModel::onQuickSessionStart,
         onCustomSessionStart = viewModel::onCustomSessionStart,
         onFavoriteToggle = viewModel::onFavoriteToggle,
+        onAddShortcut = viewModel::onAddShortcutClick,
         onRetry = viewModel::loadSubcategories,
         snackbarHostState = snackbarHostState,
     )
@@ -176,15 +192,14 @@ fun CategoryDetailsContent(
     onQuickSessionStart: () -> Unit,
     onCustomSessionStart: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
     onRetry: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    val scrollBehavior =
-        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
     // Hoisted here, and never reset: the row set is identical in both modes and only the chrome changes, unlike Subcategory Details where filtering changes which items exist.
     // Resetting on list mode switch would throw a user who long-pressed halfway down the list back to the top.
     val listState = rememberLazyListState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     // System back leaves Selection Mode (if active) rather than the screen, same as the top app bar's back arrow below
     BackHandler(enabled = state.isSelectionMode, onBack = onSelectionModeToggle)
@@ -203,6 +218,7 @@ fun CategoryDetailsContent(
                         CategoryDetailsActions(
                             isFavorite = state.isFavorite,
                             onFavoriteToggle = onFavoriteToggle,
+                            onAddShortcut = onAddShortcut,
                         )
                     },
                 )
@@ -383,17 +399,11 @@ private fun SelectionModeToolbarActions(
     }
 }
 
-/**
- * Bookmark stays in the bar; anything past it falls into the overflow menu, which is how
- * [AppBarRow] renders `maxItemCount - 1` items inline.
- *
- * The bookmark is **deliberately cosmetic** — see [CategoryDetailsViewModel.onFavoriteToggle].
- * Add-to-home-screen is still unwired, pending the dynamic launcher shortcut work.
- */
 @Composable
 private fun CategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
 ) {
     val bookmarkLabel = stringResource(R.string.category_details_bookmark_label)
     val addShortcutLabel = stringResource(R.string.category_details_add_shortcut_label)
@@ -420,7 +430,7 @@ private fun CategoryDetailsActions(
             label = bookmarkLabel,
         )
         clickableItem(
-            onClick = {},
+            onClick = onAddShortcut,
             icon = { Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null) },
             label = addShortcutLabel,
         )

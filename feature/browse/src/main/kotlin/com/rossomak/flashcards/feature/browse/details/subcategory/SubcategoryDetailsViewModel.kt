@@ -4,12 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference
 import com.rossomak.flashcards.core.domain.model.orderedBy
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveSubcategoryFavoriteStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinSubcategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetSubcategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
@@ -20,6 +22,8 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -35,6 +39,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
+@Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class SubcategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getFlashcards: GetFlashcardsUseCase,
@@ -43,12 +48,14 @@ class SubcategoryDetailsViewModel @Inject constructor(
     private val saveStudySessionPreference: SaveStudySessionPreferenceUseCase,
     private val observeSubcategoryFavoriteState: ObserveSubcategoryFavoriteStateUseCase,
     private val setSubcategoryFavorite: SetSubcategoryFavoriteUseCase,
+    private val pinSubcategoryShortcut: PinSubcategoryShortcutUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<SubcategoryDetailsRoute>()
 
     private val _state = MutableStateFlow(
         SubcategoryDetailsScreenState(
+            subcategoryId = route.subcategoryId,
             categoryName = route.categoryName,
             subcategoryName = route.subcategoryName
         )
@@ -126,13 +133,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, isFavorite))
             if (result.isSuccess) {
-                _messages.tryEmit(
-                    if (isFavorite) {
-                        SubcategoryDetailsMessage.AddedToFavorites
-                    } else {
-                        SubcategoryDetailsMessage.RemovedFromFavorites
-                    },
-                )
+                _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites)
             }
         }
     }
@@ -146,6 +147,16 @@ class SubcategoryDetailsViewModel @Inject constructor(
         _state.update { it.copy(isFavorite = restoreTo) }
         viewModelScope.launch {
             setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, restoreTo))
+        }
+    }
+
+    fun onAddShortcutClick() {
+        viewModelScope.launch {
+            when (pinSubcategoryShortcut(route.subcategoryId)) {
+                PinShortcutResult.Pinned -> Unit
+                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinFailed)
+                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinUnsupported)
+            }
         }
     }
 

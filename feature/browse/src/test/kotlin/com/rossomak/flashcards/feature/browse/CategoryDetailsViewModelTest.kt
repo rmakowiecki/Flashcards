@@ -2,15 +2,18 @@ package com.rossomak.flashcards.feature.browse
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.domain.repository.FakeAppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState
@@ -49,6 +52,8 @@ class CategoryDetailsViewModelTest {
     private val userFavoritesRepository = FakeUserFavoritesRepository()
     private val observeCategoryFavoriteState = ObserveCategoryFavoriteStateUseCase(userFavoritesRepository)
     private val setCategoryFavorite = SetCategoryFavoriteUseCase(userFavoritesRepository)
+    private val appShortcutsRepository = FakeAppShortcutsRepository()
+    private val pinCategoryShortcut = PinCategoryShortcutUseCase(flashcardRepository, appShortcutsRepository)
 
     private val route = CategoryDetailsRoute(categoryId = "android", categoryName = "Android")
 
@@ -70,6 +75,7 @@ class CategoryDetailsViewModelTest {
             observeProgressSummary,
             observeCategoryFavoriteState,
             setCategoryFavorite,
+            pinCategoryShortcut,
         )
 
     private fun subcategory(id: String): Subcategory = Subcategory(
@@ -171,6 +177,58 @@ class CategoryDetailsViewModelTest {
 
         viewModel.state.value.isFavorite shouldBe false
     }
+
+    // --- shortcut pinning ---
+
+    @Test
+    fun `add-shortcut click pins the routed category`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(category(route.categoryId, route.categoryName)))
+        val viewModel = createViewModel()
+
+        viewModel.onAddShortcutClick()
+        advanceUntilIdle()
+
+        appShortcutsRepository.pinnedTargets.single().id shouldBe "category:${route.categoryId}"
+    }
+
+    @Test
+    fun `add-shortcut click on an unresolvable category emits the failed message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.categoriesByIdsToReturn = Result.success(emptyList())
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onAddShortcutClick()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe CategoryDetailsMessage.ShortcutPinFailed
+            }
+        }
+
+    @Test
+    fun `add-shortcut click on an unsupported launcher emits the unsupported message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(category(route.categoryId, route.categoryName)))
+            appShortcutsRepository.pinShortcutResult = false
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onAddShortcutClick()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe CategoryDetailsMessage.ShortcutPinUnsupported
+            }
+        }
+
+    private fun category(id: String, name: String) = Category(
+        id = id,
+        name = name,
+        order = 0,
+        subcategoryCount = 0,
+        iconSvg = null,
+        color = null,
+        featuredSubcategoryNames = emptyList(),
+    )
 
     // --- Selection Mode ---
 

@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.data.di
 
+import com.rossomak.flashcards.core.data.repository.DefaultAppShortcutsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCurationRepository
@@ -19,6 +20,7 @@ import com.rossomak.flashcards.core.data.source.FirestoreUserFavoritesRemoteData
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource
 import com.rossomak.flashcards.core.data.source.UserFavoritesRemoteDataSource
+import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
@@ -37,6 +39,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAppShortcutsRepository(defaultAppShortcutsRepository: DefaultAppShortcutsRepository): AppShortcutsRepository
 
     @Binds
     @Singleton

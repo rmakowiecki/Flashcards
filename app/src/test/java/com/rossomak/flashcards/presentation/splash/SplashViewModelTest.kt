@@ -1,17 +1,30 @@
 package com.rossomak.flashcards.presentation.splash
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
 import com.rossomak.flashcards.testutil.MainDispatcherRule
+import com.rossomak.flashcards.ui.navigation.Splash
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -21,17 +34,32 @@ class SplashViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    private val savedStateHandle: SavedStateHandle = mockk()
     private val getCurrentAuthUserUseCase: GetCurrentAuthUserUseCase = mockk()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
+    private val flashcardRepository = FakeFlashcardRepository()
 
     private val testUser = AuthUser("u1", "a@b.com", "Alex", null)
 
-    private fun createViewModel(hasSeenOnboarding: Boolean = true): SplashViewModel {
+    @Before
+    fun setUp() {
+        mockkObject(RouteDecoder)
+    }
+
+    @After
+    fun tearDown() {
+        unmockkObject(RouteDecoder)
+    }
+
+    private fun createViewModel(hasSeenOnboarding: Boolean = true, pendingRoute: String? = null): SplashViewModel {
         userPreferencesRepository.preferences.value =
             userPreferencesRepository.preferences.value.copy(hasSeenOnboarding = hasSeenOnboarding)
+        every { RouteDecoder.decode(any<() -> Splash>()) } returns Splash(pendingRoute = pendingRoute)
         return SplashViewModel(
+            savedStateHandle,
             getCurrentAuthUserUseCase,
             ObserveUserPreferencesUseCase(userPreferencesRepository),
+            flashcardRepository,
         )
     }
 
@@ -156,4 +184,106 @@ class SplashViewModelTest {
             awaitItem() shouldBe SplashDestination.Login
         }
     }
+
+    @Test
+    fun `authenticated user with a category shortcut route emits ToCategoryDetails`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns testUser
+            flashcardRepository.categoriesByIdsToReturn =
+                Result.success(listOf(category(id = "android", name = "Android")))
+
+            val viewModel = createViewModel(pendingRoute = "/study/category/android")
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.ToCategoryDetails(
+                    CategoryDetailsRoute(categoryId = "android", categoryName = "Android"),
+                )
+            }
+        }
+
+    @Test
+    fun `authenticated user with a subcategory shortcut route emits ToSubcategoryDetails`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns testUser
+            flashcardRepository.subcategoriesByIdsToReturn = Result.success(
+                listOf(subcategory(id = "kotlin-coroutines", categoryId = "android", categoryName = "Android", name = "Coroutines")),
+            )
+
+            val viewModel = createViewModel(pendingRoute = "/study/category/android/subcategory/kotlin-coroutines")
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.ToSubcategoryDetails(
+                    SubcategoryDetailsRoute(
+                        categoryId = "android",
+                        categoryName = "Android",
+                        subcategoryId = "kotlin-coroutines",
+                        subcategoryName = "Coroutines",
+                    ),
+                )
+            }
+        }
+
+    @Test
+    fun `authenticated user with a stale shortcut route falls back to Main silently`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns testUser
+            flashcardRepository.categoriesByIdsToReturn = Result.success(emptyList())
+
+            val viewModel = createViewModel(pendingRoute = "/study/category/deleted-category")
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.Main
+            }
+        }
+
+    @Test
+    fun `authenticated user with a subcategory route whose category id mismatches falls back to Main silently`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns testUser
+            flashcardRepository.subcategoriesByIdsToReturn = Result.success(
+                listOf(subcategory(id = "kotlin-coroutines", categoryId = "android", categoryName = "Android", name = "Coroutines")),
+            )
+
+            val viewModel = createViewModel(pendingRoute = "/study/category/wrong/subcategory/kotlin-coroutines")
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.Main
+            }
+        }
+
+    @Test
+    fun `unauthenticated user with a shortcut route still emits plain Login, route dropped`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns null
+
+            val viewModel = createViewModel(pendingRoute = "/study/category/android")
+            viewModel.onAnimationCompleted()
+
+            viewModel.events.test {
+                awaitItem() shouldBe SplashDestination.Login
+            }
+        }
+
+    private fun category(id: String, name: String) = Category(
+        id = id,
+        name = name,
+        order = 0,
+        subcategoryCount = 0,
+        iconSvg = null,
+        color = null,
+        featuredSubcategoryNames = emptyList(),
+    )
+
+    private fun subcategory(id: String, categoryId: String, categoryName: String, name: String) = Subcategory(
+        id = id,
+        name = name,
+        categoryId = categoryId,
+        categoryName = categoryName,
+        order = 0,
+        cardCount = 0,
+    )
 }

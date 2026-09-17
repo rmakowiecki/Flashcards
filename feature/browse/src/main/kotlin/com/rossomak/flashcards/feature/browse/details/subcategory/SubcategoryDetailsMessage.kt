@@ -6,8 +6,13 @@ package com.rossomak.flashcards.feature.browse.details.subcategory
  */
 sealed interface SubcategoryDetailsMessage {
 
-    /** Both favourite messages are cosmetic: nothing is persisted. See [SubcategoryDetailsViewModel.onFavoriteToggle]. */
     data object AddedToFavorites : SubcategoryDetailsMessage
 
     data object RemovedFromFavorites : SubcategoryDetailsMessage
+
+    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.UnsupportedLauncher] — no OS placement dialog appeared. */
+    data object ShortcutPinUnsupported : SubcategoryDetailsMessage
+
+    /** [com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityResolutionError] — the Subcategory/parent Category no longer resolves. */
+    data object ShortcutPinFailed : SubcategoryDetailsMessage
 }

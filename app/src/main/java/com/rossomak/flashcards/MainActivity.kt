@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
+import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.presentation.startup.AppStartViewModel
 import com.rossomak.flashcards.presentation.startup.AppStartupState
@@ -33,13 +34,20 @@ class MainActivity : ComponentActivity() {
             splashView.remove()
         }
 
+        // Only a launcher-shortcut's own Intent carries this action; an ordinary launcher-icon tap
+        // (or a warm-started MainActivity handing this same Intent back on process recreation)
+        // does not, so this stays null on every other cold start.
+        val launchRoute = intent.takeIf { it.action == AppShortcutsRepository.ACTION_OPEN_ROUTE }
+            ?.getStringExtra(AppShortcutsRepository.EXTRA_ROUTE)
+
         enableEdgeToEdge()
         setContent {
             FlashcardsTheme(dynamicColor = false) {
                 val navController = rememberNavController()
                 FlashcardsNavGraph(
                     navController = navController,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    launchRoute = launchRoute,
                 )
             }
         }

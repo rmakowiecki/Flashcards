@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -165,7 +166,7 @@ private fun RowScope.ShowcaseActions() {
         )
         clickableItem(
             onClick = {},
-            icon = { Icon(imageVector = Icons.Filled.AddToHomeScreen, contentDescription = null) },
+            icon = { Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null) },
             label = "Add to home screen",
         )
     }
