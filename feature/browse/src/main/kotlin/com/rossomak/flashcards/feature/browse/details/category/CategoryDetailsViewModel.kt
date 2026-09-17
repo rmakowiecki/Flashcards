@@ -4,9 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
-import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 class CategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSubcategories: GetSubcategoriesUseCase,
-    private val getProgressSummary: GetProgressSummaryUseCase,
+    private val observeProgressSummary: ObserveProgressSummaryUseCase,
     private val observeCategoryFavoriteState: ObserveCategoryFavoriteStateUseCase,
     private val setCategoryFavorite: SetCategoryFavoriteUseCase,
 ) : ViewModel() {
@@ -47,7 +47,7 @@ class CategoryDetailsViewModel @Inject constructor(
 
     init {
         loadSubcategories()
-        loadProgressSummary()
+        collectProgressSummary()
         observeFavoriteState()
     }
 
@@ -190,18 +190,16 @@ class CategoryDetailsViewModel @Inject constructor(
     }
 
     /**
-     * Runs independently of [loadSubcategories] so a slow or failed progress read never gates the
-     * subcategory list. A failure leaves [CategoryDetailsScreenState.isProgressResolved] `false`
-     * forever — every ring stays unknown and every subtitle simply drops its studied segment
-     * (same as a never-studied subcategory), with no error surfaced, per the ticket's "no error, no
-     * retry prompt, no snackbar" rule.
+     * Runs independently of [loadSubcategories] so a slow progress read never gates the
+     * subcategory list. [ObserveProgressSummaryUseCase] is a live Firestore listener, not a
+     * one-shot read: it re-attaches on its own after a network drop, so a screen left open through
+     * a connectivity blip still gets its rings filled in without any retry wiring here.
      */
-    private fun loadProgressSummary() {
+    private fun collectProgressSummary() {
         viewModelScope.launch {
-            getProgressSummary()
-                .onSuccess { summary ->
-                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
-                }
+            observeProgressSummary().collect { summary ->
+                _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+            }
         }
     }
 }

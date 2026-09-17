@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesParams
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 class BrowseViewModel @Inject constructor(
     private val getCategories: GetCategoriesUseCase,
     private val searchCategories: SearchCategoriesUseCase,
-    private val getProgressSummary: GetProgressSummaryUseCase,
+    private val observeProgressSummary: ObserveProgressSummaryUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BrowseScreenState())
@@ -39,7 +39,7 @@ class BrowseViewModel @Inject constructor(
     init {
         loadCategories()
         observeSearchQuery()
-        loadProgressSummary()
+        collectProgressSummary()
     }
 
     fun onCategoriesRefresh() {
@@ -206,18 +206,18 @@ class BrowseViewModel @Inject constructor(
         trim().length >= SearchCategoriesUseCase.MIN_QUERY_LENGTH
 
     /**
-     * Runs independently of [loadCategories] and any search, so a slow or failed progress read
-     * never gates the category list or search results — same rule as
-     * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel.loadProgressSummary]. A failure leaves
-     * [BrowseScreenState.isProgressResolved] `false` forever: every matched subcategory's ring stays
-     * unknown, with no error surfaced.
+     * Runs independently of [loadCategories] and any search, so a slow progress read never gates
+     * the category list or search results — same rule as
+     * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel.collectProgressSummary].
+     * [ObserveProgressSummaryUseCase] is a live Firestore listener, not a one-shot read: it
+     * re-attaches on its own after a network drop, so a search that only succeeded because
+     * connectivity came back also gets its progress rings filled in, with no extra wiring here.
      */
-    private fun loadProgressSummary() {
+    private fun collectProgressSummary() {
         viewModelScope.launch {
-            getProgressSummary()
-                .onSuccess { summary ->
-                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
-                }
+            observeProgressSummary().collect { summary ->
+                _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+            }
         }
     }
 

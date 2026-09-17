@@ -8,7 +8,7 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
@@ -33,7 +33,7 @@ class BrowseViewModelTest {
     private val getCategories = GetCategoriesUseCase(flashcardRepository)
     private val searchCategories = SearchCategoriesUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
-    private val getProgressSummary = GetProgressSummaryUseCase(cardProgressRepository)
+    private val observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository)
 
     private val categoryId = "cat-1"
     private val categoryName = "Android"
@@ -67,7 +67,7 @@ class BrowseViewModelTest {
     )
 
     private fun createViewModel(): BrowseViewModel =
-        BrowseViewModel(getCategories, searchCategories, getProgressSummary)
+        BrowseViewModel(getCategories, searchCategories, observeProgressSummary)
 
     @Test
     fun `onCategorySelected emits CategoryDetails with id and name`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -291,12 +291,16 @@ class BrowseViewModelTest {
         }
 
     @Test
-    fun `a failed summary read leaves search results intact with the matched subcategory unresolved and surfaces no error`() =
+    fun `a summary held behind a gate leaves search results intact with the matched subcategory unresolved until it arrives`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
-            cardProgressRepository.summaryResultToReturn = Result.failure(IllegalStateException("boom"))
-            // Parks init's own loadProgressSummary() so the search below genuinely runs while the
-            // summary read is still in flight, rather than the fake resolving it up front.
+            cardProgressRepository.seedSummary(
+                ProgressSummary(
+                    subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 4, masteredCount = 2)),
+                ),
+            )
+            // Parks init's own collectProgressSummary() so the search below genuinely runs while the
+            // listener's first emission is still in flight, rather than the fake resolving it up front.
             val summaryGate = CompletableDeferred<Unit>()
             cardProgressRepository.summaryReadGate = summaryGate
 
@@ -313,8 +317,32 @@ class BrowseViewModelTest {
             summaryGate.complete(Unit)
             advanceUntilIdle()
 
-            viewModel.state.value.isProgressResolved shouldBe false
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Unresolved
+            viewModel.state.value.isProgressResolved shouldBe true
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 4, masteredCount = 2)
+        }
+
+    @Test
+    fun `a later summary update after search results are shown replaces the resolved values`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+            cardProgressRepository.seedSummary(
+                ProgressSummary(subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 1, masteredCount = 0))),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSearchQueryChange("compose")
+            advanceUntilIdle()
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 1, masteredCount = 0)
+
+            // Mirrors a session finishing (or connectivity returning) after the screen is already
+            // showing search results — the listener re-fires and the ring updates in place.
+            cardProgressRepository.seedSummary(
+                ProgressSummary(subcategories = mapOf(compose.id to SubcategoryProgressSummary(studiedCount = 4, masteredCount = 2))),
+            )
+            advanceUntilIdle()
+
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 4, masteredCount = 2)
         }
 
     @Test

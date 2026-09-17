@@ -21,7 +21,7 @@ data class SubcategoryProgressSummary(
  * means the User has never finished a session at all. Both render as an empty ring — the display's concern, not this type's.
  *
  * Written only by the server-authoritative `submitStudySession` Cloud Function — this
- * client only ever reads it, via [com.rossomak.flashcards.core.domain.repository.CardProgressRepository.getProgressSummary].
+ * client only ever reads it, via [com.rossomak.flashcards.core.domain.repository.CardProgressRepository.observeProgressSummary].
  */
 data class ProgressSummary(
     val subcategories: Map<String, SubcategoryProgressSummary>,
