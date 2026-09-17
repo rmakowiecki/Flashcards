@@ -43,7 +43,7 @@ flowchart TD
     ShortcutTap([Tap a pinned or dynamic shortcut]) --> Splash(SPLASH SCREEN)
 Splash --> StillValid{Shortcut's topic\nstill exists?}
 
-StillValid -->|no, e.g. deleted/renamed away| Home(HOME SCREEN\nnormal landing)
+StillValid -->|no, e.g. deleted| Home(HOME SCREEN\nnormal landing)
 StillValid -->|yes| SignedIn2{Signed in?}
 
 SignedIn2 -->|yes| DirectOpen([Opens directly at\nCategory/Subcategory Details])
