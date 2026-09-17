@@ -36,7 +36,14 @@ import com.rossomak.flashcards.presentation.main.MainScreen
 import com.rossomak.flashcards.presentation.splash.SplashScreen
 import kotlinx.serialization.Serializable
 
-@Serializable object Splash
+/**
+ * [pendingRoute] is the raw route string off a launcher-shortcut Intent
+ * (`AppShortcutsRepository.EXTRA_ROUTE`), forwarded here as [FlashcardsNavGraph]'s start-destination
+ * argument so [SplashViewModel][com.rossomak.flashcards.presentation.splash.SplashViewModel] can
+ * decode it the same testable way any other route argument is decoded. Null on every ordinary
+ * app launch.
+ */
+@Serializable data class Splash(val pendingRoute: String? = null)
 
 @Serializable object Main
 
@@ -182,18 +189,32 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
             SplashScreen(
                 onNavigateToMain = {
                     navController.navigate(Main) {
-                        popUpTo(Splash) { inclusive = true }
+                        popUpTo<Splash> { inclusive = true }
                     }
                 },
                 onNavigateToOnboarding = {
                     navController.navigate(OnboardingRoute) {
-                        popUpTo(Splash) { inclusive = true }
+                        popUpTo<Splash> { inclusive = true }
                     }
                 },
                 onNavigateToLogin = {
                     navController.navigate(AuthRoute) {
-                        popUpTo(Splash) { inclusive = true }
+                        popUpTo<Splash> { inclusive = true }
                     }
+                },
+                onNavigateToCategoryDetails = { route ->
+                    // Pushed on top of Main rather than replacing it outright, so back from
+                    // Details returns to Browse instead of exiting the app.
+                    navController.navigate(Main) {
+                        popUpTo<Splash> { inclusive = true }
+                    }
+                    navController.navigate(route)
+                },
+                onNavigateToSubcategoryDetails = { route ->
+                    navController.navigate(Main) {
+                        popUpTo<Splash> { inclusive = true }
+                    }
+                    navController.navigate(route)
                 },
             )
         }
@@ -233,7 +254,8 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
 @Composable
 fun FlashcardsNavGraph(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    launchRoute: String? = null,
 ) {
     // One SharedTransitionLayout around the whole NavHost: a shared element is matched between the
     // outgoing and the incoming destination, so both have to sit inside the same scope.
@@ -241,7 +263,7 @@ fun FlashcardsNavGraph(
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
             NavHost(
                 navController = navController,
-                startDestination = Splash,
+                startDestination = Splash(pendingRoute = launchRoute),
                 modifier = Modifier.fillMaxSize()
             ) {
                 launchDestinations(navController)

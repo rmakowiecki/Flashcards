@@ -36,6 +36,8 @@ import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -54,12 +56,16 @@ fun SplashScreen(
     onNavigateToMain: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToLogin: () -> Unit,
+    onNavigateToCategoryDetails: (CategoryDetailsRoute) -> Unit,
+    onNavigateToSubcategoryDetails: (SubcategoryDetailsRoute) -> Unit,
 ) {
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             SplashDestination.Main -> onNavigateToMain()
             SplashDestination.Onboarding -> onNavigateToOnboarding()
             SplashDestination.Login -> onNavigateToLogin()
+            is SplashDestination.ToCategoryDetails -> onNavigateToCategoryDetails(destination.route)
+            is SplashDestination.ToSubcategoryDetails -> onNavigateToSubcategoryDetails(destination.route)
         }
     }
 
