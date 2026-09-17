@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateU
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
@@ -103,23 +104,19 @@ class CategoryDetailsViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.assertValue {
-            isLoading shouldBe false
-            this.subcategories shouldBe subcategories
-            errorResId shouldBe null
+            content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
         }
     }
 
     @Test
-    fun `failed subcategory load surfaces error and stops loading`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `failed subcategory load surfaces error`() = runTest(mainDispatcherRule.testDispatcher) {
         flashcardRepository.subcategoriesToReturn = Result.failure(IllegalStateException("boom"))
 
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         viewModel.state.assertValue {
-            isLoading shouldBe false
-            subcategories shouldBe emptyList()
-            errorResId shouldBe R.string.category_details_load_error
+            content shouldBe CategoryDetailsContentState.Error(R.string.category_details_load_error)
         }
     }
 
@@ -331,15 +328,14 @@ class CategoryDetailsViewModelTest {
     }
 
     @Test
-    fun `isAllSelected is false for an empty Category`() = runTest(mainDispatcherRule.testDispatcher) {
-        flashcardRepository.subcategoriesToReturn = Result.success(emptyList())
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `an empty subcategory list from a successful load surfaces error, a Category always has one or more`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.subcategoriesToReturn = Result.success(emptyList())
+            val viewModel = createViewModel()
+            advanceUntilIdle()
 
-        viewModel.onSelectionModeToggle()
-
-        viewModel.state.value.isAllSelected shouldBe false
-    }
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.Error(R.string.category_details_load_error)
+        }
 
     @Test
     fun `select-all with nothing selected selects every subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -570,8 +566,7 @@ class CategoryDetailsViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.assertValue {
-                this.subcategories shouldBe subcategories
-                errorResId shouldBe null
+                content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
                 isProgressResolved shouldBe false
                 progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
                 progressFor("sub-2") shouldBe SubcategoryProgress.Unresolved
@@ -593,7 +588,7 @@ class CategoryDetailsViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.subcategories shouldBe subcategories
+        viewModel.state.value.content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
         viewModel.state.value.isProgressResolved shouldBe false
         viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
 
@@ -619,14 +614,14 @@ class CategoryDetailsViewModelTest {
             advanceUntilIdle()
 
             // Subcategory list is in, summary is still parked: rows exist but every one is unresolved.
-            viewModel.state.value.subcategories shouldBe subcategories
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
             subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgress.Unresolved }
 
             summaryGate.complete(Unit)
             advanceUntilIdle()
 
             // Releasing the summary changes only the progress values, never the list itself.
-            viewModel.state.value.subcategories shouldBe subcategories
+            viewModel.state.value.content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
         }
 
     @Test

@@ -177,7 +177,7 @@ class BrowseViewModel @Inject constructor(
 
     private fun loadCategories() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, hasLoadError = false) }
+            _state.update { it.copy(isLoading = true) }
             getCategories()
                 .onSuccess { categories ->
                     _state.update { it.copy(isLoading = false, categories = categories) }
@@ -188,7 +188,7 @@ class BrowseViewModel @Inject constructor(
                     rerunActiveSearch()
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, hasLoadError = true) }
+                    _state.update { it.copy(isLoading = false) }
                 }
         }
     }

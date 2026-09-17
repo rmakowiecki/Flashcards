@@ -85,11 +85,12 @@ class CategoryDetailsViewModel @Inject constructor(
      */
     fun onSelectAllToggle() {
         _state.update {
+            val subcategories = (it.content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: return@update it
             it.copy(
                 selectedSubcategoryIds = if (it.isAllSelected) {
                     emptySet()
                 } else {
-                    it.subcategories.map { subcategory -> subcategory.id }.toSet()
+                    subcategories.map { subcategory -> subcategory.id }.toSet()
                 },
             )
         }
@@ -97,7 +98,8 @@ class CategoryDetailsViewModel @Inject constructor(
 
     /** Every Subcategory in the Category, sampled by the Preview screen — not honoured literally. */
     fun onQuickSessionStart() {
-        emitPreviewSession(subcategories = _state.value.subcategories, isQuickSession = true)
+        val subcategories = (_state.value.content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: return
+        emitPreviewSession(subcategories = subcategories, isQuickSession = true)
     }
 
     /**
@@ -108,8 +110,9 @@ class CategoryDetailsViewModel @Inject constructor(
     fun onCustomSessionStart() {
         val state = _state.value
         val selectedIds = state.selectedSubcategoryIds ?: return
+        val subcategories = (state.content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: return
         emitPreviewSession(
-            subcategories = state.subcategories.filter { it.id in selectedIds },
+            subcategories = subcategories.filter { it.id in selectedIds },
             isQuickSession = false,
         )
     }
@@ -175,15 +178,25 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    private fun loadSubcategories() {
+    internal fun loadSubcategories() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, errorResId = null) }
+            _state.update { it.copy(content = CategoryDetailsContentState.Loading) }
             getSubcategories(route.categoryId)
                 .onSuccess { subcategories ->
-                    _state.update { it.copy(isLoading = false, subcategories = subcategories) }
+                    _state.update {
+                        it.copy(
+                            // A Category always contains at least one Subcategory (CONTEXT.md); an
+                            // empty result means the read is lying, not that there's nothing to show.
+                            content = if (subcategories.isEmpty()) {
+                                CategoryDetailsContentState.Error(R.string.category_details_load_error)
+                            } else {
+                                CategoryDetailsContentState.Subcategories(subcategories)
+                            },
+                        )
+                    }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, errorResId = R.string.category_details_load_error) }
+                    _state.update { it.copy(content = CategoryDetailsContentState.Error(R.string.category_details_load_error)) }
                 }
         }
     }

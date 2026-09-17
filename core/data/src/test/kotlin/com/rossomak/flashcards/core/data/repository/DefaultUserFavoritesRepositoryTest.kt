@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.repository
 
 import app.cash.turbine.test
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.rossomak.flashcards.core.data.model.UserFavoritesDto
 import com.rossomak.flashcards.core.data.source.UserFavoritesRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.UserFavorites
@@ -14,8 +15,10 @@ import io.mockk.just
 import io.mockk.mockk
 import java.time.Instant
 import java.util.Date
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -55,6 +58,39 @@ class DefaultUserFavoritesRepositoryTest {
             awaitItem() shouldBe UserFavorites.EMPTY
             awaitComplete()
         }
+    }
+
+    @Test
+    fun `observeFavorites completes silently on permission denied without retrying`() = runTest {
+        val attempts = AtomicInteger(0)
+        every { remoteDataSource.observeFavorites() } returns flow {
+            attempts.incrementAndGet()
+            throw FirebaseFirestoreException("sign-out", FirebaseFirestoreException.Code.PERMISSION_DENIED)
+        }
+
+        createRepository().observeFavorites().test {
+            awaitComplete()
+        }
+        attempts.get() shouldBe 1
+    }
+
+    @Test
+    fun `observeFavorites retries and recovers after a non-permission listener failure`() = runTest {
+        val attempts = AtomicInteger(0)
+        every { remoteDataSource.observeFavorites() } returns flow {
+            if (attempts.getAndIncrement() == 0) {
+                throw FirebaseFirestoreException("listener dropped", FirebaseFirestoreException.Code.UNAVAILABLE)
+            } else {
+                emit(UserFavoritesDto(categories = mapOf("android" to Timestamp(Date(1_000L)))))
+            }
+        }
+
+        createRepository().observeFavorites().test {
+            val favorites = awaitItem()
+            favorites.categoryIds shouldBe mapOf("android" to Instant.ofEpochMilli(1_000L))
+            awaitComplete()
+        }
+        attempts.get() shouldBe 2
     }
 
     @Test

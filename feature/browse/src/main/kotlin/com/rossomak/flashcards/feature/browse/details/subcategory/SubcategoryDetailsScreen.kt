@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -52,6 +53,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
@@ -66,6 +68,13 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Error
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Flashcards
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Loading
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.NoMatches
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinUnsupported
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
@@ -102,32 +111,32 @@ fun SubcategoryDetailsScreen(
         }
     }
 
-    val addedToFavorites = stringResource(R.string.favorites_added_message)
-    val removedFromFavorites = stringResource(R.string.favorites_removed_message)
-    val undoLabel = stringResource(R.string.favorites_undo_button)
-    val shortcutPinUnsupported = stringResource(R.string.shortcut_pin_unsupported_message)
+    val addedToFavoritesText = stringResource(R.string.favorites_added_message)
+    val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
+    val undoLabelText = stringResource(R.string.favorites_undo_button)
+    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
 
     // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
     // lambda, so the wait is launched rather than blocking the collector.
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         when (message) {
-            SubcategoryDetailsMessage.AddedToFavorites, SubcategoryDetailsMessage.RemovedFromFavorites -> {
-                val text = if (message == SubcategoryDetailsMessage.AddedToFavorites) addedToFavorites else removedFromFavorites
+            AddedToFavorites, RemovedFromFavorites -> {
+                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
                 snackbarScope.launch {
                     val result = snackbarHostState.showSnackbar(
                         message = text,
-                        actionLabel = undoLabel,
+                        actionLabel = undoLabelText,
                         duration = SnackbarDuration.Short,
                     )
                     if (result == SnackbarResult.ActionPerformed) {
-                        viewModel.onFavoriteUndo(restoreTo = message != SubcategoryDetailsMessage.AddedToFavorites)
+                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
                     }
                 }
             }
-            SubcategoryDetailsMessage.ShortcutPinUnsupported -> {
+            ShortcutPinUnsupported -> {
                 snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinUnsupported, duration = SnackbarDuration.Short)
+                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
                 }
             }
         }
@@ -141,6 +150,7 @@ fun SubcategoryDetailsScreen(
         onResetFilters = viewModel::onResetFilters,
         onFavoriteToggle = viewModel::onFavoriteToggle,
         onAddShortcut = viewModel::onAddShortcutClick,
+        onRetry = viewModel::loadFlashcards,
         onDialogEvent = viewModel::onDialogEvent,
         snackbarHostState = snackbarHostState,
     )
@@ -157,6 +167,7 @@ fun SubcategoryDetailsContent(
     onResetFilters: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onAddShortcut: () -> Unit,
+    onRetry: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
@@ -195,24 +206,33 @@ fun SubcategoryDetailsContent(
             )
         },
     ) { innerPadding ->
-        when (val content = state.content) {
-            SubcategoryDetailsContentState.Loading -> CenteredContent(modifier = Modifier.padding(innerPadding)) {
-                CircularProgressIndicator()
-            }
-
-            is SubcategoryDetailsContentState.Error -> CenteredContent(modifier = Modifier.padding(innerPadding)) {
-                Text(text = stringResource(content.messageRes))
-            }
-
-            is SubcategoryDetailsContentState.Cards -> FlashcardList(
-                modifier = Modifier.padding(innerPadding),
-                flashcards = content.flashcards,
-                listState = listState,
-            )
-            // Resetting restores every tag and the difficulty range but deliberately leaves the sort order alone
-            // sort cannot cause an empty result, so resetting it here would undo an unrelated choice (ADR-0022).
-            SubcategoryDetailsContentState.NoMatches -> CenteredContent(modifier = Modifier.padding(innerPadding)) {
-                FlashcardsEmptyState(
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (val content = state.content) {
+                Loading -> CircularProgressIndicator()
+                is Error -> FlashcardsEmptyState(
+                    icon = Icons.Filled.ErrorOutline,
+                    title = stringResource(CoreUiR.string.common_load_error_title),
+                    supportingText = stringResource(content.messageRes),
+                    tone = FlashcardsEmptyStateTone.Error,
+                    button = {
+                        FlashcardsFilledButton(
+                            text = stringResource(CoreUiR.string.common_retry_button),
+                            onClick = onRetry,
+                        )
+                    },
+                )
+                is Flashcards -> FlashcardList(
+                    flashcards = content.flashcards,
+                    listState = listState,
+                )
+                // Resetting restores every tag and the difficulty range but deliberately leaves the sort order alone
+                // sort cannot cause an empty result, so resetting it here would undo an unrelated choice (ADR-0022).
+                NoMatches -> FlashcardsEmptyState(
                     icon = Icons.Filled.SearchOff,
                     title = stringResource(R.string.subcategory_details_no_matches_title),
                     supportingText = stringResource(R.string.subcategory_details_no_matches_message),
@@ -255,14 +275,14 @@ private fun SubcategoryDetailsTopBar(
                 )
             },
         )
-        val cards = state.content as? SubcategoryDetailsContentState.Cards
-        if (cards != null) {
+        val flashcards = state.content as? Flashcards
+        if (flashcards != null) {
             FlashcardsOverlineLabel(
                 text = if (state.hasActiveFilters) {
                     pluralStringResource(
                         R.plurals.subcategory_details_filtered_card_count_label,
                         state.totalCount,
-                        cards.flashcards.size,
+                        flashcards.flashcards.size,
                         state.totalCount,
                     )
                 } else {
@@ -289,8 +309,8 @@ private fun SubcategoryDetailsBottomBar(
         actions = {
             SubcategoryDetailsToolbarActions(
                 hasActiveFilters = state.hasActiveFilters,
-                enabled = state.content is SubcategoryDetailsContentState.Cards ||
-                    state.content is SubcategoryDetailsContentState.NoMatches,
+                enabled = state.content is Flashcards ||
+                    state.content is NoMatches,
                 onFilterClick = {
                     onDialogEvent(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
@@ -313,7 +333,7 @@ private fun SubcategoryDetailsBottomBar(
                 },
                 onClick = onStartSession,
                 size = FlashcardsComponentSize.Small,
-                enabled = state.content is SubcategoryDetailsContentState.Cards,
+                enabled = state.content is Flashcards,
                 icon = Icons.Filled.PlayArrow,
             )
         },
@@ -393,19 +413,6 @@ private fun RowScope.SubcategoryDetailsToolbarActions(
             imageVector = Icons.AutoMirrored.Filled.Sort,
             contentDescription = stringResource(R.string.subcategory_details_sort_cd),
         )
-    }
-}
-
-@Composable
-private fun CenteredContent(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        content()
     }
 }
 
