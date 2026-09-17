@@ -7,6 +7,9 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class FirebaseAuthRemoteDataSource @Inject constructor(
@@ -14,6 +17,14 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
 ) : AuthRemoteDataSource {
 
     override fun getCurrentUser(): AuthUser? = firebaseAuth.currentUser?.toAuthUser()
+
+    // AuthStateListener fires immediately with the current user on registration, then again on
+    // every sign-in/sign-out — a single listener backs both the initial value and later changes.
+    override fun observeAuthUser(): Flow<AuthUser?> = callbackFlow {
+        val listener = FirebaseAuth.AuthStateListener { auth -> trySend(auth.currentUser?.toAuthUser()) }
+        firebaseAuth.addAuthStateListener(listener)
+        awaitClose { firebaseAuth.removeAuthStateListener(listener) }
+    }
 
     override suspend fun signInWithGoogleIdToken(idToken: String): Result<AuthUser> {
         return try {
