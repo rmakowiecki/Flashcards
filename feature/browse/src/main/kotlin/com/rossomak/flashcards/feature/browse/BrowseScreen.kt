@@ -53,6 +53,7 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CategorySearchResults
 import com.rossomak.flashcards.core.domain.model.CategoryWithSubcategorySummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
@@ -245,7 +246,7 @@ private fun BoxScope.CategoryListContent(
                 )
             },
         )
-        else -> CategoryList(categories = state.categories, onCategoryClick = onCategoryClick)
+        else -> CategoryList(categories = state.categories, favorites = state.favorites, onCategoryClick = onCategoryClick)
     }
 }
 
@@ -322,6 +323,7 @@ private fun ExpandedSearchContent(
         is SearchStatus.Results -> SearchResults(
             results = status.results,
             categories = state.categories,
+            favorites = state.favorites,
             progressFor = state::progressFor,
             onCategoryClick = onCategoryClick,
             onSubcategoryClick = onSubcategoryClick,
@@ -380,6 +382,7 @@ private fun CenteredEmptyState(
 @Composable
 internal fun CategoryList(
     categories: List<Category>,
+    favorites: UserFavorites,
     onCategoryClick: (String, String) -> Unit,
 ) {
     ScrollableSectionColumn {
@@ -390,6 +393,7 @@ internal fun CategoryList(
             categories = categories.map { category ->
                 CategoryWithSubcategorySummary(category = category, subcategorySummary = category.featuredSubcategoryNames)
             },
+            favorites = favorites,
             onCategoryClick = onCategoryClick,
         )
     }
@@ -407,6 +411,7 @@ internal fun CategoryList(
 internal fun SearchResults(
     results: CategorySearchResults,
     categories: List<Category>,
+    favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgress,
     onCategoryClick: (String, String) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
@@ -415,11 +420,11 @@ internal fun SearchResults(
     ScrollableSectionColumn {
         if (results.subcategories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_topics_label))
-            SubcategoryListGroup(results, progressFor, categories, onSubcategoryClick, onSubcategorySessionStart)
+            SubcategoryListGroup(results, favorites, progressFor, categories, onSubcategoryClick, onSubcategorySessionStart)
         }
         if (results.categories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_categories_label))
-            CategoryListGroup(categories = results.categories, onCategoryClick = onCategoryClick)
+            CategoryListGroup(categories = results.categories, favorites = favorites, onCategoryClick = onCategoryClick)
         }
     }
 }
@@ -427,6 +432,7 @@ internal fun SearchResults(
 @Composable
 private fun SubcategoryListGroup(
     results: CategorySearchResults,
+    favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgress,
     categories: List<Category>,
     onSubcategoryClick: (Subcategory) -> Unit,
@@ -448,6 +454,7 @@ private fun SubcategoryListGroup(
                     R.string.browse_search_start_session_cd,
                     subcategory.name,
                 ),
+                isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
                 onSubcategoryClick = onSubcategoryClick,
                 onSubcategorySessionStart = onSubcategorySessionStart,
             )
@@ -471,6 +478,7 @@ private fun ScrollableSectionColumn(content: @Composable () -> Unit) {
 @Composable
 private fun CategoryListGroup(
     categories: List<CategoryWithSubcategorySummary>,
+    favorites: UserFavorites,
     onCategoryClick: (String, String) -> Unit,
 ) {
     val subcategorySummarySeparator = stringResource(R.string.browse_middle_dot_separator)
@@ -486,6 +494,7 @@ private fun CategoryListGroup(
                 ),
                 placeholderSubtitle = placeholderSubtitle,
                 subcategorySummarySeparator = subcategorySummarySeparator,
+                isFavorited = favorites.categoryIds.containsKey(categoryWithSummary.category.id),
                 onCategoryClick = onCategoryClick,
             )
         },
@@ -501,6 +510,7 @@ private fun CategoryWithSubcategorySummary.toListGroupItem(
     subcategoryCountText: String,
     placeholderSubtitle: String,
     subcategorySummarySeparator: String,
+    isFavorited: Boolean,
     onCategoryClick: (String, String) -> Unit,
 ): FlashcardsListGroupItem = FlashcardsListGroupItem.DetailedRow(
     key = category.id,
@@ -508,6 +518,7 @@ private fun CategoryWithSubcategorySummary.toListGroupItem(
     subtitle = subcategorySummary.joinToString(subcategorySummarySeparator).ifEmpty { placeholderSubtitle },
     secondaryText = subcategoryCountText,
     onClick = { onCategoryClick(category.id, category.name) },
+    isFavorited = isFavorited,
     leading = {
         FlashcardsVectorIconTile(
             iconSvg = category.iconSvg,
@@ -614,6 +625,7 @@ private fun SearchResultsPreview() {
             ),
         ),
         categories = previewCategories,
+        favorites = UserFavorites.EMPTY,
         progressFor = previewProgressFor,
         onCategoryClick = { _, _ -> },
         onSubcategoryClick = {},

@@ -69,7 +69,7 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Error
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Flashcards
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.FlashcardsList
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Loading
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.NoMatches
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
@@ -219,6 +219,11 @@ fun SubcategoryDetailsContent(
         ) {
             when (val content = state.content) {
                 Loading -> CircularProgressIndicator()
+                is FlashcardsList -> FlashcardList(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    flashcards = content.flashcards,
+                    listState = listState,
+                )
                 is Error -> FlashcardsEmptyState(
                     icon = Icons.Filled.ErrorOutline,
                     title = stringResource(CoreUiR.string.common_load_error_title),
@@ -230,11 +235,6 @@ fun SubcategoryDetailsContent(
                             onClick = onRetry,
                         )
                     },
-                )
-                is Flashcards -> FlashcardList(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    flashcards = content.flashcards,
-                    listState = listState,
                 )
                 // Resetting restores every tag and the difficulty range but deliberately leaves the sort order alone
                 // sort cannot cause an empty result, so resetting it here would undo an unrelated choice (ADR-0022).
@@ -281,7 +281,7 @@ private fun SubcategoryDetailsTopBar(
                 )
             },
         )
-        val flashcards = state.content as? Flashcards
+        val flashcards = state.content as? FlashcardsList
         if (flashcards != null) {
             FlashcardsOverlineLabel(
                 text = if (state.hasActiveFilters) {
@@ -315,7 +315,7 @@ private fun SubcategoryDetailsBottomBar(
         actions = {
             SubcategoryDetailsToolbarActions(
                 hasActiveFilters = state.hasActiveFilters,
-                enabled = state.content is Flashcards ||
+                enabled = state.content is FlashcardsList ||
                     state.content is NoMatches,
                 onFilterClick = {
                     onDialogEvent(
@@ -338,7 +338,7 @@ private fun SubcategoryDetailsBottomBar(
                 },
                 onClick = onStartSession,
                 size = FlashcardsComponentSize.Small,
-                enabled = state.content is Flashcards,
+                enabled = state.content is FlashcardsList,
                 icon = Icons.Filled.PlayArrow,
             )
         },
