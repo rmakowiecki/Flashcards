@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveSubcategoryFavoriteStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinSubcategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetSubcategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
+@Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class SubcategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getFlashcards: GetFlashcardsUseCase,
@@ -43,12 +45,14 @@ class SubcategoryDetailsViewModel @Inject constructor(
     private val saveStudySessionPreference: SaveStudySessionPreferenceUseCase,
     private val observeSubcategoryFavoriteState: ObserveSubcategoryFavoriteStateUseCase,
     private val setSubcategoryFavorite: SetSubcategoryFavoriteUseCase,
+    private val pinSubcategoryShortcut: PinSubcategoryShortcutUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<SubcategoryDetailsRoute>()
 
     private val _state = MutableStateFlow(
         SubcategoryDetailsScreenState(
+            subcategoryId = route.subcategoryId,
             categoryName = route.categoryName,
             subcategoryName = route.subcategoryName
         )
@@ -146,6 +150,16 @@ class SubcategoryDetailsViewModel @Inject constructor(
         _state.update { it.copy(isFavorite = restoreTo) }
         viewModelScope.launch {
             setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, restoreTo))
+        }
+    }
+
+    /** `false` (unresolvable Subcategory/parent Category, or launcher doesn't support pinning) surfaces a snackbar instead of doing nothing. */
+    fun onAddShortcutClick() {
+        viewModelScope.launch {
+            val pinned = pinSubcategoryShortcut(route.subcategoryId)
+            if (!pinned) {
+                _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinUnsupported)
+            }
         }
     }
 

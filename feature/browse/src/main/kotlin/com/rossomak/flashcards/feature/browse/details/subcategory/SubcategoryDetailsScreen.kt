@@ -105,23 +105,30 @@ fun SubcategoryDetailsScreen(
     val addedToFavorites = stringResource(R.string.favorites_added_message)
     val removedFromFavorites = stringResource(R.string.favorites_removed_message)
     val undoLabel = stringResource(R.string.favorites_undo_button)
+    val shortcutPinUnsupported = stringResource(R.string.shortcut_pin_unsupported_message)
 
     // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
     // lambda, so the wait is launched rather than blocking the collector.
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
-        val text = when (message) {
-            SubcategoryDetailsMessage.AddedToFavorites -> addedToFavorites
-            SubcategoryDetailsMessage.RemovedFromFavorites -> removedFromFavorites
-        }
-        snackbarScope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = text,
-                actionLabel = undoLabel,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.onFavoriteUndo(restoreTo = message != SubcategoryDetailsMessage.AddedToFavorites)
+        when (message) {
+            SubcategoryDetailsMessage.AddedToFavorites, SubcategoryDetailsMessage.RemovedFromFavorites -> {
+                val text = if (message == SubcategoryDetailsMessage.AddedToFavorites) addedToFavorites else removedFromFavorites
+                snackbarScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = text,
+                        actionLabel = undoLabel,
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.onFavoriteUndo(restoreTo = message != SubcategoryDetailsMessage.AddedToFavorites)
+                    }
+                }
+            }
+            SubcategoryDetailsMessage.ShortcutPinUnsupported -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinUnsupported, duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -133,12 +140,14 @@ fun SubcategoryDetailsScreen(
         onStartSession = viewModel::onStartSession,
         onResetFilters = viewModel::onResetFilters,
         onFavoriteToggle = viewModel::onFavoriteToggle,
+        onAddShortcut = viewModel::onAddShortcutClick,
         onDialogEvent = viewModel::onDialogEvent,
         snackbarHostState = snackbarHostState,
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
 fun SubcategoryDetailsContent(
     modifier: Modifier = Modifier,
@@ -147,6 +156,7 @@ fun SubcategoryDetailsContent(
     onStartSession: () -> Unit,
     onResetFilters: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
@@ -174,6 +184,7 @@ fun SubcategoryDetailsContent(
                 scrollBehavior = scrollBehavior,
                 onNavigateBack = onNavigateBack,
                 onFavoriteToggle = onFavoriteToggle,
+                onAddShortcut = onAddShortcut,
             )
         },
         bottomBar = {
@@ -228,6 +239,7 @@ private fun SubcategoryDetailsTopBar(
     scrollBehavior: TopAppBarScrollBehavior,
     onNavigateBack: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
 ) {
     Column(modifier = modifier) {
         FlashcardsTopAppBar(
@@ -239,6 +251,7 @@ private fun SubcategoryDetailsTopBar(
                 SubcategoryDetailsActions(
                     isFavorite = state.isFavorite,
                     onFavoriteToggle = onFavoriteToggle,
+                    onAddShortcut = onAddShortcut,
                 )
             },
         )
@@ -312,13 +325,13 @@ private fun SubcategoryDetailsBottomBar(
  * [AppBarRow] renders `maxItemCount - 1` items inline.
  *
  * The bookmark is **deliberately cosmetic** — see
- * [SubcategoryDetailsViewModel.onFavoriteToggle]. Add-to-home-screen is still unwired, pending the
- * dynamic launcher shortcut work.
+ * [SubcategoryDetailsViewModel.onFavoriteToggle].
  */
 @Composable
 private fun RowScope.SubcategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
 ) {
     val bookmarkLabel = stringResource(R.string.subcategory_details_bookmark_label)
     val addShortcutLabel = stringResource(R.string.subcategory_details_add_shortcut_label)
@@ -345,7 +358,7 @@ private fun RowScope.SubcategoryDetailsActions(
             label = bookmarkLabel,
         )
         clickableItem(
-            onClick = {},
+            onClick = onAddShortcut,
             icon = { Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null) },
             label = addShortcutLabel,
         )

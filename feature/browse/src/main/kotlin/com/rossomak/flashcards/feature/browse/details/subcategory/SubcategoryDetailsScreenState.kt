@@ -24,6 +24,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
  * @param isFavorite live from [UserFavoritesRepository.observeFavorites][com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository.observeFavorites], written via [SubcategoryDetailsViewModel.onFavoriteToggle].
  */
 data class SubcategoryDetailsScreenState(
+    val subcategoryId: String = "",
     val categoryName: String = "",
     val subcategoryName: String = "",
     val content: SubcategoryDetailsContentState = SubcategoryDetailsContentState.Loading,
