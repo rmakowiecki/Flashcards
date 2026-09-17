@@ -3,14 +3,17 @@ package com.rossomak.flashcards.feature.browse.details.category
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
-import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -137,13 +140,7 @@ class CategoryDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
             if (result.isSuccess) {
-                _messages.tryEmit(
-                    if (isFavorite) {
-                        CategoryDetailsMessage.AddedToFavorites
-                    } else {
-                        CategoryDetailsMessage.RemovedFromFavorites
-                    },
-                )
+                _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites)
             }
         }
     }
@@ -160,12 +157,12 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    /** `false` (unresolvable Category, or launcher doesn't support pinning) surfaces a snackbar instead of doing nothing. */
     fun onAddShortcutClick() {
         viewModelScope.launch {
-            val pinned = pinCategoryShortcut(route.categoryId)
-            if (!pinned) {
-                _messages.tryEmit(CategoryDetailsMessage.ShortcutPinUnsupported)
+            when (pinCategoryShortcut(route.categoryId)) {
+                PinShortcutResult.Pinned -> Unit
+                PinShortcutResult.EntityNotFound -> _messages.tryEmit(CategoryDetailsMessage.ShortcutPinFailed)
+                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(CategoryDetailsMessage.ShortcutPinUnsupported)
             }
         }
     }

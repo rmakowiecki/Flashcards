@@ -389,7 +389,7 @@ class SubcategoryDetailsViewModelTest {
     }
 
     @Test
-    fun `add-shortcut click on an unresolvable subcategory emits the unsupported message`() =
+    fun `add-shortcut click on an unresolvable subcategory emits the failed message`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.subcategoriesByIdsToReturn = Result.success(emptyList())
             val viewModel = startedViewModel()
@@ -398,7 +398,7 @@ class SubcategoryDetailsViewModelTest {
                 viewModel.onAddShortcutClick()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe SubcategoryDetailsMessage.ShortcutPinUnsupported
+                awaitItem() shouldBe SubcategoryDetailsMessage.ShortcutPinFailed
             }
         }
 

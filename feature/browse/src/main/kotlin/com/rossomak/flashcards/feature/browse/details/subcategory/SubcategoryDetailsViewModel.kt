@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference
 import com.rossomak.flashcards.core.domain.model.orderedBy
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
@@ -21,6 +22,8 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -130,13 +133,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, isFavorite))
             if (result.isSuccess) {
-                _messages.tryEmit(
-                    if (isFavorite) {
-                        SubcategoryDetailsMessage.AddedToFavorites
-                    } else {
-                        SubcategoryDetailsMessage.RemovedFromFavorites
-                    },
-                )
+                _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites)
             }
         }
     }
@@ -153,12 +150,12 @@ class SubcategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    /** `false` (unresolvable Subcategory/parent Category, or launcher doesn't support pinning) surfaces a snackbar instead of doing nothing. */
     fun onAddShortcutClick() {
         viewModelScope.launch {
-            val pinned = pinSubcategoryShortcut(route.subcategoryId)
-            if (!pinned) {
-                _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinUnsupported)
+            when (pinSubcategoryShortcut(route.subcategoryId)) {
+                PinShortcutResult.Pinned -> Unit
+                PinShortcutResult.EntityNotFound -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinFailed)
+                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinUnsupported)
             }
         }
     }

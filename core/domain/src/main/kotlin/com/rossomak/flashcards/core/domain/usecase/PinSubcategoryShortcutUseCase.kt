@@ -1,5 +1,10 @@
 package com.rossomak.flashcards.core.domain.usecase
 
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult.EntityNotFound
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult.Pinned
+import com.rossomak.flashcards.core.domain.model.PinShortcutResult.UnsupportedLauncher
+import com.rossomak.flashcards.core.domain.model.ShortcutRoute
 import com.rossomak.flashcards.core.domain.model.ShortcutTarget
 import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
@@ -10,32 +15,30 @@ import javax.inject.Inject
  * Pins a Subcategory as a launcher shortcut. [params] is the Subcategory's id — resolved here to
  * the Subcategory itself, then to its parent Category for [ShortcutTarget.iconSvg]/[ShortcutTarget.color]:
  * a Subcategory carries no icon/color of its own (same rule [com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory] documents).
- *
- * `false` covers an unresolvable [params]/parent Category and a launcher that doesn't support
- * pinning alike — either way there is nothing to show the OS placement dialog for.
  */
 class PinSubcategoryShortcutUseCase @Inject constructor(
     private val flashcardRepository: FlashcardRepository,
     private val appShortcutsRepository: AppShortcutsRepository,
-) : UseCase<String, Boolean> {
+) : UseCase<String, PinShortcutResult> {
 
-    override suspend operator fun invoke(params: String): Boolean {
+    override suspend operator fun invoke(params: String): PinShortcutResult {
         val subcategory = flashcardRepository.fetchSubcategoriesByIds(setOf(params))
             .getOrNull()
             ?.firstOrNull()
-            ?: return false
+            ?: return EntityNotFound
         val category = flashcardRepository.fetchCategoriesByIds(setOf(subcategory.categoryId))
             .getOrNull()
             ?.firstOrNull()
-            ?: return false
-        return appShortcutsRepository.pinShortcut(
+            ?: return EntityNotFound
+        val pinningResult = appShortcutsRepository.pinShortcut(
             ShortcutTarget(
                 id = "subcategory:${subcategory.id}",
                 name = subcategory.name,
-                route = "/study/category/${subcategory.categoryId}/subcategory/${subcategory.id}",
+                route = ShortcutRoute.subcategory(subcategory.categoryId, subcategory.id),
                 iconSvg = category.iconSvg,
                 color = category.color,
             ),
         )
+        return if (pinningResult) Pinned else UnsupportedLauncher
     }
 }

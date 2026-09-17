@@ -12,8 +12,8 @@ import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
-import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState
@@ -192,7 +192,7 @@ class CategoryDetailsViewModelTest {
     }
 
     @Test
-    fun `add-shortcut click on an unresolvable category emits the unsupported message`() =
+    fun `add-shortcut click on an unresolvable category emits the failed message`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.categoriesByIdsToReturn = Result.success(emptyList())
             val viewModel = createViewModel()
@@ -201,7 +201,7 @@ class CategoryDetailsViewModelTest {
                 viewModel.onAddShortcutClick()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe CategoryDetailsMessage.ShortcutPinUnsupported
+                awaitItem() shouldBe CategoryDetailsMessage.ShortcutPinFailed
             }
         }
 

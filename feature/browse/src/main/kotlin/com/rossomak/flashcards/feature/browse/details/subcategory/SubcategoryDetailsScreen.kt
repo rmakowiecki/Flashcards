@@ -74,6 +74,7 @@ import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDet
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.NoMatches
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinFailed
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinUnsupported
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
@@ -115,6 +116,7 @@ fun SubcategoryDetailsScreen(
     val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
     val undoLabelText = stringResource(R.string.favorites_undo_button)
     val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
+    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
 
     // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
     // lambda, so the wait is launched rather than blocking the collector.
@@ -137,6 +139,11 @@ fun SubcategoryDetailsScreen(
             ShortcutPinUnsupported -> {
                 snackbarScope.launch {
                     snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
+                }
+            }
+            ShortcutPinFailed -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
                 }
             }
         }
@@ -171,15 +178,13 @@ fun SubcategoryDetailsContent(
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
     // Hoisted out of FlashcardList so it survives the Cards -> NoMatches -> Cards round trip, which
     // would otherwise drop the state and hide the reset below.
     val listState = rememberLazyListState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     // Filtering or re-sorting yields a different list, so a retained offset would leave the user
     // mid-list on cards they never scrolled to. Both land them back at the top.
-    //
     // Only the list resets: `scrollBehavior.state` is deliberately left alone, so a collapsed top
     // app bar stays collapsed rather than springing back open on every filter tweak.
     LaunchedEffect(state.filters, state.sortOrder) {

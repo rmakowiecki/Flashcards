@@ -76,6 +76,7 @@ import com.rossomak.flashcards.feature.browse.R
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.PreviewStudySession
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinFailed
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinUnsupported
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Resolved
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Unresolved
@@ -118,6 +119,7 @@ fun CategoryDetailsScreen(
     val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
     val undoLabelText = stringResource(R.string.favorites_undo_button)
     val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
+    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
 
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
@@ -138,6 +140,11 @@ fun CategoryDetailsScreen(
             ShortcutPinUnsupported -> {
                 snackbarScope.launch {
                     snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
+                }
+            }
+            ShortcutPinFailed -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
                 }
             }
         }
@@ -189,12 +196,10 @@ fun CategoryDetailsContent(
     onRetry: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    val scrollBehavior =
-        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
     // Hoisted here, and never reset: the row set is identical in both modes and only the chrome changes, unlike Subcategory Details where filtering changes which items exist.
     // Resetting on list mode switch would throw a user who long-pressed halfway down the list back to the top.
     val listState = rememberLazyListState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     // System back leaves Selection Mode (if active) rather than the screen, same as the top app bar's back arrow below
     BackHandler(enabled = state.isSelectionMode, onBack = onSelectionModeToggle)
@@ -394,12 +399,6 @@ private fun SelectionModeToolbarActions(
     }
 }
 
-/**
- * Bookmark stays in the bar; anything past it falls into the overflow menu, which is how
- * [AppBarRow] renders `maxItemCount - 1` items inline.
- *
- * The bookmark is **deliberately cosmetic** — see [CategoryDetailsViewModel.onFavoriteToggle].
- */
 @Composable
 private fun CategoryDetailsActions(
     isFavorite: Boolean,
