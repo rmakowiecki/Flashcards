@@ -2,9 +2,12 @@ package com.rossomak.flashcards.feature.browse
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
+import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.repository.FakeAppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
@@ -12,6 +15,7 @@ import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveSubcategoryFavoriteStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinSubcategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetSubcategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
@@ -55,6 +59,8 @@ class SubcategoryDetailsViewModelTest {
     private val userFavoritesRepository = FakeUserFavoritesRepository()
     private val observeSubcategoryFavoriteState = ObserveSubcategoryFavoriteStateUseCase(userFavoritesRepository)
     private val setSubcategoryFavorite = SetSubcategoryFavoriteUseCase(userFavoritesRepository)
+    private val appShortcutsRepository = FakeAppShortcutsRepository()
+    private val pinSubcategoryShortcut = PinSubcategoryShortcutUseCase(flashcardRepository, appShortcutsRepository)
 
     private val route = SubcategoryDetailsRoute(
         categoryId = "cat-1",
@@ -90,6 +96,7 @@ class SubcategoryDetailsViewModelTest {
         saveStudySessionPreference = SaveStudySessionPreferenceUseCase(preferencesRepository),
         observeSubcategoryFavoriteState = observeSubcategoryFavoriteState,
         setSubcategoryFavorite = setSubcategoryFavorite,
+        pinSubcategoryShortcut = pinSubcategoryShortcut,
     )
 
     private fun flashcard(
@@ -366,6 +373,69 @@ class SubcategoryDetailsViewModelTest {
                 viewModel.state.value.isFavorite shouldBe false
             }
         }
+
+    // --- shortcut pinning ---
+
+    @Test
+    fun `add-shortcut click pins the routed subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.subcategoriesByIdsToReturn = Result.success(listOf(subcategoryModel()))
+        flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(categoryModel()))
+        val viewModel = startedViewModel()
+
+        viewModel.onAddShortcutClick()
+        advanceUntilIdle()
+
+        appShortcutsRepository.pinnedTargets.single().id shouldBe "subcategory:${route.subcategoryId}"
+    }
+
+    @Test
+    fun `add-shortcut click on an unresolvable subcategory emits the unsupported message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.subcategoriesByIdsToReturn = Result.success(emptyList())
+            val viewModel = startedViewModel()
+
+            viewModel.messages.test {
+                viewModel.onAddShortcutClick()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe SubcategoryDetailsMessage.ShortcutPinUnsupported
+            }
+        }
+
+    @Test
+    fun `add-shortcut click on an unsupported launcher emits the unsupported message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.subcategoriesByIdsToReturn = Result.success(listOf(subcategoryModel()))
+            flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(categoryModel()))
+            appShortcutsRepository.pinShortcutResult = false
+            val viewModel = startedViewModel()
+
+            viewModel.messages.test {
+                viewModel.onAddShortcutClick()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe SubcategoryDetailsMessage.ShortcutPinUnsupported
+            }
+        }
+
+    private fun subcategoryModel() = Subcategory(
+        id = route.subcategoryId,
+        name = route.subcategoryName,
+        categoryId = route.categoryId,
+        categoryName = route.categoryName,
+        order = 0,
+        cardCount = pool.size,
+    )
+
+    private fun categoryModel() = Category(
+        id = route.categoryId,
+        name = route.categoryName,
+        order = 0,
+        subcategoryCount = 0,
+        iconSvg = null,
+        color = null,
+        featuredSubcategoryNames = emptyList(),
+    )
 
     // --- starting a session ---
 
