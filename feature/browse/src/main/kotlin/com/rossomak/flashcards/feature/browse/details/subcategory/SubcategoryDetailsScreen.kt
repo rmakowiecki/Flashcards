@@ -2,8 +2,8 @@ package com.rossomak.flashcards.feature.browse.details.subcategory
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -227,6 +227,7 @@ fun SubcategoryDetailsContent(
                     },
                 )
                 is Flashcards -> FlashcardList(
+                    modifier = Modifier.align(Alignment.TopCenter),
                     flashcards = content.flashcards,
                     listState = listState,
                 )
@@ -316,8 +317,7 @@ private fun SubcategoryDetailsBottomBar(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
                     )
                 },
-                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) },
-            )
+            ) { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) }
         },
         trailing = {
             FlashcardsFilledButton(
@@ -340,15 +340,8 @@ private fun SubcategoryDetailsBottomBar(
     )
 }
 
-/**
- * Bookmark stays in the bar; anything past it falls into the overflow menu, which is how
- * [AppBarRow] renders `maxItemCount - 1` items inline.
- *
- * The bookmark is **deliberately cosmetic** — see
- * [SubcategoryDetailsViewModel.onFavoriteToggle].
- */
 @Composable
-private fun RowScope.SubcategoryDetailsActions(
+private fun SubcategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
     onAddShortcut: () -> Unit,
@@ -394,7 +387,7 @@ private fun RowScope.SubcategoryDetailsActions(
  * they could never clear from this screen (ADR-0038).
  */
 @Composable
-private fun RowScope.SubcategoryDetailsToolbarActions(
+private fun SubcategoryDetailsToolbarActions(
     hasActiveFilters: Boolean,
     enabled: Boolean,
     onFilterClick: () -> Unit,
@@ -434,7 +427,7 @@ private fun FlashcardList(
     LazyColumn(
         state = listState,
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(horizontal = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState),

@@ -3,20 +3,21 @@ package com.rossomak.flashcards.core.domain.repository
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.yield
 
 class FakeCardProgressRepository : CardProgressRepository {
     private val progressBySubcategoryId: MutableMap<String, SubcategoryProgress> = mutableMapOf()
-    private var summary: ProgressSummary? = null
+    private val summaryUpdates = MutableStateFlow<ProgressSummary?>(null)
 
     /** Overrides every [getProgress] call when set, success or failure alike. */
     var resultToReturn: Result<SubcategoryProgress?>? = null
 
-    /** Overrides every [getProgressSummary] call when set, success or failure alike. */
-    var summaryResultToReturn: Result<ProgressSummary?>? = null
-
     /**
-     * When set, [getProgressSummary] suspends on this until the test completes it — lets a test
+     * When set, [observeProgressSummary] suspends on this before its first emission — lets a test
      * park the summary read indefinitely to assert an in-between state (e.g. subcategories loaded,
      * summary still pending) instead of only the states before and after `advanceUntilIdle()`
      * drains everything at once. `null` (the default) keeps the old single-[yield] behavior.
@@ -30,8 +31,13 @@ class FakeCardProgressRepository : CardProgressRepository {
         progressBySubcategoryId[progress.subcategoryId] = progress
     }
 
+    /**
+     * Sets the value [observeProgressSummary] emits, both as the initial snapshot for a not-yet-
+     * subscribed collector and, if called again after a collector is already active, as a live
+     * update — mirroring a real Firestore snapshot listener re-firing after a change.
+     */
     fun seedSummary(summary: ProgressSummary) {
-        this.summary = summary
+        summaryUpdates.value = summary
     }
 
     /**
@@ -45,8 +51,8 @@ class FakeCardProgressRepository : CardProgressRepository {
         return resultToReturn ?: Result.success(progressBySubcategoryId[subcategoryId])
     }
 
-    override suspend fun getProgressSummary(): Result<ProgressSummary?> {
+    override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {
         summaryReadGate?.await() ?: yield()
-        return summaryResultToReturn ?: Result.success(summary)
+        emitAll(summaryUpdates)
     }
 }

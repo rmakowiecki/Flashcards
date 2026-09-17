@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -255,6 +256,7 @@ fun CategoryDetailsContent(
                 )
 
                 is CategoryDetailsContentState.Subcategories -> SubcategoryList(
+                    modifier = Modifier.align(Alignment.TopCenter),
                     listState = listState,
                     subcategories = content.subcategories,
                     isSelectionMode = state.isSelectionMode,
@@ -455,7 +457,7 @@ private fun SubcategoryList(
     LazyColumn(
         state = listState,
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(horizontal = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState)

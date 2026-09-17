@@ -10,10 +10,10 @@ import com.rossomak.flashcards.core.domain.repository.FakeAppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
-import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState
@@ -48,7 +48,7 @@ class CategoryDetailsViewModelTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val getSubcategories = GetSubcategoriesUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
-    private val getProgressSummary = GetProgressSummaryUseCase(cardProgressRepository)
+    private val observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository)
     private val userFavoritesRepository = FakeUserFavoritesRepository()
     private val observeCategoryFavoriteState = ObserveCategoryFavoriteStateUseCase(userFavoritesRepository)
     private val setCategoryFavorite = SetCategoryFavoriteUseCase(userFavoritesRepository)
@@ -72,7 +72,7 @@ class CategoryDetailsViewModelTest {
         CategoryDetailsViewModel(
             savedStateHandle,
             getSubcategories,
-            getProgressSummary,
+            observeProgressSummary,
             observeCategoryFavoriteState,
             setCategoryFavorite,
             pinCategoryShortcut,
@@ -556,20 +556,28 @@ class CategoryDetailsViewModelTest {
     }
 
     @Test
-    fun `a failed summary read leaves the subcategory list intact with every subcategory unresolved and surfaces no error`() =
+    fun `a later summary update after the list is shown replaces the resolved values`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val subcategories = listOf(subcategory("sub-1"), subcategory("sub-2"))
             flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
-            cardProgressRepository.summaryResultToReturn = Result.failure(IllegalStateException("boom"))
+            cardProgressRepository.seedSummary(
+                ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 2, masteredCount = 1))),
+            )
 
             val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 2, masteredCount = 1)
+
+            // Mirrors a session finishing (or connectivity returning) after the screen is already
+            // showing the subcategory list — the listener re-fires and the ring updates in place.
+            cardProgressRepository.seedSummary(
+                ProgressSummary(subcategories = mapOf("sub-1" to SubcategoryProgressSummary(studiedCount = 5, masteredCount = 3))),
+            )
             advanceUntilIdle()
 
             viewModel.state.assertValue {
                 content shouldBe CategoryDetailsContentState.Subcategories(subcategories)
-                isProgressResolved shouldBe false
-                progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
-                progressFor("sub-2") shouldBe SubcategoryProgress.Unresolved
+                progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 5, masteredCount = 3)
             }
         }
 
