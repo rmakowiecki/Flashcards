@@ -4,12 +4,15 @@ import com.rossomak.flashcards.core.data.source.AuthRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 
 class DefaultAuthRepository @Inject constructor(
     private val remoteDataSource: AuthRemoteDataSource,
 ) : AuthRepository {
 
     override fun getCurrentUser(): AuthUser? = remoteDataSource.getCurrentUser()
+
+    override fun observeAuthUser(): Flow<AuthUser?> = remoteDataSource.observeAuthUser()
 
     override suspend fun signInWithGoogleIdToken(idToken: String): Result<AuthUser> =
         remoteDataSource.signInWithGoogleIdToken(idToken)
