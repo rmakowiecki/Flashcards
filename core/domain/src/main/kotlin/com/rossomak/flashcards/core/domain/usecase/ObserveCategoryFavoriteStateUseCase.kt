@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.map
 class ObserveCategoryFavoriteStateUseCase @Inject constructor(
     private val userFavoritesRepository: UserFavoritesRepository,
 ) : UseCase<String, Flow<Boolean>> {
+
+    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     override suspend operator fun invoke(categoryId: String): Flow<Boolean> =
         userFavoritesRepository.observeFavorites().map { it.categoryIds.containsKey(categoryId) }
 }

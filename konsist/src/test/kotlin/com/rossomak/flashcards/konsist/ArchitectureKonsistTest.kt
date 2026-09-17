@@ -179,7 +179,9 @@ class ArchitectureKonsistTest {
             .filter { koClass -> koClass.annotations.any { it.name == "HiltViewModel" } }
             .assertTrue { koClass ->
                 koClass.properties().none { property ->
-                    !property.hasPrivateModifier && !property.hasProtectedModifier && !property.hasInternalModifier &&
+                    !property.hasPrivateModifier &&
+                        !property.hasProtectedModifier &&
+                        !property.hasInternalModifier &&
                         (property.type?.name == "MutableStateFlow" || property.type?.name == "MutableSharedFlow")
                 }
             }
