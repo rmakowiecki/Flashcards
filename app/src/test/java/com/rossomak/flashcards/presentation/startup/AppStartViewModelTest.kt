@@ -173,4 +173,22 @@ class AppStartViewModelTest {
         coVerify(exactly = 1) { clearDynamicShortcutsUseCase() }
         coVerify(exactly = 0) { syncDynamicShortcutsUseCase() }
     }
+
+    @Test
+    fun `switching to a second authenticated user without an intervening null restarts the shortcut sync`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getCurrentAuthUserUseCase() } returns null
+            val otherUser = testUser.copy(uid = "u2")
+            authUserFlow.value = testUser
+
+            createViewModel()
+            advanceUntilIdle()
+            coVerify(exactly = 1) { syncDynamicShortcutsUseCase() }
+
+            authUserFlow.value = otherUser
+            advanceUntilIdle()
+
+            coVerify(exactly = 2) { syncDynamicShortcutsUseCase() }
+            coVerify(exactly = 0) { clearDynamicShortcutsUseCase() }
+        }
 }

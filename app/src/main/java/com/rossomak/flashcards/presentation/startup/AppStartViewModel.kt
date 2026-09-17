@@ -50,12 +50,12 @@ class AppStartViewModel @Inject constructor(
         viewModelScope.launch {
             // Dynamic shortcuts mirror per-user favorites, so this tracks live auth changes rather than startupState's one-shot check
             // a sign-out mid-session must clear shortcuts from the previous session immediately, not just on the next cold start
-            // collectLatest cancels syncDynamicShortcuts()'s never-completing favorites collection as soon as authenticated flips false, before clearDynamicShortcuts() runs.
+            // collectLatest cancels syncDynamicShortcuts()'s never-completing favorites collection as soon as the uid flips, before the next branch runs.
             observeAuthUser()
-                .map { authUser -> authUser != null && !authUser.isAnonymous }
+                .map { authUser -> authUser?.takeUnless { it.isAnonymous }?.uid }
                 .distinctUntilChanged()
-                .collectLatest { authenticated ->
-                    if (authenticated) {
+                .collectLatest { authenticatedUid ->
+                    if (authenticatedUid != null) {
                         syncDynamicShortcuts()
                     } else {
                         clearDynamicShortcuts()
