@@ -7,6 +7,7 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
@@ -30,6 +31,7 @@ class CategoryDetailsViewModel @Inject constructor(
     private val getProgressSummary: GetProgressSummaryUseCase,
     private val observeCategoryFavoriteState: ObserveCategoryFavoriteStateUseCase,
     private val setCategoryFavorite: SetCategoryFavoriteUseCase,
+    private val pinCategoryShortcut: PinCategoryShortcutUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<CategoryDetailsRoute>()
@@ -152,6 +154,16 @@ class CategoryDetailsViewModel @Inject constructor(
         _state.update { it.copy(isFavorite = restoreTo) }
         viewModelScope.launch {
             setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, restoreTo))
+        }
+    }
+
+    /** `false` (unresolvable Category, or launcher doesn't support pinning) surfaces a snackbar instead of doing nothing. */
+    fun onAddShortcutClick() {
+        viewModelScope.launch {
+            val pinned = pinCategoryShortcut(route.categoryId)
+            if (!pinned) {
+                _messages.tryEmit(CategoryDetailsMessage.ShortcutPinUnsupported)
+            }
         }
     }
 

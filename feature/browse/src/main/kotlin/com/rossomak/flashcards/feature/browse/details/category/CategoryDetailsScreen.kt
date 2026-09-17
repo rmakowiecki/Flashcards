@@ -108,21 +108,28 @@ fun CategoryDetailsScreen(
     val addedToFavorites = stringResource(R.string.favorites_added_message)
     val removedFromFavorites = stringResource(R.string.favorites_removed_message)
     val undoLabel = stringResource(R.string.favorites_undo_button)
+    val shortcutPinUnsupported = stringResource(R.string.shortcut_pin_unsupported_message)
 
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
-        val text = when (message) {
-            CategoryDetailsMessage.AddedToFavorites -> addedToFavorites
-            CategoryDetailsMessage.RemovedFromFavorites -> removedFromFavorites
-        }
-        snackbarScope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = text,
-                actionLabel = undoLabel,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.onFavoriteUndo(restoreTo = message != CategoryDetailsMessage.AddedToFavorites)
+        when (message) {
+            CategoryDetailsMessage.AddedToFavorites, CategoryDetailsMessage.RemovedFromFavorites -> {
+                val text = if (message == CategoryDetailsMessage.AddedToFavorites) addedToFavorites else removedFromFavorites
+                snackbarScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = text,
+                        actionLabel = undoLabel,
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.onFavoriteUndo(restoreTo = message != CategoryDetailsMessage.AddedToFavorites)
+                    }
+                }
+            }
+            CategoryDetailsMessage.ShortcutPinUnsupported -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = shortcutPinUnsupported, duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -147,6 +154,7 @@ fun CategoryDetailsScreen(
         onQuickSessionStart = viewModel::onQuickSessionStart,
         onCustomSessionStart = viewModel::onCustomSessionStart,
         onFavoriteToggle = viewModel::onFavoriteToggle,
+        onAddShortcut = viewModel::onAddShortcutClick,
         snackbarHostState = snackbarHostState,
     )
 }
@@ -167,6 +175,7 @@ fun CategoryDetailsContent(
     onQuickSessionStart: () -> Unit,
     onCustomSessionStart: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val scrollBehavior =
@@ -193,6 +202,7 @@ fun CategoryDetailsContent(
                         CategoryDetailsActions(
                             isFavorite = state.isFavorite,
                             onFavoriteToggle = onFavoriteToggle,
+                            onAddShortcut = onAddShortcut,
                         )
                     },
                 )
@@ -373,12 +383,12 @@ private fun SelectionModeToolbarActions(
  * [AppBarRow] renders `maxItemCount - 1` items inline.
  *
  * The bookmark is **deliberately cosmetic** — see [CategoryDetailsViewModel.onFavoriteToggle].
- * Add-to-home-screen is still unwired, pending the dynamic launcher shortcut work.
  */
 @Composable
 private fun CategoryDetailsActions(
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
 ) {
     val bookmarkLabel = stringResource(R.string.category_details_bookmark_label)
     val addShortcutLabel = stringResource(R.string.category_details_add_shortcut_label)
@@ -405,7 +415,7 @@ private fun CategoryDetailsActions(
             label = bookmarkLabel,
         )
         clickableItem(
-            onClick = {},
+            onClick = onAddShortcut,
             icon = { Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null) },
             label = addShortcutLabel,
         )

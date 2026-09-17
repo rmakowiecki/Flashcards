@@ -9,4 +9,7 @@ sealed interface CategoryDetailsMessage {
     data object AddedToFavorites : CategoryDetailsMessage
 
     data object RemovedFromFavorites : CategoryDetailsMessage
+
+    /** [com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase] returned `false` — no OS placement dialog appeared. */
+    data object ShortcutPinUnsupported : CategoryDetailsMessage
 }
