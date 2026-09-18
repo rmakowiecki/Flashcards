@@ -67,7 +67,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             observeUserPreferences()
                 .onEach { preferences -> _state.update { it.copy(dailyGoalMinutes = preferences.dailyGoalMinutes) } }
-                .launchIn(viewModelScope)
+                .launchIn(this)
         }
         viewModelScope.launch {
             observeStudySessionPreferences()
@@ -87,7 +87,7 @@ class SettingsViewModel @Inject constructor(
                         )
                     }
                 }
-                .launchIn(viewModelScope)
+                .launchIn(this)
         }
         // The row shows the voice's name, not its id, so the list is needed before the dialog is
         // ever opened. Cached afterwards, so opening the dialog costs no second platform query.
