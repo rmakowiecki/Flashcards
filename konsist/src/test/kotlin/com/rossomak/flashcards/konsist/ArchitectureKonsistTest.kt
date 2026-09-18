@@ -174,6 +174,7 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `HiltViewModel classes do not expose public MutableStateFlow or MutableSharedFlow`() {
+        val mutableFlowInitializer = Regex("""=\s*Mutable(StateFlow|SharedFlow)\b""")
         projectScope
             .classes()
             .filter { koClass -> koClass.annotations.any { it.name == "HiltViewModel" } }
@@ -182,7 +183,11 @@ class ArchitectureKonsistTest {
                     !property.hasPrivateModifier &&
                         !property.hasProtectedModifier &&
                         !property.hasInternalModifier &&
-                        (property.type?.name == "MutableStateFlow" || property.type?.name == "MutableSharedFlow")
+                        (
+                            property.type?.name == "MutableStateFlow" ||
+                                property.type?.name == "MutableSharedFlow" ||
+                                mutableFlowInitializer.containsMatchIn(property.text)
+                            )
                 }
             }
     }
@@ -219,7 +224,7 @@ class ArchitectureKonsistTest {
         // Random.Default in the constructor signature — never called ad hoc in a function body.
         // Test doubles/fixtures and Hilt *Module providers are exempt: that's exactly where
         // Random is legitimately constructed to be handed out via DI.
-        val directRandom = Regex("""\bRandom\.Default\b|\bRandom\(\)""")
+        val directRandom = Regex("""\bRandom\.Default\b|\bRandom\s*\(""")
         projectScope
             .functions()
             .filter { it.path.contains("/core/domain/") || it.path.contains("/core/data/") }
