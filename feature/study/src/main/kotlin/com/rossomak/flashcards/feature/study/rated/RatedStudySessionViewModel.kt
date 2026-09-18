@@ -838,7 +838,6 @@ class RatedStudySessionViewModel @Inject constructor(
 
     public override fun onCleared() {
         voiceGateway.stop()
-        super.onCleared()
     }
 
     private companion object {

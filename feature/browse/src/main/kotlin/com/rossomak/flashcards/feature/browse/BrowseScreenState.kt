@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CategorySearchResults
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.feature.browse.details.category.subcategoryProgressFor
@@ -96,6 +97,7 @@ data class BrowseScreenState(
     val searchStatus: SearchStatus = SearchStatus.Prompt,
     val progressSummary: ProgressSummary? = null,
     val isProgressResolved: Boolean = false,
+    val favorites: UserFavorites = UserFavorites.EMPTY,
 ) {
 
     /** One matched subcategory's ring/subtitle data — see [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressFor]. */

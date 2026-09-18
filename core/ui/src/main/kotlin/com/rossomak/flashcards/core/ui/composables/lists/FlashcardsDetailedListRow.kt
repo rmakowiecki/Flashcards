@@ -48,6 +48,7 @@ fun FlashcardsDetailedListRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    isFavorited: Boolean = false,
     role: Role = Role.Button,
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
@@ -74,13 +75,7 @@ fun FlashcardsDetailedListRow(
                 .padding(start = if (leading != null) MaterialTheme.spacing.xxsmall else MaterialTheme.spacing.none),
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.none),
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            FlashcardsRowTitleText(title = title, isFavorited = isFavorited)
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,

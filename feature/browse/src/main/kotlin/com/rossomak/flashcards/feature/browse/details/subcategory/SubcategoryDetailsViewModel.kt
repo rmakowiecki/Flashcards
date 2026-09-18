@@ -255,7 +255,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
                     content = if (filtered.cards.isEmpty()) {
                         SubcategoryDetailsContentState.NoMatches
                     } else {
-                        SubcategoryDetailsContentState.Flashcards(filtered.cards.orderedBy(it.sortOrder))
+                        SubcategoryDetailsContentState.FlashcardsList(filtered.cards.orderedBy(it.sortOrder))
                     },
                     availableTags = filtered.poolTags,
                     totalCount = filtered.totalCount,

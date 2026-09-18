@@ -5,10 +5,13 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
@@ -34,6 +37,8 @@ class BrowseViewModelTest {
     private val searchCategories = SearchCategoriesUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
     private val observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository)
+    private val userFavoritesRepository = FakeUserFavoritesRepository()
+    private val observeUserFavorites = ObserveUserFavoritesUseCase(userFavoritesRepository)
 
     private val categoryId = "cat-1"
     private val categoryName = "Android"
@@ -67,7 +72,7 @@ class BrowseViewModelTest {
     )
 
     private fun createViewModel(): BrowseViewModel =
-        BrowseViewModel(getCategories, searchCategories, observeProgressSummary)
+        BrowseViewModel(getCategories, searchCategories, observeProgressSummary, observeUserFavorites)
 
     @Test
     fun `onCategorySelected emits CategoryDetails with id and name`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -384,6 +389,52 @@ class BrowseViewModelTest {
         val progress = viewModel.state.value.progressFor(compose.id) as SubcategoryProgress.Resolved
         (progress.masteredCount <= progress.studiedCount) shouldBe true
     }
+
+    // --- favorites badging on category/subcategory rows ---
+
+    @Test
+    fun `state favorites reflects only the ids favorited via the shared favorites repository`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            userFavoritesRepository.setCategoryFavorite(categoryId, isFavorite = true)
+            advanceUntilIdle()
+
+            viewModel.state.value.favorites.categoryIds.keys shouldBe setOf(categoryId)
+            viewModel.state.value.favorites.subcategoryIds shouldBe emptyMap()
+        }
+
+    @Test
+    fun `favorites arriving after search results neither reorders them nor changes their identity`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["co"] = Result.success(listOf(compose, coroutines))
+            userFavoritesRepository.setSubcategoryFavorite(coroutines.id, isFavorite = true)
+            // Parks the favorites read so it genuinely stays in flight past the point the search
+            // results have already resolved, instead of relying on both never having been dispatched yet.
+            val favoritesGate = CompletableDeferred<Unit>()
+            userFavoritesRepository.favoritesReadGate = favoritesGate
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSearchQueryChange("co")
+            advanceUntilIdle()
+
+            // Results are in, favorites are still parked: rows exist but none is badged yet.
+            var status = viewModel.state.value.searchStatus
+            status.shouldBeInstanceOf<SearchStatus.Results>()
+            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
+            viewModel.state.value.favorites shouldBe UserFavorites.EMPTY
+
+            favoritesGate.complete(Unit)
+            advanceUntilIdle()
+
+            // Releasing favorites changes only the badge data, never the results themselves.
+            status = viewModel.state.value.searchStatus
+            status.shouldBeInstanceOf<SearchStatus.Results>()
+            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
+            viewModel.state.value.favorites.subcategoryIds.keys shouldBe setOf(coroutines.id)
+        }
 
     private companion object {
         const val DEBOUNCE_MILLIS = 500L

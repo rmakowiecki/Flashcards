@@ -10,7 +10,6 @@ import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -30,7 +29,7 @@ class AppStartViewModelTest {
     private val getCurrentAuthUserUseCase: GetCurrentAuthUserUseCase = mockk()
     private val authUserFlow = MutableStateFlow<AuthUser?>(null)
     private val observeAuthUserUseCase: ObserveAuthUserUseCase = mockk {
-        every { this@mockk() } returns authUserFlow
+        coEvery { this@mockk() } returns authUserFlow
     }
     private val syncFlashcardCacheGenerationUseCase: SyncFlashcardCacheGenerationUseCase = mockk {
         coEvery { this@mockk() } returns Unit

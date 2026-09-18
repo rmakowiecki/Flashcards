@@ -73,6 +73,7 @@ sealed interface FlashcardsListGroupItem {
         val secondaryText: String? = null,
         val secondaryContent: (@Composable () -> Unit)? = null,
         val enabled: Boolean = true,
+        val isFavorited: Boolean = false,
         val leading: (@Composable () -> Unit)? = null,
         val trailing: (@Composable () -> Unit)? = null,
         override val key: Any? = null,
@@ -89,6 +90,7 @@ sealed interface FlashcardsListGroupItem {
         val secondaryText: String,
         val onClick: () -> Unit,
         val enabled: Boolean = true,
+        val isFavorited: Boolean = false,
         val leading: (@Composable () -> Unit)? = null,
         val trailing: (@Composable () -> Unit)? = null,
         override val key: Any? = null,
@@ -102,6 +104,7 @@ sealed interface FlashcardsListGroupItem {
         val subtitle: String? = null,
         val subtitleContent: (@Composable () -> Unit)? = null,
         val enabled: Boolean = true,
+        val isFavorited: Boolean = false,
         val leading: (@Composable () -> Unit)? = null,
         override val key: Any? = null,
     ) : FlashcardsListGroupItem
@@ -136,6 +139,7 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
             secondaryText = item.secondaryText,
             secondaryContent = item.secondaryContent,
             enabled = item.enabled,
+            isFavorited = item.isFavorited,
             leading = item.leading,
             trailing = item.trailing,
         )
@@ -146,6 +150,7 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
             secondaryText = item.secondaryText,
             onClick = item.onClick,
             enabled = item.enabled,
+            isFavorited = item.isFavorited,
             leading = item.leading,
             trailing = item.trailing,
         )
@@ -157,6 +162,7 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
             subtitle = item.subtitle,
             subtitleContent = item.subtitleContent,
             enabled = item.enabled,
+            isFavorited = item.isFavorited,
             leading = item.leading,
         )
         is FlashcardsListGroupItem.ExpandableRow -> FlashcardsExpandableListRow(

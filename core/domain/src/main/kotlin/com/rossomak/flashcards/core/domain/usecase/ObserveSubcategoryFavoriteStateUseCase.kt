@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.domain.usecase
 
 import com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository
+import com.rossomak.flashcards.core.domain.usecase.base.UseCase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -11,7 +12,9 @@ import kotlinx.coroutines.flow.map
  */
 class ObserveSubcategoryFavoriteStateUseCase @Inject constructor(
     private val userFavoritesRepository: UserFavoritesRepository,
-) {
-    operator fun invoke(subcategoryId: String): Flow<Boolean> =
+) : UseCase<String, Flow<Boolean>> {
+
+    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
+    override suspend operator fun invoke(subcategoryId: String): Flow<Boolean> =
         userFavoritesRepository.observeFavorites().map { it.subcategoryIds.containsKey(subcategoryId) }
 }

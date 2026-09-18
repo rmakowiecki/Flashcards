@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.domain.usecase
 
+import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
@@ -30,6 +31,7 @@ import javax.inject.Inject
  * outcome carries no further authority here; the delivery queue is what makes delivery durable against being
  * offline or the app being killed.
  */
+@ArchConventionExempt("TODO: fit onPreviewReady's two-callback shape into UseCase/NoParamUseCase, then drop this exemption.")
 class SubmitStudySessionUseCase @Inject constructor(
     private val cardProgressRepository: CardProgressRepository,
     private val scoringStateRepository: ScoringStateRepository,

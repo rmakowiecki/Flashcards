@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
@@ -35,6 +36,7 @@ class CategoryDetailsViewModel @Inject constructor(
     private val observeCategoryFavoriteState: ObserveCategoryFavoriteStateUseCase,
     private val setCategoryFavorite: SetCategoryFavoriteUseCase,
     private val pinCategoryShortcut: PinCategoryShortcutUseCase,
+    private val observeUserFavorites: ObserveUserFavoritesUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<CategoryDetailsRoute>()
@@ -54,6 +56,7 @@ class CategoryDetailsViewModel @Inject constructor(
         loadSubcategories()
         collectProgressSummary()
         observeFavoriteState()
+        observeFavorites()
     }
 
     /**
@@ -88,7 +91,7 @@ class CategoryDetailsViewModel @Inject constructor(
      */
     fun onSelectAllToggle() {
         _state.update {
-            val subcategories = (it.content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: return@update it
+            val subcategories = (it.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return@update it
             it.copy(
                 selectedSubcategoryIds = if (it.isAllSelected) {
                     emptySet()
@@ -101,7 +104,7 @@ class CategoryDetailsViewModel @Inject constructor(
 
     /** Every Subcategory in the Category, sampled by the Preview screen — not honoured literally. */
     fun onQuickSessionStart() {
-        val subcategories = (_state.value.content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: return
+        val subcategories = (_state.value.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return
         emitPreviewSession(subcategories = subcategories, isQuickSession = true)
     }
 
@@ -113,7 +116,7 @@ class CategoryDetailsViewModel @Inject constructor(
     fun onCustomSessionStart() {
         val state = _state.value
         val selectedIds = state.selectedSubcategoryIds ?: return
-        val subcategories = (state.content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: return
+        val subcategories = (state.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return
         emitPreviewSession(
             subcategories = subcategories.filter { it.id in selectedIds },
             isQuickSession = false,
@@ -175,6 +178,20 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Badges each subcategory row reactively — the list itself never waits on this to render, same
+     * rule as [collectProgressSummary]. [ObserveUserFavoritesUseCase] is a live Firestore listener
+     * too, re-attaching on its own after a network drop, so a screen left open through a
+     * connectivity blip still gets its bookmark badges filled in without any retry wiring here.
+     */
+    private fun observeFavorites() {
+        viewModelScope.launch {
+            observeUserFavorites().collect { favorites ->
+                _state.update { it.copy(favorites = favorites) }
+            }
+        }
+    }
+
     internal fun loadSubcategories() {
         viewModelScope.launch {
             _state.update { it.copy(content = CategoryDetailsContentState.Loading) }
@@ -187,7 +204,7 @@ class CategoryDetailsViewModel @Inject constructor(
                             content = if (subcategories.isEmpty()) {
                                 CategoryDetailsContentState.Error(R.string.category_details_load_error)
                             } else {
-                                CategoryDetailsContentState.Subcategories(subcategories)
+                                CategoryDetailsContentState.SubcategoriesList(subcategories)
                             },
                         )
                     }

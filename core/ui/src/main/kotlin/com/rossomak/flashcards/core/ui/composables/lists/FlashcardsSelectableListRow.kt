@@ -2,9 +2,7 @@ package com.rossomak.flashcards.core.ui.composables.lists
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +47,6 @@ private const val DISABLED_ALPHA = 0.6f
  * [subtitleContent] overrides [subtitle] when given, for a caller that needs more than a
  * single-styled line — see [FlashcardsListRow]'s own `secondaryContent`.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FlashcardsSelectableListRow(
     title: String,
@@ -59,6 +56,7 @@ fun FlashcardsSelectableListRow(
     subtitle: String? = null,
     subtitleContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    isFavorited: Boolean = false,
     leading: @Composable (() -> Unit)? = null,
 ) {
     val backgroundColor by animateColorAsState(
@@ -96,14 +94,7 @@ fun FlashcardsSelectableListRow(
                 .padding(start = if (leading != null) MaterialTheme.spacing.xxsmall else MaterialTheme.spacing.none),
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.none),
         ) {
-            Text(
-                text = title,
-                modifier = Modifier.basicMarquee(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Clip,
-            )
+            FlashcardsRowTitleText(title = title, isFavorited = isFavorited)
             if (subtitleContent != null) {
                 subtitleContent()
             } else if (subtitle != null) {

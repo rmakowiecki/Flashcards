@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.browse.details.category
 import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.UserFavorites
 
 /**
  * @param selectedSubcategoryIds **one nullable field, not a boolean plus a set.** `null` means
@@ -19,8 +20,7 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
  * session. Never read directly by the screen; go through [progressFor].
  * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
  * failed read leaves it `false` forever rather than surfacing an error, per the ticket's "no error,
- * no retry prompt" rule. The subcategory list itself never waits on this: [content] resolves to
- * [CategoryDetailsContentState.Subcategories] as soon as it loads, independent of the progress read.
+ * [CategoryDetailsContentState.SubcategoriesList] as soon as it loads, independent of the progress read.
  */
 data class CategoryDetailsScreenState(
     val categoryId: String = "",
@@ -30,6 +30,7 @@ data class CategoryDetailsScreenState(
     val isFavorite: Boolean = false,
     val progressSummary: ProgressSummary? = null,
     val isProgressResolved: Boolean = false,
+    val favorites: UserFavorites = UserFavorites.EMPTY,
 ) {
 
     val isSelectionMode: Boolean
@@ -39,7 +40,7 @@ data class CategoryDetailsScreenState(
         get() = selectedSubcategoryIds?.size ?: 0
 
     private val subcategories: List<Subcategory>
-        get() = (content as? CategoryDetailsContentState.Subcategories)?.subcategories ?: emptyList()
+        get() = (content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: emptyList()
 
     /** Sum of [Subcategory.cardCount] across the selected Subcategories — the CTA button session size. */
     val selectedCardCount: Int
@@ -73,16 +74,11 @@ sealed interface CategoryDetailsContentState {
 
     data object Loading : CategoryDetailsContentState
 
-    /**
-     * Carries a resource id rather than a built string: the ViewModel has no business holding
-     * user-facing English, and lint cannot see a hardcoded one there (ADR-0023).
-     */
-    data class Error(@param:StringRes val messageRes: Int) : CategoryDetailsContentState
+    data class SubcategoriesList(val subcategories: List<Subcategory>) : CategoryDetailsContentState
 
-    data class Subcategories(val subcategories: List<Subcategory>) : CategoryDetailsContentState
+    data class Error(@param:StringRes val messageRes: Int) : CategoryDetailsContentState
 }
 
-/** See [CategoryDetailsScreenState.progressFor]. */
 sealed interface SubcategoryProgress {
     /** The summary read hasn't resolved yet, or failed — renders as an unknown ring and dashes. */
     data object Unresolved : SubcategoryProgress

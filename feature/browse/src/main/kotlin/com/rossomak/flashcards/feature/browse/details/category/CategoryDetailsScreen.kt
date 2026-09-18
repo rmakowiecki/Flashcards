@@ -55,6 +55,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
@@ -73,6 +74,9 @@ import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.Error
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.Loading
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.SubcategoriesList
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.PreviewStudySession
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
@@ -222,7 +226,7 @@ fun CategoryDetailsContent(
                         )
                     },
                 )
-                val subcategories = state.content as? CategoryDetailsContentState.Subcategories
+                val subcategories = state.content as? SubcategoriesList
                 if (subcategories != null) {
                     FlashcardsOverlineLabel(text = categoryDetailsOverline(state, subcategories.subcategories.size))
                 }
@@ -245,9 +249,21 @@ fun CategoryDetailsContent(
             contentAlignment = Alignment.Center,
         ) {
             when (val content = state.content) {
-                CategoryDetailsContentState.Loading -> CircularProgressIndicator()
-
-                is CategoryDetailsContentState.Error -> FlashcardsEmptyState(
+                Loading -> CircularProgressIndicator()
+                is SubcategoriesList -> SubcategoryList(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    listState = listState,
+                    subcategories = content.subcategories,
+                    isSelectionMode = state.isSelectionMode,
+                    selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
+                    favorites = state.favorites,
+                    progressFor = state::progressFor,
+                    onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
+                    onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
+                    onSubcategoryLongPress = onSubcategoryLongPress,
+                    onSubcategorySelectionChange = onSubcategorySelectionChange,
+                )
+                is Error -> FlashcardsEmptyState(
                     icon = Icons.Filled.ErrorOutline,
                     title = stringResource(CoreUiR.string.common_load_error_title),
                     supportingText = stringResource(content.messageRes),
@@ -258,19 +274,6 @@ fun CategoryDetailsContent(
                             onClick = onRetry,
                         )
                     },
-                )
-
-                is CategoryDetailsContentState.Subcategories -> SubcategoryList(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    listState = listState,
-                    subcategories = content.subcategories,
-                    isSelectionMode = state.isSelectionMode,
-                    selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
-                    progressFor = state::progressFor,
-                    onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-                    onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
-                    onSubcategoryLongPress = onSubcategoryLongPress,
-                    onSubcategorySelectionChange = onSubcategorySelectionChange,
                 )
             }
         }
@@ -331,7 +334,7 @@ private fun CategoryDetailsBottomBar(
     onQuickSessionStart: () -> Unit,
     onCustomSessionStart: () -> Unit,
 ) {
-    val hasSubcategories = state.content is CategoryDetailsContentState.Subcategories
+    val hasSubcategories = state.content is SubcategoriesList
     FlashcardsBottomToolbar(
         modifier = modifier,
         actions = {
@@ -445,6 +448,7 @@ private fun SubcategoryList(
     subcategories: List<Subcategory>,
     isSelectionMode: Boolean,
     selectedSubcategoryIds: Set<String>,
+    favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgress,
     onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
     onNavigateToPreviewStudySession: (Subcategory) -> Unit,
@@ -467,6 +471,7 @@ private fun SubcategoryList(
                 subcategory.toListGroupItem(
                     isSelectionMode = isSelectionMode,
                     isSelected = subcategory.id in selectedSubcategoryIds,
+                    isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
                     progress = progress,
                     playContentDescription = resources.getString(R.string.category_details_topic_play_cd, subcategory.name),
                     ringContentDescription = progress.ringContentDescription(resources, subcategory.cardCount),
@@ -535,6 +540,7 @@ private fun Resolved.studiedFraction(cardCount: Int): Float =
 private fun Subcategory.toListGroupItem(
     isSelectionMode: Boolean,
     isSelected: Boolean,
+    isFavorited: Boolean,
     progress: SubcategoryProgress,
     playContentDescription: String,
     ringContentDescription: String,
@@ -564,6 +570,7 @@ private fun Subcategory.toListGroupItem(
             subtitleContent = subtitle,
             selected = isSelected,
             onSelectedChange = { selected -> onSelectedChange(subcategory.id, selected) },
+            isFavorited = isFavorited,
             leading = ring,
         )
     } else {
@@ -575,6 +582,7 @@ private fun Subcategory.toListGroupItem(
                 onNavigateToSubcategoryDetails(subcategory.categoryId, subcategory.categoryName, subcategory.id, subcategory.name)
             },
             onLongClick = { onLongPress(subcategory.id) },
+            isFavorited = isFavorited,
             leading = ring,
             trailing = {
                 Row(

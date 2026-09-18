@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesParams
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +29,7 @@ class BrowseViewModel @Inject constructor(
     private val getCategories: GetCategoriesUseCase,
     private val searchCategories: SearchCategoriesUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
+    private val observeUserFavorites: ObserveUserFavoritesUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BrowseScreenState())
@@ -40,6 +42,7 @@ class BrowseViewModel @Inject constructor(
         loadCategories()
         observeSearchQuery()
         collectProgressSummary()
+        observeFavorites()
     }
 
     fun onCategoriesRefresh() {
@@ -217,6 +220,21 @@ class BrowseViewModel @Inject constructor(
         viewModelScope.launch {
             observeProgressSummary().collect { summary ->
                 _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+            }
+        }
+    }
+
+    /**
+     * Badges list rows reactively — the list itself never waits on this to render, same rule as
+     * [collectProgressSummary]. [ObserveUserFavoritesUseCase] is backed by the same kind of live
+     * Firestore listener as [ObserveProgressSummaryUseCase], with the same reconnect-after-drop
+     * behavior, so search results that only came back because connectivity returned still get their
+     * bookmark badges filled in, with no extra wiring here.
+     */
+    private fun observeFavorites() {
+        viewModelScope.launch {
+            observeUserFavorites().collect { favorites ->
+                _state.update { it.copy(favorites = favorites) }
             }
         }
     }
