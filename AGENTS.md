@@ -181,6 +181,7 @@ StateFlow / SharedFlow rules:
 - `SharedFlow` for transient one-time events such as snackbars and toasts
 - **Navigation is a one-time event, not state**: dispatch it through a `Channel<XxxDestination>(Channel.BUFFERED)` exposed via `receiveAsFlow()` and collect it once in the UI with `ObserveAsEvents(viewModel.events) { … }` (`core:ui`). Destinations stay type-safe sealed interfaces implementing `NavigationEvent` (no route strings). Never put navigation in persistent screen state; there is no `onNavigationHandled()` reset. See [docs/navigation-pattern.md](./docs/navigation-pattern.md) and [ADR-0019](./docs/adr/0019-navigation-as-one-time-events.md).
 - Handle errors with `.catch()` operator on upstream flows
+- Delays use `Duration`, not raw `Long` ms: `delay(NO_SPEECH_TIMEOUT_MS.milliseconds)`, never bare millis.
 
 ## Data Layer Standards
 
