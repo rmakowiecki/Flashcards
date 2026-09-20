@@ -1,5 +1,16 @@
 package com.rossomak.flashcards.feature.onboarding
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -17,17 +28,26 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
@@ -49,6 +69,7 @@ import com.rossomak.flashcards.feature.onboarding.step.SessionModesStep
 import com.rossomak.flashcards.feature.onboarding.step.StructureStep
 import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -70,6 +91,9 @@ private data class OnboardingActions(
     val onFavoriteSubcategoryToggle: (String) -> Unit,
     val onFavoritesStepEntered: () -> Unit,
     val onFavoriteSubcategoriesRetry: () -> Unit,
+    val onVoiceDemoStart: () -> Unit,
+    val onVoiceDemoPlay: () -> Unit,
+    val onVoiceDemoStop: () -> Unit,
     val onFinish: () -> Unit,
 )
 
@@ -99,6 +123,9 @@ fun OnboardingScreen(
             onFavoriteSubcategoryToggle = viewModel::onFavoriteSubcategoryToggle,
             onFavoritesStepEntered = viewModel::onFavoritesStepEntered,
             onFavoriteSubcategoriesRetry = viewModel::onFavoriteSubcategoriesRetry,
+            onVoiceDemoStart = viewModel::onVoiceDemoStart,
+            onVoiceDemoPlay = viewModel::onVoiceDemoPlay,
+            onVoiceDemoStop = viewModel::onVoiceDemoStop,
             onFinish = viewModel::onFinish,
         ),
     )
@@ -129,6 +156,22 @@ private fun OnboardingContent(
         if (currentStep == OnboardingStep.Favorites) {
             actions.onFavoritesStepEntered()
         }
+        // Hard-stops the voice demo the moment a swipe carries the pager off this step — leaving it
+        // running unattended on another step is the one thing the design explicitly rules out.
+        if (currentStep != OnboardingStep.VoicePrivacy) {
+            actions.onVoiceDemoStop()
+        }
+    }
+
+    // Same hard stop for the app leaving the foreground (recents, lock screen, backgrounding) while
+    // still parked on the VoicePrivacy step — the mic must not keep listening once the screen isn't.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) actions.onVoiceDemoStop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // The entrance runs once per visit to the flow, staged behind the logo the splash screen hands
@@ -297,10 +340,11 @@ private fun OnboardingStepPage(
             onIncrement = actions.onDailyGoalIncrement,
             modifier = modifier,
         )
-        OnboardingStep.VoicePrivacy -> VoicePrivacyStep(
-            // TODO(voice): wire to the real capture + on-device obfuscation preview. Tapping does
-            //  nothing today so this release ships no RECORD_AUDIO prompt during onboarding.
-            onTestVoice = {},
+        OnboardingStep.VoicePrivacy -> VoicePrivacyStepRoute(
+            voiceDemoState = state.voiceDemoState,
+            onTestVoice = actions.onVoiceDemoStart,
+            onPlay = actions.onVoiceDemoPlay,
+            onVoiceDemoStop = actions.onVoiceDemoStop,
             modifier = modifier,
         )
         OnboardingStep.Favorites -> FavoritesStep(
@@ -322,6 +366,89 @@ private fun OnboardingStepPage(
     }
 }
 
+/**
+ * Owns the RECORD_AUDIO check/request for the voice demo — the ViewModel and its voice gateway
+ * assume the permission is already granted (docs/temp/to-grill/mic-permission-check-platform-layer.md).
+ * [onTestVoice] doubles as Retry: both a first tap and a retry start a fresh listening attempt.
+ */
+@Composable
+private fun VoicePrivacyStepRoute(
+    voiceDemoState: VoiceDemoState,
+    onTestVoice: () -> Unit,
+    onPlay: () -> Unit,
+    onVoiceDemoStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var permissionDenied by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // shouldShowRequestPermissionRationale is false both before the first-ever request and
+        // after a "don't ask again" denial; checking it right after this callback (rather than
+        // before launch()) disambiguates: a standard denial still returns true here.
+        val canAskAgain = granted ||
+            ActivityCompat.shouldShowRequestPermissionRationale(
+                context.findActivity(),
+                Manifest.permission.RECORD_AUDIO,
+            )
+        permissionDenied = !granted && !canAskAgain
+        if (granted) onTestVoice()
+    }
+
+    // Catches the case the launcher callback above can't: user denies, leaves to the system
+    // Settings app, grants it there, and comes back. That round-trip never fires the launcher
+    // callback, so only a resume-time recheck notices the permission actually changed.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val latestPermissionDenied by rememberUpdatedState(permissionDenied)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val isGranted = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.RECORD_AUDIO,
+                ) == PackageManager.PERMISSION_GRANTED
+                val wasDenied = latestPermissionDenied
+                permissionDenied = !isGranted
+                if (isGranted && wasDenied) onVoiceDemoStop()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    VoicePrivacyStep(
+        voiceDemoState = voiceDemoState,
+        permissionDenied = permissionDenied,
+        onTestVoice = {
+            val isGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (isGranted) {
+                permissionDenied = false
+                onTestVoice()
+            } else {
+                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        },
+        onPlay = onPlay,
+        onOpenSettings = {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+            context.startActivity(intent)
+        },
+        modifier = modifier,
+    )
+}
+
+private tailrec fun Context.findActivity(): Activity = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> error("Permission rationale check requires an Activity context")
+}
+
 @Preview(showBackground = true, widthDp = 400, heightDp = 860)
 @Composable
 private fun OnboardingContentPreview() {
@@ -335,6 +462,9 @@ private fun OnboardingContentPreview() {
                 onFavoriteSubcategoryToggle = {},
                 onFavoritesStepEntered = {},
                 onFavoriteSubcategoriesRetry = {},
+                onVoiceDemoStart = {},
+                onVoiceDemoPlay = {},
+                onVoiceDemoStop = {},
                 onFinish = {},
             ),
         )

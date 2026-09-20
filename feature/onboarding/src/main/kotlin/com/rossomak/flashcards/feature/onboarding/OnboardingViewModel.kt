@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseC
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -32,6 +33,7 @@ class OnboardingViewModel @Inject constructor(
     private val getOnboardingSubcategories: GetOnboardingSubcategoriesUseCase,
     private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
     private val signInAnonymously: SignInAnonymouslyUseCase,
+    private val voiceDemoGateway: VoiceDemoGateway,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingScreenState())
@@ -46,6 +48,29 @@ class OnboardingViewModel @Inject constructor(
             val userName = authUser?.displayName?.takeIf { it.isNotBlank() } ?: authUser?.email
             _state.update { it.copy(userName = userName) }
         }
+        viewModelScope.launch {
+            voiceDemoGateway.state.collect { voiceDemoState ->
+                _state.update { it.copy(voiceDemoState = voiceDemoState) }
+            }
+        }
+    }
+
+    /** Called by the screen once RECORD_AUDIO is confirmed granted — tap-to-start and Retry both route here. */
+    fun onVoiceDemoStart() {
+        voiceDemoGateway.start()
+    }
+
+    fun onVoiceDemoPlay() {
+        voiceDemoGateway.play()
+    }
+
+    /** Hard-stops the demo: pager navigation away from the step, or the app backgrounding. */
+    fun onVoiceDemoStop() {
+        voiceDemoGateway.stop()
+    }
+
+    override fun onCleared() {
+        voiceDemoGateway.stop()
     }
 
     fun onStudyModeSelect(studyMode: StudyMode) {
