@@ -2,7 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CyclomaticComplexMethod:VoiceCaptureEngine.kt$VoiceCaptureEngine$private suspend fun captureFrames( audioRecord: AudioRecord, isRouteChangePending: () -&gt; Boolean, ): CaptureResult</ID>
     <ID>MagicNumber:PitchShiftVoiceObfuscator.kt$PitchShiftVoiceObfuscator$0.5</ID>
     <ID>MagicNumber:VoiceCaptureEngine.kt$VoiceCaptureEngine$1000</ID>
     <ID>MagicNumber:VoiceCaptureEngine.kt$VoiceCaptureEngine$1000L</ID>
@@ -10,9 +9,7 @@
     <ID>MagicNumber:WavEncoder.kt$WavEncoder$16</ID>
     <ID>MagicNumber:WavEncoder.kt$WavEncoder$8</ID>
     <ID>NestedBlockDepth:OnnxSileroVadSession.kt$OnnxSileroVadSession$override fun run(window: FloatArray): Float</ID>
-    <ID>NestedBlockDepth:VoiceCaptureEngine.kt$VoiceCaptureEngine$@RequiresPermission(android.Manifest.permission.RECORD_AUDIO) private suspend fun runCaptureLoop()</ID>
-    <ID>NestedBlockDepth:VoiceCaptureEngine.kt$VoiceCaptureEngine$private suspend fun captureFrames( audioRecord: AudioRecord, isRouteChangePending: () -&gt; Boolean, ): CaptureResult</ID>
     <ID>TooGenericExceptionCaught:VoiceCaptureEngine.kt$VoiceCaptureEngine$exception: Exception</ID>
-    <ID>UnusedPrivateProperty:VoiceCaptureEngine.kt$VoiceCaptureEngine$@ApplicationContext private val context: Context</ID>
+    <ID>UnusedPrivateProperty:VoiceCaptureEngine.kt$VoiceCaptureEngine$@param:ApplicationContext private val context: Context</ID>
   </CurrentIssues>
 </SmellBaseline>
