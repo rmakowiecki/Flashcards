@@ -41,6 +41,12 @@ import com.rossomak.flashcards.feature.onboarding.component.OnboardingContentCol
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
 import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Failed
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Idle
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Listening
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Playing
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Ready
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.SpeechDetected
 
 /**
  * Introduces Voice Answering and the on-device privacy transform.
@@ -125,7 +131,9 @@ private fun VoiceTestCard(
         VOICE_TEST_CARD_BODY_HEIGHT +
         MaterialTheme.spacing.normal * 2
     Surface(
-        modifier = modifier.fillMaxWidth().height(cardHeight),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(cardHeight),
         shape = RoundedCornerShape(MaterialTheme.cornerRadius.card),
         color = MaterialTheme.colorScheme.surface,
     ) {
@@ -168,7 +176,7 @@ private fun MicBadge(voiceDemoState: VoiceDemoState, modifier: Modifier = Modifi
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            if (voiceDemoState is VoiceDemoState.Listening || voiceDemoState is VoiceDemoState.SpeechDetected) {
+            if (voiceDemoState is Listening || voiceDemoState is SpeechDetected) {
                 CircularProgressIndicator(modifier = Modifier.size(MaterialTheme.sizes.metadataBadgeIcon))
             } else {
                 Icon(imageVector = Icons.Default.Mic, contentDescription = null)
@@ -186,8 +194,8 @@ private fun VoiceTestCardBody(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when {
-        permissionDenied -> Column(
+    if (permissionDenied) {
+        Column(
             modifier = modifier,
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
@@ -204,44 +212,38 @@ private fun VoiceTestCardBody(
                 onClick = onOpenSettings,
             )
         }
-
-        else -> when (voiceDemoState) {
-            is VoiceDemoState.Idle -> VoiceTestHint(
-                text = stringResource(R.string.voice_privacy_try_hint),
-                buttonText = stringResource(R.string.voice_privacy_test_button),
+    } else when (voiceDemoState) {
+        is Idle -> VoiceTestHint(
+            text = stringResource(R.string.voice_privacy_try_hint),
+            buttonText = stringResource(R.string.voice_privacy_test_button),
+            onClick = onTestVoice,
+        )
+        is Listening -> VoiceTestStatus(
+            text = stringResource(R.string.voice_privacy_listening_hint),
+        )
+        is SpeechDetected -> VoiceTestStatus(
+            text = stringResource(R.string.voice_privacy_speech_detected_hint),
+        )
+        is Ready, is Playing -> Row(
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+        ) {
+            FlashcardsFilledButton(
+                text = stringResource(R.string.voice_privacy_play_button),
+                onClick = onPlay,
+                icon = Icons.Default.PlayArrow,
+                enabled = voiceDemoState !is Playing,
+            )
+            FlashcardsTextButton(
+                text = stringResource(R.string.voice_privacy_retry_button),
                 onClick = onTestVoice,
-            )
-
-            is VoiceDemoState.Listening -> VoiceTestStatus(
-                text = stringResource(R.string.voice_privacy_listening_hint),
-            )
-
-            is VoiceDemoState.SpeechDetected -> VoiceTestStatus(
-                text = stringResource(R.string.voice_privacy_speech_detected_hint),
-            )
-
-            is VoiceDemoState.Ready, is VoiceDemoState.Playing -> Row(
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
-            ) {
-                FlashcardsFilledButton(
-                    text = stringResource(R.string.voice_privacy_play_button),
-                    onClick = onPlay,
-                    icon = Icons.Default.PlayArrow,
-                    enabled = voiceDemoState !is VoiceDemoState.Playing,
-                )
-                FlashcardsTextButton(
-                    text = stringResource(R.string.voice_privacy_retry_button),
-                    onClick = onTestVoice,
-                    icon = Icons.Default.Replay,
-                )
-            }
-
-            is VoiceDemoState.Failed -> VoiceTestHint(
-                text = stringResource(R.string.voice_privacy_capture_failed_message),
-                buttonText = stringResource(R.string.voice_privacy_retry_button),
-                onClick = onTestVoice,
+                icon = Icons.Default.Replay,
             )
         }
+        is Failed -> VoiceTestHint(
+            text = stringResource(R.string.voice_privacy_capture_failed_message),
+            buttonText = stringResource(R.string.voice_privacy_retry_button),
+            onClick = onTestVoice,
+        )
     }
 }
 
