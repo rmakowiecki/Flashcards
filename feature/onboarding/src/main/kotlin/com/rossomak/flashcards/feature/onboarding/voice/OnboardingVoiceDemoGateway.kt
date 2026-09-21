@@ -10,6 +10,8 @@ import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechEnded
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechStarted
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.UtteranceCaptured
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,8 +21,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Onboarding's only consumer of core:voice concretes — see [VoiceDemoGateway]. Unlike the study

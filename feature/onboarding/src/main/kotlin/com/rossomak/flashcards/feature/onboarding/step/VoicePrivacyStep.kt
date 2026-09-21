@@ -212,38 +212,40 @@ private fun VoiceTestCardBody(
                 onClick = onOpenSettings,
             )
         }
-    } else when (voiceDemoState) {
-        is Idle -> VoiceTestHint(
-            text = stringResource(R.string.voice_privacy_try_hint),
-            buttonText = stringResource(R.string.voice_privacy_test_button),
-            onClick = onTestVoice,
-        )
-        is Listening -> VoiceTestStatus(
-            text = stringResource(R.string.voice_privacy_listening_hint),
-        )
-        is SpeechDetected -> VoiceTestStatus(
-            text = stringResource(R.string.voice_privacy_speech_detected_hint),
-        )
-        is Ready, is Playing -> Row(
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
-        ) {
-            FlashcardsFilledButton(
-                text = stringResource(R.string.voice_privacy_play_button),
-                onClick = onPlay,
-                icon = Icons.Default.PlayArrow,
-                enabled = voiceDemoState !is Playing,
-            )
-            FlashcardsTextButton(
-                text = stringResource(R.string.voice_privacy_retry_button),
+    } else {
+        when (voiceDemoState) {
+            is Idle -> VoiceTestHint(
+                text = stringResource(R.string.voice_privacy_try_hint),
+                buttonText = stringResource(R.string.voice_privacy_test_button),
                 onClick = onTestVoice,
-                icon = Icons.Default.Replay,
+            )
+            is Listening -> VoiceTestStatus(
+                text = stringResource(R.string.voice_privacy_listening_hint),
+            )
+            is SpeechDetected -> VoiceTestStatus(
+                text = stringResource(R.string.voice_privacy_speech_detected_hint),
+            )
+            is Ready, is Playing -> Row(
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+            ) {
+                FlashcardsFilledButton(
+                    text = stringResource(R.string.voice_privacy_play_button),
+                    onClick = onPlay,
+                    icon = Icons.Default.PlayArrow,
+                    enabled = voiceDemoState !is Playing,
+                )
+                FlashcardsTextButton(
+                    text = stringResource(R.string.voice_privacy_retry_button),
+                    onClick = onTestVoice,
+                    icon = Icons.Default.Replay,
+                )
+            }
+            is Failed -> VoiceTestHint(
+                text = stringResource(R.string.voice_privacy_capture_failed_message),
+                buttonText = stringResource(R.string.voice_privacy_retry_button),
+                onClick = onTestVoice,
             )
         }
-        is Failed -> VoiceTestHint(
-            text = stringResource(R.string.voice_privacy_capture_failed_message),
-            buttonText = stringResource(R.string.voice_privacy_retry_button),
-            onClick = onTestVoice,
-        )
     }
 }
 

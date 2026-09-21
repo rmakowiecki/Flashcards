@@ -10,6 +10,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,8 +26,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 /** A single VAD-bounded utterance. Only obfuscated audio ever leaves the engine in this form. */
 data class CapturedUtterance(
@@ -165,35 +165,7 @@ class VoiceCaptureEngine @Inject constructor(
                     return
                 }
                 routeChangePending.set(false)
-                val audioRecord = createAudioRecord(route) ?: run {
-                    _events.emit(VoiceCaptureEvent.CaptureFailed("AudioRecord initialization failed"))
-                    return
-                }
-                val captureResult = try {
-                    audioRecord.startRecording()
-                    if (!isRouteHonored(audioRecord, route)) {
-                        _events.emit(VoiceCaptureEvent.CaptureFailed("Capture not routed to Bluetooth microphone"))
-                        CaptureResult.Failed
-                    } else {
-                        warmUpBluetoothRoute(audioRecord, route)
-                        captureFrames(audioRecord, maxUtteranceFrames) { routeChangePending.get() }
-                    }
-                } catch (exception: SecurityException) {
-                    _events.emit(VoiceCaptureEvent.CaptureFailed("Microphone permission missing: ${exception.message}"))
-                    CaptureResult.Failed
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (exception: Exception) {
-                    // VAD inference or AudioRecord failures used to kill the loop silently, leaving
-                    // the UI stuck on "silence". Surface them so they show up in the debug event log.
-                    android.util.Log.e(TAG, "capture loop error", exception)
-                    _events.emit(VoiceCaptureEvent.CaptureFailed("Capture loop error: ${exception.message}"))
-                    CaptureResult.Failed
-                } finally {
-                    runCatching { audioRecord.stop() }
-                    audioRecord.release()
-                }
-                when (captureResult) {
+                when (attemptCapture(route, maxUtteranceFrames, routeChangePending)) {
                     CaptureResult.Stopped, CaptureResult.Failed -> return
                     CaptureResult.RouteChanged -> Unit // loop and rebuild AudioRecord on the new route
                 }
@@ -203,6 +175,42 @@ class VoiceCaptureEngine @Inject constructor(
             _isListening.value = false
             _isSpeechDetected.value = false
             _actualMicDevice.value = null
+        }
+    }
+
+    @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
+    private suspend fun attemptCapture(
+        route: CaptureRoute,
+        maxUtteranceFrames: Int,
+        routeChangePending: AtomicBoolean,
+    ): CaptureResult {
+        val audioRecord = createAudioRecord(route) ?: run {
+            _events.emit(VoiceCaptureEvent.CaptureFailed("AudioRecord initialization failed"))
+            return CaptureResult.Failed
+        }
+        return try {
+            audioRecord.startRecording()
+            if (!isRouteHonored(audioRecord, route)) {
+                _events.emit(VoiceCaptureEvent.CaptureFailed("Capture not routed to Bluetooth microphone"))
+                CaptureResult.Failed
+            } else {
+                warmUpBluetoothRoute(audioRecord, route)
+                captureFrames(audioRecord, maxUtteranceFrames) { routeChangePending.get() }
+            }
+        } catch (exception: SecurityException) {
+            _events.emit(VoiceCaptureEvent.CaptureFailed("Microphone permission missing: ${exception.message}"))
+            CaptureResult.Failed
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (exception: Exception) {
+            // VAD inference or AudioRecord failures used to kill the loop silently, leaving
+            // the UI stuck on "silence". Surface them so they show up in the debug event log.
+            android.util.Log.e(TAG, "capture loop error", exception)
+            _events.emit(VoiceCaptureEvent.CaptureFailed("Capture loop error: ${exception.message}"))
+            CaptureResult.Failed
+        } finally {
+            runCatching { audioRecord.stop() }
+            audioRecord.release()
         }
     }
 
@@ -218,66 +226,97 @@ class VoiceCaptureEngine @Inject constructor(
         isRouteChangePending: () -> Boolean,
     ): CaptureResult {
         val frame = ShortArray(FRAME_SIZE_SAMPLES)
-        val preRoll = ArrayDeque<ShortArray>(PRE_ROLL_FRAMES)
-        val utterance = mutableListOf<ShortArray>()
-        var isInUtterance = false
-        var trailingSilenceFrames = 0
-        var speechFrameCount = 0
+        val state = UtteranceState()
         while (captureJob?.isActive == true) {
-            if (isRouteChangePending() && !isInUtterance) return CaptureResult.RouteChanged
+            if (isRouteChangePending() && !state.isInUtterance) return CaptureResult.RouteChanged
             val read = audioRecord.read(frame, 0, frame.size)
             if (read <= 0) continue
             updateActualMicDevice(audioRecord)
             if (read < frame.size) frame.fill(0, read, frame.size)
             val isSpeech = voiceActivityDetector.isSpeech(frame)
             _isSpeechDetected.value = isSpeech
-            when {
-                isSpeech && !isInUtterance -> {
-                    isInUtterance = true
-                    trailingSilenceFrames = 0
-                    speechFrameCount = 1
-                    utterance.clear()
-                    utterance.addAll(preRoll)
-                    preRoll.clear()
-                    utterance.add(frame.copyOf())
-                    _events.emit(VoiceCaptureEvent.SpeechStarted)
-                }
-                isInUtterance && isSpeech -> {
-                    utterance.add(frame.copyOf())
-                    speechFrameCount++
-                    trailingSilenceFrames = 0
-                }
-                isInUtterance -> {
-                    // Only pad a short context window (leading-in for the next burst, or
-                    // trailing-out for this one) into the buffer; frames beyond GAP_PAD_FRAMES
-                    // are neither appended nor obfuscated/uploaded — dead air between
-                    // thinking-pauses never leaves the device. trailingSilenceFrames still
-                    // counts every silent frame so the END_SILENCE_FRAMES hangover timing is
-                    // unaffected.
-                    trailingSilenceFrames++
-                    if (trailingSilenceFrames <= GAP_PAD_FRAMES) {
-                        utterance.add(frame.copyOf())
-                    }
-                    val utteranceEnded = trailingSilenceFrames >= END_SILENCE_FRAMES
-                    val utteranceTooLong = utterance.size >= maxUtteranceFrames
-                    if (utteranceEnded || utteranceTooLong) {
-                        isInUtterance = false
-                        _events.emit(VoiceCaptureEvent.SpeechEnded)
-                        finishUtterance(utterance, speechFrameCount)
-                        utterance.clear()
-                        trailingSilenceFrames = 0
-                        speechFrameCount = 0
-                        // Finished the in-flight utterance; now it's safe to switch devices.
-                        if (isRouteChangePending()) return CaptureResult.RouteChanged
-                    }
-                }
-                else -> {
-                    preRoll.addLast(frame.copyOf())
-                    if (preRoll.size > PRE_ROLL_FRAMES) preRoll.removeFirst()
-                }
-            }
+            val routeChangeRequested = processFrame(frame, isSpeech, state, maxUtteranceFrames, isRouteChangePending)
+            if (routeChangeRequested) return CaptureResult.RouteChanged
         }
         return CaptureResult.Stopped
+    }
+
+    /** Mutable per-utterance buffers, kept together so [captureFrames] passes a single state object around. */
+    private class UtteranceState {
+        val preRoll = ArrayDeque<ShortArray>(PRE_ROLL_FRAMES)
+        val frames = mutableListOf<ShortArray>()
+        var isInUtterance = false
+        var trailingSilenceFrames = 0
+        var speechFrameCount = 0
+    }
+
+    /** Returns true if a pending route change was honored and the caller should return [CaptureResult.RouteChanged]. */
+    private suspend fun processFrame(
+        frame: ShortArray,
+        isSpeech: Boolean,
+        state: UtteranceState,
+        maxUtteranceFrames: Int,
+        isRouteChangePending: () -> Boolean,
+    ): Boolean {
+        when {
+            isSpeech && !state.isInUtterance -> startUtterance(frame, state)
+            state.isInUtterance && isSpeech -> continueUtterance(frame, state)
+            state.isInUtterance -> return handleTrailingSilence(frame, state, maxUtteranceFrames, isRouteChangePending)
+            else -> bufferPreRoll(frame, state)
+        }
+        return false
+    }
+
+    private suspend fun startUtterance(frame: ShortArray, state: UtteranceState) {
+        state.isInUtterance = true
+        state.trailingSilenceFrames = 0
+        state.speechFrameCount = 1
+        state.frames.clear()
+        state.frames.addAll(state.preRoll)
+        state.preRoll.clear()
+        state.frames.add(frame.copyOf())
+        _events.emit(VoiceCaptureEvent.SpeechStarted)
+    }
+
+    private fun continueUtterance(frame: ShortArray, state: UtteranceState) {
+        state.frames.add(frame.copyOf())
+        state.speechFrameCount++
+        state.trailingSilenceFrames = 0
+    }
+
+    /**
+     * Only pads a short context window (leading-in for the next burst, or trailing-out for this
+     * one) into the buffer; frames beyond GAP_PAD_FRAMES are neither appended nor
+     * obfuscated/uploaded — dead air between thinking-pauses never leaves the device.
+     * trailingSilenceFrames still counts every silent frame so the END_SILENCE_FRAMES hangover
+     * timing is unaffected.
+     */
+    private suspend fun handleTrailingSilence(
+        frame: ShortArray,
+        state: UtteranceState,
+        maxUtteranceFrames: Int,
+        isRouteChangePending: () -> Boolean,
+    ): Boolean {
+        state.trailingSilenceFrames++
+        if (state.trailingSilenceFrames <= GAP_PAD_FRAMES) {
+            state.frames.add(frame.copyOf())
+        }
+        val utteranceEnded = state.trailingSilenceFrames >= END_SILENCE_FRAMES
+        val utteranceTooLong = state.frames.size >= maxUtteranceFrames
+        if (!utteranceEnded && !utteranceTooLong) return false
+        state.isInUtterance = false
+        _events.emit(VoiceCaptureEvent.SpeechEnded)
+        finishUtterance(state.frames, state.speechFrameCount)
+        state.frames.clear()
+        state.trailingSilenceFrames = 0
+        state.speechFrameCount = 0
+        // Finished the in-flight utterance; now it's safe to switch devices.
+        return isRouteChangePending()
+    }
+
+    private fun bufferPreRoll(frame: ShortArray, state: UtteranceState) {
+        state.preRoll.addLast(frame.copyOf())
+        if (state.preRoll.size > PRE_ROLL_FRAMES) state.preRoll.removeFirst()
     }
 
     private suspend fun finishUtterance(frames: List<ShortArray>, speechFrameCount: Int) {
