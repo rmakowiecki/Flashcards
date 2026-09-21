@@ -247,6 +247,8 @@ Commands (local only — CI wiring is a later PR):
 ```
 `staticAnalysis` is NOT wired into `check` (keeps test runs fast). Any NEW (non-baselined) finding fails it.
 
+Touched only one module? Run `./gradlew :module:path:staticAnalysis` (e.g. `./gradlew :feature:study:staticAnalysis`) instead of the root task — same checks, scoped to that module, faster than running every module's Spotless/detekt/Lint. Konsist still runs whole-repo every time (its cross-module layer rules can't be scoped to one module), so it's no slower there. Root `./gradlew staticAnalysis` stays the mandatory gate before considering work done or committing — the module-scoped task is for iteration, not a substitute for the full gate.
+
 Burning down a baseline: fix the smells, then regenerate with `./gradlew detektBaseline` / `./gradlew updateLintBaseline`; delete a baseline file once it reaches empty to fully enforce that module. Deferred to follow-up PRs: detekt type-resolution + Compose ruleset, arg-order → Konsist migration, lint rule tightening, CI.
 
 `LargeClass` is excluded repo-wide for `*Test.kt` (`config/detekt/detekt.yml`) — test classes may grow unbounded rather than being split by concern; a new finding there is never baselined, it's already excluded by config.
