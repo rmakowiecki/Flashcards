@@ -75,3 +75,16 @@ pluginManager.withPlugin("com.android.application") {
         lint { baseline = file("lint-baseline.xml") }
     }
 }
+
+// Per-module entry point, e.g. `./gradlew :feature:study:staticAnalysis` — faster than the root
+// aggregate when only one module changed. Konsist stays whole-repo (its cross-module layer rules
+// can't be scoped to one module), so it still runs every time; the speedup comes from skipping
+// every other module's Spotless/detekt/Lint.
+val moduleStaticAnalysis = tasks.register("staticAnalysis") {
+    group = "verification"
+    description = "Runs Spotless, detekt and (Android modules) Lint for this module, plus Konsist."
+    dependsOn("spotlessCheck", "detekt", ":konsist:test")
+}
+// Lint only exists on Android modules — pure-Kotlin modules (android-core-kotlin) have no such task.
+pluginManager.withPlugin("com.android.library") { moduleStaticAnalysis.configure { dependsOn("lint") } }
+pluginManager.withPlugin("com.android.application") { moduleStaticAnalysis.configure { dependsOn("lint") } }
