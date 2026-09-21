@@ -14,9 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Minimal on-device playback of raw PCM clips. Used by the debug Voice screen to audition
- * captured audio and the obfuscation A/B — not part of the production study-session flow
- * (card playback stays on the Media3 [TtsPlayer] stack).
+ * Minimal on-device playback of raw PCM clips: used by the debug Voice screen to audition captured
+ * audio and the obfuscation A/B, and by onboarding's voice demo to play back the obfuscated
+ * utterance. Card playback during study sessions stays on the separate Media3 [TtsPlayer] stack.
  */
 @Singleton
 class PcmPlayer @Inject constructor() {

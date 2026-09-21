@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 
 @UnstableApi
 class StudySessionVoiceGateway @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : VoiceGateway {
 
     private val _state = MutableStateFlow(VoicePlaybackState())

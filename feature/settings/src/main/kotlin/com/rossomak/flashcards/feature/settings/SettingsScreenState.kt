@@ -37,6 +37,9 @@ data class SettingsScreenState(
     val availableVoices: List<VoiceOption> = emptyList(),
     val isSigningOut: Boolean = false,
     val activeDialog: SettingsDialog? = null,
+    // Deferred: one-shot snackbar trigger held as screen state — violates AGENTS.md's SharedFlow-
+    // for-transient-events rule (see CategoryDetailsMessage for the correct shape). Migrate to a
+    // SharedFlow<SettingsMessage>.
     val saveError: String? = null,
 ) {
 

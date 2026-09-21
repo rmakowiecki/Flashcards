@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.onboarding
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
@@ -24,6 +25,7 @@ data class OnboardingScreenState(
     val favoriteSubcategoriesLoadingFailed: Boolean = false,
     val selectedFavoriteSubcategoriesIds: ImmutableSet<String> = persistentSetOf(),
     val isCommitting: Boolean = false,
+    val voiceDemoState: VoiceDemoState = VoiceDemoState.Idle,
 ) {
     val canDecrementDailyGoal: Boolean
         get() = dailyGoalMinutes > DailyGoal.MIN_MINUTES
