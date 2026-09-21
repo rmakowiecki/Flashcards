@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
@@ -435,7 +436,7 @@ private fun ScopeHeroBody(
                         state.subcategoryCount,
                         state.subcategoryCount,
                     ),
-                    icon = Icons.Default.List,
+                    icon = Icons.AutoMirrored.Filled.List,
                     style = OnGradient,
                     onClick = {
                         // Quick's subcategory count is the SubcategoryCountRange setting; Custom's

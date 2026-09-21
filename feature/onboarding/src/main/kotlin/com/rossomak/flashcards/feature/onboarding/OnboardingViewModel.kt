@@ -10,6 +10,9 @@ import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseC
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -17,8 +20,11 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -32,6 +38,7 @@ class OnboardingViewModel @Inject constructor(
     private val getOnboardingSubcategories: GetOnboardingSubcategoriesUseCase,
     private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
     private val signInAnonymously: SignInAnonymouslyUseCase,
+    private val voiceDemoGateway: VoiceDemoGateway,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingScreenState())
@@ -40,12 +47,43 @@ class OnboardingViewModel @Inject constructor(
     private val eventChannel = Channel<OnboardingDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
+    private val _voiceDemoFailureMessages = MutableSharedFlow<VoiceDemoFailureReason>(extraBufferCapacity = 1)
+
+    val voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason> = _voiceDemoFailureMessages.asSharedFlow()
+
     init {
         viewModelScope.launch {
             val authUser = getCurrentAuthUser()
             val userName = authUser?.displayName?.takeIf { it.isNotBlank() } ?: authUser?.email
             _state.update { it.copy(userName = userName) }
         }
+        viewModelScope.launch {
+            voiceDemoGateway.state.collect { voiceDemoState ->
+                _state.update { it.copy(voiceDemoState = voiceDemoState) }
+                if (voiceDemoState is VoiceDemoState.Failed) {
+                    _voiceDemoFailureMessages.tryEmit(voiceDemoState.reason)
+                }
+            }
+        }
+    }
+
+    /** Called by the screen once RECORD_AUDIO is confirmed granted — tap-to-start and Retry both route here. */
+    fun onVoiceDemoStart() {
+        voiceDemoGateway.start()
+    }
+
+    fun onVoiceDemoPlay() {
+        voiceDemoGateway.play()
+    }
+
+    /** Hard-stops the demo: pager navigation away from the step, or the app backgrounding. */
+    fun onVoiceDemoStop() {
+        voiceDemoGateway.stop()
+    }
+
+    override fun onCleared() {
+        voiceDemoGateway.stop()
+        voiceDemoGateway.release()
     }
 
     fun onStudyModeSelect(studyMode: StudyMode) {

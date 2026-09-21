@@ -86,11 +86,14 @@ Naming/ownership rules for `strings.xml` — full rationale in [ADR-0023](./docs
 - Role suffix is one of a closed set: `_label`, `_button`, `_title`, `_hint`, `_error`, `_message`, `_cd`.
 - Shared strings live in `:core:ui` prefixed `common_` (e.g. `common_done_button`) — promote a string there only once a 2nd module needs it verbatim; don't pre-seed a common list.
 - `HardcodedText` lint is `error` in the convention plugins — new hardcoded UI strings fail the build. Existing hardcoded strings migrate incrementally as their screen is touched.
+- **Domain/gateway layers never hardcode UI-facing strings.** A ViewModel, gateway, use case, or repository that can fail in a way the UI surfaces must model the failure as a sealed type (e.g. `XxxFailureReason`), not a `String` reason/message. Resolving a variant to a string resource happens at the presentation boundary (ViewModel or Composable) — and only for variants actually rendered; an unused variant needs no string yet.
 
 ### Sealed Classes for States
 Use sealed classes for finite UI states (e.g. loading / content / error variants of a screen state).
 
 For fallible operations, return `kotlin.Result<T>` and consume with `.onSuccess { ... }` / `.onFailure { ... }`. Do not define a project-local `Result` type — it would shadow the stdlib one.
+
+**Statically import sealed variants used in an exhaustive `when`.** `import com.example.VoiceDemoFailureReason.RouteUnavailable` (and its sibling variants) so branches read `RouteUnavailable ->` / `is CaptureError ->`, not `VoiceDemoFailureReason.RouteUnavailable ->`. Cuts repetition without losing exhaustiveness-checking. Applies to any sealed class/interface `when`, not just UI state
 
 ### No ephemeral planning references in persistent text
 Never cite a `spec NN`/`ticket NN`/`docs/temp`/scratch-plan label in KDoc, code comments, commit messages, or any file that isn't itself the ephemeral plan doc. Those numbers/paths are session-local planning scaffolding — meaningless (or actively confusing) to a future reader, since the plan doc they point to is gitignored or long gone. Persistent docs (KDoc, ADRs, `CONTEXT.md`, `SYSTEMDESIGN.md`, README files) describe the *current, standalone* design — reference another persistent doc (an ADR, a class, a file) instead, or drop the citation and just explain the reasoning inline.
@@ -178,9 +181,10 @@ Dispatchers:
 
 StateFlow / SharedFlow rules:
 - `StateFlow` for UI state in ViewModels (single source of truth per screen)
-- `SharedFlow` for transient one-time events such as snackbars and toasts
+- **A one-shot snackbar/toast message is never screen state — not even as a nullable field nulled out after showing.** It's a transient event, same category as navigation. Shape: ViewModel owns `private val _messages = MutableSharedFlow<XxxMessage>(extraBufferCapacity = 1)` exposed as `val messages: SharedFlow<XxxMessage> = _messages.asSharedFlow()`, sent via `_messages.tryEmit(...)`; a sealed `XxxMessage` interface in its own file, doc'd "one-shot snackbar messages... never screen state"; the Composable consumes it with the same `observeAsEvents` helper navigation uses (`core:ui/navigation/ObserveAsEventsKt.kt` — it's generic over any `Flow<T>`, not nav-only) and calls `snackbarHostState.showSnackbar(...)` inside. See `CategoryDetailsViewModel`/`CategoryDetailsMessage` for the reference implementation.
 - **Navigation is a one-time event, not state**: dispatch it through a `Channel<XxxDestination>(Channel.BUFFERED)` exposed via `receiveAsFlow()` and collect it once in the UI with `ObserveAsEvents(viewModel.events) { … }` (`core:ui`). Destinations stay type-safe sealed interfaces implementing `NavigationEvent` (no route strings). Never put navigation in persistent screen state; there is no `onNavigationHandled()` reset. See [docs/navigation-pattern.md](./docs/navigation-pattern.md) and [ADR-0019](./docs/adr/0019-navigation-as-one-time-events.md).
 - Handle errors with `.catch()` operator on upstream flows
+- Delays use `Duration`, not raw `Long` ms: `delay(NO_SPEECH_TIMEOUT_MS.milliseconds)`, never bare millis.
 
 ## Data Layer Standards
 
@@ -260,7 +264,7 @@ See [TESTING.md](./TESTING.md) for full conventions: file/method naming, MainDis
 
 ### New worktrees
 
-Creating a new `git worktree` gives you a checkout without the gitignored local secrets (Firebase config, signing keystores, service-account JSONs) needed to build/run the app, and without the `graphify-out/` knowledge graph. You're allowed to run `scripts/copy-worktree-local-state.sh -f <path-to-worktree>` to bring both over from the current checkout — do this right after creating a worktree, without asking. Always pass `-f` so existing secret files in the target worktree are overwritten (keeps stale copies from lingering); `graphify-out/` is symlinked back to this checkout rather than copied, and the script refuses to touch it if the destination already has a real (non-symlinked) `graphify-out/` directory, `-f` or not. Do not open/read the secret files yourself; the script copies them by filename pattern only and never prints contents.
+Creating a new `git worktree` gives you a checkout without the gitignored local secrets (Firebase config, signing keystores, service-account JSONs) needed to build/run the app, and without the `graphify-out/` and `graft/` knowledge graphs. You're allowed to run `scripts/copy-worktree-local-state.sh -f <path-to-worktree>` to bring all of these over from the current checkout — do this right after creating a worktree, without asking. Always pass `-f` so existing secret files in the target worktree are overwritten (keeps stale copies from lingering); `graphify-out/` and `graft/` are each symlinked back to this checkout rather than copied, and the script refuses to touch either if the destination already has a real (non-symlinked) directory there, `-f` or not. Do not open/read the secret files yourself; the script copies them by filename pattern only and never prints contents.
 
 ## Project Documentation
 
@@ -269,3 +273,99 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 - `CONTEXT.md` — domain vocabulary glossary
 - `TESTING.md` — testing conventions
 - `docs/navigation-pattern.md` — state-based navigation pattern (why no SharedFlow)
+
+
+# Codebase Context Policy
+
+## Tool roles
+
+- Graft is the default code-context tool.
+  Use it for symbol lookup, file/API orientation, caller/callee tracing,
+  local dependency analysis, implementation planning, and narrow blast-radius checks.
+
+- Graphify is the architecture/product-context tool.
+  Use it for cross-module or cross-repository relationships; ADRs, specs,
+  READMEs, schemas, configuration, CI/CD, operational docs, rationale,
+  architectural paths, broad impact analysis, and exploratory investigation.
+
+## Retrieval discipline
+
+1. Start every implementation task with Graft.
+2. Retrieve the smallest useful context first. Do not load whole files,
+   module trees, or broad graph reports without a specific question.
+3. Use Graphify only when the task crosses a system boundary, needs
+   non-code context, asks for rationale/architecture, or remains ambiguous
+   after one focused Graft retrieval.
+4. After Graphify identifies the relevant subsystems and constraints,
+   return to Graft to retrieve exact files, symbols, APIs, callers,
+   and implementation paths.
+5. Do not query both tools by default or duplicate the same lookup in both.
+6. If Graphify and source code appear inconsistent, treat current source
+   and tests as authoritative; note the inconsistency and propose updating
+   the relevant documentation/graph.
+
+## Escalation triggers
+
+Use Graphify when any of these apply:
+- An ADR, spec, design document, schema, contract, config, or runbook matters.
+- The change spans multiple independently owned modules or repositories.
+- The task changes a public API, persisted data, external protocol,
+  security/privacy behavior, build pipeline, or deployment behavior.
+- The request asks why a design exists, not merely where to edit.
+- Graft cannot locate an owning subsystem or yields multiple plausible paths
+  after one focused `graft ask` — escalate on the first miss, don't reword
+  and retry Graft.
+- The task is architecture analysis, a migration, incident investigation,
+  broad PR review, or product-impact assessment.
+
+## Task modes
+
+### Scoped implementation
+Use Graft only unless an escalation trigger occurs.
+
+### Cross-cutting implementation
+Use Graft for the initial code map, Graphify for system constraints and
+impact paths, then Graft again for exact edits and tests.
+
+### Architecture exploration
+Use Graphify first; use Graft only after selecting a concrete code path.
+
+## Before editing
+
+State:
+- The task mode: scoped implementation, cross-cutting implementation,
+  or architecture exploration.
+- The tools used and why.
+- The likely modules/files affected.
+- Any assumptions, unknowns, or documentation/code conflicts.
+
+
+## Graft — repo context graph
+
+This repo is indexed in `graft/`: small linked markdown nodes that explain each
+system and carry exact file:line spans, kept in sync with the code through git.
+Command syntax (`ask`/`grep`/`skeleton`/`callers`/`map`) is injected into every
+session and subagent by this project's hooks — not repeated here to avoid
+paying for it twice. Browse `graft/INDEX.md` directly if the hook context
+isn't visible for some reason.
+
+After big code changes, refresh the graph with `graft build` (deterministic,
+no API key, $0).
+
+## Graphify — architecture/product context graph
+
+This repo also has a knowledge graph at `graphify-out/` (god nodes, community
+structure, cross-file relationships) — separate from `graft/`, scoped to the
+escalation triggers above, not a first stop for code lookups.
+
+- `graphify query "<question>"` → scoped subgraph, usually much smaller than
+  `GRAPH_REPORT.md` or raw grep output. Requires `graphify-out/graph.json`.
+- `graphify path "<A>" "<B>"` → relationship/dependency path between two
+  named things.
+- `graphify explain "<concept>"` → focused subgraph for one concept.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead
+  of raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review, or
+  when `query`/`path`/`explain` don't surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current
+  (AST-only, no API cost).

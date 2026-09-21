@@ -66,6 +66,17 @@
     <string name="voice_privacy_try_hint">Try it — say your answer out loud</string>
     <string name="voice_privacy_test_button">Test your voice</string>
     <string name="voice_privacy_banner_message">Your voice is always transformed on-device before rating. We never store or hear the real you.</string>
+    <string name="voice_privacy_listening_hint">Listening… speak now</string>
+    <string name="voice_privacy_speech_detected_hint">Got it — keep going.</string>
+    <string name="voice_privacy_ready_hint">Recorded — ready to play</string>
+    <string name="voice_privacy_playing_hint">Playing…</string>
+    <string name="voice_privacy_play_button">Play</string>
+    <string name="voice_privacy_retry_button">Retry</string>
+    <string name="voice_privacy_capture_failed_message">Something went wrong recording that. Try again.</string>
+    <string name="voice_privacy_route_unavailable_snackbar_message">Microphone route wasn\'t ready in time</string>
+    <string name="voice_privacy_permission_denied_message">Microphone access is off, so this preview can\'t record. Turn it on in Settings to try it.</string>
+    <string name="voice_privacy_open_settings_button">Open settings</string>
+    <string name="voice_privacy_listening_cd">Listening for your answer</string>
 
     <!-- 7 · Favorite topics -->
     <string name="favorites_eyebrow_label">Convenient bookmarks</string>

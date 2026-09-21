@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Copies/links gitignored local state -- secrets (local.properties,
 # google-services.json, service-account/cred JSONs, signing keystores) and
-# the graphify-out/ knowledge graph -- from this checkout into a freshly
-# created worktree, so the app builds there and graphify queries work
-# without re-fetching credentials or rebuilding the graph by hand.
+# the graphify-out/ and graft/ knowledge graphs -- from this checkout into a
+# freshly created worktree, so the app builds there and graft/graphify
+# queries work without re-fetching credentials or rebuilding either graph
+# by hand.
 #
 # Usage:
 #   scripts/copy-worktree-local-state.sh <path-to-worktree>
@@ -12,11 +13,15 @@
 # Never prints secret file contents -- only paths copied/skipped/linked. Safe
 # to run from an agent session; it does not require reading secret contents.
 #
-# graphify-out/ is symlinked (absolute path), not copied -- one shared graph
-# across all worktrees, kept current via `graphify update .` from whichever
-# worktree you're using. If the destination already has a real graphify-out/
-# directory (not a symlink), this refuses to touch it even with -f -- that's
-# 144M+ of that worktree's own graph state, not a copyable secret.
+# graphify-out/ and graft/ are symlinked (absolute path), not copied -- one
+# shared graph of each kind across all worktrees, kept current via
+# `graphify update .` / `graft build` from whichever worktree you're using.
+# graft/ may carry LLM-cost content if built with `graft build --deep`, not
+# just the deterministic $0 wiring graph, so it's worth sharing rather than
+# rebuilding per worktree, same as graphify-out/. If the destination already
+# has a real directory (not a
+# symlink) at either path, this refuses to touch it even with -f -- that's
+# that worktree's own graph state, not a copyable secret.
 
 set -euo pipefail
 
@@ -83,10 +88,11 @@ if [[ -f "$SRC/local.properties" ]]; then
   done
 fi
 
-# --- shared graphify knowledge graph (symlink, not copy) ---
-link_graphify() {
-  local src_dir="$SRC/graphify-out"
-  local dst_dir="$DST/graphify-out"
+# --- shared knowledge graphs (symlink, not copy) ---
+link_shared_dir() {
+  local name="$1"
+  local src_dir="$SRC/$name"
+  local dst_dir="$DST/$name"
   [[ -d "$src_dir" ]] || return 0
 
   if [[ -e "$dst_dir" || -L "$dst_dir" ]]; then
@@ -94,25 +100,26 @@ link_graphify() {
       local current_target
       current_target="$(readlink "$dst_dir")"
       if [[ "$current_target" == "$src_dir" ]]; then
-        echo "skip (already linked): graphify-out"
+        echo "skip (already linked): $name"
         return 0
       fi
       if [[ "$FORCE" -eq 1 ]]; then
         rm "$dst_dir"
         ln -s "$src_dir" "$dst_dir"
-        echo "relinked: graphify-out -> $src_dir"
+        echo "relinked: $name -> $src_dir"
         return 0
       fi
-      echo "skip (linked elsewhere, use -f to relink): graphify-out -> $current_target"
+      echo "skip (linked elsewhere, use -f to relink): $name -> $current_target"
       return 0
     fi
-    echo "refuse: graphify-out exists as a real directory at $dst_dir -- not touching it (even with -f). Resolve manually."
+    echo "refuse: $name exists as a real directory at $dst_dir -- not touching it (even with -f). Resolve manually."
     return 0
   fi
 
   ln -s "$src_dir" "$dst_dir"
-  echo "linked: graphify-out -> $src_dir"
+  echo "linked: $name -> $src_dir"
 }
-link_graphify
+link_shared_dir "graphify-out"
+link_shared_dir "graft"
 
 echo "done."
