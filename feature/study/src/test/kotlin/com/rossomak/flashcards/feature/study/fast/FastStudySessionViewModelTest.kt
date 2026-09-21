@@ -663,16 +663,17 @@ class FastStudySessionViewModelTest {
 
     @Test
     fun `observeVoiceState surfaces a voice error and clears active playback`() = runTest(mainDispatcherRule.testDispatcher) {
-        val voiceError = "playback failed"
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true, error = voiceError)
-        advanceUntilIdle()
+        viewModel.messages.test {
+            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true, error = "playback failed")
+            advanceUntilIdle()
 
-        viewModel.state.value.voiceError shouldBe voiceError
-        viewModel.state.value.isVoiceActive shouldBe false
-        viewModel.state.value.isVoicePlaying shouldBe false
+            awaitItem() shouldBe FastStudySessionMessage.VoicePlaybackUnavailable
+            viewModel.state.value.isVoiceActive shouldBe false
+            viewModel.state.value.isVoicePlaying shouldBe false
+        }
     }
 
     @Test
@@ -687,18 +688,6 @@ class FastStudySessionViewModelTest {
         viewModel.state.value.currentCardIndex shouldBe 2
         viewModel.state.value.isAnswerRevealed shouldBe true
         viewModel.state.value.isVoiceActive shouldBe true
-    }
-
-    @Test
-    fun `onVoiceErrorDismissed clears the voice error`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        voiceGateway.stateFlow.value = VoicePlaybackState(error = "boom")
-        advanceUntilIdle()
-
-        viewModel.onVoiceErrorDismissed()
-
-        viewModel.state.value.voiceError shouldBe null
     }
 
     @Test
@@ -823,6 +812,25 @@ class FastStudySessionViewModelTest {
             Triple("card-1", subcategoryId, setOf(CurationAction.Delete))
         )
         viewModel.state.value.activeDialog shouldBe null
+    }
+
+    @Test
+    fun `a failed curation report submission emits a message`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val curationRepository = FakeCurationRepository()
+        curationRepository.upsertResultToReturn = Result.failure(IllegalStateException("network error"))
+        val viewModel = createViewModel(curationRepository)
+        advanceUntilIdle()
+        viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+        val draft = viewModel.state.value.activeDialog as ReportCurrentCardProblem
+        viewModel.onDialogEvent(DraftChange(draft.withAction(CurationAction.Delete, isChecked = true)))
+
+        viewModel.messages.test {
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionMessage.CurationReportFailed
+        }
     }
 
     @Test
