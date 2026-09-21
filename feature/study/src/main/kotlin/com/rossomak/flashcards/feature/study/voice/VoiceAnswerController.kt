@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.voice
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.PowerManager
@@ -147,6 +148,10 @@ class VoiceAnswerController @Inject constructor(
     }
 
     /** Called once the shared TTS engine finishes reading the current card's question — opens the listening window. */
+    // startListening() below requires RECORD_AUDIO, but lint can't see that isEnabled only
+    // flips true after hasRecordAudioPermission() passes in start() — this path is unreachable
+    // without the permission granted.
+    @SuppressLint("MissingPermission")
     fun onQuestionFinishedSpeaking() {
         if (!_state.value.isEnabled) return
         // Clear the previous card's grade/error before opening this round's listening window —
