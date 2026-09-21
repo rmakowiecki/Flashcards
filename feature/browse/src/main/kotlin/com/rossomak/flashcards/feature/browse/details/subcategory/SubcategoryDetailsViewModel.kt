@@ -67,7 +67,6 @@ class SubcategoryDetailsViewModel @Inject constructor(
 
     private val _messages = MutableSharedFlow<SubcategoryDetailsMessage>(extraBufferCapacity = 1)
 
-    /** Transient one-shot messages for the snackbar. Never screen state. */
     val messages: SharedFlow<SubcategoryDetailsMessage> = _messages.asSharedFlow()
 
     /**

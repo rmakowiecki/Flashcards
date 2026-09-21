@@ -10,7 +10,6 @@ dependencies {
     testFixturesImplementation(libs.kotlinx.coroutines.test)
     // Feature modules get these from the android-feature convention plugin; core:domain is a plain
     // JVM module, so its own unit tests declare them here.
-    testImplementation(libs.junit)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.kotlinx.coroutines.test)
 }
