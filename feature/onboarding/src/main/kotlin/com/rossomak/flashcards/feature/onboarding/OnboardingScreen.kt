@@ -409,8 +409,10 @@ private fun VoicePrivacyStepRoute(
                     Manifest.permission.RECORD_AUDIO,
                 ) == PackageManager.PERMISSION_GRANTED
                 val wasDenied = latestPermissionDenied
-                permissionDenied = !isGranted
-                if (isGranted && wasDenied) onVoiceDemoStop()
+                if (wasDenied) {
+                    permissionDenied = !isGranted
+                    if (isGranted) onVoiceDemoStop()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
