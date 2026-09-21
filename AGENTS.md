@@ -86,11 +86,14 @@ Naming/ownership rules for `strings.xml` — full rationale in [ADR-0023](./docs
 - Role suffix is one of a closed set: `_label`, `_button`, `_title`, `_hint`, `_error`, `_message`, `_cd`.
 - Shared strings live in `:core:ui` prefixed `common_` (e.g. `common_done_button`) — promote a string there only once a 2nd module needs it verbatim; don't pre-seed a common list.
 - `HardcodedText` lint is `error` in the convention plugins — new hardcoded UI strings fail the build. Existing hardcoded strings migrate incrementally as their screen is touched.
+- **Domain/gateway layers never hardcode UI-facing strings.** A ViewModel, gateway, use case, or repository that can fail in a way the UI surfaces must model the failure as a sealed type (e.g. `XxxFailureReason`), not a `String` reason/message. Resolving a variant to a string resource happens at the presentation boundary (ViewModel or Composable) — and only for variants actually rendered; an unused variant needs no string yet.
 
 ### Sealed Classes for States
 Use sealed classes for finite UI states (e.g. loading / content / error variants of a screen state).
 
 For fallible operations, return `kotlin.Result<T>` and consume with `.onSuccess { ... }` / `.onFailure { ... }`. Do not define a project-local `Result` type — it would shadow the stdlib one.
+
+**Statically import sealed variants used in an exhaustive `when`.** `import com.example.VoiceDemoFailureReason.RouteUnavailable` (and its sibling variants) so branches read `RouteUnavailable ->` / `is CaptureError ->`, not `VoiceDemoFailureReason.RouteUnavailable ->`. Cuts repetition without losing exhaustiveness-checking. Applies to any sealed class/interface `when`, not just UI state
 
 ### No ephemeral planning references in persistent text
 Never cite a `spec NN`/`ticket NN`/`docs/temp`/scratch-plan label in KDoc, code comments, commit messages, or any file that isn't itself the ephemeral plan doc. Those numbers/paths are session-local planning scaffolding — meaningless (or actively confusing) to a future reader, since the plan doc they point to is gitignored or long gone. Persistent docs (KDoc, ADRs, `CONTEXT.md`, `SYSTEMDESIGN.md`, README files) describe the *current, standalone* design — reference another persistent doc (an ADR, a class, a file) instead, or drop the citation and just explain the reasoning inline.
@@ -178,7 +181,7 @@ Dispatchers:
 
 StateFlow / SharedFlow rules:
 - `StateFlow` for UI state in ViewModels (single source of truth per screen)
-- `SharedFlow` for transient one-time events such as snackbars and toasts
+- **A one-shot snackbar/toast message is never screen state — not even as a nullable field nulled out after showing.** It's a transient event, same category as navigation. Shape: ViewModel owns `private val _messages = MutableSharedFlow<XxxMessage>(extraBufferCapacity = 1)` exposed as `val messages: SharedFlow<XxxMessage> = _messages.asSharedFlow()`, sent via `_messages.tryEmit(...)`; a sealed `XxxMessage` interface in its own file, doc'd "one-shot snackbar messages... never screen state"; the Composable consumes it with the same `observeAsEvents` helper navigation uses (`core:ui/navigation/ObserveAsEventsKt.kt` — it's generic over any `Flow<T>`, not nav-only) and calls `snackbarHostState.showSnackbar(...)` inside. See `CategoryDetailsViewModel`/`CategoryDetailsMessage` for the reference implementation.
 - **Navigation is a one-time event, not state**: dispatch it through a `Channel<XxxDestination>(Channel.BUFFERED)` exposed via `receiveAsFlow()` and collect it once in the UI with `ObserveAsEvents(viewModel.events) { … }` (`core:ui`). Destinations stay type-safe sealed interfaces implementing `NavigationEvent` (no route strings). Never put navigation in persistent screen state; there is no `onNavigationHandled()` reset. See [docs/navigation-pattern.md](./docs/navigation-pattern.md) and [ADR-0019](./docs/adr/0019-navigation-as-one-time-events.md).
 - Handle errors with `.catch()` operator on upstream flows
 - Delays use `Duration`, not raw `Long` ms: `delay(NO_SPEECH_TIMEOUT_MS.milliseconds)`, never bare millis.
