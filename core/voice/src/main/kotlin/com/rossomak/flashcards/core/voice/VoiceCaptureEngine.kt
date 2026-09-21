@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /** A single VAD-bounded utterance. Only obfuscated audio ever leaves the engine in this form. */
 data class CapturedUtterance(
@@ -87,14 +89,22 @@ class VoiceCaptureEngine @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var captureJob: Job? = null
 
-    /** Starts continuous VAD-driven capture. No-op when already listening. */
+    /**
+     * Starts continuous VAD-driven capture. No-op when already listening.
+     *
+     * @param maxUtteranceDuration per-call override of the hard per-utterance cap, clamped to
+     * [MAX_UTTERANCE_DURATION] so a caller can only tighten it, never loosen it beyond the
+     * engine-wide default other callers (e.g. feature:study's continuous voice answering) rely on.
+     */
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
-    fun startListening() {
+    fun startListening(maxUtteranceDuration: Duration = MAX_UTTERANCE_DURATION) {
         if (captureJob?.isActive == true) return
         voiceActivityDetector.reset()
         voiceObfuscator.randomizeSessionShift()
         _isListening.value = true
-        captureJob = scope.launch { runCaptureLoop() }
+        val maxUtteranceFrames =
+            (minOf(maxUtteranceDuration, MAX_UTTERANCE_DURATION).inWholeMilliseconds / FRAME_DURATION_MS).toInt()
+        captureJob = scope.launch { runCaptureLoop(maxUtteranceFrames) }
     }
 
     fun stopListening() {
@@ -135,7 +145,7 @@ class VoiceCaptureEngine @Inject constructor(
     }
 
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
-    private suspend fun runCaptureLoop() {
+    private suspend fun runCaptureLoop(maxUtteranceFrames: Int) {
         // A route change (BT connect/disconnect mid-session) can't be applied to a live AudioRecord,
         // so it's applied by rebuilding at the next utterance boundary. This flag is raised by the
         // route-change collector and consumed at a safe point inside captureFrames(). AtomicBoolean
@@ -166,7 +176,7 @@ class VoiceCaptureEngine @Inject constructor(
                         CaptureResult.Failed
                     } else {
                         warmUpBluetoothRoute(audioRecord, route)
-                        captureFrames(audioRecord) { routeChangePending.get() }
+                        captureFrames(audioRecord, maxUtteranceFrames) { routeChangePending.get() }
                     }
                 } catch (exception: SecurityException) {
                     _events.emit(VoiceCaptureEvent.CaptureFailed("Microphone permission missing: ${exception.message}"))
@@ -204,6 +214,7 @@ class VoiceCaptureEngine @Inject constructor(
      */
     private suspend fun captureFrames(
         audioRecord: AudioRecord,
+        maxUtteranceFrames: Int,
         isRouteChangePending: () -> Boolean,
     ): CaptureResult {
         val frame = ShortArray(FRAME_SIZE_SAMPLES)
@@ -248,7 +259,7 @@ class VoiceCaptureEngine @Inject constructor(
                         utterance.add(frame.copyOf())
                     }
                     val utteranceEnded = trailingSilenceFrames >= END_SILENCE_FRAMES
-                    val utteranceTooLong = utterance.size >= MAX_UTTERANCE_FRAMES
+                    val utteranceTooLong = utterance.size >= maxUtteranceFrames
                     if (utteranceEnded || utteranceTooLong) {
                         isInUtterance = false
                         _events.emit(VoiceCaptureEvent.SpeechEnded)
@@ -424,5 +435,6 @@ class VoiceCaptureEngine @Inject constructor(
         private const val GAP_PAD_FRAMES = 8 // 160ms
         private const val MIN_UTTERANCE_FRAMES = 15 // <300ms of speech is discarded as noise
         private const val MAX_UTTERANCE_FRAMES = 1500 // 30s hard cap per utterance
+        val MAX_UTTERANCE_DURATION: Duration = (MAX_UTTERANCE_FRAMES * FRAME_DURATION_MS).milliseconds
     }
 }

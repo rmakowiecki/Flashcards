@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Onboarding's only consumer of core:voice concretes — see [VoiceDemoGateway]. Unlike the study
@@ -47,6 +48,7 @@ class OnboardingVoiceDemoGateway @Inject constructor(
     // that guard lives outside this class, so lint can't trace it back to this call site.
     @SuppressLint("MissingPermission")
     override fun start() {
+        resetPlayback()
         stopListeningInternal()
         _state.value = VoiceDemoState.Listening
         captureEventsJob = scope.launch {
@@ -55,10 +57,10 @@ class OnboardingVoiceDemoGateway @Inject constructor(
         sessionRouteJob = scope.launch { audioRouteManager.acquireSessionRoute() }
         listenJob = scope.launch {
             audioRouteManager.awaitRouteReady()
-            voiceCaptureEngine.startListening()
+            voiceCaptureEngine.startListening(MAX_UTTERANCE_DURATION)
             noSpeechTimeoutJob = scope.launch {
                 delay(NO_SPEECH_TIMEOUT_MS.milliseconds)
-                voiceCaptureEngine.stopListening()
+                stopListeningInternal()
                 _state.value = VoiceDemoState.Idle
             }
         }
@@ -76,11 +78,15 @@ class OnboardingVoiceDemoGateway @Inject constructor(
     }
 
     override fun stop() {
+        resetPlayback()
+        stopListeningInternal()
+        _state.value = VoiceDemoState.Idle
+    }
+
+    private fun resetPlayback() {
         playbackResetJob?.cancel()
         playbackResetJob = null
         pcmPlayer.stop()
-        stopListeningInternal()
-        _state.value = VoiceDemoState.Idle
     }
 
     private fun stopListeningInternal() {
@@ -110,7 +116,7 @@ class OnboardingVoiceDemoGateway @Inject constructor(
                 _state.value = VoiceDemoState.Ready(event.utterance)
             }
             is CaptureFailed -> {
-                voiceCaptureEngine.stopListening()
+                stopListeningInternal()
                 _state.value = VoiceDemoState.Failed(event.reason)
             }
         }
@@ -118,5 +124,10 @@ class OnboardingVoiceDemoGateway @Inject constructor(
 
     private companion object {
         const val NO_SPEECH_TIMEOUT_MS = 8_000L
+
+        // Demo is a single tap-scoped listen, not the study session's continuous flow — keep it
+        // well short of VoiceCaptureEngine's engine-wide 30s hard cap so an onboarding user can't
+        // ramble past what the demo is meant to show.
+        val MAX_UTTERANCE_DURATION = 8.seconds
     }
 }
