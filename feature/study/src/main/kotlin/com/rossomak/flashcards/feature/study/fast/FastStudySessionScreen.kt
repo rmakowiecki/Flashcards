@@ -40,6 +40,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +63,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionTopAppBar
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
 import kotlinx.coroutines.launch
 
 @Composable
@@ -120,32 +123,30 @@ fun FastStudySessionScreen(
 
     val voicePlaybackUnavailableMessage = stringResource(R.string.study_session_voice_playback_unavailable_message)
     val openTtsSettingsAction = stringResource(R.string.study_session_open_tts_settings_button)
+    val curationReportFailedMessage = stringResource(R.string.fast_study_session_report_failure_message)
 
-    LaunchedEffect(state.voiceError) {
-        if (state.voiceError == null) return@LaunchedEffect
-        launch {
-            val result = snackbarHostState.showSnackbar(
-                message = voicePlaybackUnavailableMessage,
-                actionLabel = openTtsSettingsAction,
-                duration = SnackbarDuration.Long,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                val ttsSettingsIntent = Intent("com.android.settings.TTS_SETTINGS").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                if (ttsSettingsIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(ttsSettingsIntent)
+    val snackbarScope = rememberCoroutineScope()
+    observeAsEvents(viewModel.messages) { message ->
+        when (message) {
+            VoicePlaybackUnavailable -> snackbarScope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = voicePlaybackUnavailableMessage,
+                    actionLabel = openTtsSettingsAction,
+                    duration = SnackbarDuration.Long,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    val ttsSettingsIntent = Intent("com.android.settings.TTS_SETTINGS").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    if (ttsSettingsIntent.resolveActivity(context.packageManager) != null) {
+                        context.startActivity(ttsSettingsIntent)
+                    }
                 }
             }
-            viewModel.onVoiceErrorDismissed()
+            CurationReportFailed -> snackbarScope.launch {
+                snackbarHostState.showSnackbar(message = curationReportFailedMessage, duration = SnackbarDuration.Short)
+            }
         }
-    }
-
-    val curationErrorMessage = state.curationError?.let { stringResource(it) }
-    LaunchedEffect(state.curationError) {
-        val error = curationErrorMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Short)
-        viewModel.onCurationErrorDismissed()
     }
 
     FastStudySessionContent(

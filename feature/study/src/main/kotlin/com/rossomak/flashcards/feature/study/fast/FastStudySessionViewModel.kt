@@ -44,8 +44,11 @@ import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -83,6 +86,9 @@ class FastStudySessionViewModel @Inject constructor(
     private var isPastRewindThreshold = false
     private val eventChannel = Channel<FastStudySessionDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
+
+    private val _messages = MutableSharedFlow<FastStudySessionMessage>(extraBufferCapacity = 1)
+    val messages: SharedFlow<FastStudySessionMessage> = _messages.asSharedFlow()
 
     private var lastObservedCardIndex = -1
 
@@ -204,7 +210,8 @@ class FastStudySessionViewModel @Inject constructor(
             voiceGateway.state.collect { voice ->
                 if (voice.error != null) {
                     voiceStarted = false
-                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false, voiceError = voice.error) }
+                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false) }
+                    _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
                     return@collect
                 }
                 // The answer phase for the current index is Fast's Studied criterion under
@@ -371,10 +378,6 @@ class FastStudySessionViewModel @Inject constructor(
                 voiceGateway.togglePlayPause()
             }
         }
-    }
-
-    fun onVoiceErrorDismissed() {
-        _state.update { it.copy(voiceError = null) }
     }
 
     private fun startRewindThresholdTimer() {
@@ -546,7 +549,7 @@ class FastStudySessionViewModel @Inject constructor(
                     actions = dialog.selectedActions,
                 )
             ).onFailure {
-                _state.update { it.copy(curationError = R.string.fast_study_session_report_failure_message) }
+                _messages.tryEmit(FastStudySessionMessage.CurationReportFailed)
             }
         }
     }
@@ -606,10 +609,6 @@ class FastStudySessionViewModel @Inject constructor(
                 )
             }
         }
-    }
-
-    fun onCurationErrorDismissed() {
-        _state.update { it.copy(curationError = null) }
     }
 
     public override fun onCleared() {
