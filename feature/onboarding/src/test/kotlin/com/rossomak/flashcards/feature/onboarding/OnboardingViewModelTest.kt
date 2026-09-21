@@ -17,9 +17,13 @@ import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUse
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -36,6 +40,7 @@ class OnboardingViewModelTest {
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
     private val onboardingSubcategoriesRepository = FakeOnboardingSubcategoriesRepository()
     private val userFavoritesRepository = FakeUserFavoritesRepository()
+    private val voiceDemoGateway = FakeVoiceDemoGateway()
 
     private fun createViewModel(): OnboardingViewModel = OnboardingViewModel(
         getCurrentAuthUser = GetCurrentAuthUserUseCase(authRepository),
@@ -46,6 +51,7 @@ class OnboardingViewModelTest {
         getOnboardingSubcategories = GetOnboardingSubcategoriesUseCase(onboardingSubcategoriesRepository),
         setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
         signInAnonymously = SignInAnonymouslyUseCase(authRepository),
+        voiceDemoGateway = voiceDemoGateway,
     )
 
     private fun authUser(displayName: String?, email: String?) = AuthUser(
@@ -382,4 +388,27 @@ class OnboardingViewModelTest {
             userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe false
             userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe null
         }
+}
+
+private class FakeVoiceDemoGateway : VoiceDemoGateway {
+    val stateFlow = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
+    override val state: StateFlow<VoiceDemoState> = stateFlow
+
+    var startCalls = 0
+    var playCalls = 0
+    var stopCalls = 0
+    var releaseCalls = 0
+
+    override fun start() {
+        startCalls++
+    }
+    override fun play() {
+        playCalls++
+    }
+    override fun stop() {
+        stopCalls++
+    }
+    override fun release() {
+        releaseCalls++
+    }
 }

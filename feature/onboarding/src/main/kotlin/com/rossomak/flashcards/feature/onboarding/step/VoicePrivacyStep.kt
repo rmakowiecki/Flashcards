@@ -27,6 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
@@ -56,7 +58,7 @@ import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.SpeechDet
  * grading rather than a badge over the whole screen.
  *
  * RECORD_AUDIO is requested and checked by the caller, not here: [permissionDenied] is the only
- * signal this composable gets about it (docs/temp/to-grill/mic-permission-check-platform-layer.md).
+ * signal this composable gets about it.
  */
 @Composable
 internal fun VoicePrivacyStep(
@@ -169,6 +171,7 @@ private val VOICE_TEST_CARD_BODY_HEIGHT = 120.dp
 
 @Composable
 private fun MicBadge(voiceDemoState: VoiceDemoState, modifier: Modifier = Modifier) {
+    val listeningContentDescription = stringResource(R.string.voice_privacy_listening_cd)
     Surface(
         modifier = modifier.size(MaterialTheme.sizes.ratingButton),
         shape = RoundedCornerShape(MaterialTheme.cornerRadius.full),
@@ -177,7 +180,11 @@ private fun MicBadge(voiceDemoState: VoiceDemoState, modifier: Modifier = Modifi
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (voiceDemoState is Listening || voiceDemoState is SpeechDetected) {
-                CircularProgressIndicator(modifier = Modifier.size(MaterialTheme.sizes.metadataBadgeIcon))
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(MaterialTheme.sizes.metadataBadgeIcon)
+                        .semantics { contentDescription = listeningContentDescription },
+                )
             } else {
                 Icon(imageVector = Icons.Default.Mic, contentDescription = null)
             }
@@ -225,20 +232,34 @@ private fun VoiceTestCardBody(
             is SpeechDetected -> VoiceTestStatus(
                 text = stringResource(R.string.voice_privacy_speech_detected_hint),
             )
-            is Ready, is Playing -> Row(
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+            is Ready, is Playing -> Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             ) {
-                FlashcardsFilledButton(
-                    text = stringResource(R.string.voice_privacy_play_button),
-                    onClick = onPlay,
-                    icon = Icons.Default.PlayArrow,
-                    enabled = voiceDemoState !is Playing,
+                VoiceTestStatus(
+                    text = stringResource(
+                        if (voiceDemoState is Playing) {
+                            R.string.voice_privacy_playing_hint
+                        } else {
+                            R.string.voice_privacy_ready_hint
+                        },
+                    ),
                 )
-                FlashcardsTextButton(
-                    text = stringResource(R.string.voice_privacy_retry_button),
-                    onClick = onTestVoice,
-                    icon = Icons.Default.Replay,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+                ) {
+                    FlashcardsFilledButton(
+                        text = stringResource(R.string.voice_privacy_play_button),
+                        onClick = onPlay,
+                        icon = Icons.Default.PlayArrow,
+                        enabled = voiceDemoState !is Playing,
+                    )
+                    FlashcardsTextButton(
+                        text = stringResource(R.string.voice_privacy_retry_button),
+                        onClick = onTestVoice,
+                        icon = Icons.Default.Replay,
+                    )
+                }
             }
             is Failed -> VoiceTestHint(
                 text = stringResource(R.string.voice_privacy_capture_failed_message),

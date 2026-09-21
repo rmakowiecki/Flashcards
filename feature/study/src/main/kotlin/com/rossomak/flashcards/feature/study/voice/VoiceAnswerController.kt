@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.voice
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.PowerManager
@@ -8,6 +9,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndGradeSpokenAnswerUseCase
@@ -45,7 +47,9 @@ data class VoiceAnswerState(
     val lastGrade: VoiceAnswerGrade? = null,
     val lastGradedCardId: String? = null,
     val captureRoute: CaptureRouteType = CaptureRouteType.None,
-    val error: String? = null,
+    // Compile-safe migration only: still just a null-check trigger for one fixed snackbar
+    // message, not resolved per-reason yet.
+    val error: VoiceAnswerFailureReason? = null,
 )
 
 /**
@@ -65,7 +69,7 @@ data class VoiceAnswerState(
  * OEM battery managers can't starve the 20ms frame loop (design doc §Wake lock).
  */
 class VoiceAnswerController @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val transcribeAndGradeSpokenAnswer: TranscribeAndGradeSpokenAnswerUseCase,
     private val voiceCaptureEngine: VoiceCaptureEngine,
     private val audioRouteManager: AudioRouteManager,
@@ -99,7 +103,7 @@ class VoiceAnswerController @Inject constructor(
     fun start() {
         if (_state.value.isEnabled) return
         if (!hasRecordAudioPermission()) {
-            _state.value = VoiceAnswerState(error = "Microphone permission not granted")
+            _state.value = VoiceAnswerState(error = VoiceAnswerFailureReason.PermissionMissing)
             return
         }
         acquireWakeLock()
@@ -147,6 +151,10 @@ class VoiceAnswerController @Inject constructor(
     }
 
     /** Called once the shared TTS engine finishes reading the current card's question — opens the listening window. */
+    // startListening() below requires RECORD_AUDIO, but lint can't see that isEnabled only
+    // flips true after hasRecordAudioPermission() passes in start() — this path is unreachable
+    // without the permission granted.
+    @SuppressLint("MissingPermission")
     fun onQuestionFinishedSpeaking() {
         if (!_state.value.isEnabled) return
         // Clear the previous card's grade/error before opening this round's listening window —
@@ -201,7 +209,12 @@ class VoiceAnswerController @Inject constructor(
             is VoiceCaptureEvent.CaptureFailed -> {
                 listenTimeoutJob?.cancel()
                 voiceCaptureEngine.stopListening()
-                _state.update { it.copy(phase = VoiceAnswerPhase.WaitingForQuestion, error = event.reason) }
+                _state.update {
+                    it.copy(
+                        phase = VoiceAnswerPhase.WaitingForQuestion,
+                        error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
+                    )
+                }
             }
         }
     }
@@ -249,10 +262,11 @@ class VoiceAnswerController @Inject constructor(
                 }
             }
             .catch { error ->
+                loge(error) { "voice answer grading/upload failed" }
                 _state.update {
                     it.copy(
                         phase = VoiceAnswerPhase.SpeakingNotice,
-                        error = error.message,
+                        error = VoiceAnswerFailureReason.GradingFailed(error.message),
                     )
                 }
                 // No screen to look at in this UX — failure must be audible (design doc §Upload

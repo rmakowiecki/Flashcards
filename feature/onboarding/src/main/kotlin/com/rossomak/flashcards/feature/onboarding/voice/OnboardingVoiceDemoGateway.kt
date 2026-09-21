@@ -16,11 +16,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Onboarding's only consumer of core:voice concretes — see [VoiceDemoGateway]. Unlike the study
@@ -39,7 +41,7 @@ class OnboardingVoiceDemoGateway @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var captureEventsJob: Job? = null
-    private var sessionRouteJob: Job? = null
+    private var sessionAudioRouteAcquireJob: Job? = null
     private var listenJob: Job? = null
     private var noSpeechTimeoutJob: Job? = null
     private var playbackResetJob: Job? = null
@@ -54,9 +56,16 @@ class OnboardingVoiceDemoGateway @Inject constructor(
         captureEventsJob = scope.launch {
             voiceCaptureEngine.events.collect { event -> handleCaptureEvent(event) }
         }
-        sessionRouteJob = scope.launch { audioRouteManager.acquireSessionRoute() }
+        sessionAudioRouteAcquireJob = scope.launch { audioRouteManager.acquireSessionRoute() }
         listenJob = scope.launch {
-            audioRouteManager.awaitRouteReady()
+            val routeReady = withTimeoutOrNull(ROUTE_READY_TIMEOUT_MS.milliseconds) {
+                audioRouteManager.awaitRouteReady()
+            } != null
+            if (!routeReady) {
+                stopListeningInternal()
+                _state.value = VoiceDemoState.Failed(VoiceDemoFailureReason.RouteUnavailable)
+                return@launch
+            }
             voiceCaptureEngine.startListening(MAX_UTTERANCE_DURATION)
             restartNoSpeechTimeout()
         }
@@ -79,6 +88,10 @@ class OnboardingVoiceDemoGateway @Inject constructor(
         _state.value = VoiceDemoState.Idle
     }
 
+    override fun release() {
+        scope.cancel()
+    }
+
     private fun resetPlayback() {
         playbackResetJob?.cancel()
         playbackResetJob = null
@@ -93,8 +106,8 @@ class OnboardingVoiceDemoGateway @Inject constructor(
         voiceCaptureEngine.stopListening()
         // Cancel before releasing: acquireSessionRoute() can still be mid-handshake here, and a
         // stale resume after releaseSessionRoute() would re-apply routing on a dead attempt.
-        sessionRouteJob?.cancel()
-        sessionRouteJob = null
+        sessionAudioRouteAcquireJob?.cancel()
+        sessionAudioRouteAcquireJob = null
         audioRouteManager.releaseSessionRoute()
         captureEventsJob?.cancel()
         captureEventsJob = null
@@ -117,7 +130,7 @@ class OnboardingVoiceDemoGateway @Inject constructor(
             }
             is CaptureFailed -> {
                 stopListeningInternal()
-                _state.value = VoiceDemoState.Failed(event.reason)
+                _state.value = VoiceDemoState.Failed(VoiceDemoFailureReason.CaptureError(event.reason))
             }
         }
     }
@@ -133,6 +146,7 @@ class OnboardingVoiceDemoGateway @Inject constructor(
 
     private companion object {
         const val NO_SPEECH_TIMEOUT_MS = 8_000L
+        const val ROUTE_READY_TIMEOUT_MS = 8_000L
 
         // Demo is a single tap-scoped listen, not the study session's continuous flow — keep it
         // well short of VoiceCaptureEngine's engine-wide 30s hard cap so an onboarding user can't

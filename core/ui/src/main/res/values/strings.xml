@@ -8,6 +8,12 @@
     <string name="common_cancel_button">Cancel</string>
     <string name="common_keep_as_default_label">Keep as my default</string>
     <string name="common_difficulty_level_cd">Difficulty %1$d out of %2$d</string>
+    <!-- VoiceCaptureFailureReason, shared by every feature that surfaces core:voice capture failures -->
+    <string name="common_voice_capture_bluetooth_unavailable_message">Bluetooth microphone isn\'t available</string>
+    <string name="common_voice_capture_audio_record_init_failed_message">Couldn\'t start the microphone</string>
+    <string name="common_voice_capture_not_routed_bluetooth_message">Audio isn\'t routed to your Bluetooth mic</string>
+    <string name="common_voice_capture_permission_missing_message">Microphone permission is missing</string>
+    <string name="common_voice_capture_loop_error_message">Something interrupted the recording</string>
     <string name="common_difficulty_range_cd">Difficulty %1$d to %2$d out of %3$d</string>
     <string name="common_navigate_back_cd">Back</string>
     <string name="common_close_cd">Close</string>
