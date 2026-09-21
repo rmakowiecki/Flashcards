@@ -6,6 +6,10 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
+import com.rossomak.flashcards.core.common.logd
+import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.logi
+import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.CaptureFailed
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -34,13 +38,6 @@ data class CapturedUtterance(
     val durationMs: Long,
 )
 
-sealed interface VoiceCaptureEvent {
-    data object SpeechStarted : VoiceCaptureEvent
-    data object SpeechEnded : VoiceCaptureEvent
-    data class UtteranceCaptured(val utterance: CapturedUtterance) : VoiceCaptureEvent
-    data class CaptureFailed(val reason: String) : VoiceCaptureEvent
-}
-
 /**
  * Continuous mic capture: AudioRecord (16kHz mono PCM) feeding 20ms frames through the
  * [VoiceActivityDetector]; VAD-bounded utterances are buffered, run through the [VoiceObfuscator]
@@ -61,7 +58,7 @@ sealed interface VoiceCaptureEvent {
  */
 @Singleton
 class VoiceCaptureEngine @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val voiceActivityDetector: VoiceActivityDetector,
     private val voiceObfuscator: VoiceObfuscator,
     private val audioRouteManager: AudioRouteManager,
@@ -99,15 +96,18 @@ class VoiceCaptureEngine @Inject constructor(
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
     fun startListening(maxUtteranceDuration: Duration = MAX_UTTERANCE_DURATION) {
         if (captureJob?.isActive == true) return
+        logd { "startListening" }
         voiceActivityDetector.reset()
         voiceObfuscator.randomizeSessionShift()
         _isListening.value = true
         val maxUtteranceFrames =
             (minOf(maxUtteranceDuration, MAX_UTTERANCE_DURATION).inWholeMilliseconds / FRAME_DURATION_MS).toInt()
+                .coerceAtLeast(MIN_UTTERANCE_FRAMES)
         captureJob = scope.launch { runCaptureLoop(maxUtteranceFrames) }
     }
 
     fun stopListening() {
+        logd { "stopListening" }
         captureJob?.cancel()
         captureJob = null
         _isListening.value = false
@@ -161,11 +161,14 @@ class VoiceCaptureEngine @Inject constructor(
                 if (!route.isCapturable) {
                     // Bluetooth-strict (ADR-0027): a mic-capable BT device is connected but its link
                     // isn't ready — never fall back to the pocketed phone mic. Strict-pause instead.
-                    _events.emit(VoiceCaptureEvent.CaptureFailed("Bluetooth microphone unavailable"))
+                    loge { "Bluetooth microphone unavailable" }
+                    _events.emit(CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
                     return
                 }
                 routeChangePending.set(false)
-                when (attemptCapture(route, maxUtteranceFrames, routeChangePending)) {
+                val result = attemptCapture(route, maxUtteranceFrames, routeChangePending)
+                logd { "capture attempt result: $result" }
+                when (result) {
                     CaptureResult.Stopped, CaptureResult.Failed -> return
                     CaptureResult.RouteChanged -> Unit // loop and rebuild AudioRecord on the new route
                 }
@@ -185,28 +188,31 @@ class VoiceCaptureEngine @Inject constructor(
         routeChangePending: AtomicBoolean,
     ): CaptureResult {
         val audioRecord = createAudioRecord(route) ?: run {
-            _events.emit(VoiceCaptureEvent.CaptureFailed("AudioRecord initialization failed"))
+            loge { "AudioRecord initialization failed" }
+            _events.emit(CaptureFailed(VoiceCaptureFailureReason.AudioRecordInitFailed))
             return CaptureResult.Failed
         }
         return try {
             audioRecord.startRecording()
             if (!isRouteHonored(audioRecord, route)) {
-                _events.emit(VoiceCaptureEvent.CaptureFailed("Capture not routed to Bluetooth microphone"))
+                loge { "Capture not routed to Bluetooth microphone" }
+                _events.emit(CaptureFailed(VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth))
                 CaptureResult.Failed
             } else {
                 warmUpBluetoothRoute(audioRecord, route)
                 captureFrames(audioRecord, maxUtteranceFrames) { routeChangePending.get() }
             }
         } catch (exception: SecurityException) {
-            _events.emit(VoiceCaptureEvent.CaptureFailed("Microphone permission missing: ${exception.message}"))
+            loge(exception) { "Microphone permission missing" }
+            _events.emit(CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(exception.message)))
             CaptureResult.Failed
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: Exception) {
             // VAD inference or AudioRecord failures used to kill the loop silently, leaving
             // the UI stuck on "silence". Surface them so they show up in the debug event log.
-            android.util.Log.e(TAG, "capture loop error", exception)
-            _events.emit(VoiceCaptureEvent.CaptureFailed("Capture loop error: ${exception.message}"))
+            loge(exception) { "capture loop error" }
+            _events.emit(CaptureFailed(VoiceCaptureFailureReason.CaptureLoopError(exception.message)))
             CaptureResult.Failed
         } finally {
             runCatching { audioRecord.stop() }
@@ -402,12 +408,12 @@ class VoiceCaptureEngine @Inject constructor(
             if (read <= 0) continue
             if (frameEnergy(frame, read) >= BT_WARMUP_ENERGY_THRESHOLD) {
                 val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
-                android.util.Log.i(TAG, "BT warm-up settled in ${elapsedMs}ms (route=${route.type})")
+                logi { "BT warm-up settled in ${elapsedMs}ms (route=${route.type})" }
                 return
             }
         }
         val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
-        android.util.Log.i(TAG, "BT warm-up timed out after ${elapsedMs}ms (route=${route.type}) — proceeding anyway")
+        logi { "BT warm-up timed out after ${elapsedMs}ms (route=${route.type}) — proceeding anyway" }
     }
 
     private fun frameEnergy(frame: ShortArray, sampleCount: Int): Long {
@@ -434,7 +440,7 @@ class VoiceCaptureEngine @Inject constructor(
             val routedDevice = audioRecord.routedDevice
             if (routedDevice != null) return routedDevice.type == route.device?.type
             if (System.nanoTime() >= deadlineNanos) return false
-            delay(ROUTE_HONORED_POLL_MS)
+            delay(ROUTE_HONORED_POLL_MS.milliseconds)
         }
     }
 
@@ -460,7 +466,6 @@ class VoiceCaptureEngine @Inject constructor(
         }
 
     companion object {
-        private const val TAG = "VoiceCapture"
         const val SAMPLE_RATE_HZ = 16_000
         const val FRAME_DURATION_MS = 20
         const val FRAME_SIZE_SAMPLES = SAMPLE_RATE_HZ * FRAME_DURATION_MS / 1000
