@@ -180,7 +180,6 @@ fun RatedStudySessionScreen(
         onVoiceNext = viewModel::onVoiceNext,
         onVoicePrevious = viewModel::onVoicePrevious,
         onVoiceAnswerToggle = viewModel::onVoiceAnswerToggle,
-        onResumeSession = viewModel::onResumeSession,
         onDialogEvent = viewModel::onDialogEvent,
     )
 }
@@ -197,7 +196,6 @@ fun RatedStudySessionContent(
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
     onVoiceAnswerToggle: () -> Unit,
-    onResumeSession: () -> Unit,
     onDialogEvent: (StudySessionDialogEvent) -> Unit,
 ) {
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -244,7 +242,6 @@ fun RatedStudySessionContent(
                 onVoicePrevious = onVoicePrevious,
                 onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
                 onVoiceAnswerToggle = onVoiceAnswerToggle,
-                onResumeSession = onResumeSession,
             )
         },
     ) { innerPadding ->
@@ -275,7 +272,6 @@ private fun RatedStudySessionSheetContent(
     onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
     onVoiceAnswerToggle: () -> Unit,
-    onResumeSession: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -286,19 +282,13 @@ private fun RatedStudySessionSheetContent(
         if (state.isVoiceActive) {
             RatedVoiceAnswerHeader(state = state, onVoiceAnswerToggle = onVoiceAnswerToggle, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
             RatedVoiceTranscript(state = state)
-            if (state.isVoiceAnswerPaused) {
-                // Distinct from the transient busy/listening disable windows below: the transport
-                // itself is idle here, only the resume affordance is live.
-                RatedVoiceAnswerPausedContent(onResumeSession = onResumeSession)
-            } else {
-                RatedVoiceTransportRow(
-                    state = state,
-                    onShowAnswer = onShowAnswer,
-                    onVoicePlayPause = onVoicePlayPause,
-                    onVoiceNext = onVoiceNext,
-                    onVoicePrevious = onVoicePrevious,
-                )
-            }
+            RatedVoiceTransportRow(
+                state = state,
+                onShowAnswer = onShowAnswer,
+                onVoicePlayPause = onVoicePlayPause,
+                onVoiceNext = onVoiceNext,
+                onVoicePrevious = onVoicePrevious,
+            )
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -409,33 +399,6 @@ private fun RatedVoiceTranscript(state: RatedStudySessionScreenState) {
     }
 }
 
-/**
- * Shown instead of [RatedVoiceTransportRow] once three consecutive silence timeouts have paused
- * the session: playback and the microphone
- * are already stopped, and this is the only live control until the user taps Resume.
- */
-@Composable
-private fun RatedVoiceAnswerPausedContent(onResumeSession: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.study_session_voice_answer_paused_message),
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = onResumeSession) {
-            Text(stringResource(R.string.study_session_voice_answer_resume_button))
-        }
-    }
-}
-
 @Composable
 private fun RatedVoiceTransportRow(
     state: RatedStudySessionScreenState,
@@ -475,7 +438,7 @@ private fun RatedVoiceTransportRow(
         ) {
             IconButton(
                 onClick = onVoicePrevious,
-                enabled = state.currentCardIndex > 0 && !isVoiceAnswerBusy,
+                enabled = state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
@@ -505,7 +468,7 @@ private fun RatedVoiceTransportRow(
                 // the answer is revealed by the grading pipeline itself (ADR-0026), never by this
                 // button — here it can only mean "skip this question".
                 onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-                enabled = !isVoiceAnswerBusy,
+                enabled = !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
@@ -562,7 +525,6 @@ private fun RatedStudySessionVoiceActivePreview() {
         onVoiceNext = {},
         onVoicePrevious = {},
         onVoiceAnswerToggle = {},
-        onResumeSession = {},
         onDialogEvent = {},
     )
 }
@@ -599,7 +561,6 @@ private fun RatedStudySessionManualPreview() {
         onVoiceNext = {},
         onVoicePrevious = {},
         onVoiceAnswerToggle = {},
-        onResumeSession = {},
         onDialogEvent = {},
     )
 }

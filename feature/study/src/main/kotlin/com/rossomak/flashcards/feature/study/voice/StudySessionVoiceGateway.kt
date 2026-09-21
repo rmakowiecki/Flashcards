@@ -50,6 +50,7 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
     private var pendingVoiceAnswering: Boolean? = null
+    private var pendingNextSilenceWillPauseSession: Boolean? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -66,6 +67,7 @@ class StudySessionVoiceGateway @Inject constructor(
             pendingSpeechRate?.let { binder.setPlaybackSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
             pendingVoiceAnswering?.let { binder.setVoiceAnswering(it) }
+            pendingNextSilenceWillPauseSession?.let { binder.setNextSilenceWillPauseSession(it) }
             collectVoiceState(binder)
             collectVoiceAnswerState(binder)
         }
@@ -104,6 +106,7 @@ class StudySessionVoiceGateway @Inject constructor(
         _state.value = VoicePlaybackState()
         _voiceAnswerState.value = VoiceAnswerState()
         pendingVoiceAnswering = null
+        pendingNextSilenceWillPauseSession = null
     }
 
     override fun togglePlayPause() {
@@ -139,6 +142,11 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun setVoiceAnswering(enabled: Boolean) {
         pendingVoiceAnswering = enabled
         voiceBinder?.setVoiceAnswering(enabled)
+    }
+
+    override fun setNextSilenceWillPauseSession(willPause: Boolean) {
+        pendingNextSilenceWillPauseSession = willPause
+        voiceBinder?.setNextSilenceWillPauseSession(willPause)
     }
 
     private fun collectVoiceState(binder: StudySessionVoiceService.LocalBinder) {

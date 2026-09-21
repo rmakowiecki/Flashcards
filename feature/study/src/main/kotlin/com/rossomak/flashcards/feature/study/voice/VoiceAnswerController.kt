@@ -93,8 +93,18 @@ class VoiceAnswerController @Inject constructor(
     private var activeCard: VoiceFlashcard? = null
     private var noticeTts: TextToSpeech? = null
 
+    // Whether *this* listening window's silence timeout would be the one that pauses the
+    // session — pushed by the ViewModel (the sole owner of the consecutive-silence count)
+    // ahead of each listen cycle, so onSilenceTimeout() can pick its spoken message without
+    // needing to know the count itself.
+    private var nextSilenceWillPauseSession = false
+
     fun setActiveCard(card: VoiceFlashcard?) {
         activeCard = card
+    }
+
+    fun setNextSilenceWillPauseSession(willPause: Boolean) {
+        nextSilenceWillPauseSession = willPause
     }
 
     fun start() {
@@ -137,6 +147,7 @@ class VoiceAnswerController @Inject constructor(
         captureEventsJob = null
         releaseWakeLock()
         activeCard = null
+        nextSilenceWillPauseSession = false
         _state.value = VoiceAnswerState()
     }
 
@@ -183,7 +194,12 @@ class VoiceAnswerController @Inject constructor(
     private suspend fun onSilenceTimeout() {
         voiceCaptureEngine.stopListening()
         _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice) }
-        speakNotice(context.getString(R.string.study_session_voice_answer_skip_spoken_message))
+        val messageRes = if (nextSilenceWillPauseSession) {
+            R.string.study_session_voice_answer_skip_pause_spoken_message
+        } else {
+            R.string.study_session_voice_answer_skip_spoken_message
+        }
+        speakNotice(context.getString(messageRes))
     }
 
     private suspend fun handleCaptureEvent(event: VoiceCaptureEvent) {

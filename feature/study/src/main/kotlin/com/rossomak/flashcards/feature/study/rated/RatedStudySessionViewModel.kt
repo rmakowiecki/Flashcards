@@ -406,6 +406,7 @@ class RatedStudySessionViewModel @Inject constructor(
         val headCardId = ratedSessionState?.currentCard?.id
         if (gradedCardId != null && gradedCardId != headCardId) return
         consecutiveSilenceCount = 0
+        pushNextSilenceWillPauseSession()
         applyAttemptRating(grade.toFlashcardAttemptRating(), deferSync = true)
     }
 
@@ -421,10 +422,22 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onVoiceSilenceTimeout() {
         ratedSessionState = ratedSessionState?.let(::requeueAfterSilence)
         consecutiveSilenceCount++
+        pushNextSilenceWillPauseSession()
         pendingSessionSync = { syncStateFromRatedSession() }
         if (consecutiveSilenceCount >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD) {
             pauseForRepeatedSilence()
         }
+    }
+
+    /**
+     * Pushed ahead of every listen cycle (never computed reactively) so
+     * [VoiceAnswerController.onSilenceTimeout] can pick its own spoken message the instant its
+     * internal timer fires, without needing to know [consecutiveSilenceCount] itself.
+     */
+    private fun pushNextSilenceWillPauseSession() {
+        voiceGateway.setNextSilenceWillPauseSession(
+            consecutiveSilenceCount + 1 >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD
+        )
     }
 
     /**
@@ -440,6 +453,7 @@ class RatedStudySessionViewModel @Inject constructor(
     /** Re-arms voice answering on the same card, counter back at zero. */
     fun onResumeSession() {
         consecutiveSilenceCount = 0
+        pushNextSilenceWillPauseSession()
         _state.update { it.copy(isVoiceAnswerPaused = false) }
         voiceGateway.setVoiceAnswering(true)
         if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
@@ -562,7 +576,9 @@ class RatedStudySessionViewModel @Inject constructor(
     }
 
     fun onVoicePlayPause() {
-        if (pausedDueToExtendedContext) {
+        if (_state.value.isVoiceAnswerPaused) {
+            onResumeSession()
+        } else if (pausedDueToExtendedContext) {
             advanceAfterExtendedContextJob?.cancel()
             pausedDueToExtendedContext = false
             viewModelScope.launch {
