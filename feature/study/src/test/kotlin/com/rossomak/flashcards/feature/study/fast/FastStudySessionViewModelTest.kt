@@ -946,6 +946,7 @@ private class FakeVoiceGateway : VoiceGateway {
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
 
     var lastVoiceAnswering: Boolean? = null
+    var lastNextSilenceWillPauseSession: Boolean? = null
 
     var startCalls = 0
     var lastStartCards: List<Flashcard>? = null
@@ -995,5 +996,8 @@ private class FakeVoiceGateway : VoiceGateway {
     }
     override fun setVoiceAnswering(enabled: Boolean) {
         lastVoiceAnswering = enabled
+    }
+    override fun setNextSilenceWillPauseSession(willPause: Boolean) {
+        lastNextSilenceWillPauseSession = willPause
     }
 }

@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.rated
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -41,6 +42,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -69,6 +71,12 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionTopAppBar
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerConsentSaveFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import kotlinx.coroutines.launch
 
@@ -120,39 +128,19 @@ fun RatedStudySessionScreen(
         }
     }
 
-    LaunchedEffect(state.lastVoiceAnswerGrade) {
-        val grade = state.lastVoiceAnswerGrade ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(
-            message = context.getString(
-                R.string.study_session_voice_answer_grade_message,
-                grade.gradePercent,
-                grade.feedback,
-            ),
-            duration = SnackbarDuration.Short,
-        )
-        viewModel.onVoiceAnswerGradeDismissed()
-    }
-
-    LaunchedEffect(state.voiceAnswerError) {
-        if (state.voiceAnswerError == null) return@LaunchedEffect
-        snackbarHostState.showSnackbar(
-            message = context.getString(R.string.study_session_voice_answer_error_message),
-            duration = SnackbarDuration.Short,
-        )
-    }
-
-    val voicePlaybackUnavailableMessage = stringResource(R.string.study_session_voice_playback_unavailable_message)
-    val openTtsSettingsAction = stringResource(R.string.study_session_open_tts_settings_button)
-
-    LaunchedEffect(state.voiceError) {
-        if (state.voiceError == null) return@LaunchedEffect
-        launch {
+    val snackbarScope = rememberCoroutineScope()
+    observeAsEvents(viewModel.messages) { message ->
+        snackbarScope.launch {
             val result = snackbarHostState.showSnackbar(
-                message = voicePlaybackUnavailableMessage,
-                actionLabel = openTtsSettingsAction,
-                duration = SnackbarDuration.Long,
+                message = resolveRatedStudySessionMessage(context = context, message = message),
+                actionLabel = if (message == VoicePlaybackUnavailable) {
+                    context.getString(R.string.study_session_open_tts_settings_button)
+                } else {
+                    null
+                },
+                duration = if (message == VoicePlaybackUnavailable) SnackbarDuration.Long else SnackbarDuration.Short,
             )
-            if (result == SnackbarResult.ActionPerformed) {
+            if (message == VoicePlaybackUnavailable && result == SnackbarResult.ActionPerformed) {
                 val ttsSettingsIntent = Intent("com.android.settings.TTS_SETTINGS").apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -160,14 +148,7 @@ fun RatedStudySessionScreen(
                     context.startActivity(ttsSettingsIntent)
                 }
             }
-            viewModel.onVoiceErrorDismissed()
         }
-    }
-
-    LaunchedEffect(state.curationError) {
-        val error = state.curationError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Short)
-        viewModel.onCurationErrorDismissed()
     }
 
     RatedStudySessionContent(
@@ -282,6 +263,7 @@ private fun RatedStudySessionSheetContent(
         if (state.isVoiceActive) {
             RatedVoiceAnswerHeader(state = state, onVoiceAnswerToggle = onVoiceAnswerToggle, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
             RatedVoiceTranscript(state = state)
+            RatedVoiceGradeFeedback(state = state)
             RatedVoiceTransportRow(
                 state = state,
                 onShowAnswer = onShowAnswer,
@@ -390,6 +372,25 @@ private fun RatedVoiceTranscript(state: RatedStudySessionScreenState) {
     ) {
         Text(
             text = state.voiceAnswerSanitizedTranscript,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+// Long-form feedback (grade percent + rationale). Plain bottom-sheet text for as long as SpeakingNotice is
+// reading it aloud; lastVoiceAnswerGrade is only non-null for a round that actually graded, never
+// for a silence-timeout skip or a grading/transcription failure (see observeVoiceState's reveal
+// gating in the ViewModel for the same distinction).
+@Composable
+private fun RatedVoiceGradeFeedback(state: RatedStudySessionScreenState) {
+    val grade = state.lastVoiceAnswerGrade
+    if (state.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice && grade != null) {
+        Text(
+            text = stringResource(R.string.study_session_voice_answer_grade_message, grade.gradePercent, grade.feedback),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
@@ -563,4 +564,13 @@ private fun RatedStudySessionManualPreview() {
         onVoiceAnswerToggle = {},
         onDialogEvent = {},
     )
+}
+
+private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
+    VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
+    VoiceAnswerConsentSaveFailed -> context.getString(R.string.study_session_voice_answer_consent_save_error_message)
+    CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
+    VoiceAnswerGradingFailed -> context.getString(R.string.study_session_voice_answer_error_message)
+    VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
+    VoiceAnswerSilencePause -> context.getString(R.string.study_session_voice_answer_skip_pause_message)
 }

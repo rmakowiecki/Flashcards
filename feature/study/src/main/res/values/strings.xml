@@ -19,8 +19,9 @@
     <string name="study_session_voice_answer_failure_spoken_message">Couldn\'t grade that answer, moving on.</string>
     <string name="study_session_voice_answer_skip_spoken_message">No answer heard, moving on.</string>
     <string name="study_session_voice_answer_skip_pause_spoken_message">No answer heard 3 times in a row, pausing the session.</string>
-    <string name="study_session_voice_answer_paused_message">Paused after repeated silence — tap Resume to keep going.</string>
-    <string name="study_session_voice_answer_resume_button">Resume</string>
+    <string name="study_session_voice_answer_skip_message">No answer heard, moving on.</string>
+    <string name="study_session_voice_answer_skip_pause_message">No answer heard 3 times in a row, pausing the session.</string>
+    <string name="study_session_voice_answer_consent_save_error_message">Couldn\'t save voice answering — try again</string>
     <string name="study_session_no_cards_message">No cards available</string>
     <string name="study_session_load_error_message">Could not load flashcards</string>
     <string name="fast_study_session_report_failure_message">Failed to submit report</string>

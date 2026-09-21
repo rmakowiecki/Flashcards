@@ -7,7 +7,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
 
@@ -34,19 +33,14 @@ data class RatedStudySessionScreenState(
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
-    // Deferred: one-shot snackbar trigger held as screen state — violates AGENTS.md's SharedFlow-
-    // for-transient-events rule. Migrate to a SharedFlow<RatedStudySessionMessage>.
-    val voiceError: String? = null,
-    // Deferred: same violation as voiceError above — migrate together.
-    val curationError: String? = null,
     val isVoiceAnswerEnabled: Boolean = false,
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
     val voiceAnswerSanitizedTranscript: String? = null,
-    // Deferred: same violation as voiceError above — migrate together.
+    // Continuous display state, not a one-shot event: mirrors the current round's grade for as
+    // long as VoiceAnswerPhase.SpeakingNotice is reading it aloud, rendered as bottom-sheet plain
+    // text (RatedVoiceGradeFeedback) rather than a snackbar. One-shot voice-answering failures go
+    // through RatedStudySessionMessage instead — see RatedStudySessionViewModel.messages.
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
-    // Deferred: same violation as voiceError above — migrate together (also deferred: granular
-    // per-reason messaging; today this only triggers one fixed message).
-    val voiceAnswerError: VoiceAnswerFailureReason? = null,
     val isMicPermissionRequestPending: Boolean = false,
     val activeDialog: StudySessionDialog? = null,
     // Mirrors RatedSessionState.masteredCount; the "mastered" half of the top bar's counter.
