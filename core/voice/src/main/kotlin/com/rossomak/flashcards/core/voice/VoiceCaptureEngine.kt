@@ -257,14 +257,17 @@ class VoiceCaptureEngine @Inject constructor(
         state: UtteranceState,
         maxUtteranceFrames: Int,
         isRouteChangePending: () -> Boolean,
-    ): Boolean {
-        when {
-            isSpeech && !state.isInUtterance -> startUtterance(frame, state)
-            state.isInUtterance && isSpeech -> continueUtterance(frame, state)
-            state.isInUtterance -> return handleTrailingSilence(frame, state, maxUtteranceFrames, isRouteChangePending)
-            else -> bufferPreRoll(frame, state)
+    ): Boolean = when {
+        isSpeech && !state.isInUtterance -> {
+            startUtterance(frame, state)
+            false
         }
-        return false
+        state.isInUtterance && isSpeech -> continueUtterance(frame, state, maxUtteranceFrames, isRouteChangePending)
+        state.isInUtterance -> handleTrailingSilence(frame, state, maxUtteranceFrames, isRouteChangePending)
+        else -> {
+            bufferPreRoll(frame, state)
+            false
+        }
     }
 
     private suspend fun startUtterance(frame: ShortArray, state: UtteranceState) {
@@ -278,10 +281,18 @@ class VoiceCaptureEngine @Inject constructor(
         _events.emit(VoiceCaptureEvent.SpeechStarted)
     }
 
-    private fun continueUtterance(frame: ShortArray, state: UtteranceState) {
+    /** Returns true if a pending route change was honored and the caller should return [CaptureResult.RouteChanged]. */
+    private suspend fun continueUtterance(
+        frame: ShortArray,
+        state: UtteranceState,
+        maxUtteranceFrames: Int,
+        isRouteChangePending: () -> Boolean,
+    ): Boolean {
         state.frames.add(frame.copyOf())
         state.speechFrameCount++
         state.trailingSilenceFrames = 0
+        if (state.frames.size < maxUtteranceFrames) return false
+        return finishUtteranceAndCheckRoute(state, isRouteChangePending)
     }
 
     /**
@@ -304,6 +315,14 @@ class VoiceCaptureEngine @Inject constructor(
         val utteranceEnded = state.trailingSilenceFrames >= END_SILENCE_FRAMES
         val utteranceTooLong = state.frames.size >= maxUtteranceFrames
         if (!utteranceEnded && !utteranceTooLong) return false
+        return finishUtteranceAndCheckRoute(state, isRouteChangePending)
+    }
+
+    /** Shared by cap-hit (mid-speech) and silence-hit (trailing) endings, so both emit the same event sequence. */
+    private suspend fun finishUtteranceAndCheckRoute(
+        state: UtteranceState,
+        isRouteChangePending: () -> Boolean,
+    ): Boolean {
         state.isInUtterance = false
         _events.emit(VoiceCaptureEvent.SpeechEnded)
         finishUtterance(state.frames, state.speechFrameCount)

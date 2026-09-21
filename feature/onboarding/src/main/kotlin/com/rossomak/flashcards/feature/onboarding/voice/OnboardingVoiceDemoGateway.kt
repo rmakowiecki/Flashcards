@@ -58,11 +58,7 @@ class OnboardingVoiceDemoGateway @Inject constructor(
         listenJob = scope.launch {
             audioRouteManager.awaitRouteReady()
             voiceCaptureEngine.startListening(MAX_UTTERANCE_DURATION)
-            noSpeechTimeoutJob = scope.launch {
-                delay(NO_SPEECH_TIMEOUT_MS.milliseconds)
-                stopListeningInternal()
-                _state.value = VoiceDemoState.Idle
-            }
+            restartNoSpeechTimeout()
         }
     }
 
@@ -110,8 +106,12 @@ class OnboardingVoiceDemoGateway @Inject constructor(
                 noSpeechTimeoutJob?.cancel()
                 _state.value = VoiceDemoState.SpeechDetected
             }
-            is SpeechEnded -> Unit
+            // A short blip (below MIN_UTTERANCE_FRAMES) ends without UtteranceCaptured following,
+            // so restart the timeout here or the demo is stuck listening with nothing to time it out.
+            is SpeechEnded -> restartNoSpeechTimeout()
             is UtteranceCaptured -> {
+                noSpeechTimeoutJob?.cancel()
+                noSpeechTimeoutJob = null
                 voiceCaptureEngine.stopListening()
                 _state.value = VoiceDemoState.Ready(event.utterance)
             }
@@ -119,6 +119,15 @@ class OnboardingVoiceDemoGateway @Inject constructor(
                 stopListeningInternal()
                 _state.value = VoiceDemoState.Failed(event.reason)
             }
+        }
+    }
+
+    private fun restartNoSpeechTimeout() {
+        noSpeechTimeoutJob?.cancel()
+        noSpeechTimeoutJob = scope.launch {
+            delay(NO_SPEECH_TIMEOUT_MS.milliseconds)
+            stopListeningInternal()
+            _state.value = VoiceDemoState.Idle
         }
     }
 
