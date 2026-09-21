@@ -261,7 +261,7 @@ See [TESTING.md](./TESTING.md) for full conventions: file/method naming, MainDis
 
 ### New worktrees
 
-Creating a new `git worktree` gives you a checkout without the gitignored local secrets (Firebase config, signing keystores, service-account JSONs) needed to build/run the app, and without the `graphify-out/` knowledge graph. You're allowed to run `scripts/copy-worktree-local-state.sh -f <path-to-worktree>` to bring both over from the current checkout — do this right after creating a worktree, without asking. Always pass `-f` so existing secret files in the target worktree are overwritten (keeps stale copies from lingering); `graphify-out/` is symlinked back to this checkout rather than copied, and the script refuses to touch it if the destination already has a real (non-symlinked) `graphify-out/` directory, `-f` or not. Do not open/read the secret files yourself; the script copies them by filename pattern only and never prints contents.
+Creating a new `git worktree` gives you a checkout without the gitignored local secrets (Firebase config, signing keystores, service-account JSONs) needed to build/run the app, and without the `graphify-out/` and `graft/` knowledge graphs. You're allowed to run `scripts/copy-worktree-local-state.sh -f <path-to-worktree>` to bring all of these over from the current checkout — do this right after creating a worktree, without asking. Always pass `-f` so existing secret files in the target worktree are overwritten (keeps stale copies from lingering); `graphify-out/` and `graft/` are each symlinked back to this checkout rather than copied, and the script refuses to touch either if the destination already has a real (non-symlinked) directory there, `-f` or not. Do not open/read the secret files yourself; the script copies them by filename pattern only and never prints contents.
 
 ## Project Documentation
 
@@ -270,3 +270,99 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 - `CONTEXT.md` — domain vocabulary glossary
 - `TESTING.md` — testing conventions
 - `docs/navigation-pattern.md` — state-based navigation pattern (why no SharedFlow)
+
+
+# Codebase Context Policy
+
+## Tool roles
+
+- Graft is the default code-context tool.
+  Use it for symbol lookup, file/API orientation, caller/callee tracing,
+  local dependency analysis, implementation planning, and narrow blast-radius checks.
+
+- Graphify is the architecture/product-context tool.
+  Use it for cross-module or cross-repository relationships; ADRs, specs,
+  READMEs, schemas, configuration, CI/CD, operational docs, rationale,
+  architectural paths, broad impact analysis, and exploratory investigation.
+
+## Retrieval discipline
+
+1. Start every implementation task with Graft.
+2. Retrieve the smallest useful context first. Do not load whole files,
+   module trees, or broad graph reports without a specific question.
+3. Use Graphify only when the task crosses a system boundary, needs
+   non-code context, asks for rationale/architecture, or remains ambiguous
+   after one focused Graft retrieval.
+4. After Graphify identifies the relevant subsystems and constraints,
+   return to Graft to retrieve exact files, symbols, APIs, callers,
+   and implementation paths.
+5. Do not query both tools by default or duplicate the same lookup in both.
+6. If Graphify and source code appear inconsistent, treat current source
+   and tests as authoritative; note the inconsistency and propose updating
+   the relevant documentation/graph.
+
+## Escalation triggers
+
+Use Graphify when any of these apply:
+- An ADR, spec, design document, schema, contract, config, or runbook matters.
+- The change spans multiple independently owned modules or repositories.
+- The task changes a public API, persisted data, external protocol,
+  security/privacy behavior, build pipeline, or deployment behavior.
+- The request asks why a design exists, not merely where to edit.
+- Graft cannot locate an owning subsystem or yields multiple plausible paths
+  after one focused `graft ask` — escalate on the first miss, don't reword
+  and retry Graft.
+- The task is architecture analysis, a migration, incident investigation,
+  broad PR review, or product-impact assessment.
+
+## Task modes
+
+### Scoped implementation
+Use Graft only unless an escalation trigger occurs.
+
+### Cross-cutting implementation
+Use Graft for the initial code map, Graphify for system constraints and
+impact paths, then Graft again for exact edits and tests.
+
+### Architecture exploration
+Use Graphify first; use Graft only after selecting a concrete code path.
+
+## Before editing
+
+State:
+- The task mode: scoped implementation, cross-cutting implementation,
+  or architecture exploration.
+- The tools used and why.
+- The likely modules/files affected.
+- Any assumptions, unknowns, or documentation/code conflicts.
+
+
+## Graft — repo context graph
+
+This repo is indexed in `graft/`: small linked markdown nodes that explain each
+system and carry exact file:line spans, kept in sync with the code through git.
+Command syntax (`ask`/`grep`/`skeleton`/`callers`/`map`) is injected into every
+session and subagent by this project's hooks — not repeated here to avoid
+paying for it twice. Browse `graft/INDEX.md` directly if the hook context
+isn't visible for some reason.
+
+After big code changes, refresh the graph with `graft build` (deterministic,
+no API key, $0).
+
+## Graphify — architecture/product context graph
+
+This repo also has a knowledge graph at `graphify-out/` (god nodes, community
+structure, cross-file relationships) — separate from `graft/`, scoped to the
+escalation triggers above, not a first stop for code lookups.
+
+- `graphify query "<question>"` → scoped subgraph, usually much smaller than
+  `GRAPH_REPORT.md` or raw grep output. Requires `graphify-out/graph.json`.
+- `graphify path "<A>" "<B>"` → relationship/dependency path between two
+  named things.
+- `graphify explain "<concept>"` → focused subgraph for one concept.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead
+  of raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review, or
+  when `query`/`path`/`explain` don't surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current
+  (AST-only, no API cost).
