@@ -5,6 +5,7 @@ import android.speech.tts.TextToSpeech
 import com.rossomak.flashcards.core.data.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -17,6 +18,8 @@ class VoiceOptionsDataSource @Inject constructor(
         continuation.invokeOnCancellation { tts?.shutdown() }
         tts = TextToSpeech(context) { status ->
             val voices = if (status == TextToSpeech.SUCCESS) {
+                // App is English-only content — never leave this on the device's system locale.
+                tts?.language = Locale.US
                 // Grouped by ISO country code (VoiceCuration guarantees one of US/GB/AU, never
                 // blank) purely to number each group's voices 1-based — Voice.name is Android's
                 // own unique id, but its format is engine-opaque (not documented as delimited in

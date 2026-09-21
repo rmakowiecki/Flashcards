@@ -17,6 +17,7 @@ import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
 import com.rossomak.flashcards.feature.study.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -274,6 +275,9 @@ class VoiceAnswerController @Inject constructor(
                 tts?.shutdown()
                 noticeTts = null
             } else {
+                // App supports English content only — never fall back to the device's system
+                // locale (e.g. Polish), which garbles English notice text.
+                tts?.language = Locale.US
                 tts?.setOnUtteranceProgressListener(noticeUtteranceListener)
             }
         }
