@@ -10,7 +10,9 @@ import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseC
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason
 import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
+import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -18,8 +20,11 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -42,6 +47,10 @@ class OnboardingViewModel @Inject constructor(
     private val eventChannel = Channel<OnboardingDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
+    private val _voiceDemoFailureMessages = MutableSharedFlow<VoiceDemoFailureReason>(extraBufferCapacity = 1)
+
+    val voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason> = _voiceDemoFailureMessages.asSharedFlow()
+
     init {
         viewModelScope.launch {
             val authUser = getCurrentAuthUser()
@@ -51,6 +60,9 @@ class OnboardingViewModel @Inject constructor(
         viewModelScope.launch {
             voiceDemoGateway.state.collect { voiceDemoState ->
                 _state.update { it.copy(voiceDemoState = voiceDemoState) }
+                if (voiceDemoState is VoiceDemoState.Failed) {
+                    _voiceDemoFailureMessages.tryEmit(voiceDemoState.reason)
+                }
             }
         }
     }
@@ -71,6 +83,7 @@ class OnboardingViewModel @Inject constructor(
 
     override fun onCleared() {
         voiceDemoGateway.stop()
+        voiceDemoGateway.release()
     }
 
     fun onStudyModeSelect(studyMode: StudyMode) {
