@@ -55,6 +55,9 @@ data class RatedSessionState(
     /** How many distinct cards have resolved [FlashcardTerminalRating.Mastered] so far. */
     val masteredCount: Int get() = terminalStates.values.count { it.terminalState == FlashcardTerminalRating.Mastered }
 
+    /** How many distinct cards have reached any [FlashcardTerminalRating] so far, any grade. */
+    val completedCount: Int get() = terminalStates.size
+
     /** `true` exactly when every distinct card has reached a Terminal State. */
     val isComplete: Boolean get() = queue.isEmpty()
 
