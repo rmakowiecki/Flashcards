@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
+import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 
@@ -43,7 +44,9 @@ fun StudySessionBody(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            isLoading -> CenteredBox(innerPadding) { CircularProgressIndicator() }
+            isLoading -> CenteredBox(innerPadding) {
+                CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
+            }
             error != null -> CenteredBox(innerPadding) { Text(text = error) }
             flashcards.isEmpty() -> CenteredBox(innerPadding) {
                 Text(text = stringResource(R.string.study_session_no_cards_message))
