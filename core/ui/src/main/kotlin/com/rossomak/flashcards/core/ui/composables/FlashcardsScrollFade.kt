@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.ui.composables
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.MaterialTheme
@@ -150,6 +151,31 @@ fun Modifier.flashcardsListScrollFade(
                 fadeHeightPx
             }
         },
+    )
+}
+
+/**
+ * [flashcardsListScrollFade] for a plain [ScrollState]-driven `Modifier.verticalScroll` container
+ * (not a lazy list) — e.g. [FlashcardCard][com.rossomak.flashcards.feature.study.chrome.FlashcardCard]'s
+ * own content column, which scrolls internally when a card's question/answer text overflows its max
+ * height. Same solid-color paint-over technique as [flashcardsListScrollFade]: pass the color the
+ * scrollable content actually sits on (its own container's background), not the screen background.
+ */
+@Composable
+fun Modifier.flashcardsScrollFade(
+    scrollState: ScrollState,
+    fadeHeight: Dp = FlashcardsScrollFadeHeight,
+    backgroundColor: Color = MaterialTheme.colorScheme.background,
+): Modifier {
+    val canFadeTop by remember(scrollState) { derivedStateOf { scrollState.canScrollBackward } }
+    val canFadeBottom by remember(scrollState) { derivedStateOf { scrollState.canScrollForward } }
+    return edgeScrollFade(
+        fadeHeight = fadeHeight,
+        reveal = FlashcardsFadeReveal.Solid(backgroundColor),
+        canFadeTop = canFadeTop,
+        canFadeBottom = canFadeBottom,
+        topScrolledPx = { scrollState.value.toFloat() },
+        bottomScrolledPx = { (scrollState.maxValue - scrollState.value).toFloat() },
     )
 }
 
