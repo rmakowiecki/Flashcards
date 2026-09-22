@@ -98,7 +98,11 @@ class RatedStudySessionViewModel @Inject constructor(
     private val sessionTitle: String = route.sessionTitle
 
     private val _state = MutableStateFlow(
-        RatedStudySessionScreenState(sessionTitle = sessionTitle, attemptsLimit = route.ratedAttempts),
+        RatedStudySessionScreenState(
+            sessionTitle = sessionTitle,
+            attemptsLimit = route.ratedAttempts,
+            isVoiceMode = route.voiceAnsweringEnabled,
+        ),
     )
     val state: StateFlow<RatedStudySessionScreenState> = _state.asStateFlow()
 
@@ -306,7 +310,9 @@ class RatedStudySessionViewModel @Inject constructor(
             voiceGateway.state.collect { voice ->
                 if (voice.error != null) {
                     voiceStarted = false
-                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false) }
+                    // Falls back to the manual-mode sheet too — the engine isn't coming back for
+                    // this session, so there is no point leaving voice's controls up, greyed out.
+                    _state.update { it.copy(isVoiceMode = false, isVoiceActive = false, isVoicePlaying = false) }
                     _messages.tryEmit(RatedStudySessionMessage.VoicePlaybackUnavailable)
                     return@collect
                 }
@@ -530,7 +536,12 @@ class RatedStudySessionViewModel @Inject constructor(
 
     fun onMicPermissionResult(isGranted: Boolean) {
         _state.update { it.copy(isMicPermissionRequestPending = false) }
-        if (!isGranted) return
+        if (!isGranted) {
+            // The gateway never gets bootstrapped without the mic — falls back to the manual-mode
+            // sheet rather than leaving voice's controls up with no engine behind them.
+            _state.update { it.copy(isVoiceMode = false) }
+            return
+        }
         // Rated sessions never auto-start the gateway; enabling voice answering is what
         // bootstraps it here (ADR-0025).
         ensureVoiceGatewayStarted()
@@ -784,6 +795,9 @@ class RatedStudySessionViewModel @Inject constructor(
         when (dialog) {
             is CurrentCardExtendedContext -> onExtendedContextDialogDismissed()
             is SessionVoiceSettings -> onVoiceSettingsDismiss()
+            // Declining consent means the gateway never bootstraps — falls back to the manual-mode
+            // sheet rather than leaving voice's controls up with no engine behind them.
+            VoiceAnswerConsent -> _state.update { it.copy(isVoiceMode = false) }
             else -> Unit
         }
     }

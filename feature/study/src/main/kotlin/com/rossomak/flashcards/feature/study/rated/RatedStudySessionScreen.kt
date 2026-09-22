@@ -189,7 +189,7 @@ fun RatedStudySessionContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         sheetSwipeEnabled = false,
         sheetPeekHeight = when {
-            state.isVoiceActive -> 176.dp
+            state.isVoiceMode -> 176.dp
             state.isAnswerRevealed -> 200.dp
             else -> 152.dp
         },
@@ -260,7 +260,7 @@ private fun RatedStudySessionSheetContent(
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp, bottom = 24.dp),
     ) {
-        if (state.isVoiceActive) {
+        if (state.isVoiceMode) {
             RatedVoiceAnswerHeader(state = state, onVoiceAnswerToggle = onVoiceAnswerToggle, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
             RatedVoiceTranscript(state = state)
             RatedVoiceGradeFeedback(state = state)
@@ -439,7 +439,8 @@ private fun RatedVoiceTransportRow(
         ) {
             IconButton(
                 onClick = onVoicePrevious,
-                enabled = state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
+                enabled = state.isVoiceActive &&
+                    state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
@@ -450,7 +451,7 @@ private fun RatedVoiceTransportRow(
             FilledIconButton(
                 onClick = onVoicePlayPause,
                 modifier = Modifier.size(56.dp),
-                enabled = !isVoiceAnswerListening,
+                enabled = state.isVoiceActive && !isVoiceAnswerListening,
             ) {
                 Icon(
                     imageVector = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -469,7 +470,7 @@ private fun RatedVoiceTransportRow(
                 // the answer is revealed by the grading pipeline itself (ADR-0026), never by this
                 // button — here it can only mean "skip this question".
                 onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-                enabled = !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
+                enabled = state.isVoiceActive && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
@@ -515,6 +516,7 @@ private fun RatedStudySessionVoiceActivePreview() {
         state = RatedStudySessionScreenState(
             sessionTitle = "Compose",
             flashcards = emptyList(),
+            isVoiceMode = true,
             isVoiceActive = true,
             isVoicePlaying = true,
             speechRate = 1.25f,

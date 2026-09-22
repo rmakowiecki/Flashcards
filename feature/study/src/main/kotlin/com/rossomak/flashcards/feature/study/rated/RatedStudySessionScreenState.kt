@@ -30,6 +30,11 @@ data class RatedStudySessionScreenState(
     val currentCardIndex: Int = 0,
     val isAnswerRevealed: Boolean = false,
     val error: String? = null,
+    // Routed at session start (RatedStudySessionRoute.voiceAnsweringEnabled) — known synchronously,
+    // unlike isVoiceActive below, which only flips once the voice engine finishes binding. The
+    // sheet must never show the manual-mode perspective for a voice session, even for the moment
+    // between entry and that bind completing, so it branches on this flag instead of isVoiceActive.
+    val isVoiceMode: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
