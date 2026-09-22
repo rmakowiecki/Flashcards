@@ -71,7 +71,12 @@ class FastStudySessionViewModel @Inject constructor(
     private val route = savedStateHandle.decodeRoute<FastStudySessionRoute>()
     private val sessionTitle: String = route.sessionTitle
 
-    private val _state = MutableStateFlow(FastStudySessionScreenState(sessionTitle = sessionTitle))
+    private val _state = MutableStateFlow(
+        FastStudySessionScreenState(
+            sessionTitle = sessionTitle,
+            isReadAloudMode = route.readAloudEnabled,
+        ),
+    )
     val state: StateFlow<FastStudySessionScreenState> = _state.asStateFlow()
 
     // Tracks eagerly so rapid toggles don't race against isVoiceActive propagation.
@@ -204,7 +209,12 @@ class FastStudySessionViewModel @Inject constructor(
             voiceGateway.state.collect { voice ->
                 if (voice.error != null) {
                     voiceStarted = false
-                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false, voiceError = voice.error) }
+                    // Falls back to the manual-mode sheet too — the engine isn't coming back for
+                    // this session, so there is no point leaving read-aloud's controls up, greyed
+                    // out.
+                    _state.update {
+                        it.copy(isReadAloudMode = false, isVoiceActive = false, isVoicePlaying = false, voiceError = voice.error)
+                    }
                     return@collect
                 }
                 // The answer phase for the current index is Fast's Studied criterion under
@@ -296,7 +306,10 @@ class FastStudySessionViewModel @Inject constructor(
     }
 
     fun onVoiceAutoStartDeclined() {
-        _state.update { it.copy(isVoiceAutoStartPending = false) }
+        // The gateway never gets bootstrapped without notification permission — falls back to the
+        // manual-mode sheet rather than leaving read-aloud's controls up with no engine behind
+        // them.
+        _state.update { it.copy(isVoiceAutoStartPending = false, isReadAloudMode = false) }
     }
 
     fun onVoiceAutoStart() {
