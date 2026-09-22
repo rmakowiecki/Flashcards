@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flags violations of the argument-order convention in AGENTS.md / ADR-0020.
+"""Flags violations of the argument-order convention.
 
 Heuristic, regex + paren-depth based -- not a real AST check. Exits non-zero if
 any violation is found. Covers:
@@ -186,7 +186,7 @@ def main() -> int:
     if violations:
         for v in violations:
             print(v)
-        print("\nArgument-order violations found -- see AGENTS.md §Argument Order and ADR-0020.")
+        print("\nArgument-order violations found -- see ADR-0020.")
         return 1
 
     print("check-arg-order: no violations found.")
