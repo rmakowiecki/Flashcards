@@ -84,16 +84,18 @@ fun FlashcardCard(
                 isAnswerRevealed = isAnswerRevealed,
                 attemptSlots = attemptSlots,
             )
-            AnimatedVisibility(
-                visible = isAnswerRevealed,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-            ) {
-                FlashcardAnswerSection(
-                    card = card,
-                    syntaxEngine = syntaxEngine,
-                    onExtendedContextClick = onExtendedContextClick,
-                )
+            key(card.id) {
+                AnimatedVisibility(
+                    visible = isAnswerRevealed,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    FlashcardAnswerSection(
+                        card = card,
+                        syntaxEngine = syntaxEngine,
+                        onExtendedContextClick = onExtendedContextClick,
+                    )
+                }
             }
         }
     }
