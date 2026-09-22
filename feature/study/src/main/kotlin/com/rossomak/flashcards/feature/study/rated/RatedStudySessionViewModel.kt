@@ -51,6 +51,7 @@ import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -61,15 +62,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runs a Rated Study Session end to end — reveal, the Failed/Partial/Correct row, and the
- * in-session voice-answering toggle with its consent and microphone flow
+ * session-entry voice-answering consent-and-microphone handshake
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)).
  * Knows nothing about Read-aloud or auto-start playback — those are Fast concepts.
  *
@@ -187,8 +186,6 @@ class RatedStudySessionViewModel @Inject constructor(
     // True only when opening voice settings paused an in-progress playback; gates resume on close.
     private var pausedForVoiceSettings = false
 
-    private var hasVoiceAnswerConsent = false
-
     // Edge-detects a fresh arrival at SpeakingNotice in observeVoiceAnswerState — the collector
     // sees every VoiceAnswerState the gateway emits, but a grade/silence-timeout must apply exactly
     // once per round, not once per equal-value re-collection.
@@ -216,7 +213,6 @@ class RatedStudySessionViewModel @Inject constructor(
         loadFlashcards()
         observeVoiceState()
         observeVoiceAnswerState()
-        observeVoiceAnswerConsentState()
     }
 
     // Card selection happens on the Preview Study Session screen (ADR-0004); the session only
@@ -252,7 +248,13 @@ class RatedStudySessionViewModel @Inject constructor(
             // The clock starts here, once a card is actually on screen — never at route entry, so
             // a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
-            honourRoutedVoiceAnswering(hasCards = sessionCards.isNotEmpty())
+            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry. Consent
+            // is read as a one-shot rather than from hasVoiceAnswerConsent, whose collector may not
+            // have emitted yet by the time the cards land.
+            if (route.voiceAnsweringEnabled && sessionCards.isNotEmpty()) {
+                val hasConsent = observeUserPreferences().first().voiceAnswerConsentGranted
+                requestVoiceAnswering(hasConsent)
+            }
         }
     }
 
@@ -291,18 +293,6 @@ class RatedStudySessionViewModel @Inject constructor(
         if (_state.value.isVoiceActive || voiceStarted) {
             voiceGateway.updateQueue(machine.remainingCards)
         }
-    }
-
-    /**
-     * The Preview screen's voice-answering choice (ADR-0030) takes effect on entry, running the
-     * same consent-then-microphone path the in-session toggle uses.
-     *
-     * Consent is read as a one-shot rather than from [hasVoiceAnswerConsent], whose collector may
-     * not have emitted yet by the time the cards land.
-     */
-    private suspend fun honourRoutedVoiceAnswering(hasCards: Boolean) {
-        if (!route.voiceAnsweringEnabled || !hasCards) return
-        requestVoiceAnswering(observeUserPreferences().first().voiceAnswerConsentGranted)
     }
 
     private fun observeVoiceState() {
@@ -485,25 +475,6 @@ class RatedStudySessionViewModel @Inject constructor(
         _state.update { it.copy(isVoiceAnswerPaused = false) }
         voiceGateway.setVoiceAnswering(true)
         if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
-    }
-
-    private fun observeVoiceAnswerConsentState() {
-        viewModelScope.launch {
-            observeUserPreferences().map { it.voiceAnswerConsentGranted }.collect { hasConsent ->
-                hasVoiceAnswerConsent = hasConsent
-            }
-        }
-    }
-
-    fun onVoiceAnswerToggle() {
-        if (_state.value.isVoiceAnswerEnabled) {
-            // Voice-answering-on drives the shared TTS engine in a stop-after-question shape;
-            // there is no meaningful "keep reading, just stop grading" middle state (ADR-0025),
-            // so disabling it tears down the whole engine back to manual Show Answer/Next.
-            voiceGateway.stop()
-            return
-        }
-        requestVoiceAnswering(hasVoiceAnswerConsent)
     }
 
     /** Consent first, then the microphone. Both gates are one-time; neither is skippable. */

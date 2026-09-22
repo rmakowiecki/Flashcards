@@ -918,49 +918,11 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `onVoiceAnswerToggle without consent shows the consent dialog even before the gateway is active`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            // Rated sessions never auto-start the gateway (ADR-0025) — the toggle must be reachable
-            // while isVoiceActive is still false.
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.onVoiceAnswerToggle()
-
-            viewModel.state.value.activeDialog shouldBe VoiceAnswerConsent
-            voiceGateway.lastVoiceAnswering shouldBe null
-        }
-
-    @Test
-    fun `onVoiceAnswerToggle with consent requests the mic permission even before the gateway is active`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(voiceAnswerConsentGranted = true)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.onVoiceAnswerToggle()
-
-            viewModel.state.value.isMicPermissionRequestPending shouldBe true
-            viewModel.state.value.activeDialog shouldBe null
-        }
-
-    @Test
-    fun `onVoiceAnswerToggle while enabled stops the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true)
-        advanceUntilIdle()
-
-        viewModel.onVoiceAnswerToggle()
-
-        voiceGateway.stopCalls shouldBe 1
-    }
-
-    @Test
     fun `accepting voice-answer consent persists it and requests the mic permission`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(voiceAnsweringEnabled = true))
+        loadThreeCards()
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onVoiceAnswerToggle()
 
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()
@@ -973,10 +935,11 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a failed consent save keeps the dialog open, surfaces an error, and skips the mic request`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(route.copy(voiceAnsweringEnabled = true))
+            loadThreeCards()
             userPreferencesRepository.saveError = IllegalStateException("disk full")
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onVoiceAnswerToggle()
 
             viewModel.messages.test {
                 viewModel.onDialogEvent(Confirm)

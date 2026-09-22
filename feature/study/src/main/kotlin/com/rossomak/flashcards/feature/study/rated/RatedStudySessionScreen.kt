@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -160,7 +158,6 @@ fun RatedStudySessionScreen(
         onVoicePlayPause = viewModel::onVoicePlayPause,
         onVoiceNext = viewModel::onVoiceNext,
         onVoicePrevious = viewModel::onVoicePrevious,
-        onVoiceAnswerToggle = viewModel::onVoiceAnswerToggle,
         onDialogEvent = viewModel::onDialogEvent,
     )
 }
@@ -176,7 +173,6 @@ fun RatedStudySessionContent(
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
-    onVoiceAnswerToggle: () -> Unit,
     onDialogEvent: (StudySessionDialogEvent) -> Unit,
 ) {
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -222,7 +218,6 @@ fun RatedStudySessionContent(
                 onVoiceNext = onVoiceNext,
                 onVoicePrevious = onVoicePrevious,
                 onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
-                onVoiceAnswerToggle = onVoiceAnswerToggle,
             )
         },
     ) { innerPadding ->
@@ -252,7 +247,6 @@ private fun RatedStudySessionSheetContent(
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
-    onVoiceAnswerToggle: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -261,7 +255,7 @@ private fun RatedStudySessionSheetContent(
             .padding(top = 8.dp, bottom = 24.dp),
     ) {
         if (state.isVoiceMode) {
-            RatedVoiceAnswerHeader(state = state, onVoiceAnswerToggle = onVoiceAnswerToggle, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
+            RatedVoiceAnswerHeader(state = state, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
             RatedVoiceTranscript(state = state)
             RatedVoiceGradeFeedback(state = state)
             RatedVoiceTransportRow(
@@ -272,25 +266,6 @@ private fun RatedStudySessionSheetContent(
                 onVoicePrevious = onVoicePrevious,
             )
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.study_session_voice_answer_label),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onVoiceAnswerToggle) {
-                    Icon(
-                        imageVector = Icons.Default.MicOff,
-                        contentDescription = stringResource(R.string.study_session_voice_answer_enable_cd),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
             if (!state.isAnswerRevealed) {
                 Button(
                     onClick = onShowAnswer,
@@ -308,7 +283,6 @@ private fun RatedStudySessionSheetContent(
 @Composable
 private fun RatedVoiceAnswerHeader(
     state: RatedStudySessionScreenState,
-    onVoiceAnswerToggle: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
     Row(
@@ -334,23 +308,6 @@ private fun RatedVoiceAnswerHeader(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = onVoiceAnswerToggle) {
-            Icon(
-                imageVector = if (state.isVoiceAnswerEnabled) Icons.Default.Mic else Icons.Default.MicOff,
-                contentDescription = stringResource(
-                    if (state.isVoiceAnswerEnabled) {
-                        R.string.study_session_voice_answer_disable_cd
-                    } else {
-                        R.string.study_session_voice_answer_enable_cd
-                    }
-                ),
-                tint = if (state.isVoiceAnswerEnabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
         IconButton(onClick = onVoiceSettingsCogClick) {
             Icon(
                 imageVector = Icons.Default.Settings,
@@ -527,7 +484,6 @@ private fun RatedStudySessionVoiceActivePreview() {
         onVoicePlayPause = {},
         onVoiceNext = {},
         onVoicePrevious = {},
-        onVoiceAnswerToggle = {},
         onDialogEvent = {},
     )
 }
@@ -563,7 +519,6 @@ private fun RatedStudySessionManualPreview() {
         onVoicePlayPause = {},
         onVoiceNext = {},
         onVoicePrevious = {},
-        onVoiceAnswerToggle = {},
         onDialogEvent = {},
     )
 }

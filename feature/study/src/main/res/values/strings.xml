@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="study_session_voice_answer_enable_cd">Enable voice answering</string>
-    <string name="study_session_voice_answer_disable_cd">Disable voice answering</string>
     <string name="study_session_voice_answer_waiting_label">Reading question…</string>
     <string name="study_session_voice_answer_listening_label">Listening for your answer…</string>
     <string name="study_session_voice_answer_grading_label">Grading your answer…</string>
     <string name="study_session_voice_answer_feedback_label">Speaking feedback…</string>
     <string name="study_session_voice_answer_grade_message">Graded %1$d%%: %2$s</string>
     <string name="study_session_voice_answer_error_message">Couldn\'t grade that answer</string>
-    <string name="study_session_voice_answer_label">Voice answering</string>
     <string name="study_session_show_answer_cd">Show answer</string>
     <string name="study_session_next_flashcard_cd">Next flashcard</string>
     <string name="study_session_voice_answer_consent_title">Hands-free voice answering</string>
