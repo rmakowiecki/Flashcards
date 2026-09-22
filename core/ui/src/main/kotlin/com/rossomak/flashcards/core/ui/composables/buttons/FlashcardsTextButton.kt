@@ -28,8 +28,8 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
- * The lowest-emphasis button — no fill, no border, text (+ optional icon) only ("Skip",
- * "Learn more"). Use for a dismissive or auxiliary action that shouldn't draw the eye.
+ * The lowest-emphasis button — no fill, no border, text (+ optional icon) only ("Skip").
+ * Use for a dismissive or auxiliary action that shouldn't draw the eye.
  *
  * Unlike the other three `Flashcards*Button`s, this doesn't override M3 [TextButton]'s
  * `contentPadding` — a text button has no visible container edge, so its own tighter default

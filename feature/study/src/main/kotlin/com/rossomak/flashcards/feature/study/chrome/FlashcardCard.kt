@@ -3,6 +3,8 @@ package com.rossomak.flashcards.feature.study.chrome
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,11 +12,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
@@ -34,7 +41,6 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorBadge
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorEmphasis.Emphasized
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorEmphasis.Neutral
 import com.rossomak.flashcards.core.ui.composables.SyntaxCodeBlock
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.withInlineCode
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
@@ -161,11 +167,7 @@ private fun FlashcardAnswerSection(
             )
             if (!extendedContext.isNullOrBlank()) {
                 Spacer(modifier = Modifier.weight(1f))
-                FlashcardsTextButton(
-                    text = stringResource(R.string.study_session_learn_more_button),
-                    onClick = { onExtendedContextClick(extendedContext) },
-                    icon = Icons.Default.Info,
-                )
+                LearnMoreLink(onClick = { onExtendedContextClick(extendedContext) })
             }
         }
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.xsmall))
@@ -181,5 +183,38 @@ private fun FlashcardAnswerSection(
                 engine = syntaxEngine,
             )
         }
+    }
+}
+
+/**
+ * A bare icon+text tap target for the auxiliary "Learn more" action — deliberately not a
+ * [FlashcardsTextButton], which floors at a fixed height that overpowers the compact,
+ * intrinsic-height [FlashcardsIndicatorBadge] it sits beside in the same row.
+ */
+@Composable
+private fun LearnMoreLink(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(MaterialTheme.cornerRadius.full))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.width(MaterialTheme.spacing.xxsmall))
+        Text(
+            text = stringResource(R.string.study_session_learn_more_button),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
