@@ -32,6 +32,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
+import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -41,6 +42,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import com.rossomak.flashcards.feature.study.voice.VoiceGateway
 import com.rossomak.flashcards.feature.study.voice.VoicePhase
@@ -142,6 +144,11 @@ class RatedStudySessionViewModel @Inject constructor(
     // resolves, sending a second Summary navigation event. Mirrors FastStudySessionViewModel's
     // identical guard.
     private var terminated = false
+
+    // Guards the mic-permission-revoked terminal path (observeVoiceAnswerState) against emitting
+    // its snackbar more than once — terminate() is separately idempotent, but the underlying
+    // VoiceAnswerState can keep repeating while this collector runs until the ViewModel clears.
+    private var micPermissionRevokedHandled = false
 
     private var rewindJob: Job? = null
     private var isPastRewindThreshold = false
@@ -351,6 +358,27 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun observeVoiceAnswerState() {
         viewModelScope.launch {
             voiceGateway.voiceAnswerState.collect { voiceAnswer ->
+                // Mic permission missing right now ends the session outright — checked
+                // unconditionally, not gated behind entering SpeakingNotice below, because a
+                // mid-listen capture failure (VoiceAnswerController.handleCaptureEvent) resets
+                // phase to WaitingForQuestion and never reaches SpeakingNotice at all; without this
+                // check the session would otherwise silently freeze on the current card forever.
+                // Covers both shapes: CaptureFailed wrapping a VoiceCaptureFailureReason from an
+                // active listen attempt (revoked mid-session, e.g. via system Settings), and the
+                // bare PermissionMissing VoiceAnswerController.start() sets if the permission is
+                // already gone the moment voice answering (re)enables — reachable via onResumeSession()
+                // after a pause.
+                val error = voiceAnswer.error
+                val isMicPermissionMissing = error is VoiceAnswerFailureReason.PermissionMissing ||
+                    (error is VoiceAnswerFailureReason.CaptureFailed && error.reason is VoiceCaptureFailureReason.PermissionMissing)
+                if (isMicPermissionMissing) {
+                    if (!micPermissionRevokedHandled) {
+                        micPermissionRevokedHandled = true
+                        _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
+                        terminate(abandoned = true)
+                    }
+                    return@collect
+                }
                 // Edge-detected before the state update below, off the collector's own running
                 // previousVoiceAnswerPhase — SpeakingNotice is entered exactly once per graded or
                 // silence-timed-out round, never re-triggered by an equal-value re-collection.

@@ -33,6 +33,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
+import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
@@ -41,6 +42,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnsw
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerConsentSaveFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
@@ -1230,7 +1232,7 @@ class RatedStudySessionViewModelTest {
                     voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
                         isEnabled = true,
                         phase = VoiceAnswerPhase.SpeakingNotice,
-                        error = VoiceAnswerFailureReason.PermissionMissing,
+                        error = VoiceAnswerFailureReason.GradingFailed("boom"),
                     )
                     advanceUntilIdle()
                     awaitItem() shouldBe VoiceAnswerGradingFailed
@@ -1240,6 +1242,68 @@ class RatedStudySessionViewModelTest {
             }
             // Three in a row — a real silence timeout would have paused by now.
             viewModel.state.value.isVoiceAnswerPaused shouldBe false
+        }
+
+    @Test
+    fun `a mid-session capture failure from a missing mic permission ends the session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                // CaptureFailed resets phase to WaitingForQuestion, never SpeakingNotice — this must
+                // still be caught, unlike an ordinary grading/transcription failure.
+                voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                    isEnabled = true,
+                    phase = VoiceAnswerPhase.WaitingForQuestion,
+                    error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)),
+                )
+                advanceUntilIdle()
+
+                awaitItem() shouldBe VoiceAnswerMicPermissionRevoked
+            }
+            viewModel.events.test {
+                awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
+            }
+        }
+
+    @Test
+    fun `a bare mic-permission-missing voice-answer state also ends the session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // VoiceAnswerController.start() sets this bare (unwrapped) form directly if the
+            // permission is already gone the moment voice answering (re)enables — e.g. resuming
+            // after a pause with the permission revoked in the meantime.
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(error = VoiceAnswerFailureReason.PermissionMissing)
+                advanceUntilIdle()
+
+                awaitItem() shouldBe VoiceAnswerMicPermissionRevoked
+            }
+            viewModel.events.test {
+                awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
+            }
+        }
+
+    @Test
+    fun `a capture failure unrelated to mic permission does not end the session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                isEnabled = true,
+                phase = VoiceAnswerPhase.WaitingForQuestion,
+                error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable),
+            )
+            advanceUntilIdle()
+
+            viewModel.events.test { expectNoEvents() }
         }
 
     @Test
@@ -1278,7 +1342,7 @@ class RatedStudySessionViewModelTest {
             voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
                 isEnabled = true,
                 phase = VoiceAnswerPhase.SpeakingNotice,
-                error = VoiceAnswerFailureReason.PermissionMissing,
+                error = VoiceAnswerFailureReason.GradingFailed("boom"),
             )
             advanceUntilIdle()
             voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
