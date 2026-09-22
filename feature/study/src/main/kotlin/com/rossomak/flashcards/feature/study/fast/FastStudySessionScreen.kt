@@ -6,21 +6,25 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,16 +47,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
@@ -62,7 +70,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCur
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
-import com.rossomak.flashcards.feature.study.chrome.StudySessionTopAppBar
+import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
+import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
 import kotlinx.coroutines.launch
@@ -143,6 +152,7 @@ fun FastStudySessionScreen(
                     }
                 }
             }
+
             CurationReportFailed -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(message = curationReportFailedMessage, duration = SnackbarDuration.Short)
             }
@@ -186,62 +196,77 @@ fun FastStudySessionContent(
         bottomSheetState = rememberStandardBottomSheetState(skipHiddenState = true),
     )
 
-    BottomSheetScaffold(
-        modifier = modifier,
-        scaffoldState = scaffoldState,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        sheetSwipeEnabled = false,
-        sheetPeekHeight = when {
-            state.isVoiceActive -> 176.dp
-            state.isAnswerRevealed -> 160.dp
-            else -> 112.dp
-        },
-        sheetDragHandle = {},
-        topBar = {
-            StudySessionTopAppBar(
-                sessionTitle = state.sessionTitle,
-                reportableCard = state.currentCard,
-                counterText = if (state.flashcards.isNotEmpty()) {
-                    stringResource(
-                        R.string.fast_study_session_position_counter_label,
-                        state.currentCardIndex + 1,
-                        state.flashcards.size,
-                    )
-                } else {
-                    null
-                },
-                onClose = { actions.onDialogEvent(Open(ExitSession)) },
-                onReportProblem = { card ->
-                    actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
-                },
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.brandColors.screenGradient),
+    ) {
+        BottomSheetScaffold(
+            modifier = Modifier.fillMaxSize(),
+            scaffoldState = scaffoldState,
+            containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            sheetSwipeEnabled = false,
+            sheetPeekHeight = when {
+                state.isVoiceActive -> 150.dp
+                state.isAnswerRevealed -> 150.dp
+                else -> 150.dp
+            },
+            sheetDragHandle = {},
+            topBar = {
+                StudySessionHeader(
+                    title = studySessionCardTitle(
+                        categoryName = state.categoryName,
+                        currentCard = state.currentCard,
+                        subcategoryNameById = state.subcategoryNameById,
+                        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+                    ),
+                    reportableCard = state.currentCard,
+                    progressLabel = if (state.flashcards.isNotEmpty()) {
+                        stringResource(R.string.fast_study_session_progress_label)
+                    } else {
+                        null
+                    },
+                    completedCount = if (state.flashcards.isNotEmpty()) state.currentCardIndex + 1 else null,
+                    totalCount = if (state.flashcards.isNotEmpty()) state.flashcards.size else null,
+                    progressFraction = if (state.flashcards.isNotEmpty()) {
+                        (state.currentCardIndex + 1) / state.flashcards.size.toFloat()
+                    } else {
+                        null
+                    },
+                    onClose = { actions.onDialogEvent(Open(ExitSession)) },
+                    onReportProblem = { card ->
+                        actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
+                    },
+                )
+            },
+            sheetContent = {
+                FastStudySessionSheetContent(
+                    state = state,
+                    onShowAnswer = actions.onShowAnswer,
+                    onNextCard = actions.onNextCard,
+                    onVoicePlayPause = actions.onVoicePlayPause,
+                    onVoiceNext = actions.onVoiceNext,
+                    onVoicePrevious = actions.onVoicePrevious,
+                    onVoiceSettingsCogClick = { actions.onDialogEvent(Open(SessionVoiceSettings())) },
+                )
+            },
+        ) { innerPadding ->
+            StudySessionBody(
+                isLoading = state.isLoading,
+                error = state.error?.let { stringResource(it) },
+                flashcards = state.flashcards,
+                currentCardIndex = state.currentCardIndex,
+                isAnswerRevealed = state.isAnswerRevealed,
+                innerPadding = innerPadding,
+                onExtendedContextClick = { actions.onDialogEvent(Open(CurrentCardExtendedContext(it))) },
             )
-        },
-        sheetContent = {
-            FastStudySessionSheetContent(
-                state = state,
-                onShowAnswer = actions.onShowAnswer,
-                onNextCard = actions.onNextCard,
-                onVoicePlayPause = actions.onVoicePlayPause,
-                onVoiceNext = actions.onVoiceNext,
-                onVoicePrevious = actions.onVoicePrevious,
-                onVoiceSettingsCogClick = { actions.onDialogEvent(Open(SessionVoiceSettings())) },
-            )
-        },
-    ) { innerPadding ->
-        StudySessionBody(
-            isLoading = state.isLoading,
-            error = state.error?.let { stringResource(it) },
-            flashcards = state.flashcards,
-            currentCardIndex = state.currentCardIndex,
-            isAnswerRevealed = state.isAnswerRevealed,
-            innerPadding = innerPadding,
-            onExtendedContextClick = { actions.onDialogEvent(Open(CurrentCardExtendedContext(it))) },
-        )
 
-        StudySessionDialogHost(
-            activeDialog = state.activeDialog,
-            onDialogEvent = actions.onDialogEvent,
-        )
+            StudySessionDialogHost(
+                activeDialog = state.activeDialog,
+                onDialogEvent = actions.onDialogEvent,
+            )
+        }
     }
 }
 
@@ -275,15 +300,35 @@ private fun FastStudySessionSheetContent(
                 onClick = onShowAnswer,
                 modifier = Modifier.fillMaxWidth(),
             ) {
+                Icon(imageVector = Icons.Default.Flip, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.size(8.dp))
                 Text(stringResource(R.string.study_session_show_answer_button))
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.study_session_show_answer_caption_message),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         } else {
             Button(
                 onClick = onNextCard,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.fast_study_session_next_button))
+                Spacer(modifier = Modifier.size(8.dp))
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.fast_study_session_next_caption_message),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -305,17 +350,13 @@ private fun FastVoiceTransportControls(
         ) {
             IconButton(onClick = onVoiceSettingsCogClick) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = Icons.Outlined.Settings,
                     contentDescription = stringResource(R.string.study_session_voice_settings_cd),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(96.dp),
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalArrangement = Arrangement.Center,
@@ -371,7 +412,8 @@ private fun FastVoiceTransportControls(
 private fun FastStudySessionVoiceActivePreview() {
     FastStudySessionContent(
         state = FastStudySessionScreenState(
-            sessionTitle = "Compose",
+            categoryName = "Android",
+            subcategoryNameById = mapOf("compose" to "Compose"),
             flashcards = emptyList(),
             isVoiceActive = true,
             isVoicePlaying = true,
@@ -395,7 +437,8 @@ private fun FastStudySessionVoiceActivePreview() {
 private fun FastStudySessionManualRevealedPreview() {
     FastStudySessionContent(
         state = FastStudySessionScreenState(
-            sessionTitle = "Compose",
+            categoryName = "Android",
+            subcategoryNameById = mapOf("compose" to "Compose"),
             flashcards = listOf(
                 com.rossomak.flashcards.core.domain.model.Flashcard(
                     id = "1",

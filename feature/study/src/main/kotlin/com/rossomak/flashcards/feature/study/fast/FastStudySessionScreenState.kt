@@ -16,7 +16,8 @@ import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
  * this split exists to remove.
  */
 data class FastStudySessionScreenState(
-    val sessionTitle: String = "",
+    val categoryName: String = "",
+    val subcategoryNameById: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val flashcards: List<Flashcard> = emptyList(),
     val currentCardIndex: Int = 0,

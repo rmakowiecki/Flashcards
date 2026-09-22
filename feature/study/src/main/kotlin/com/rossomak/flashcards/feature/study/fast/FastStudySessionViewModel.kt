@@ -72,9 +72,17 @@ class FastStudySessionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<FastStudySessionRoute>()
+
+    // Distinct from the screen's own per-card title (chrome.studySessionCardTitle):
+    // this is the fixed name the voice gateway's notification shows for the whole session.
     private val sessionTitle: String = route.sessionTitle
 
-    private val _state = MutableStateFlow(FastStudySessionScreenState(sessionTitle = sessionTitle))
+    private val _state = MutableStateFlow(
+        FastStudySessionScreenState(
+            categoryName = route.categoryName,
+            subcategoryNameById = route.subcategoryIds.zip(route.subcategoryNames).toMap(),
+        ),
+    )
     val state: StateFlow<FastStudySessionScreenState> = _state.asStateFlow()
 
     // Tracks eagerly so rapid toggles don't race against isVoiceActive propagation.
