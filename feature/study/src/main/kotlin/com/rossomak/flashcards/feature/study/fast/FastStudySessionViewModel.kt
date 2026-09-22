@@ -41,6 +41,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -53,7 +54,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runs a Fast Study Session end to end. Knows nothing about Ratings, Attempts or voice answering —
@@ -216,7 +216,7 @@ class FastStudySessionViewModel @Inject constructor(
             voiceGateway.state.collect { voice ->
                 if (voice.error != null) {
                     voiceStarted = false
-                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false) }
+                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false, isReadAloudMode = false) }
                     _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
                     return@collect
                 }

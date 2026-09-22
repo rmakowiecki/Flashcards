@@ -663,6 +663,9 @@ class FastStudySessionViewModelTest {
 
     @Test
     fun `observeVoiceState surfaces a voice error and clears active playback`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(readAloudEnabled = true))
+        loadThreeCards()
+
         val viewModel = createViewModel()
         advanceUntilIdle()
 
@@ -673,6 +676,7 @@ class FastStudySessionViewModelTest {
             awaitItem() shouldBe FastStudySessionMessage.VoicePlaybackUnavailable
             viewModel.state.value.isVoiceActive shouldBe false
             viewModel.state.value.isVoicePlaying shouldBe false
+            viewModel.state.value.isReadAloudMode shouldBe false
         }
     }
 
