@@ -24,6 +24,8 @@ import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsDifficultyBadge
+import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorBadge
+import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorEmphasis.Emphasized
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButtonRow
@@ -137,7 +139,10 @@ private fun MasteryResultCard(modifier: Modifier = Modifier) {
             ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MasteredBadge()
+            FlashcardsIndicatorBadge(
+                label = stringResource(R.string.mastery_mastered_label),
+                emphasis = Emphasized,
+            )
             Text(
                 text = stringResource(R.string.mastery_xp_reward_label, CARD_MASTERY_XP),
                 style = MaterialTheme.typography.titleMedium,
@@ -162,25 +167,6 @@ private fun MasteryCard(
             modifier = Modifier.padding(MaterialTheme.spacing.normal),
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             content = content,
-        )
-    }
-}
-
-@Composable
-private fun MasteredBadge(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.full),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Text(
-            text = stringResource(R.string.mastery_mastered_label),
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(
-                horizontal = MaterialTheme.spacing.small,
-                vertical = MaterialTheme.spacing.xxsmall,
-            ),
         )
     }
 }
