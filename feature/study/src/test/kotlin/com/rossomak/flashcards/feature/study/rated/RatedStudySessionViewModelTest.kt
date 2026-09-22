@@ -40,6 +40,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSessi
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerConsentSaveFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
@@ -1290,20 +1291,26 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a capture failure unrelated to mic permission does not end the session`() =
+    fun `a capture failure unrelated to mic permission pauses the session instead of ending it`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.WaitingForQuestion,
-                error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable),
-            )
-            advanceUntilIdle()
+            viewModel.messages.test {
+                voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                    isEnabled = true,
+                    phase = VoiceAnswerPhase.WaitingForQuestion,
+                    error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable),
+                )
+                advanceUntilIdle()
 
+                awaitItem() shouldBe VoiceAnswerCaptureUnavailable
+            }
             viewModel.events.test { expectNoEvents() }
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+            voiceGateway.lastVoiceAnswering shouldBe false
+            voiceGateway.restartCurrentCardCalls shouldBe 1
         }
 
     @Test

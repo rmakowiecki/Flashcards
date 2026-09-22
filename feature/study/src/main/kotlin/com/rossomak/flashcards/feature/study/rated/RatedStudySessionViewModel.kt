@@ -371,9 +371,24 @@ class RatedStudySessionViewModel @Inject constructor(
                 if (isMicPermissionMissing) {
                     if (!micPermissionRevokedHandled) {
                         micPermissionRevokedHandled = true
+                        voiceGateway.stop()
                         _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
-                        terminate(abandoned = true)
+                        // Deferred, not immediate: this delay gives the snackbar time to actually show
+                        viewModelScope.launch {
+                            delay(MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS.milliseconds)
+                            terminate(abandoned = true)
+                        }
                     }
+                    return@collect
+                }
+                // A non-permission capture failure (Bluetooth mic dropped, capture-loop error, etc.)
+                // is recoverable, unlike a revoked permission — pause on the current card rather than ending the session
+                if (error is VoiceAnswerFailureReason.CaptureFailed) {
+                    if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
+                    voiceGateway.setVoiceAnswering(false)
+                    voiceGateway.restartCurrentCard()
+                    _state.update { it.copy(isVoiceAnswerPaused = true) }
+                    _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
                     return@collect
                 }
                 // Edge-detected before the state update below, off the collector's own running
@@ -862,5 +877,6 @@ class RatedStudySessionViewModel @Inject constructor(
         const val EXTENDED_CONTEXT_ADVANCE_DELAY_MS = 500L
         const val CONSECUTIVE_SILENCE_PAUSE_THRESHOLD = 3
         const val SECONDS_PER_MINUTE = 60
+        const val MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS = 4000L
     }
 }

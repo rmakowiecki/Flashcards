@@ -17,6 +17,7 @@ import com.rossomak.flashcards.core.voice.AudioRouteManager
 import com.rossomak.flashcards.core.voice.CaptureRouteType
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
+import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import com.rossomak.flashcards.feature.study.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
@@ -234,6 +235,11 @@ class VoiceAnswerController @Inject constructor(
                         error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
                     )
                 }
+                if (event.reason !is VoiceCaptureFailureReason.PermissionMissing) {
+                    // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
+                    // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
+                    speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
+                }
             }
         }
     }
@@ -344,6 +350,15 @@ class VoiceAnswerController @Inject constructor(
         noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, NOTICE_UTTERANCE_ID)
     }
 
+    /**
+     * Same TTS channel as [speakNotice], different utterance id: [noticeUtteranceListener] only
+     * chains into [onNoticeFinishedSpeaking]'s advance-next-card callback for [NOTICE_UTTERANCE_ID],
+     * so a notice spoken here finishes as a no-op rather than advancing the session.
+     */
+    private fun speakStandaloneNotice(text: String) {
+        noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, CAPTURE_FAILURE_NOTICE_UTTERANCE_ID)
+    }
+
     private fun hasRecordAudioPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
@@ -372,6 +387,7 @@ class VoiceAnswerController @Inject constructor(
         const val WAKE_LOCK_TAG = "flashcards:voiceAnswerCapture"
         const val WAKE_LOCK_TIMEOUT_MS = 60L * 60L * 1000L // 1h safety cap per session
         const val NOTICE_UTTERANCE_ID = "voice_answer_notice"
+        const val CAPTURE_FAILURE_NOTICE_UTTERANCE_ID = "voice_answer_capture_failure_notice"
         const val SILENCE_TIMEOUT_MS = 8_000L
         const val ADVANCE_DELAY_MS = 1_000L
     }

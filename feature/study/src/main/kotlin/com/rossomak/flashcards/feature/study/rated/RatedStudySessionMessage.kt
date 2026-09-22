@@ -21,4 +21,10 @@ sealed interface RatedStudySessionMessage {
 
     /** Microphone permission was revoked mid-session (e.g. via system Settings); the session ends. */
     data object VoiceAnswerMicPermissionRevoked : RatedStudySessionMessage
+
+    /**
+     * A non-permission capture failure (e.g. Bluetooth mic dropped, capture-loop error) — voice
+     * answering pauses on the current card; the session continues once the user resumes.
+     */
+    data object VoiceAnswerCaptureUnavailable : RatedStudySessionMessage
 }

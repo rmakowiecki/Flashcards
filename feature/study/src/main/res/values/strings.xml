@@ -7,6 +7,8 @@
     <string name="study_session_voice_answer_grade_message">Graded %1$d%%: %2$s</string>
     <string name="study_session_voice_answer_error_message">Couldn\'t grade that answer</string>
     <string name="study_session_voice_answer_mic_permission_revoked_message">Microphone access was turned off — ending session</string>
+    <string name="study_session_voice_answer_capture_unavailable_message">Voice answering paused — couldn\'t hear you</string>
+    <string name="study_session_voice_answer_capture_unavailable_spoken_message">Couldn\'t hear you, pausing the session.</string>
     <string name="study_session_show_answer_cd">Show answer</string>
     <string name="study_session_next_flashcard_cd">Next flashcard</string>
     <string name="study_session_voice_answer_consent_title">Hands-free voice answering</string>
