@@ -3,7 +3,6 @@ package com.rossomak.flashcards.feature.study.rated
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
@@ -112,16 +111,14 @@ class RatedStudySessionViewModel @Inject constructor(
 
     internal var rewindThresholdMs: Long = VoicePlaybackState.REWIND_THRESHOLD_MS
 
-    // Test-only seam for asserting a deterministic queue sequence (ADR-0046) — production leaves
-    // this as Random.Default and never seeds it.
+    // Test-only seam for asserting a deterministic queue sequence (ADR-0046) — production leaves this as Random.Default and never seeds it.
     internal var random: Random = Random.Default
 
-    // Test-only seam mirroring random above — production leaves this as Instant::now and never
-    // overrides it.
+    // Test-only seam mirroring random above — production leaves this as Instant::now and never overrides it.
     internal var now: () -> Instant = Instant::now
 
     // Generated once per session and carried on the ViewModel rather than SavedStateHandle — the
-    // ViewModel instance itself already survives rotation, and there is nothing to restore it from
+    // ViewModel instance itself already survives config changes, and there is nothing to restore it from
     // after an app kill (no in-progress persistence, by design).
     private val sessionId: String = UUID.randomUUID().toString()
 
@@ -441,8 +438,6 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onVoiceGraded(grade: VoiceAnswerGrade, gradedCardId: String?) {
         val headCardId = ratedSessionState?.currentCard?.id
         if (gradedCardId != null && gradedCardId != headCardId) {
-            // TEMP debug logging — pinning down a premature "pausing" spoken notice, see AGENTS chat.
-            logd { "onVoiceGraded: dropping stale grade for $gradedCardId (head is $headCardId), consecutiveSilenceCount NOT reset (still $consecutiveSilenceCount)" }
             return
         }
         consecutiveSilenceCount = 0
@@ -462,8 +457,6 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onVoiceSilenceTimeout() {
         ratedSessionState = ratedSessionState?.let(::requeueAfterSilence)
         consecutiveSilenceCount++
-        // TEMP debug logging — pinning down a premature "pausing" spoken notice, see AGENTS chat.
-        logd { "onVoiceSilenceTimeout: consecutiveSilenceCount=$consecutiveSilenceCount" }
         pushNextSilenceWillPauseSession()
         pendingSessionSync = { syncStateFromRatedSession() }
         if (consecutiveSilenceCount >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD) {
@@ -481,8 +474,6 @@ class RatedStudySessionViewModel @Inject constructor(
      */
     private fun pushNextSilenceWillPauseSession() {
         val willPause = consecutiveSilenceCount + 1 >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD
-        // TEMP debug logging — pinning down a premature "pausing" spoken notice, see AGENTS chat.
-        logd { "pushNextSilenceWillPauseSession: consecutiveSilenceCount=$consecutiveSilenceCount, willPause=$willPause" }
         voiceGateway.setNextSilenceWillPauseSession(willPause)
     }
 
