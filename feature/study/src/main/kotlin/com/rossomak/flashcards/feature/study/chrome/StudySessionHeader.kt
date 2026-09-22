@@ -1,9 +1,9 @@
 package com.rossomak.flashcards.feature.study.chrome
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -131,13 +131,12 @@ fun StudySessionHeader(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FlashcardTagRow(tags: List<String>, modifier: Modifier = Modifier) {
-    FlowRow(
-        modifier = modifier,
+    Row(
+        modifier = modifier.basicMarquee(),
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
     ) {
         tags.forEach { tag -> FlashcardsMetadataBadge(label = tag, style = OnGradient) }
     }
