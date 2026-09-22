@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +62,7 @@ fun FlashcardCard(
 ) {
     val syntaxEngine = remember { SyntaxTokenizer() }
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.card)
-    val scrollState = rememberScrollState()
+    val scrollState = key(card.id) { rememberScrollState() }
 
     Surface(
         modifier = modifier.fillMaxWidth().clip(shape),
