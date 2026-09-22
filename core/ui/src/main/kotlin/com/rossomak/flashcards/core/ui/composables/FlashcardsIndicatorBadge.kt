@@ -45,8 +45,8 @@ fun FlashcardsIndicatorBadge(
         contentColor = contentColor,
     ) {
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelMediumEmphasized,
             modifier = Modifier.padding(
                 horizontal = MaterialTheme.spacing.small,
                 vertical = MaterialTheme.spacing.xxsmall,
