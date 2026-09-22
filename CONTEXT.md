@@ -81,7 +81,7 @@ _Avoid_: Outcome, Ledger entry (retired names), Card record (that name belongs t
 
 **Study Mode**:
 The interaction mechanic of a Study Session. Two values:
-- **Rated**: user reveals each answer manually, then self-rates (Failed / Partial / Correct) — or enables **Voice Answering** in-session for hands-free listen-and-grade instead. Each Flashcard accumulates Attempts until it reaches a **Terminal State**.
+- **Rated**: user reveals each answer manually, then self-rates (Failed / Partial / Correct) — or chooses **Voice Answering** up front for hands-free listen-and-grade instead. Each Flashcard accumulates Attempts until it reaches a **Terminal State**.
 - **Fast**: cards advance question → reveal answer → next, either manually (tap to reveal, tap to advance) or with read-aloud enabled — system TTS reads the question aloud, pauses, reads the answer aloud, then auto-advances hands-free. User controls playback via transport controls (pause / play / skip / speed slider) when read-aloud is on. Playback continues with the screen off or app backgrounded. No Ratings, no Attempts, no Terminal States — a Fast Study Session's only per-card record is that a Flashcard became **Studied**.
 _Avoid_: Automatic mode, Passive mode, Browse mode, Voice mode (voice is the delivery mechanism, not the mode name)
 
@@ -94,7 +94,7 @@ The user's self-assessment after viewing an answer in a **Rated** Study Session.
 _Avoid_: Score, Grade, Answer, Response
 
 **Voice Answering**:
-A Rated-Study-Sessions-only mechanic that replaces manual reveal-and-self-rate with hands-free listen-transcribe-grade: the shared Fast-mode TTS engine reads the question, the app listens for a spoken answer, transcribes and grades it, and the resulting grade band becomes the Flashcard's **Rating** exactly as a manual tap would. Off by default. Selectable up front as a row on the **Preview Study Session Screen** (ADR-0030), and still toggleable in-session after the session has started. Enabling it auto-enables question TTS through the same engine Fast mode uses, but stops after the question — it never auto-progresses to reading the answer.
+A Rated-Study-Sessions-only mechanic that replaces manual reveal-and-self-rate with hands-free listen-transcribe-grade: the shared Fast-mode TTS engine reads the question, the app listens for a spoken answer, transcribes and grades it, and the resulting grade band becomes the Flashcard's **Rating** exactly as a manual tap would. Off by default. Selectable up front as a row on the **Preview Study Session Screen** (ADR-0030) — this is a decision made once at session entry, with no way to change it once the session has started. Enabling it auto-enables question TTS through the same engine Fast mode uses, but stops after the question — it never auto-progresses to reading the answer.
 _Avoid_: Voice mode (voice is the delivery mechanism, not a Study Mode — see Study Mode's avoid list), Voice grading (grading is the mechanism inside the feature, not the feature's name)
 
 **Terminal State**:
@@ -186,7 +186,7 @@ _Avoid_: Sessions finished, Sessions done
 - A **Recent** is a past **Study Session** — single-subcategory if one Subcategory, composite if multiple
 - A **Favorite** is a bookmarked **Subcategory**
 - An **Attempt** produces exactly one **Rating** *(Rated sessions only)*
-- **Voice Answering** is a toggle available only within a **Rated** Study Session; its automatic grade produces a **Rating** the same way a manual tap does
+- **Voice Answering** is chosen up front for a **Rated** Study Session and fixed for its duration; its automatic grade produces a **Rating** the same way a manual tap does
 - A **Flashcard** in a **Rated** Study Session has at most as many **Attempts** as the User's configured limit (default 3, max 5)
 - A **Terminal State** is decided by the best **Rating** a Flashcard achieved: Correct → Mastered, else Partial → Partial, else Failed *(Rated sessions only)*
 - A **Flashcard** the User has any **Card Progress** for is **Studied**; a Flashcard whose Card Progress state is `Mastered` is in **Persistent Mastery** — so Persistent Mastery is a subset of Studied
