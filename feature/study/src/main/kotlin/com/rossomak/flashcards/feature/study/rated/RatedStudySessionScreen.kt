@@ -5,23 +5,26 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -54,11 +58,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
-import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButtonRow
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
@@ -68,7 +72,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCur
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
-import com.rossomak.flashcards.feature.study.chrome.StudySessionTopAppBar
+import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
+import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import kotlinx.coroutines.launch
 
@@ -204,64 +209,80 @@ fun RatedStudySessionContent(
         bottomSheetState = rememberStandardBottomSheetState(skipHiddenState = true),
     )
 
-    BottomSheetScaffold(
-        modifier = modifier,
-        scaffoldState = scaffoldState,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        sheetSwipeEnabled = false,
-        sheetPeekHeight = when {
-            state.isVoiceActive -> 176.dp
-            state.isAnswerRevealed -> 200.dp
-            else -> 152.dp
-        },
-        sheetDragHandle = {},
-        topBar = {
-            StudySessionTopAppBar(
-                sessionTitle = state.sessionTitle,
-                reportableCard = state.currentCard,
-                counterText = if (state.distinctCardCount > 0) {
-                    stringResource(
-                        R.string.rated_study_session_mastered_counter_label,
-                        state.masteredCount,
-                        state.distinctCardCount,
-                    )
-                } else {
-                    null
-                },
-                onClose = { onDialogEvent(Open(ExitSession)) },
-                onReportProblem = { card ->
-                    onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
-                },
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.brandColors.screenGradient),
+    ) {
+        BottomSheetScaffold(
+            modifier = Modifier.fillMaxSize(),
+            scaffoldState = scaffoldState,
+            containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            sheetSwipeEnabled = false,
+            sheetPeekHeight = when {
+                state.isVoiceActive -> 176.dp
+                state.isAnswerRevealed -> 200.dp
+                else -> 152.dp
+            },
+            sheetDragHandle = {},
+            topBar = {
+                StudySessionHeader(
+                    title = studySessionCardTitle(
+                        categoryName = state.categoryName,
+                        currentCard = state.currentCard,
+                        subcategoryNameById = state.subcategoryNameById,
+                        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+                    ),
+                    reportableCard = state.currentCard,
+                    progressLabel = if (state.distinctCardCount > 0) {
+                        stringResource(R.string.rated_study_session_progress_label)
+                    } else {
+                        null
+                    },
+                    completedCount = if (state.distinctCardCount > 0) state.completedCount else null,
+                    totalCount = if (state.distinctCardCount > 0) state.distinctCardCount else null,
+                    progressFraction = if (state.distinctCardCount > 0) {
+                        state.completedCount / state.distinctCardCount.toFloat()
+                    } else {
+                        null
+                    },
+                    onClose = { onDialogEvent(Open(ExitSession)) },
+                    onReportProblem = { card ->
+                        onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
+                    },
+                )
+            },
+            sheetContent = {
+                RatedStudySessionSheetContent(
+                    state = state,
+                    onShowAnswer = onShowAnswer,
+                    onAttemptRating = onAttemptRating,
+                    onVoicePlayPause = onVoicePlayPause,
+                    onVoiceNext = onVoiceNext,
+                    onVoicePrevious = onVoicePrevious,
+                    onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
+                    onVoiceAnswerToggle = onVoiceAnswerToggle,
+                    onResumeSession = onResumeSession,
+                )
+            },
+        ) { innerPadding ->
+            StudySessionBody(
+                isLoading = state.isLoading,
+                error = state.error,
+                flashcards = state.flashcards,
+                currentCardIndex = state.currentCardIndex,
+                isAnswerRevealed = state.isAnswerRevealed,
+                innerPadding = innerPadding,
+                attemptSlots = state.attemptSlots,
+                onExtendedContextClick = { onDialogEvent(Open(CurrentCardExtendedContext(it))) },
             )
-        },
-        sheetContent = {
-            RatedStudySessionSheetContent(
-                state = state,
-                onShowAnswer = onShowAnswer,
-                onAttemptRating = onAttemptRating,
-                onVoicePlayPause = onVoicePlayPause,
-                onVoiceNext = onVoiceNext,
-                onVoicePrevious = onVoicePrevious,
-                onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
-                onVoiceAnswerToggle = onVoiceAnswerToggle,
-                onResumeSession = onResumeSession,
-            )
-        },
-    ) { innerPadding ->
-        StudySessionBody(
-            isLoading = state.isLoading,
-            error = state.error,
-            flashcards = state.flashcards,
-            currentCardIndex = state.currentCardIndex,
-            isAnswerRevealed = state.isAnswerRevealed,
-            innerPadding = innerPadding,
-            onExtendedContextClick = { onDialogEvent(Open(CurrentCardExtendedContext(it))) },
-        )
 
-        StudySessionDialogHost(
-            activeDialog = state.activeDialog,
-            onDialogEvent = onDialogEvent,
-        )
+            StudySessionDialogHost(
+                activeDialog = state.activeDialog,
+                onDialogEvent = onDialogEvent,
+            )
+        }
     }
 }
 
@@ -324,10 +345,20 @@ private fun RatedStudySessionSheetContent(
                     onClick = onShowAnswer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                    Icon(imageVector = Icons.Default.Flip, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(8.dp))
                     Text(stringResource(R.string.study_session_show_answer_button))
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.study_session_show_answer_caption_message),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
             } else {
-                AttemptRatingButtons(slots = state.attemptSlots, onAttemptRating = onAttemptRating)
+                AttemptRatingButtons(onAttemptRating = onAttemptRating)
             }
         }
     }
@@ -381,7 +412,7 @@ private fun RatedVoiceAnswerHeader(
         }
         IconButton(onClick = onVoiceSettingsCogClick) {
             Icon(
-                imageVector = Icons.Default.Settings,
+                imageVector = Icons.Outlined.Settings,
                 contentDescription = stringResource(R.string.study_session_voice_settings_cd),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -523,22 +554,15 @@ private fun RatedVoiceTransportRow(
 }
 
 @Composable
-private fun AttemptRatingButtons(
-    slots: List<FlashcardsAttemptSlotState>,
-    onAttemptRating: (FlashcardAttemptRating) -> Unit,
-) {
+private fun AttemptRatingButtons(onAttemptRating: (FlashcardAttemptRating) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            FlashcardsAttemptIndicator(slots = slots)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(CoreUiR.string.common_rating_prompt_label),
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleSmall,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
         FlashcardsRatingButtonRow(onRatingSelect = onAttemptRating)
     }
 }
@@ -549,7 +573,8 @@ private fun AttemptRatingButtons(
 private fun RatedStudySessionVoiceActivePreview() {
     RatedStudySessionContent(
         state = RatedStudySessionScreenState(
-            sessionTitle = "Compose",
+            categoryName = "Android",
+            subcategoryNameById = mapOf("compose" to "Compose"),
             flashcards = emptyList(),
             isVoiceActive = true,
             isVoicePlaying = true,
@@ -573,7 +598,8 @@ private fun RatedStudySessionVoiceActivePreview() {
 private fun RatedStudySessionManualPreview() {
     RatedStudySessionContent(
         state = RatedStudySessionScreenState(
-            sessionTitle = "Compose",
+            categoryName = "Android",
+            subcategoryNameById = mapOf("compose" to "Compose"),
             flashcards = listOf(
                 com.rossomak.flashcards.core.domain.model.Flashcard(
                     id = "1",

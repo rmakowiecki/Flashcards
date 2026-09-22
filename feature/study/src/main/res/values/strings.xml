@@ -32,13 +32,15 @@
     <string name="study_session_voice_play_cd">Play</string>
     <string name="study_session_voice_pause_cd">Pause</string>
     <string name="study_session_question_label">Question</string>
-    <string name="study_session_difficulty_label">Difficulty %1$d</string>
     <string name="study_session_answer_label">Answer</string>
-    <string name="study_session_extended_context_button">Extended context</string>
+    <string name="study_session_learn_more_button">Learn more</string>
+    <string name="study_session_show_answer_caption_message">Tap to reveal the answer</string>
 
     <string name="fast_study_session_next_button">Next</string>
-    <string name="fast_study_session_position_counter_label">%1$d / %2$d</string>
-    <string name="rated_study_session_mastered_counter_label">%1$d / %2$d mastered</string>
+    <string name="fast_study_session_next_caption_message">No rating needed — just keep moving</string>
+    <string name="fast_study_session_progress_label">Card</string>
+    <string name="rated_study_session_progress_label">Completed cards</string>
+    <string name="study_session_progress_total_label">/%1$d</string>
 
     <string name="extended_context_dialog_title">More info</string>
     <string name="extended_context_acknowledge_button">Got it</string>
@@ -92,6 +94,8 @@
     <string name="study_session_summary_xp_row_time_studied_label">Time Studied</string>
     <string name="study_session_summary_xp_row_session_completed_label">Session Completed</string>
 
+    <string name="preview_session_quick_title">Quick session</string>
+    <string name="preview_session_custom_title">Custom session</string>
     <string name="preview_session_mode_label">Mode</string>
     <string name="preview_session_voice_answering_label">Voice answering</string>
     <string name="preview_session_attempts_label">Attempts</string>

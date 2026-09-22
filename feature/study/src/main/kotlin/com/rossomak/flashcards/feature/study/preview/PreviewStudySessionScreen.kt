@@ -214,7 +214,12 @@ fun PreviewStudySessionContent(
             containerColor = Color.Transparent,
             topBar = {
                 FlashcardsGradientTopBar(
-                    title = screenTitle(state),
+                    title = screenTitle(
+                        state = state,
+                        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+                        quickTitle = stringResource(R.string.preview_session_quick_title),
+                        customTitle = stringResource(R.string.preview_session_custom_title),
+                    ),
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(
@@ -317,10 +322,6 @@ private fun ErrorContent(
  * flow — no adaptive collapsing, no measuring against the sheet's actual height; see
  * [PreviewStudySessionContent]'s doc for why that was dropped.
  */
-// Four of these params (settingsSheetOpen, onOpenSettings, onToggleSettings, onOpenSettingsDialog)
-// used to arrive bundled in a single SettingsSheetController — dropped in favor of plain, flat
-// state in the caller (see PreviewStudySessionContent's own doc), which pushes this function over
-// detekt's LongParameterList threshold by one. Not worth re-introducing a bundling type for.
 @Suppress("LongParameterList")
 @Composable
 private fun ReadyContent(
@@ -680,10 +681,15 @@ private const val BADGE_DIALOG_STAGGER_DELAY_MS = 300L
 // isQuickSession is checked before isSingleSubcategory so a quick session that happens to land on
 // one subcategory still reads as "Quick session" rather than misreporting as a plain single-subcategory
 // preview.
-private fun screenTitle(state: PreviewStudySessionScreenState): String = when {
-    state.isQuickSession -> "${state.categoryName} · Quick session"
-    state.isSingleSubcategory -> "${state.categoryName} · ${state.subcategoryNames.first()}"
-    else -> "${state.categoryName} · Custom session"
+private fun screenTitle(
+    state: PreviewStudySessionScreenState,
+    separator: String,
+    quickTitle: String,
+    customTitle: String,
+): String = when {
+    state.isQuickSession -> "${state.categoryName}$separator$quickTitle"
+    state.isSingleSubcategory -> "${state.categoryName}$separator${state.subcategoryNames.first()}"
+    else -> "${state.categoryName}$separator$customTitle"
 }
 
 @Composable
@@ -693,14 +699,14 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
         state.selectedCardCount,
         state.selectedCardCount,
     )
-    // Resolved here, not inside appendSubcategoryList, so that function can stay a plain (non-
-    // @Composable) builder step — matching appendOxfordList — instead of tripping detekt/lint's
-    // ComposableNaming rule for a lowercase Unit-returning @Composable.
     val otherSubcategoriesText = (state.subcategoryNames.size - SUBCATEGORY_LIST_VISIBLE_COUNT)
         .takeIf { state.subcategoryNames.size > SUBCATEGORY_LIST_TRUNCATION_THRESHOLD }
         ?.let { otherCount ->
             pluralStringResource(R.plurals.preview_session_scope_other_subcategories_count, otherCount, otherCount)
         }
+    val listSeparator = stringResource(CoreUiR.string.common_list_separator)
+    val listTwoItemConjunction = stringResource(CoreUiR.string.common_list_two_item_conjunction)
+    val listFinalConjunction = stringResource(CoreUiR.string.common_list_final_conjunction)
     return buildAnnotatedString {
         fun appendBold(text: String) {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text) }
@@ -710,8 +716,14 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
             state.isQuickSession -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_quick_session_message))
-                appendSubcategoryList(state.subcategoryNames, ::appendBold, otherSubcategoriesText)
-                append(".")
+                appendSubcategoryList(
+                    state.subcategoryNames,
+                    ::appendBold,
+                    otherSubcategoriesText,
+                    listSeparator,
+                    listTwoItemConjunction,
+                    listFinalConjunction,
+                )
             }
             state.isSingleSubcategory -> {
                 appendBold(cardsText)
@@ -722,8 +734,14 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
             else -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_multi_subcategory_message))
-                appendSubcategoryList(state.subcategoryNames, ::appendBold, otherSubcategoriesText)
-                append(".")
+                appendSubcategoryList(
+                    state.subcategoryNames,
+                    ::appendBold,
+                    otherSubcategoriesText,
+                    listSeparator,
+                    listTwoItemConjunction,
+                    listFinalConjunction,
+                )
             }
         }
     }
@@ -735,7 +753,7 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
  * Quick session, whose subcategories the user did not choose, making naming them the whole point of a
  * preview, never truncates. Custom sessions, unbounded, still collapse once they cross it.
  */
-private val SUBCATEGORY_LIST_TRUNCATION_THRESHOLD = StudySessionConfig.MAX_SUBCATEGORY_COUNT
+private const val SUBCATEGORY_LIST_TRUNCATION_THRESHOLD = StudySessionConfig.MAX_SUBCATEGORY_COUNT
 private const val SUBCATEGORY_LIST_VISIBLE_COUNT = 3
 
 /**
@@ -747,25 +765,34 @@ private fun AnnotatedString.Builder.appendSubcategoryList(
     names: List<String>,
     appendBold: (String) -> Unit,
     otherSubcategoriesText: String?,
+    listSeparator: String,
+    listTwoItemConjunction: String,
+    listFinalConjunction: String,
 ) {
     if (otherSubcategoriesText == null) {
-        appendOxfordList(names, appendBold)
+        appendOxfordList(names, appendBold, listSeparator, listTwoItemConjunction, listFinalConjunction)
         return
     }
     names.take(SUBCATEGORY_LIST_VISIBLE_COUNT).forEachIndexed { index, name ->
-        if (index > 0) append(", ")
+        if (index > 0) append(listSeparator)
         appendBold(name)
     }
     append(otherSubcategoriesText)
 }
 
 // Joins names as "A and B" (2 items) or "A, B, and C" (3+ items), bolding each name.
-private fun AnnotatedString.Builder.appendOxfordList(names: List<String>, appendBold: (String) -> Unit) {
+private fun AnnotatedString.Builder.appendOxfordList(
+    names: List<String>,
+    appendBold: (String) -> Unit,
+    listSeparator: String,
+    listTwoItemConjunction: String,
+    listFinalConjunction: String,
+) {
     names.forEachIndexed { index, name ->
         when (index) {
             0 -> Unit
-            names.lastIndex -> append(if (names.size > 2) ", and " else " and ")
-            else -> append(", ")
+            names.lastIndex -> append(if (names.size > 2) listFinalConjunction else listTwoItemConjunction)
+            else -> append(listSeparator)
         }
         appendBold(name)
     }

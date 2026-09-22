@@ -461,6 +461,25 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
+    fun `the completed count increases on any Terminal State, unlike the mastered count`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(
+                listOf(flashcard("card-1"), flashcard("card-2")),
+            )
+            stubRoute(route.copy(cardIds = listOf("card-1", "card-2"), ratedAttempts = 1))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            viewModel.state.value.completedCount shouldBe 1
+            viewModel.state.value.masteredCount shouldBe 0
+
+            viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
+            viewModel.state.value.completedCount shouldBe 2
+            viewModel.state.value.masteredCount shouldBe 0
+        }
+
+    @Test
     fun `the distinct card total is fixed at session start and does not grow as the queue grows`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
