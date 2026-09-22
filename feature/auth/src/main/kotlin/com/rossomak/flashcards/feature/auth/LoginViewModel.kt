@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,14 +29,14 @@ class LoginViewModel @Inject constructor(
     val events = eventChannel.receiveAsFlow()
 
     fun onSignInStarted() {
-        _state.update { it.copy(isSigningIn = true, errorMessage = null) }
+        _state.update { it.copy(isSigningIn = true, failureReason = null) }
     }
 
     fun onGoogleIdTokenReceived(idToken: String) {
         viewModelScope.launch {
             signInWithGoogleUseCase(idToken)
                 .onSuccess {
-                    _state.update { it.copy(isSigningIn = false, errorMessage = null) }
+                    _state.update { it.copy(isSigningIn = false, failureReason = null) }
                     // The onboarding flag is device-scoped, so a second account signing in on a
                     // device that has already been through the flow goes straight to Main.
                     val hasSeenOnboarding = observeUserPreferences().first().hasSeenOnboarding
@@ -44,22 +45,19 @@ class LoginViewModel @Inject constructor(
                     )
                 }
                 .onFailure { error ->
+                    loge(error) { "Sign-in failed" }
                     _state.update {
-                        it.copy(
-                            isSigningIn = false,
-                            errorMessage = error.message ?: "Sign-in failed"
-                        )
+                        it.copy(isSigningIn = false, failureReason = LoginFailureReason.SignInFailed(error))
                     }
                 }
         }
     }
 
-    fun onSignInFailed(message: String?) {
-        _state.update {
-            it.copy(
-                isSigningIn = false,
-                errorMessage = message ?: "Sign-in failed"
-            )
-        }
+    fun onSignInCancelled() {
+        _state.update { it.copy(isSigningIn = false, failureReason = null) }
+    }
+
+    fun onSignInFailed(reason: LoginFailureReason) {
+        _state.update { it.copy(isSigningIn = false, failureReason = reason) }
     }
 }

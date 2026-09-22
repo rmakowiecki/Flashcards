@@ -62,14 +62,14 @@ class LoginViewModelTest {
 
     @Test
     fun `onGoogleIdTokenReceived with failed sign-in emits no navigation event`() = runTest(mainDispatcherRule.testDispatcher) {
-        val errorMessage = "network down"
-        authRepository.signInResult = Result.failure(IllegalStateException(errorMessage))
+        val cause = IllegalStateException("network down")
+        authRepository.signInResult = Result.failure(cause)
 
         val viewModel = createViewModel()
         viewModel.onGoogleIdTokenReceived("token")
         advanceUntilIdle()
 
-        viewModel.state.value.errorMessage shouldBe errorMessage
+        viewModel.state.value.failureReason shouldBe LoginFailureReason.SignInFailed(cause)
         viewModel.events.test {
             expectNoEvents()
         }
@@ -78,11 +78,23 @@ class LoginViewModelTest {
     @Test
     fun `onSignInFailed emits no navigation event`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
-        viewModel.onSignInFailed("cancelled")
+        viewModel.onSignInFailed(LoginFailureReason.NoAccountOnDevice)
         advanceUntilIdle()
 
         viewModel.events.test {
             expectNoEvents()
         }
     }
+
+    @Test
+    fun `onSignInCancelled clears signing-in state without setting a failure reason`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+            viewModel.onSignInStarted()
+
+            viewModel.onSignInCancelled()
+
+            viewModel.state.value.isSigningIn shouldBe false
+            viewModel.state.value.failureReason shouldBe null
+        }
 }

@@ -27,15 +27,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoAccountOnDevice
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.SignInFailed
 import kotlinx.coroutines.launch
 
 private val LogoWidth = 200.dp
@@ -67,7 +70,13 @@ fun LoginScreen(
             coroutineScope.launch {
                 signInLauncher.launch()
                     .onSuccess { idToken -> viewModel.onGoogleIdTokenReceived(idToken) }
-                    .onFailure { error -> viewModel.onSignInFailed(error.message) }
+                    .onFailure { error ->
+                        if (error is GoogleSignInCancelled) {
+                            viewModel.onSignInCancelled()
+                        } else {
+                            viewModel.onSignInFailed(error as? LoginFailureReason ?: SignInFailed(error))
+                        }
+                    }
             }
         },
     )
@@ -92,7 +101,7 @@ fun LoginContent(
             modifier = Modifier.fillMaxSize()
         ) {
             Image(
-                painter = painterResource(R.drawable.flashcards_white),
+                painter = painterResource(CoreUiR.drawable.flashcards_white),
                 contentDescription = null,
                 modifier = Modifier.width(LogoWidth)
             )
@@ -116,22 +125,31 @@ fun LoginContent(
                         color = Color(0xFF1F1F1F)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = "Signing in…", fontWeight = FontWeight.Medium)
+                    Text(text = stringResource(R.string.login_signing_in_label), fontWeight = FontWeight.Medium)
                 } else {
-                    Text(text = "Sign in with Google", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                    Text(
+                        text = stringResource(R.string.login_google_signin_button),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp,
+                    )
                 }
             }
 
-            if (state.errorMessage != null) {
+            if (state.failureReason != null) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = state.errorMessage,
+                    text = stringResource(state.failureReason.messageRes()),
                     color = Color.White,
                     fontSize = 14.sp
                 )
             }
         }
     }
+}
+
+private fun LoginFailureReason.messageRes(): Int = when (this) {
+    NoAccountOnDevice -> R.string.login_no_account_error
+    is SignInFailed -> R.string.login_signin_error
 }
 
 @Preview(showBackground = true, widthDp = 400, heightDp = 800)
@@ -150,7 +168,7 @@ private fun LoginContentSigningInPreview() {
 @Composable
 private fun LoginContentErrorPreview() {
     LoginContent(
-        state = LoginScreenState(errorMessage = "Sign-in cancelled"),
+        state = LoginScreenState(failureReason = SignInFailed()),
         onGoogleSignInClick = {}
     )
 }
