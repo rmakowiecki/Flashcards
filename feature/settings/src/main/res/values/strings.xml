@@ -26,4 +26,5 @@
     <string name="settings_sign_out_dialog_title">Sign out?</string>
     <string name="settings_sign_out_dialog_message">You\'ll need to sign in again to reach your cards on this device.</string>
     <string name="settings_signing_out_cd">Signing out</string>
+    <string name="settings_save_failed_error">Failed to save setting</string>
 </resources>

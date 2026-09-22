@@ -32,11 +32,6 @@ data class FastStudySessionScreenState(
     val isVoicePlaying: Boolean = false,
     val isVoiceAutoStartPending: Boolean = false,
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
-    // Deferred: one-shot snackbar trigger held as screen state — violates AGENTS.md's SharedFlow-
-    // for-transient-events rule. Migrate to a SharedFlow<FastStudySessionMessage>.
-    val voiceError: String? = null,
-    // Deferred: same violation as voiceError above — migrate together.
-    @param:StringRes val curationError: Int? = null,
     val activeDialog: StudySessionDialog? = null,
 ) {
     val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)

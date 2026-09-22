@@ -38,8 +38,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -62,6 +65,9 @@ class SettingsViewModel @Inject constructor(
 
     private val eventChannel = Channel<SettingsDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
+
+    private val _messages = MutableSharedFlow<SettingsMessage>(extraBufferCapacity = 1)
+    val messages: SharedFlow<SettingsMessage> = _messages.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -204,7 +210,7 @@ class SettingsViewModel @Inject constructor(
             val result = saveDialogPreference(dialog)
             // The dialog closes either way — a dialog left open with a stale draft isn't a retry
             // path, it's a second write on the next confirm. The snackbar is the recovery signal.
-            result.onFailure { _state.update { it.copy(saveError = "Failed to save setting") } }
+            result.onFailure { _messages.tryEmit(SettingsMessage.SaveFailed) }
         }
         _state.update { it.copy(activeDialog = null) }
     }
@@ -227,10 +233,6 @@ class SettingsViewModel @Inject constructor(
         is DailyStudyGoal -> saveUserPreference(DailyGoalMinutes(dialog.draftState))
         // Both returned above; repeated only because the `when` is exhaustive.
         is SessionVoiceSettings, SignOut -> Result.success(Unit)
-    }
-
-    fun onSaveErrorDismissed() {
-        _state.update { it.copy(saveError = null) }
     }
 
     private fun signOut() {

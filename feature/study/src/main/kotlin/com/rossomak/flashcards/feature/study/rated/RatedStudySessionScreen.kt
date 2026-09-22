@@ -377,19 +377,13 @@ private fun RatedVoiceTransportRow(
         // voice), and skipping during SPEAKING_NOTICE would start the next question on the main
         // TTS engine while VoiceAnswerController's separate notice engine is still talking — two
         // overlapping voices.
-        val isVoiceAnswerBusy = state.isVoiceAnswerEnabled &&
-            state.voiceAnswerPhase in setOf(
-                VoiceAnswerPhase.Listening,
-                VoiceAnswerPhase.SpeechDetected,
-                VoiceAnswerPhase.Grading,
-                VoiceAnswerPhase.SpeakingNotice
-            )
+        val busyStateSet = setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected, VoiceAnswerPhase.Grading, VoiceAnswerPhase.SpeakingNotice)
+        val isVoiceAnswerBusy = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in busyStateSet
         // Pause only needs to stay disabled for the narrower "answer listening" window — it
         // toggles the main TtsPlayer, which is a no-op while the mic is what's actually capturing
         // (LISTENING/SPEECH_DETECTED); re-enables the moment the answer (or its absence) has been
         // noted and GRADING/SPEAKING_NOTICE takes over.
-        val isVoiceAnswerListening = state.isVoiceAnswerEnabled &&
-            state.voiceAnswerPhase in setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected)
+        val isVoiceAnswerListening = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected)
         Row(
             modifier = Modifier.align(Alignment.Center),
             horizontalArrangement = Arrangement.Center,
@@ -397,8 +391,7 @@ private fun RatedVoiceTransportRow(
         ) {
             IconButton(
                 onClick = onVoicePrevious,
-                enabled = state.isVoiceActive &&
-                    state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
+                enabled = state.isVoiceActive && state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
@@ -413,32 +406,19 @@ private fun RatedVoiceTransportRow(
             ) {
                 Icon(
                     imageVector = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = stringResource(
-                        if (state.isVoicePlaying) {
-                            R.string.study_session_voice_pause_cd
-                        } else {
-                            R.string.study_session_voice_play_cd
-                        }
-                    ),
+                    contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd)
                 )
             }
             Spacer(modifier = Modifier.size(16.dp))
             IconButton(
-                // "Show answer" only makes sense in manual Rated mode. In voice-answering mode
-                // the answer is revealed by the grading pipeline itself (ADR-0026), never by this
-                // button — here it can only mean "skip this question".
                 onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
                 enabled = state.isVoiceActive && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
                     contentDescription = stringResource(
-                        if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) {
-                            R.string.study_session_next_flashcard_cd
-                        } else {
-                            R.string.study_session_show_answer_cd
-                        }
-                    ),
+                        if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
+                    )
                 )
             }
         }

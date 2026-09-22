@@ -29,9 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
@@ -69,6 +69,8 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSorti
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
+import com.rossomak.flashcards.feature.settings.SettingsMessage.SaveFailed
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -86,10 +88,15 @@ fun SettingsScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.saveError) {
-        val error = state.saveError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Short)
-        viewModel.onSaveErrorDismissed()
+    val saveFailedMessage = stringResource(R.string.settings_save_failed_error)
+    val snackbarScope = rememberCoroutineScope()
+    observeAsEvents(viewModel.messages) { message ->
+        val text = when (message) {
+            SaveFailed -> saveFailedMessage
+        }
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
+        }
     }
 
     SettingsContent(
