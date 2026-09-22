@@ -58,7 +58,6 @@
     <string name="browse_search_start_session_cd">Study %1$s</string>
     <string name="browse_search_topic_progress_cd">%1$d%% studied</string>
     <string name="browse_search_topic_progress_unavailable_cd">Studied progress unavailable</string>
-    <string name="browse_middle_dot_separator">" · "</string>
     <string name="browse_categories_error_title">Something went wrong</string>
     <string name="browse_categories_error_message">Couldn\'t load categories.\nCheck your connection and try again.</string>
     <plurals name="browse_category_topic_count">

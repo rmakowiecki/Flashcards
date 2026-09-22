@@ -456,7 +456,7 @@ private fun SubcategoryList(
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
 ) {
     val resources = LocalResources.current
-    val rowSubtitleSeparator = resources.getString(R.string.browse_middle_dot_separator)
+    val rowSubtitleSeparator = resources.getString(CoreUiR.string.common_middle_dot_separator)
     LazyColumn(
         state = listState,
         modifier = modifier

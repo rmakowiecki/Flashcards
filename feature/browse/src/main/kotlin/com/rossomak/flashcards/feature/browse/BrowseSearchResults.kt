@@ -52,7 +52,7 @@ internal fun SubcategoryProgress.searchRingContentDescription(cardCount: Int): S
  * as never-studied rather than a dashed placeholder, same simplification CategoryDetailsScreen's
  * subtitle makes (see its `studiedLabel`), since a search result that resolves to zero moments
  * later looks identical anyway. The parent category itself is no longer named here as text — see
- * [SearchResultSubtitle]'s leading glyph. The separator itself is `R.string.browse_middle_dot_separator`,
+ * [SearchResultSubtitle]'s leading glyph. The separator itself is `CoreUiR.string.common_middle_dot_separator`,
  * shared with [CategoryDetailsRowSubtitle] and the chip line in BrowseScreen. [separator] is
  * resolved once by the caller and passed down rather than re-resolved per subcategory.
  */
