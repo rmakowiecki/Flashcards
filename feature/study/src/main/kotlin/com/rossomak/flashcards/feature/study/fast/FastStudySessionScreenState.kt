@@ -23,6 +23,7 @@ data class FastStudySessionScreenState(
     val currentCardIndex: Int = 0,
     val isAnswerRevealed: Boolean = false,
     @param:StringRes val error: Int? = null,
+    val isReadAloudMode: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
     val isVoiceAutoStartPending: Boolean = false,

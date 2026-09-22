@@ -17,9 +17,12 @@ import com.rossomak.flashcards.core.voice.AudioRouteManager
 import com.rossomak.flashcards.core.voice.CaptureRouteType
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
+import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import com.rossomak.flashcards.feature.study.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -96,8 +99,18 @@ class VoiceAnswerController @Inject constructor(
     private var activeCard: VoiceFlashcard? = null
     private var noticeTts: TextToSpeech? = null
 
+    // Whether *this* listening window's silence timeout would be the one that pauses the
+    // session — pushed by the ViewModel (the sole owner of the consecutive-silence count)
+    // ahead of each listen cycle, so onSilenceTimeout() can pick its spoken message without
+    // needing to know the count itself.
+    private var nextSilenceWillPauseSession = false
+
     fun setActiveCard(card: VoiceFlashcard?) {
         activeCard = card
+    }
+
+    fun setNextSilenceWillPauseSession(willPause: Boolean) {
+        nextSilenceWillPauseSession = willPause
     }
 
     fun start() {
@@ -140,6 +153,7 @@ class VoiceAnswerController @Inject constructor(
         captureEventsJob = null
         releaseWakeLock()
         activeCard = null
+        nextSilenceWillPauseSession = false
         _state.value = VoiceAnswerState()
     }
 
@@ -157,6 +171,7 @@ class VoiceAnswerController @Inject constructor(
     @SuppressLint("MissingPermission")
     fun onQuestionFinishedSpeaking() {
         if (!_state.value.isEnabled) return
+        acquireWakeLock()
         // Clear the previous card's grade/error before opening this round's listening window —
         // otherwise it rides along on this phase-only update, gets picked up as "new" by the
         // ViewModel, and re-shows a stale snackbar (e.g. over this round's own no-answer notice),
@@ -181,7 +196,7 @@ class VoiceAnswerController @Inject constructor(
             voiceCaptureEngine.startListening()
             listenTimeoutJob?.cancel()
             listenTimeoutJob = scope.launch {
-                delay(SILENCE_TIMEOUT_MS)
+                delay(SILENCE_TIMEOUT_MS.milliseconds)
                 onSilenceTimeout()
             }
         }
@@ -190,7 +205,12 @@ class VoiceAnswerController @Inject constructor(
     private suspend fun onSilenceTimeout() {
         voiceCaptureEngine.stopListening()
         _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice) }
-        speakNotice(context.getString(R.string.study_session_voice_answer_skip_spoken_message))
+        val messageRes = if (nextSilenceWillPauseSession) {
+            R.string.study_session_voice_answer_skip_pause_spoken_message
+        } else {
+            R.string.study_session_voice_answer_skip_spoken_message
+        }
+        speakNotice(context.getString(messageRes))
     }
 
     private suspend fun handleCaptureEvent(event: VoiceCaptureEvent) {
@@ -214,6 +234,11 @@ class VoiceAnswerController @Inject constructor(
                         phase = VoiceAnswerPhase.WaitingForQuestion,
                         error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
                     )
+                }
+                if (event.reason !is VoiceCaptureFailureReason.PermissionMissing) {
+                    // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
+                    // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
+                    speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
                 }
             }
         }
@@ -288,6 +313,8 @@ class VoiceAnswerController @Inject constructor(
                 tts?.shutdown()
                 noticeTts = null
             } else {
+                // App supports English content only — never fall back to the device's system locale (e.g. Polish), which garbles English notice text.
+                tts?.language = Locale.US
                 tts?.setOnUtteranceProgressListener(noticeUtteranceListener)
             }
         }
@@ -313,7 +340,7 @@ class VoiceAnswerController @Inject constructor(
 
     /** 1000ms after the grade/skip notice finishes speaking (ADR-0025), tell the service to advance to the next card. */
     private suspend fun onNoticeFinishedSpeaking() {
-        delay(ADVANCE_DELAY_MS)
+        delay(ADVANCE_DELAY_MS.milliseconds)
         if (!_state.value.isEnabled) return
         _state.update { it.copy(phase = VoiceAnswerPhase.WaitingForQuestion) }
         _advanceRequests.emit(Unit)
@@ -323,17 +350,31 @@ class VoiceAnswerController @Inject constructor(
         noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, NOTICE_UTTERANCE_ID)
     }
 
+    /**
+     * Same TTS channel as [speakNotice], different utterance id: [noticeUtteranceListener] only
+     * chains into [onNoticeFinishedSpeaking]'s advance-next-card callback for [NOTICE_UTTERANCE_ID],
+     * so a notice spoken here finishes as a no-op rather than advancing the session.
+     */
+    private fun speakStandaloneNotice(text: String) {
+        noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, CAPTURE_FAILURE_NOTICE_UTTERANCE_ID)
+    }
+
     private fun hasRecordAudioPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
 
+    // Renewed every question cycle (see onQuestionFinishedSpeaking) rather than acquired once for
+    // the whole session — acquire(timeout) on a non-reference-counted lock just resets its
+    // auto-release deadline, so calling this repeatedly keeps the lock alive indefinitely across a
+    // long session while WAKE_LOCK_TIMEOUT_MS still caps the damage if renewal itself ever stalls.
     private fun acquireWakeLock() {
-        if (wakeLock?.isHeld == true) return
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
-            setReferenceCounted(false)
-            acquire(WAKE_LOCK_TIMEOUT_MS)
+        val lock = wakeLock ?: run {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
+                setReferenceCounted(false)
+            }.also { wakeLock = it }
         }
+        lock.acquire(WAKE_LOCK_TIMEOUT_MS)
     }
 
     private fun releaseWakeLock() {
@@ -346,6 +387,7 @@ class VoiceAnswerController @Inject constructor(
         const val WAKE_LOCK_TAG = "flashcards:voiceAnswerCapture"
         const val WAKE_LOCK_TIMEOUT_MS = 60L * 60L * 1000L // 1h safety cap per session
         const val NOTICE_UTTERANCE_ID = "voice_answer_notice"
+        const val CAPTURE_FAILURE_NOTICE_UTTERANCE_ID = "voice_answer_capture_failure_notice"
         const val SILENCE_TIMEOUT_MS = 8_000L
         const val ADVANCE_DELAY_MS = 1_000L
     }

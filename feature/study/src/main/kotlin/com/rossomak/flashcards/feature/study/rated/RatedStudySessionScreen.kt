@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.rated
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Flip
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -44,6 +43,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -74,6 +74,14 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerConsentSaveFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import kotlinx.coroutines.launch
 
@@ -125,39 +133,19 @@ fun RatedStudySessionScreen(
         }
     }
 
-    LaunchedEffect(state.lastVoiceAnswerGrade) {
-        val grade = state.lastVoiceAnswerGrade ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(
-            message = context.getString(
-                R.string.study_session_voice_answer_grade_message,
-                grade.gradePercent,
-                grade.feedback,
-            ),
-            duration = SnackbarDuration.Short,
-        )
-        viewModel.onVoiceAnswerGradeDismissed()
-    }
-
-    LaunchedEffect(state.voiceAnswerError) {
-        if (state.voiceAnswerError == null) return@LaunchedEffect
-        snackbarHostState.showSnackbar(
-            message = context.getString(R.string.study_session_voice_answer_error_message),
-            duration = SnackbarDuration.Short,
-        )
-    }
-
-    val voicePlaybackUnavailableMessage = stringResource(R.string.study_session_voice_playback_unavailable_message)
-    val openTtsSettingsAction = stringResource(R.string.study_session_open_tts_settings_button)
-
-    LaunchedEffect(state.voiceError) {
-        if (state.voiceError == null) return@LaunchedEffect
-        launch {
+    val snackbarScope = rememberCoroutineScope()
+    observeAsEvents(viewModel.messages) { message ->
+        snackbarScope.launch {
             val result = snackbarHostState.showSnackbar(
-                message = voicePlaybackUnavailableMessage,
-                actionLabel = openTtsSettingsAction,
-                duration = SnackbarDuration.Long,
+                message = resolveRatedStudySessionMessage(context = context, message = message),
+                actionLabel = if (message == VoicePlaybackUnavailable) {
+                    context.getString(R.string.study_session_open_tts_settings_button)
+                } else {
+                    null
+                },
+                duration = if (message == VoicePlaybackUnavailable) SnackbarDuration.Long else SnackbarDuration.Short,
             )
-            if (result == SnackbarResult.ActionPerformed) {
+            if (message == VoicePlaybackUnavailable && result == SnackbarResult.ActionPerformed) {
                 val ttsSettingsIntent = Intent("com.android.settings.TTS_SETTINGS").apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -165,14 +153,7 @@ fun RatedStudySessionScreen(
                     context.startActivity(ttsSettingsIntent)
                 }
             }
-            viewModel.onVoiceErrorDismissed()
         }
-    }
-
-    LaunchedEffect(state.curationError) {
-        val error = state.curationError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Short)
-        viewModel.onCurationErrorDismissed()
     }
 
     RatedStudySessionContent(
@@ -184,8 +165,6 @@ fun RatedStudySessionScreen(
         onVoicePlayPause = viewModel::onVoicePlayPause,
         onVoiceNext = viewModel::onVoiceNext,
         onVoicePrevious = viewModel::onVoicePrevious,
-        onVoiceAnswerToggle = viewModel::onVoiceAnswerToggle,
-        onResumeSession = viewModel::onResumeSession,
         onDialogEvent = viewModel::onDialogEvent,
     )
 }
@@ -201,8 +180,6 @@ fun RatedStudySessionContent(
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
-    onVoiceAnswerToggle: () -> Unit,
-    onResumeSession: () -> Unit,
     onDialogEvent: (StudySessionDialogEvent) -> Unit,
 ) {
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -221,8 +198,8 @@ fun RatedStudySessionContent(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             sheetSwipeEnabled = false,
             sheetPeekHeight = when {
-                state.isVoiceActive -> 176.dp
-                state.isAnswerRevealed -> 200.dp
+                state.isVoiceMode -> 176.dp
+                state.isAnswerRevealed -> 176.dp
                 else -> 152.dp
             },
             sheetDragHandle = {},
@@ -262,8 +239,6 @@ fun RatedStudySessionContent(
                     onVoiceNext = onVoiceNext,
                     onVoicePrevious = onVoicePrevious,
                     onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
-                    onVoiceAnswerToggle = onVoiceAnswerToggle,
-                    onResumeSession = onResumeSession,
                 )
             },
         ) { innerPadding ->
@@ -295,8 +270,6 @@ private fun RatedStudySessionSheetContent(
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
-    onVoiceAnswerToggle: () -> Unit,
-    onResumeSession: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -304,42 +277,18 @@ private fun RatedStudySessionSheetContent(
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp, bottom = 24.dp),
     ) {
-        if (state.isVoiceActive) {
-            RatedVoiceAnswerHeader(state = state, onVoiceAnswerToggle = onVoiceAnswerToggle, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
+        if (state.isVoiceMode) {
+            RatedVoiceAnswerHeader(state = state, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
             RatedVoiceTranscript(state = state)
-            if (state.isVoiceAnswerPaused) {
-                // Distinct from the transient busy/listening disable windows below: the transport
-                // itself is idle here, only the resume affordance is live.
-                RatedVoiceAnswerPausedContent(onResumeSession = onResumeSession)
-            } else {
-                RatedVoiceTransportRow(
-                    state = state,
-                    onShowAnswer = onShowAnswer,
-                    onVoicePlayPause = onVoicePlayPause,
-                    onVoiceNext = onVoiceNext,
-                    onVoicePrevious = onVoicePrevious,
-                )
-            }
+            RatedVoiceGradeFeedback(state = state)
+            RatedVoiceTransportRow(
+                state = state,
+                onShowAnswer = onShowAnswer,
+                onVoicePlayPause = onVoicePlayPause,
+                onVoiceNext = onVoiceNext,
+                onVoicePrevious = onVoicePrevious,
+            )
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.study_session_voice_answer_label),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onVoiceAnswerToggle) {
-                    Icon(
-                        imageVector = Icons.Default.MicOff,
-                        contentDescription = stringResource(R.string.study_session_voice_answer_enable_cd),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
             if (!state.isAnswerRevealed) {
                 Button(
                     onClick = onShowAnswer,
@@ -367,7 +316,6 @@ private fun RatedStudySessionSheetContent(
 @Composable
 private fun RatedVoiceAnswerHeader(
     state: RatedStudySessionScreenState,
-    onVoiceAnswerToggle: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
     Row(
@@ -393,23 +341,6 @@ private fun RatedVoiceAnswerHeader(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = onVoiceAnswerToggle) {
-            Icon(
-                imageVector = if (state.isVoiceAnswerEnabled) Icons.Default.Mic else Icons.Default.MicOff,
-                contentDescription = stringResource(
-                    if (state.isVoiceAnswerEnabled) {
-                        R.string.study_session_voice_answer_disable_cd
-                    } else {
-                        R.string.study_session_voice_answer_enable_cd
-                    }
-                ),
-                tint = if (state.isVoiceAnswerEnabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
         IconButton(onClick = onVoiceSettingsCogClick) {
             Icon(
                 imageVector = Icons.Outlined.Settings,
@@ -440,30 +371,22 @@ private fun RatedVoiceTranscript(state: RatedStudySessionScreenState) {
     }
 }
 
-/**
- * Shown instead of [RatedVoiceTransportRow] once three consecutive silence timeouts have paused
- * the session: playback and the microphone
- * are already stopped, and this is the only live control until the user taps Resume.
- */
+// Long-form feedback (grade percent + rationale). Plain bottom-sheet text for as long as SpeakingNotice is
+// reading it aloud; lastVoiceAnswerGrade is only non-null for a round that actually graded, never
+// for a silence-timeout skip or a grading/transcription failure (see observeVoiceState's reveal
+// gating in the ViewModel for the same distinction).
 @Composable
-private fun RatedVoiceAnswerPausedContent(onResumeSession: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+private fun RatedVoiceGradeFeedback(state: RatedStudySessionScreenState) {
+    val grade = state.lastVoiceAnswerGrade
+    if (state.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice && grade != null) {
         Text(
-            text = stringResource(R.string.study_session_voice_answer_paused_message),
-            modifier = Modifier.fillMaxWidth(),
+            text = stringResource(R.string.study_session_voice_answer_grade_message, grade.gradePercent, grade.feedback),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = onResumeSession) {
-            Text(stringResource(R.string.study_session_voice_answer_resume_button))
-        }
     }
 }
 
@@ -486,19 +409,13 @@ private fun RatedVoiceTransportRow(
         // voice), and skipping during SPEAKING_NOTICE would start the next question on the main
         // TTS engine while VoiceAnswerController's separate notice engine is still talking — two
         // overlapping voices.
-        val isVoiceAnswerBusy = state.isVoiceAnswerEnabled &&
-            state.voiceAnswerPhase in setOf(
-                VoiceAnswerPhase.Listening,
-                VoiceAnswerPhase.SpeechDetected,
-                VoiceAnswerPhase.Grading,
-                VoiceAnswerPhase.SpeakingNotice
-            )
+        val busyStateSet = setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected, VoiceAnswerPhase.Grading, VoiceAnswerPhase.SpeakingNotice)
+        val isVoiceAnswerBusy = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in busyStateSet
         // Pause only needs to stay disabled for the narrower "answer listening" window — it
         // toggles the main TtsPlayer, which is a no-op while the mic is what's actually capturing
         // (LISTENING/SPEECH_DETECTED); re-enables the moment the answer (or its absence) has been
         // noted and GRADING/SPEAKING_NOTICE takes over.
-        val isVoiceAnswerListening = state.isVoiceAnswerEnabled &&
-            state.voiceAnswerPhase in setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected)
+        val isVoiceAnswerListening = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected)
         Row(
             modifier = Modifier.align(Alignment.Center),
             horizontalArrangement = Arrangement.Center,
@@ -506,7 +423,7 @@ private fun RatedVoiceTransportRow(
         ) {
             IconButton(
                 onClick = onVoicePrevious,
-                enabled = state.currentCardIndex > 0 && !isVoiceAnswerBusy,
+                enabled = state.isVoiceActive && state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
@@ -517,36 +434,23 @@ private fun RatedVoiceTransportRow(
             FilledIconButton(
                 onClick = onVoicePlayPause,
                 modifier = Modifier.size(56.dp),
-                enabled = !isVoiceAnswerListening,
+                enabled = state.isVoiceActive && !isVoiceAnswerListening,
             ) {
                 Icon(
                     imageVector = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = stringResource(
-                        if (state.isVoicePlaying) {
-                            R.string.study_session_voice_pause_cd
-                        } else {
-                            R.string.study_session_voice_play_cd
-                        }
-                    ),
+                    contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd)
                 )
             }
             Spacer(modifier = Modifier.size(16.dp))
             IconButton(
-                // "Show answer" only makes sense in manual Rated mode. In voice-answering mode
-                // the answer is revealed by the grading pipeline itself (ADR-0026), never by this
-                // button — here it can only mean "skip this question".
                 onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-                enabled = !isVoiceAnswerBusy,
+                enabled = state.isVoiceActive && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
                     contentDescription = stringResource(
-                        if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) {
-                            R.string.study_session_next_flashcard_cd
-                        } else {
-                            R.string.study_session_show_answer_cd
-                        }
-                    ),
+                        if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
+                    )
                 )
             }
         }
@@ -576,6 +480,7 @@ private fun RatedStudySessionVoiceActivePreview() {
             categoryName = "Android",
             subcategoryNameById = mapOf("compose" to "Compose"),
             flashcards = emptyList(),
+            isVoiceMode = true,
             isVoiceActive = true,
             isVoicePlaying = true,
             speechRate = 1.25f,
@@ -586,8 +491,6 @@ private fun RatedStudySessionVoiceActivePreview() {
         onVoicePlayPause = {},
         onVoiceNext = {},
         onVoicePrevious = {},
-        onVoiceAnswerToggle = {},
-        onResumeSession = {},
         onDialogEvent = {},
     )
 }
@@ -624,8 +527,17 @@ private fun RatedStudySessionManualPreview() {
         onVoicePlayPause = {},
         onVoiceNext = {},
         onVoicePrevious = {},
-        onVoiceAnswerToggle = {},
-        onResumeSession = {},
         onDialogEvent = {},
     )
+}
+
+private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
+    VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
+    VoiceAnswerConsentSaveFailed -> context.getString(R.string.study_session_voice_answer_consent_save_error_message)
+    CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
+    VoiceAnswerGradingFailed -> context.getString(R.string.study_session_voice_answer_error_message)
+    VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
+    VoiceAnswerSilencePause -> context.getString(R.string.study_session_voice_answer_skip_pause_message)
+    VoiceAnswerMicPermissionRevoked -> context.getString(R.string.study_session_voice_answer_mic_permission_revoked_message)
+    VoiceAnswerCaptureUnavailable -> context.getString(R.string.study_session_voice_answer_capture_unavailable_message)
 }
