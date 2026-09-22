@@ -82,6 +82,10 @@ class StudySessionVoiceService : MediaSessionService() {
             if (enabled) voiceAnswerController.start() else voiceAnswerController.stop()
         }
 
+        fun setNextSilenceWillPauseSession(willPause: Boolean) {
+            voiceAnswerController.setNextSilenceWillPauseSession(willPause)
+        }
+
         fun stopPlayback() = this@StudySessionVoiceService.stopPlayback()
     }
 

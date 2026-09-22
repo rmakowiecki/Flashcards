@@ -192,7 +192,7 @@ fun FastStudySessionContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         sheetSwipeEnabled = false,
         sheetPeekHeight = when {
-            state.isVoiceActive -> 176.dp
+            state.isReadAloudMode -> 176.dp
             state.isAnswerRevealed -> 160.dp
             else -> 112.dp
         },
@@ -261,7 +261,7 @@ private fun FastStudySessionSheetContent(
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp, bottom = 24.dp),
     ) {
-        if (state.isVoiceActive) {
+        if (state.isReadAloudMode) {
             FastVoiceTransportControls(
                 state = state,
                 onShowAnswer = onShowAnswer,
@@ -323,6 +323,7 @@ private fun FastVoiceTransportControls(
             ) {
                 IconButton(
                     onClick = onVoicePrevious,
+                    enabled = state.isVoiceActive,
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
@@ -333,6 +334,7 @@ private fun FastVoiceTransportControls(
                 FilledIconButton(
                     onClick = onVoicePlayPause,
                     modifier = Modifier.size(56.dp),
+                    enabled = state.isVoiceActive,
                 ) {
                     Icon(
                         imageVector = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -348,6 +350,7 @@ private fun FastVoiceTransportControls(
                 Spacer(modifier = Modifier.size(16.dp))
                 IconButton(
                     onClick = if (state.isAnswerRevealed) onVoiceNext else onShowAnswer,
+                    enabled = state.isVoiceActive,
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
@@ -373,6 +376,7 @@ private fun FastStudySessionVoiceActivePreview() {
         state = FastStudySessionScreenState(
             sessionTitle = "Compose",
             flashcards = emptyList(),
+            isReadAloudMode = true,
             isVoiceActive = true,
             isVoicePlaying = true,
             speechRate = 1.25f,

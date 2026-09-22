@@ -31,6 +31,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
+import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -40,6 +41,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import com.rossomak.flashcards.feature.study.voice.VoiceGateway
 import com.rossomak.flashcards.feature.study.voice.VoicePhase
@@ -50,21 +52,24 @@ import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
  * Runs a Rated Study Session end to end — reveal, the Failed/Partial/Correct row, and the
- * in-session voice-answering toggle with its consent and microphone flow
+ * session-entry voice-answering consent-and-microphone handshake
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)).
  * Knows nothing about Read-aloud or auto-start playback — those are Fast concepts.
  *
@@ -93,7 +98,11 @@ class RatedStudySessionViewModel @Inject constructor(
     private val sessionTitle: String = route.sessionTitle
 
     private val _state = MutableStateFlow(
-        RatedStudySessionScreenState(sessionTitle = sessionTitle, attemptsLimit = route.ratedAttempts),
+        RatedStudySessionScreenState(
+            sessionTitle = sessionTitle,
+            attemptsLimit = route.ratedAttempts,
+            isVoiceMode = route.voiceAnsweringEnabled,
+        ),
     )
     val state: StateFlow<RatedStudySessionScreenState> = _state.asStateFlow()
 
@@ -102,16 +111,14 @@ class RatedStudySessionViewModel @Inject constructor(
 
     internal var rewindThresholdMs: Long = VoicePlaybackState.REWIND_THRESHOLD_MS
 
-    // Test-only seam for asserting a deterministic queue sequence (ADR-0046) — production leaves
-    // this as Random.Default and never seeds it.
+    // Test-only seam for asserting a deterministic queue sequence (ADR-0046) — production leaves this as Random.Default and never seeds it.
     internal var random: Random = Random.Default
 
-    // Test-only seam mirroring random above — production leaves this as Instant::now and never
-    // overrides it.
+    // Test-only seam mirroring random above — production leaves this as Instant::now and never overrides it.
     internal var now: () -> Instant = Instant::now
 
     // Generated once per session and carried on the ViewModel rather than SavedStateHandle — the
-    // ViewModel instance itself already survives rotation, and there is nothing to restore it from
+    // ViewModel instance itself already survives config changes, and there is nothing to restore it from
     // after an app kill (no in-progress persistence, by design).
     private val sessionId: String = UUID.randomUUID().toString()
 
@@ -135,10 +142,18 @@ class RatedStudySessionViewModel @Inject constructor(
     // identical guard.
     private var terminated = false
 
+    // Guards the mic-permission-revoked terminal path (observeVoiceAnswerState) against emitting
+    // its snackbar more than once — terminate() is separately idempotent, but the underlying
+    // VoiceAnswerState can keep repeating while this collector runs until the ViewModel clears.
+    private var micPermissionRevokedHandled = false
+
     private var rewindJob: Job? = null
     private var isPastRewindThreshold = false
     private val eventChannel = Channel<RatedStudySessionDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
+
+    private val _messages = MutableSharedFlow<RatedStudySessionMessage>(extraBufferCapacity = 1)
+    val messages: SharedFlow<RatedStudySessionMessage> = _messages.asSharedFlow()
 
     private var lastObservedCardIndex = -1
 
@@ -175,8 +190,6 @@ class RatedStudySessionViewModel @Inject constructor(
     // True only when opening voice settings paused an in-progress playback; gates resume on close.
     private var pausedForVoiceSettings = false
 
-    private var hasVoiceAnswerConsent = false
-
     // Edge-detects a fresh arrival at SpeakingNotice in observeVoiceAnswerState — the collector
     // sees every VoiceAnswerState the gateway emits, but a grade/silence-timeout must apply exactly
     // once per round, not once per equal-value re-collection.
@@ -204,7 +217,6 @@ class RatedStudySessionViewModel @Inject constructor(
         loadFlashcards()
         observeVoiceState()
         observeVoiceAnswerState()
-        observeVoiceAnswerConsentState()
     }
 
     // Card selection happens on the Preview Study Session screen (ADR-0004); the session only
@@ -240,7 +252,13 @@ class RatedStudySessionViewModel @Inject constructor(
             // The clock starts here, once a card is actually on screen — never at route entry, so
             // a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
-            honourRoutedVoiceAnswering(hasCards = sessionCards.isNotEmpty())
+            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry. Consent
+            // is read as a one-shot rather than from hasVoiceAnswerConsent, whose collector may not
+            // have emitted yet by the time the cards land.
+            if (route.voiceAnsweringEnabled && sessionCards.isNotEmpty()) {
+                val hasConsent = observeUserPreferences().first().voiceAnswerConsentGranted
+                requestVoiceAnswering(hasConsent)
+            }
         }
     }
 
@@ -281,24 +299,15 @@ class RatedStudySessionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * The Preview screen's voice-answering choice (ADR-0030) takes effect on entry, running the
-     * same consent-then-microphone path the in-session toggle uses.
-     *
-     * Consent is read as a one-shot rather than from [hasVoiceAnswerConsent], whose collector may
-     * not have emitted yet by the time the cards land.
-     */
-    private suspend fun honourRoutedVoiceAnswering(hasCards: Boolean) {
-        if (!route.voiceAnsweringEnabled || !hasCards) return
-        requestVoiceAnswering(observeUserPreferences().first().voiceAnswerConsentGranted)
-    }
-
     private fun observeVoiceState() {
         viewModelScope.launch {
             voiceGateway.state.collect { voice ->
                 if (voice.error != null) {
                     voiceStarted = false
-                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false, voiceError = voice.error) }
+                    // Falls back to the manual-mode sheet too — the engine isn't coming back for
+                    // this session, so there is no point leaving voice's controls up, greyed out.
+                    _state.update { it.copy(isVoiceMode = false, isVoiceActive = false, isVoicePlaying = false) }
+                    _messages.tryEmit(RatedStudySessionMessage.VoicePlaybackUnavailable)
                     return@collect
                 }
                 _state.update {
@@ -309,11 +318,14 @@ class RatedStudySessionViewModel @Inject constructor(
                         currentCardIndex = if (voice.isActive) voice.currentIndex else it.currentCardIndex,
                         // Grading/feedback also reveals the card (see observeVoiceAnswerState) —
                         // don't let this collector's phase check stomp that back to false while
-                        // the TTS engine itself is still sitting on QUESTION.
+                        // the TTS engine itself is still sitting on QUESTION. SpeakingNotice alone
+                        // is NOT enough to reveal — a silence-timeout skip or a grading/
+                        // transcription failure lands there too with no grade to show; only gate
+                        // it open when lastVoiceAnswerGrade proves this round actually graded.
                         isAnswerRevealed = if (voice.isActive) {
                             voice.phase == VoicePhase.Answer ||
                                 it.voiceAnswerPhase == VoiceAnswerPhase.Grading ||
-                                it.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice
+                                (it.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice && it.lastVoiceAnswerGrade != null)
                         } else {
                             it.isAnswerRevealed
                         },
@@ -343,6 +355,42 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun observeVoiceAnswerState() {
         viewModelScope.launch {
             voiceGateway.voiceAnswerState.collect { voiceAnswer ->
+                // Mic permission missing right now ends the session outright — checked
+                // unconditionally, not gated behind entering SpeakingNotice below, because a
+                // mid-listen capture failure (VoiceAnswerController.handleCaptureEvent) resets
+                // phase to WaitingForQuestion and never reaches SpeakingNotice at all; without this
+                // check the session would otherwise silently freeze on the current card forever.
+                // Covers both shapes: CaptureFailed wrapping a VoiceCaptureFailureReason from an
+                // active listen attempt (revoked mid-session, e.g. via system Settings), and the
+                // bare PermissionMissing VoiceAnswerController.start() sets if the permission is
+                // already gone the moment voice answering (re)enables — reachable via onResumeSession()
+                // after a pause.
+                val error = voiceAnswer.error
+                val isMicPermissionMissing = error is VoiceAnswerFailureReason.PermissionMissing ||
+                    (error is VoiceAnswerFailureReason.CaptureFailed && error.reason is VoiceCaptureFailureReason.PermissionMissing)
+                if (isMicPermissionMissing) {
+                    if (!micPermissionRevokedHandled) {
+                        micPermissionRevokedHandled = true
+                        voiceGateway.stop()
+                        _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
+                        // Deferred, not immediate: this delay gives the snackbar time to actually show
+                        viewModelScope.launch {
+                            delay(MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS.milliseconds)
+                            terminate(abandoned = true)
+                        }
+                    }
+                    return@collect
+                }
+                // A non-permission capture failure (Bluetooth mic dropped, capture-loop error, etc.)
+                // is recoverable, unlike a revoked permission — pause on the current card rather than ending the session
+                if (error is VoiceAnswerFailureReason.CaptureFailed) {
+                    if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
+                    voiceGateway.setVoiceAnswering(false)
+                    voiceGateway.restartCurrentCard()
+                    _state.update { it.copy(isVoiceAnswerPaused = true) }
+                    _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
+                    return@collect
+                }
                 // Edge-detected before the state update below, off the collector's own running
                 // previousVoiceAnswerPhase — SpeakingNotice is entered exactly once per graded or
                 // silence-timed-out round, never re-triggered by an equal-value re-collection.
@@ -362,7 +410,6 @@ class RatedStudySessionViewModel @Inject constructor(
                         voiceAnswerPhase = voiceAnswer.phase,
                         voiceAnswerSanitizedTranscript = voiceAnswer.sanitizedTranscript,
                         lastVoiceAnswerGrade = voiceAnswer.lastGrade,
-                        voiceAnswerError = voiceAnswer.error,
                         // Grading starts as soon as the utterance is captured, before the TTS
                         // engine's own phase would flip to ANSWER — reveal the card now so the
                         // user can check what they missed while grading/feedback plays out.
@@ -384,8 +431,9 @@ class RatedStudySessionViewModel @Inject constructor(
                 when {
                     grade != null -> onVoiceGraded(grade, voiceAnswer.lastGradedCardId)
                     // A grading/transcription failure is not counted as a silence timeout — it
-                    // is simply ignored, leaving the queue and consecutiveSilenceCount untouched.
-                    voiceAnswer.error != null -> Unit
+                    // just surfaces a snackbar, leaving the queue and consecutiveSilenceCount
+                    // untouched.
+                    voiceAnswer.error != null -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerGradingFailed)
                     else -> onVoiceSilenceTimeout()
                 }
             }
@@ -404,8 +452,11 @@ class RatedStudySessionViewModel @Inject constructor(
      */
     private fun onVoiceGraded(grade: VoiceAnswerGrade, gradedCardId: String?) {
         val headCardId = ratedSessionState?.currentCard?.id
-        if (gradedCardId != null && gradedCardId != headCardId) return
+        if (gradedCardId != null && gradedCardId != headCardId) {
+            return
+        }
         consecutiveSilenceCount = 0
+        pushNextSilenceWillPauseSession()
         applyAttemptRating(grade.toFlashcardAttemptRating(), deferSync = true)
     }
 
@@ -421,10 +472,24 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onVoiceSilenceTimeout() {
         ratedSessionState = ratedSessionState?.let(::requeueAfterSilence)
         consecutiveSilenceCount++
+        pushNextSilenceWillPauseSession()
         pendingSessionSync = { syncStateFromRatedSession() }
         if (consecutiveSilenceCount >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD) {
+            _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilencePause)
             pauseForRepeatedSilence()
+        } else {
+            _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilenceSkip)
         }
+    }
+
+    /**
+     * Pushed ahead of every listen cycle (never computed reactively) so
+     * [VoiceAnswerController.onSilenceTimeout] can pick its own spoken message the instant its
+     * internal timer fires, without needing to know [consecutiveSilenceCount] itself.
+     */
+    private fun pushNextSilenceWillPauseSession() {
+        val willPause = consecutiveSilenceCount + 1 >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD
+        voiceGateway.setNextSilenceWillPauseSession(willPause)
     }
 
     /**
@@ -440,28 +505,10 @@ class RatedStudySessionViewModel @Inject constructor(
     /** Re-arms voice answering on the same card, counter back at zero. */
     fun onResumeSession() {
         consecutiveSilenceCount = 0
+        pushNextSilenceWillPauseSession()
         _state.update { it.copy(isVoiceAnswerPaused = false) }
         voiceGateway.setVoiceAnswering(true)
         if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
-    }
-
-    private fun observeVoiceAnswerConsentState() {
-        viewModelScope.launch {
-            observeUserPreferences().map { it.voiceAnswerConsentGranted }.collect { hasConsent ->
-                hasVoiceAnswerConsent = hasConsent
-            }
-        }
-    }
-
-    fun onVoiceAnswerToggle() {
-        if (_state.value.isVoiceAnswerEnabled) {
-            // Voice-answering-on drives the shared TTS engine in a stop-after-question shape;
-            // there is no meaningful "keep reading, just stop grading" middle state (ADR-0025),
-            // so disabling it tears down the whole engine back to manual Show Answer/Next.
-            voiceGateway.stop()
-            return
-        }
-        requestVoiceAnswering(hasVoiceAnswerConsent)
     }
 
     /** Consent first, then the microphone. Both gates are one-time; neither is skippable. */
@@ -487,22 +534,23 @@ class RatedStudySessionViewModel @Inject constructor(
                 .onFailure {
                     // Consent wasn't actually recorded — leave the dialog up rather than starting
                     // the mic as if it had been, so a retry is a single tap on the same dialog.
-                    _state.update { it.copy(voiceError = "Failed to save voice answering consent") }
+                    _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerConsentSaveFailed)
                 }
         }
     }
 
     fun onMicPermissionResult(isGranted: Boolean) {
         _state.update { it.copy(isMicPermissionRequestPending = false) }
-        if (!isGranted) return
+        if (!isGranted) {
+            // The gateway never gets bootstrapped without the mic — falls back to the manual-mode
+            // sheet rather than leaving voice's controls up with no engine behind them.
+            _state.update { it.copy(isVoiceMode = false) }
+            return
+        }
         // Rated sessions never auto-start the gateway; enabling voice answering is what
         // bootstraps it here (ADR-0025).
         ensureVoiceGatewayStarted()
         voiceGateway.setVoiceAnswering(true)
-    }
-
-    fun onVoiceAnswerGradeDismissed() {
-        _state.update { it.copy(lastVoiceAnswerGrade = null) }
     }
 
     fun onShowAnswer() {
@@ -562,7 +610,9 @@ class RatedStudySessionViewModel @Inject constructor(
     }
 
     fun onVoicePlayPause() {
-        if (pausedDueToExtendedContext) {
+        if (_state.value.isVoiceAnswerPaused) {
+            onResumeSession()
+        } else if (pausedDueToExtendedContext) {
             advanceAfterExtendedContextJob?.cancel()
             pausedDueToExtendedContext = false
             viewModelScope.launch {
@@ -607,16 +657,12 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onExtendedContextDialogDismissed() {
         if (pausedDueToExtendedContext) {
             advanceAfterExtendedContextJob = viewModelScope.launch {
-                delay(EXTENDED_CONTEXT_ADVANCE_DELAY_MS)
+                delay(EXTENDED_CONTEXT_ADVANCE_DELAY_MS.milliseconds)
                 pausedDueToExtendedContext = false
                 voiceGateway.rewindToNext()
                 voiceGateway.togglePlayPause()
             }
         }
-    }
-
-    fun onVoiceErrorDismissed() {
-        _state.update { it.copy(voiceError = null) }
     }
 
     private fun startRewindThresholdTimer() {
@@ -722,14 +768,6 @@ class RatedStudySessionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Stores the draftState the host built, then fires any side effect the edit implies.
-     *
-     * The side effect comes from diffing the previous draftState against the next rather than from an
-     * event that names the changed field: it keeps every dialog on the one generic
-     * [StudySessionDialogEvent.DraftChange], and puts the trigger somewhere a unit test can reach
-     * (ADR-0036).
-     */
     private fun onDraftChange(dialog: StudySessionDialog) {
         val previous = _state.value.activeDialog
         _state.update { it.copy(activeDialog = dialog) }
@@ -762,14 +800,13 @@ class RatedStudySessionViewModel @Inject constructor(
         when (dialog) {
             is CurrentCardExtendedContext -> onExtendedContextDialogDismissed()
             is SessionVoiceSettings -> onVoiceSettingsDismiss()
+            // Declining consent means the gateway never bootstraps — falls back to the manual-mode
+            // sheet rather than leaving voice's controls up with no engine behind them.
+            VoiceAnswerConsent -> _state.update { it.copy(isVoiceMode = false) }
             else -> Unit
         }
     }
 
-    /**
-     * Reporting pauses playback the way the old debug FAB did — the user stopped to read the card,
-     * not to be read over. Resuming is a deliberate tap (ADR-0017).
-     */
     private fun onReportProblemOpen(dialog: ReportCurrentCardProblem) {
         if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
         _state.update { it.copy(activeDialog = dialog) }
@@ -787,7 +824,7 @@ class RatedStudySessionViewModel @Inject constructor(
                     actions = dialog.selectedActions,
                 )
             ).onFailure {
-                _state.update { it.copy(curationError = "Failed to submit report") }
+                _messages.tryEmit(RatedStudySessionMessage.CurationSubmissionFailed)
             }
         }
     }
@@ -832,10 +869,6 @@ class RatedStudySessionViewModel @Inject constructor(
         }
     }
 
-    fun onCurationErrorDismissed() {
-        _state.update { it.copy(curationError = null) }
-    }
-
     public override fun onCleared() {
         voiceGateway.stop()
     }
@@ -844,5 +877,6 @@ class RatedStudySessionViewModel @Inject constructor(
         const val EXTENDED_CONTEXT_ADVANCE_DELAY_MS = 500L
         const val CONSECUTIVE_SILENCE_PAUSE_THRESHOLD = 3
         const val SECONDS_PER_MINUTE = 60
+        const val MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS = 4000L
     }
 }

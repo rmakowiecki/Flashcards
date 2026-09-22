@@ -45,4 +45,12 @@ interface VoiceGateway {
     fun setSpeechRate(rate: Float)
     fun setVoice(voiceId: String?)
     fun setVoiceAnswering(enabled: Boolean)
+
+    /**
+     * Tells the voice-answering pipeline whether *its own* next silence timeout — should one
+     * fire before this is next called — is the one that pauses the session (ADR-0025's
+     * consecutive-silence pause), so it can pick the right spoken notice on its own; the
+     * consecutive-silence count itself stays owned by the caller.
+     */
+    fun setNextSilenceWillPauseSession(willPause: Boolean)
 }

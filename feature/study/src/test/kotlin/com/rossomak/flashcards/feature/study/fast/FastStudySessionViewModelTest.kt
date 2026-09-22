@@ -663,6 +663,9 @@ class FastStudySessionViewModelTest {
 
     @Test
     fun `observeVoiceState surfaces a voice error and clears active playback`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(readAloudEnabled = true))
+        loadThreeCards()
+
         val viewModel = createViewModel()
         advanceUntilIdle()
 
@@ -673,6 +676,7 @@ class FastStudySessionViewModelTest {
             awaitItem() shouldBe FastStudySessionMessage.VoicePlaybackUnavailable
             viewModel.state.value.isVoiceActive shouldBe false
             viewModel.state.value.isVoicePlaying shouldBe false
+            viewModel.state.value.isReadAloudMode shouldBe false
         }
     }
 
@@ -954,6 +958,7 @@ private class FakeVoiceGateway : VoiceGateway {
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
 
     var lastVoiceAnswering: Boolean? = null
+    var lastNextSilenceWillPauseSession: Boolean? = null
 
     var startCalls = 0
     var lastStartCards: List<Flashcard>? = null
@@ -1003,5 +1008,8 @@ private class FakeVoiceGateway : VoiceGateway {
     }
     override fun setVoiceAnswering(enabled: Boolean) {
         lastVoiceAnswering = enabled
+    }
+    override fun setNextSilenceWillPauseSession(willPause: Boolean) {
+        lastNextSilenceWillPauseSession = willPause
     }
 }

@@ -41,6 +41,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -74,7 +75,12 @@ class FastStudySessionViewModel @Inject constructor(
     private val route = savedStateHandle.decodeRoute<FastStudySessionRoute>()
     private val sessionTitle: String = route.sessionTitle
 
-    private val _state = MutableStateFlow(FastStudySessionScreenState(sessionTitle = sessionTitle))
+    private val _state = MutableStateFlow(
+        FastStudySessionScreenState(
+            sessionTitle = sessionTitle,
+            isReadAloudMode = route.readAloudEnabled,
+        ),
+    )
     val state: StateFlow<FastStudySessionScreenState> = _state.asStateFlow()
 
     // Tracks eagerly so rapid toggles don't race against isVoiceActive propagation.
@@ -210,7 +216,7 @@ class FastStudySessionViewModel @Inject constructor(
             voiceGateway.state.collect { voice ->
                 if (voice.error != null) {
                     voiceStarted = false
-                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false) }
+                    _state.update { it.copy(isVoiceActive = false, isVoicePlaying = false, isReadAloudMode = false) }
                     _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
                     return@collect
                 }
@@ -303,7 +309,10 @@ class FastStudySessionViewModel @Inject constructor(
     }
 
     fun onVoiceAutoStartDeclined() {
-        _state.update { it.copy(isVoiceAutoStartPending = false) }
+        // The gateway never gets bootstrapped without notification permission — falls back to the
+        // manual-mode sheet rather than leaving read-aloud's controls up with no engine behind
+        // them.
+        _state.update { it.copy(isVoiceAutoStartPending = false, isReadAloudMode = false) }
     }
 
     fun onVoiceAutoStart() {
@@ -372,7 +381,7 @@ class FastStudySessionViewModel @Inject constructor(
     private fun onExtendedContextDialogDismissed() {
         if (pausedDueToExtendedContext) {
             advanceAfterExtendedContextJob = viewModelScope.launch {
-                delay(EXTENDED_CONTEXT_ADVANCE_DELAY_MS)
+                delay(EXTENDED_CONTEXT_ADVANCE_DELAY_MS.milliseconds)
                 pausedDueToExtendedContext = false
                 voiceGateway.rewindToNext()
                 voiceGateway.togglePlayPause()
@@ -384,7 +393,7 @@ class FastStudySessionViewModel @Inject constructor(
         rewindJob?.cancel()
         isPastRewindThreshold = false
         rewindJob = viewModelScope.launch {
-            delay(rewindThresholdMs)
+            delay(rewindThresholdMs.milliseconds)
             isPastRewindThreshold = true
         }
     }
@@ -484,14 +493,6 @@ class FastStudySessionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Stores the draftState the host built, then fires any side effect the edit implies.
-     *
-     * The side effect comes from diffing the previous draftState against the next rather than from an
-     * event that names the changed field: it keeps every dialog on the one generic
-     * [StudySessionDialogEvent.DraftChange], and puts the trigger somewhere a unit test can reach
-     * (ADR-0036).
-     */
     private fun onDraftChange(dialog: StudySessionDialog) {
         val previous = _state.value.activeDialog
         _state.update { it.copy(activeDialog = dialog) }

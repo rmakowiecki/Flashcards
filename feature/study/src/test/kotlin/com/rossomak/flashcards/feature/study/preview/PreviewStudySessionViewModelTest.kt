@@ -518,6 +518,22 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
+    fun `a saved voice-answering default survives a Fast default study mode`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(singleSubcategoryRoute)
+            studySessionPreferencesRepository.preferences.value = StudySessionPreferences(
+                defaultStudyMode = StudyMode.Fast,
+                voiceAnsweringEnabled = true,
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.config.mode shouldBe StudyMode.Fast
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe true
+        }
+
+    @Test
     fun `confirming with keepAsDefault true writes the preference`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(singleSubcategoryRoute)
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
