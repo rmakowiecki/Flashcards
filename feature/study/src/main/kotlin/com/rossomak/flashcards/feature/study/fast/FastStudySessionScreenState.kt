@@ -16,17 +16,13 @@ import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
  * this split exists to remove.
  */
 data class FastStudySessionScreenState(
-    val sessionTitle: String = "",
+    val categoryName: String = "",
+    val subcategoryNameById: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val flashcards: List<Flashcard> = emptyList(),
     val currentCardIndex: Int = 0,
     val isAnswerRevealed: Boolean = false,
     @param:StringRes val error: Int? = null,
-    // Routed at session start (FastStudySessionRoute.readAloudEnabled) — known synchronously,
-    // unlike isVoiceActive below, which only flips once the voice engine finishes binding. The
-    // sheet must never show the manual-mode perspective for a read-aloud session, even for the
-    // moment between entry and that bind completing, so it branches on this flag instead of
-    // isVoiceActive.
     val isReadAloudMode: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,

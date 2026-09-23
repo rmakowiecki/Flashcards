@@ -95,11 +95,15 @@ class RatedStudySessionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<RatedStudySessionRoute>()
+
+    // Distinct from the screen's own per-card title (chrome.studySessionCardTitle):
+    // this is the fixed name the voice gateway's notification shows for the whole session.
     private val sessionTitle: String = route.sessionTitle
 
     private val _state = MutableStateFlow(
         RatedStudySessionScreenState(
-            sessionTitle = sessionTitle,
+            categoryName = route.categoryName,
+            subcategoryNameById = route.subcategoryIds.zip(route.subcategoryNames).toMap(),
             attemptsLimit = route.ratedAttempts,
             isVoiceMode = route.voiceAnsweringEnabled,
         ),
@@ -285,6 +289,7 @@ class RatedStudySessionViewModel @Inject constructor(
                 flashcards = machine.remainingCards,
                 currentCardIndex = 0,
                 masteredCount = machine.masteredCount,
+                completedCount = machine.completedCount,
                 distinctCardCount = machine.distinctCardCount,
                 currentCardRatings = machine.currentCardRatings,
             )

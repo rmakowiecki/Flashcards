@@ -10,8 +10,7 @@ complexity:
     # Detekt reports conditions whose complexity is greater than or equal to this value.
     threshold: 6
   LargeClass:
-    # Test classes are explicitly allowed to grow unbounded — splitting by concern reads worse
-    # than one file per ViewModel/screen under test (AGENTS.md, Static Analysis).
+    # Test classes are explicitly allowed to grow unbounded — splitting by concern reads worse than one file per ViewModel/screen under test
     excludes: ['**/*Test.kt']
   LongMethod:
     threshold: 80

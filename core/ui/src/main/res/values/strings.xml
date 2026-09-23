@@ -17,6 +17,10 @@
     <string name="common_difficulty_range_cd">Difficulty %1$d to %2$d out of %3$d</string>
     <string name="common_navigate_back_cd">Back</string>
     <string name="common_close_cd">Close</string>
+    <string name="common_middle_dot_separator">" · "</string>
+    <string name="common_list_separator">", "</string>
+    <string name="common_list_two_item_conjunction">" and "</string>
+    <string name="common_list_final_conjunction">", and "</string>
     <string name="common_edit_button">Edit</string>
     <string name="common_retry_button">Retry</string>
     <string name="common_load_error_title">Something went wrong</string>

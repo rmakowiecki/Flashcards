@@ -26,15 +26,15 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
- * The family's icon-only type — a circular, tonal affordance with no label to carry meaning, so
+ * The family's tonal icon-only type — a circular, tonal affordance with no label to carry meaning, so
  * [contentDescription] is required rather than optional. Wraps M3's [FilledIconButton] directly
  * for its touch target, state layer and press behaviour, the same reasoning ADR-0033 applied to
  * the labeled types. Tonal treatment only — both known callers (row play affordances) are tonal,
  * so a `variant` axis spanning filled/outlined/text would invent combinations nobody has designed.
- * See ADR-0042.
+ * See [FlashcardsFilledIconButton] for the gradient-filled sibling. See ADR-0042.
  */
 @Composable
-fun FlashcardsIconButton(
+fun FlashcardsTonalIconButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
@@ -60,22 +60,22 @@ fun FlashcardsIconButton(
     }
 }
 
-@ShowkaseComposable(name = "Icon", group = "Buttons")
+@ShowkaseComposable(name = "Icon — tonal", group = "Buttons")
 @Composable
-fun FlashcardsIconButtonShowcase() {
+fun FlashcardsTonalIconButtonShowcase() {
     FlashcardsTheme {
         Surface {
-            FlashcardsIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {})
+            FlashcardsTonalIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {})
         }
     }
 }
 
-@ShowkaseComposable(name = "Icon — small", group = "Buttons")
+@ShowkaseComposable(name = "Icon — tonal, small", group = "Buttons")
 @Composable
-fun FlashcardsIconButtonSmallShowcase() {
+fun FlashcardsTonalIconButtonSmallShowcase() {
     FlashcardsTheme {
         Surface {
-            FlashcardsIconButton(
+            FlashcardsTonalIconButton(
                 icon = Icons.Default.PlayArrow,
                 contentDescription = "Study Compose",
                 onClick = {},
@@ -85,20 +85,20 @@ fun FlashcardsIconButtonSmallShowcase() {
     }
 }
 
-@ShowkaseComposable(name = "Icon — disabled", group = "Buttons")
+@ShowkaseComposable(name = "Icon — tonal, disabled", group = "Buttons")
 @Composable
-fun FlashcardsIconButtonDisabledShowcase() {
+fun FlashcardsTonalIconButtonDisabledShowcase() {
     FlashcardsTheme {
         Surface {
-            FlashcardsIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {}, enabled = false)
+            FlashcardsTonalIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {}, enabled = false)
         }
     }
 }
 
-@ShowkaseComposable(name = "Icon — on gradient", group = "Buttons")
+@ShowkaseComposable(name = "Icon — tonal, on gradient", group = "Buttons")
 @Preview
 @Composable
-fun FlashcardsIconButtonOnGradientShowcase() {
+fun FlashcardsTonalIconButtonOnGradientShowcase() {
     FlashcardsTheme {
         Box(
             modifier = Modifier
@@ -106,13 +106,13 @@ fun FlashcardsIconButtonOnGradientShowcase() {
                 .padding(MaterialTheme.spacing.small),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall)) {
-                FlashcardsIconButton(
+                FlashcardsTonalIconButton(
                     icon = Icons.Default.PlayArrow,
                     contentDescription = "Study Compose",
                     onClick = {},
                     style = FlashcardsComponentStyle.OnGradient,
                 )
-                FlashcardsIconButton(
+                FlashcardsTonalIconButton(
                     icon = Icons.Default.PlayArrow,
                     contentDescription = "Study Compose",
                     onClick = {},
@@ -126,15 +126,15 @@ fun FlashcardsIconButtonOnGradientShowcase() {
 
 @PreviewLightDark
 @Composable
-private fun FlashcardsIconButtonPreview() {
+private fun FlashcardsTonalIconButtonPreview() {
     FlashcardsTheme {
         Surface {
             Column(
                 modifier = Modifier.padding(MaterialTheme.spacing.small),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
             ) {
-                FlashcardsIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {})
-                FlashcardsIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {}, enabled = false)
+                FlashcardsTonalIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {})
+                FlashcardsTonalIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Study Compose", onClick = {}, enabled = false)
             }
         }
     }

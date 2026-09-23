@@ -127,8 +127,6 @@ fun FlashcardsLevelCard(
                     // headlineLarge have different descent, so aligning by box-bottom (Alignment.Bottom)
                     // leaves their glyph baselines visibly offset from each other.
                     Text(
-                        // Uppercased here, not in the string resource — an all-caps resource makes
-                        // TalkBack spell it letter-by-letter instead of reading the word.
                         text = stringResource(R.string.level_card_level_label).uppercase(),
                         modifier = Modifier.alignByBaseline(),
                         color = mutedContentColor,

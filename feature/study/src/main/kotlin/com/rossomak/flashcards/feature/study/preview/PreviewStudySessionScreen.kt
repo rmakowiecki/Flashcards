@@ -17,7 +17,6 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -64,9 +63,9 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsIconButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
@@ -82,6 +81,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 
 @Composable
@@ -98,6 +98,7 @@ fun PreviewStudySessionScreen(
         when (destination) {
             is PreviewStudySessionDestination.FastStudySession ->
                 onNavigateToFastStudySession(destination.route)
+
             is PreviewStudySessionDestination.RatedStudySession ->
                 onNavigateToRatedStudySession(destination.route)
         }
@@ -175,7 +176,7 @@ fun PreviewStudySessionContent(
     var pendingBadgeDialog by remember { mutableStateOf<PreviewDialog?>(null) }
     LaunchedEffect(pendingBadgeDialog) {
         val dialog = pendingBadgeDialog ?: return@LaunchedEffect
-        delay(BADGE_DIALOG_STAGGER_DELAY_MS)
+        delay(BADGE_DIALOG_STAGGER_DELAY_MS.milliseconds)
         onDialogEvent(Open(dialog))
         pendingBadgeDialog = null
     }
@@ -214,7 +215,12 @@ fun PreviewStudySessionContent(
             containerColor = Color.Transparent,
             topBar = {
                 FlashcardsGradientTopBar(
-                    title = screenTitle(state),
+                    title = screenTitle(
+                        state = state,
+                        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+                        quickTitle = stringResource(R.string.preview_session_quick_title),
+                        customTitle = stringResource(R.string.preview_session_custom_title),
+                    ),
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(
@@ -235,6 +241,7 @@ fun PreviewStudySessionContent(
                 ) {
                     CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
                 }
+
                 state.error != null -> ErrorContent(
                     modifier = Modifier
                         .fillMaxSize()
@@ -242,6 +249,7 @@ fun PreviewStudySessionContent(
                     error = state.error,
                     onRetry = onRetry,
                 )
+
                 else -> ReadyContent(
                     modifier = Modifier
                         .fillMaxSize()
@@ -317,10 +325,6 @@ private fun ErrorContent(
  * flow — no adaptive collapsing, no measuring against the sheet's actual height; see
  * [PreviewStudySessionContent]'s doc for why that was dropped.
  */
-// Four of these params (settingsSheetOpen, onOpenSettings, onToggleSettings, onOpenSettingsDialog)
-// used to arrive bundled in a single SettingsSheetController — dropped in favor of plain, flat
-// state in the caller (see PreviewStudySessionContent's own doc), which pushes this function over
-// detekt's LongParameterList threshold by one. Not worth re-introducing a bundling type for.
 @Suppress("LongParameterList")
 @Composable
 private fun ReadyContent(
@@ -365,7 +369,6 @@ private fun ReadyContent(
     }
 }
 
-/** The play circle and "Ready to start?" title — the one part of the hero [AdaptiveHero] can drop. */
 @Composable
 private fun HeroTop(modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -518,10 +521,12 @@ private fun interactionBadgeContent(isRated: Boolean, enabled: Boolean): Interac
         label = stringResource(R.string.preview_session_interaction_manual_label),
         icon = Icons.Default.TouchApp,
     )
+
     isRated -> InteractionBadgeContent(
         label = stringResource(R.string.preview_session_interaction_voice_label),
         icon = Icons.Default.Mic,
     )
+
     else -> InteractionBadgeContent(
         label = stringResource(R.string.preview_session_interaction_auto_label),
         icon = Icons.AutoMirrored.Filled.VolumeUp,
@@ -625,7 +630,6 @@ private fun HeroActions(
     }
 }
 
-/** [HeroActions]' primary action, lifted out purely so both of its row shapes can share it. */
 @Composable
 private fun StartSessionButton(
     modifier: Modifier = Modifier,
@@ -642,48 +646,30 @@ private fun StartSessionButton(
     )
 }
 
-/**
- * The sliders icon: toggles [settingsSheetOpen] rather than only ever opening it, so it can also
- * close a sheet the user opened from here — ticket per grill. [Icons.Default.Tune], not a gear —
- * this button opens *session* settings (mode, length, filters…), not the app's Settings screen, so
- * a gear risks reading as a navigation shortcut to the wrong destination. Purely behavioural: no
- * visual "active" state exists on [FlashcardsIconButton] to reflect open/closed, only the announced
- * content description changes. A badge- or empty-state-triggered open never routes through this
- * button, so those stay force-open (never toggled shut) regardless of this value.
- */
 @Composable
 private fun SettingsToggleButton(settingsSheetOpen: Boolean, onToggleSettings: () -> Unit) {
-    FlashcardsIconButton(
+    FlashcardsTonalIconButton(
         icon = Icons.Default.Tune,
-        contentDescription = stringResource(
-            if (settingsSheetOpen) {
-                R.string.preview_session_close_settings_cd
-            } else {
-                R.string.preview_session_open_settings_cd
-            },
-        ),
+        contentDescription = stringResource(if (settingsSheetOpen) R.string.preview_session_close_settings_cd else R.string.preview_session_open_settings_cd),
         onClick = onToggleSettings,
         style = OnGradient,
     )
 }
 
 /**
- * How long a settings badge tap waits after opening the sheet before opening its dialog
- * — long enough that the sheet's own slide-up reads as a distinct event before the dialog (and
- * its background blur) covers it, short enough that the tap still feels like one action.
- * `BottomSheet`'s expand animation is spring-driven (see M3's `BottomSheet.kt`), not a fixed-duration
- * tween, so there is no single number to sync exactly against — this is tuned with headroom above a
- * typical settle, not measured from one.
- */
-private const val BADGE_DIALOG_STAGGER_DELAY_MS = 300L
+ * How long a settings badge tap waits after opening the sheet before opening its dialog — long enough that the sheet's own slide-up
+ * reads as a distinct event before the dialog (and its background blur) covers it*/
+private const val BADGE_DIALOG_STAGGER_DELAY_MS = 250L
 
-// isQuickSession is checked before isSingleSubcategory so a quick session that happens to land on
-// one subcategory still reads as "Quick session" rather than misreporting as a plain single-subcategory
-// preview.
-private fun screenTitle(state: PreviewStudySessionScreenState): String = when {
-    state.isQuickSession -> "${state.categoryName} · Quick session"
-    state.isSingleSubcategory -> "${state.categoryName} · ${state.subcategoryNames.first()}"
-    else -> "${state.categoryName} · Custom session"
+private fun screenTitle(
+    state: PreviewStudySessionScreenState,
+    separator: String,
+    quickTitle: String,
+    customTitle: String,
+): String = when {
+    state.isQuickSession -> "${state.categoryName}$separator$quickTitle"
+    state.isSingleSubcategory -> "${state.categoryName}$separator${state.subcategoryNames.first()}"
+    else -> "${state.categoryName}$separator$customTitle"
 }
 
 @Composable
@@ -693,14 +679,14 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
         state.selectedCardCount,
         state.selectedCardCount,
     )
-    // Resolved here, not inside appendSubcategoryList, so that function can stay a plain (non-
-    // @Composable) builder step — matching appendOxfordList — instead of tripping detekt/lint's
-    // ComposableNaming rule for a lowercase Unit-returning @Composable.
     val otherSubcategoriesText = (state.subcategoryNames.size - SUBCATEGORY_LIST_VISIBLE_COUNT)
         .takeIf { state.subcategoryNames.size > SUBCATEGORY_LIST_TRUNCATION_THRESHOLD }
         ?.let { otherCount ->
             pluralStringResource(R.plurals.preview_session_scope_other_subcategories_count, otherCount, otherCount)
         }
+    val listSeparator = stringResource(CoreUiR.string.common_list_separator)
+    val listTwoItemConjunction = stringResource(CoreUiR.string.common_list_two_item_conjunction)
+    val listFinalConjunction = stringResource(CoreUiR.string.common_list_final_conjunction)
     return buildAnnotatedString {
         fun appendBold(text: String) {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text) }
@@ -710,20 +696,34 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
             state.isQuickSession -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_quick_session_message))
-                appendSubcategoryList(state.subcategoryNames, ::appendBold, otherSubcategoriesText)
-                append(".")
+                appendSubcategoryList(
+                    state.subcategoryNames,
+                    ::appendBold,
+                    otherSubcategoriesText,
+                    listSeparator,
+                    listTwoItemConjunction,
+                    listFinalConjunction,
+                )
             }
+
             state.isSingleSubcategory -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_single_subcategory_prefix_message))
                 appendBold(state.subcategoryNames.first())
                 append(stringResource(R.string.preview_session_scope_single_subcategory_suffix_message))
             }
+
             else -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_multi_subcategory_message))
-                appendSubcategoryList(state.subcategoryNames, ::appendBold, otherSubcategoriesText)
-                append(".")
+                appendSubcategoryList(
+                    state.subcategoryNames,
+                    ::appendBold,
+                    otherSubcategoriesText,
+                    listSeparator,
+                    listTwoItemConjunction,
+                    listFinalConjunction,
+                )
             }
         }
     }
@@ -735,7 +735,7 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
  * Quick session, whose subcategories the user did not choose, making naming them the whole point of a
  * preview, never truncates. Custom sessions, unbounded, still collapse once they cross it.
  */
-private val SUBCATEGORY_LIST_TRUNCATION_THRESHOLD = StudySessionConfig.MAX_SUBCATEGORY_COUNT
+private const val SUBCATEGORY_LIST_TRUNCATION_THRESHOLD = StudySessionConfig.MAX_SUBCATEGORY_COUNT
 private const val SUBCATEGORY_LIST_VISIBLE_COUNT = 3
 
 /**
@@ -747,25 +747,34 @@ private fun AnnotatedString.Builder.appendSubcategoryList(
     names: List<String>,
     appendBold: (String) -> Unit,
     otherSubcategoriesText: String?,
+    listSeparator: String,
+    listTwoItemConjunction: String,
+    listFinalConjunction: String,
 ) {
     if (otherSubcategoriesText == null) {
-        appendOxfordList(names, appendBold)
+        appendOxfordList(names, appendBold, listSeparator, listTwoItemConjunction, listFinalConjunction)
         return
     }
     names.take(SUBCATEGORY_LIST_VISIBLE_COUNT).forEachIndexed { index, name ->
-        if (index > 0) append(", ")
+        if (index > 0) append(listSeparator)
         appendBold(name)
     }
     append(otherSubcategoriesText)
 }
 
 // Joins names as "A and B" (2 items) or "A, B, and C" (3+ items), bolding each name.
-private fun AnnotatedString.Builder.appendOxfordList(names: List<String>, appendBold: (String) -> Unit) {
+private fun AnnotatedString.Builder.appendOxfordList(
+    names: List<String>,
+    appendBold: (String) -> Unit,
+    listSeparator: String,
+    listTwoItemConjunction: String,
+    listFinalConjunction: String,
+) {
     names.forEachIndexed { index, name ->
         when (index) {
             0 -> Unit
-            names.lastIndex -> append(if (names.size > 2) ", and " else " and ")
-            else -> append(", ")
+            names.lastIndex -> append(if (names.size > 2) listFinalConjunction else listTwoItemConjunction)
+            else -> append(listSeparator)
         }
         appendBold(name)
     }

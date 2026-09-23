@@ -242,6 +242,18 @@ class RatedSessionStateTest {
     }
 
     @Test
+    fun `completed count increases on any Terminal State, regardless of grade`() {
+        val session = state(cardCount = 2, attemptsLimit = 1)
+
+        val afterFailed = rate(session, Failed)
+        afterFailed.state.completedCount shouldBe 1
+        afterFailed.state.masteredCount shouldBe 0
+
+        val afterCorrect = rate(afterFailed.state, Correct)
+        afterCorrect.state.completedCount shouldBe 2
+    }
+
+    @Test
     fun `currentCardRatings is empty for a card on its first Attempt`() {
         val session = state(cardCount = 1)
 

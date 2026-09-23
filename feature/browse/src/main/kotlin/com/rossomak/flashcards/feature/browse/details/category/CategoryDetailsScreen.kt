@@ -64,7 +64,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsIconButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
@@ -456,7 +456,7 @@ private fun SubcategoryList(
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
 ) {
     val resources = LocalResources.current
-    val rowSubtitleSeparator = resources.getString(R.string.browse_middle_dot_separator)
+    val rowSubtitleSeparator = resources.getString(CoreUiR.string.common_middle_dot_separator)
     LazyColumn(
         state = listState,
         modifier = modifier
@@ -589,7 +589,7 @@ private fun Subcategory.toListGroupItem(
                     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FlashcardsIconButton(
+                    FlashcardsTonalIconButton(
                         icon = Icons.Default.PlayArrow,
                         contentDescription = playContentDescription,
                         onClick = { onNavigateToPreviewStudySession(subcategory) },

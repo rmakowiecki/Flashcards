@@ -438,7 +438,7 @@ private fun SubcategoryListGroup(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit
 ) {
-    val cardsStudiedSeparator = stringResource(R.string.browse_middle_dot_separator)
+    val cardsStudiedSeparator = stringResource(CoreUiR.string.common_middle_dot_separator)
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
         items = results.subcategories.map { subcategory ->
@@ -481,7 +481,7 @@ private fun CategoryListGroup(
     favorites: UserFavorites,
     onCategoryClick: (String, String) -> Unit,
 ) {
-    val subcategorySummarySeparator = stringResource(R.string.browse_middle_dot_separator)
+    val subcategorySummarySeparator = stringResource(CoreUiR.string.common_middle_dot_separator)
     val placeholderSubtitle = stringResource(R.string.browse_category_placeholder_subtitle)
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),

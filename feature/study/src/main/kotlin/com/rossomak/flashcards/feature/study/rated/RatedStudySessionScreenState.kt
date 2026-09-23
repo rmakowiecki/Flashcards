@@ -24,7 +24,11 @@ import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
  * remove.
  */
 data class RatedStudySessionScreenState(
-    val sessionTitle: String = "",
+    val categoryName: String = "",
+    // Keyed by Flashcard.subcategoryId — resolves the current card's own subcategory name for the
+    // header title (studySessionCardTitle), since a composite session's cards can each belong to
+    // a different one.
+    val subcategoryNameById: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val flashcards: List<Flashcard> = emptyList(),
     val currentCardIndex: Int = 0,
@@ -48,10 +52,14 @@ data class RatedStudySessionScreenState(
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
     val isMicPermissionRequestPending: Boolean = false,
     val activeDialog: StudySessionDialog? = null,
-    // Mirrors RatedSessionState.masteredCount; the "mastered" half of the top bar's counter.
+    // Mirrors RatedSessionState.masteredCount. No longer the header's counter (see completedCount
+    // below) — kept for the Session Summary screen's own mastered tally.
     val masteredCount: Int = 0,
+    // Mirrors RatedSessionState.completedCount; the "completed" half of the top bar's counter —
+    // every distinct card that has reached a Terminal State so far, any grade.
+    val completedCount: Int = 0,
     // Mirrors RatedSessionState.distinctCardCount — the counter's "of" half. Fixed at session
-    // start; unlike masteredCount, a re-queue never moves it.
+    // start; unlike completedCount, a re-queue never moves it.
     val distinctCardCount: Int = 0,
     // Mirrors RatedSessionState.currentCardRatings — the current (head) card's own Rating history,
     // source for the Attempt indicator's slots below.
