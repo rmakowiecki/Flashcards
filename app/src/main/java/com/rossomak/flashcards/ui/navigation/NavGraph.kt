@@ -13,6 +13,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
+import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
@@ -34,6 +35,7 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionScreen
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScreen
 import com.rossomak.flashcards.presentation.main.MainScreen
 import com.rossomak.flashcards.presentation.splash.SplashScreen
+import com.rossomak.flashcards.ui.permission.PermissionLauncherHost
 import kotlinx.serialization.Serializable
 
 /**
@@ -254,12 +256,14 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
 @Composable
 fun FlashcardsNavGraph(
     navController: NavHostController,
+    permissionGateway: PermissionGateway,
     modifier: Modifier = Modifier,
     launchRoute: String? = null,
 ) {
     // One SharedTransitionLayout around the whole NavHost: a shared element is matched between the
     // outgoing and the incoming destination, so both have to sit inside the same scope.
     SharedTransitionLayout(modifier = modifier) {
+        PermissionLauncherHost(permissionGateway)
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
             NavHost(
                 navController = navController,
