@@ -17,7 +17,6 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -82,6 +81,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 
 @Composable
@@ -176,7 +176,7 @@ fun PreviewStudySessionContent(
     var pendingBadgeDialog by remember { mutableStateOf<PreviewDialog?>(null) }
     LaunchedEffect(pendingBadgeDialog) {
         val dialog = pendingBadgeDialog ?: return@LaunchedEffect
-        delay(BADGE_DIALOG_STAGGER_DELAY_MS)
+        delay(BADGE_DIALOG_STAGGER_DELAY_MS.milliseconds)
         onDialogEvent(Open(dialog))
         pendingBadgeDialog = null
     }
@@ -369,7 +369,6 @@ private fun ReadyContent(
     }
 }
 
-/** The play circle and "Ready to start?" title — the one part of the hero [AdaptiveHero] can drop. */
 @Composable
 private fun HeroTop(modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -631,7 +630,6 @@ private fun HeroActions(
     }
 }
 
-/** [HeroActions]' primary action, lifted out purely so both of its row shapes can share it. */
 @Composable
 private fun StartSessionButton(
     modifier: Modifier = Modifier,
@@ -648,15 +646,6 @@ private fun StartSessionButton(
     )
 }
 
-/**
- * The sliders icon: toggles [settingsSheetOpen] rather than only ever opening it, so it can also
- * close a sheet the user opened from here — ticket per grill. [Icons.Default.Tune], not a gear —
- * this button opens *session* settings (mode, length, filters…), not the app's Settings screen, so
- * a gear risks reading as a navigation shortcut to the wrong destination. Purely behavioural: no
- * visual "active" state exists on [FlashcardsTonalIconButton] to reflect open/closed, only the announced
- * content description changes. A badge- or empty-state-triggered open never routes through this
- * button, so those stay force-open (never toggled shut) regardless of this value.
- */
 @Composable
 private fun SettingsToggleButton(settingsSheetOpen: Boolean, onToggleSettings: () -> Unit) {
     FlashcardsTonalIconButton(
@@ -668,18 +657,10 @@ private fun SettingsToggleButton(settingsSheetOpen: Boolean, onToggleSettings: (
 }
 
 /**
- * How long a settings badge tap waits after opening the sheet before opening its dialog
- * — long enough that the sheet's own slide-up reads as a distinct event before the dialog (and
- * its background blur) covers it, short enough that the tap still feels like one action.
- * `BottomSheet`'s expand animation is spring-driven (see M3's `BottomSheet.kt`), not a fixed-duration
- * tween, so there is no single number to sync exactly against — this is tuned with headroom above a
- * typical settle, not measured from one.
- */
-private const val BADGE_DIALOG_STAGGER_DELAY_MS = 300L
+ * How long a settings badge tap waits after opening the sheet before opening its dialog — long enough that the sheet's own slide-up
+ * reads as a distinct event before the dialog (and its background blur) covers it*/
+private const val BADGE_DIALOG_STAGGER_DELAY_MS = 250L
 
-// isQuickSession is checked before isSingleSubcategory so a quick session that happens to land on
-// one subcategory still reads as "Quick session" rather than misreporting as a plain single-subcategory
-// preview.
 private fun screenTitle(
     state: PreviewStudySessionScreenState,
     separator: String,

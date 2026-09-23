@@ -63,6 +63,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconB
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
@@ -78,8 +79,8 @@ import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.Curati
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
 import kotlinx.coroutines.launch
 
-private val SHEET_PEEK_HEIGHT_READ_ALOUD: Dp = 176.dp
-private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 128.dp
+private val SHEET_PEEK_HEIGHT_READ_ALOUD: Dp = 175.dp
+private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 150.dp
 
 @Composable
 fun FastStudySessionScreen(
@@ -223,18 +224,10 @@ fun FastStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progressLabel = if (state.flashcards.isNotEmpty()) {
-                        stringResource(R.string.fast_study_session_progress_label)
-                    } else {
-                        null
-                    },
+                    progressLabel = if (state.flashcards.isNotEmpty()) stringResource(R.string.fast_study_session_progress_label) else null,
                     completedCount = if (state.flashcards.isNotEmpty()) state.currentCardIndex + 1 else null,
                     totalCount = if (state.flashcards.isNotEmpty()) state.flashcards.size else null,
-                    progressFraction = if (state.flashcards.isNotEmpty()) {
-                        (state.currentCardIndex + 1) / state.flashcards.size.toFloat()
-                    } else {
-                        null
-                    },
+                    progressFraction = if (state.flashcards.isNotEmpty()) (state.currentCardIndex + 1) / state.flashcards.size.toFloat() else null,
                     onClose = { actions.onDialogEvent(Open(ExitSession)) },
                     onReportProblem = { card ->
                         actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
@@ -281,10 +274,13 @@ private fun FastStudySessionSheetContent(
     onVoiceSettingsCogClick: () -> Unit,
 ) {
     Column(
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.End,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp, bottom = 24.dp),
+            .height(if (state.isReadAloudMode) SHEET_PEEK_HEIGHT_READ_ALOUD else SHEET_PEEK_HEIGHT_DEFAULT)
+            .padding(horizontal = MaterialTheme.spacing.normal)
+            .padding(top = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.medium)
     ) {
         if (state.isReadAloudMode) {
             FastVoiceTransportControls(
@@ -296,35 +292,35 @@ private fun FastStudySessionSheetContent(
                 onVoiceSettingsCogClick = onVoiceSettingsCogClick,
             )
         } else if (!state.isAnswerRevealed) {
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = stringResource(R.string.study_session_show_answer_caption_message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
             FlashcardsFilledButton(
+                modifier = Modifier.fillMaxWidth(),
                 text = stringResource(R.string.study_session_show_answer_button),
                 onClick = onShowAnswer,
-                modifier = Modifier.fillMaxWidth(),
                 icon = Icons.Default.Flip,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+        } else {
             Text(
-                text = stringResource(R.string.study_session_show_answer_caption_message),
                 modifier = Modifier.fillMaxWidth(),
+                text = stringResource(R.string.fast_study_session_next_caption_message),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-        } else {
+            Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
             FlashcardsFilledButton(
+                modifier = Modifier.fillMaxWidth(),
                 text = stringResource(R.string.fast_study_session_next_button),
                 onClick = onNextCard,
-                modifier = Modifier.fillMaxWidth(),
                 icon = Icons.AutoMirrored.Filled.ArrowForward,
                 iconPosition = FlashcardsButtonIconPosition.Trailing,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.fast_study_session_next_caption_message),
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
             )
         }
     }
@@ -339,56 +335,53 @@ private fun FastVoiceTransportControls(
     onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
-    Column {
+    Box(modifier = Modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onVoiceSettingsCogClick,
+            modifier = Modifier.align(Alignment.TopEnd),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.study_session_voice_settings_cd),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
+            modifier = Modifier
+                .padding(top = MaterialTheme.spacing.normal)
+                .align(Alignment.Center),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onVoiceSettingsCogClick) {
+            IconButton(
+                onClick = onVoicePrevious,
+                enabled = state.isVoiceActive,
+            ) {
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.study_session_voice_settings_cd),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    imageVector = Icons.Default.SkipPrevious,
+                    contentDescription = stringResource(R.string.study_session_previous_card_cd),
                 )
             }
-        }
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+            Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
+            FlashcardsFilledIconButton(
+                icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = stringResource(
+                    if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd
+                ),
+                onClick = onVoicePlayPause,
+                enabled = state.isVoiceActive,
+            )
+            Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
+            IconButton(
+                onClick = if (state.isAnswerRevealed) onVoiceNext else onShowAnswer,
+                enabled = state.isVoiceActive,
             ) {
-                IconButton(
-                    onClick = onVoicePrevious,
-                    enabled = state.isVoiceActive,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = stringResource(R.string.study_session_previous_card_cd),
-                    )
-                }
-                Spacer(modifier = Modifier.size(16.dp))
-                FlashcardsFilledIconButton(
-                    icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
                     contentDescription = stringResource(
-                        if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd
+                        if (state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
                     ),
-                    onClick = onVoicePlayPause,
-                    enabled = state.isVoiceActive,
                 )
-                Spacer(modifier = Modifier.size(16.dp))
-                IconButton(
-                    onClick = if (state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-                    enabled = state.isVoiceActive,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = stringResource(
-                            if (state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
-                        ),
-                    )
-                }
             }
         }
     }

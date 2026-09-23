@@ -39,7 +39,7 @@
     <string name="study_session_show_answer_caption_message">Tap to reveal the answer</string>
 
     <string name="fast_study_session_next_button">Next</string>
-    <string name="fast_study_session_next_caption_message">No rating needed — just keep moving</string>
+    <string name="fast_study_session_next_caption_message">Tap to proceed to the next card</string>
     <string name="fast_study_session_progress_label">Card</string>
     <string name="rated_study_session_progress_label">Completed cards</string>
     <string name="study_session_progress_total_label">/%1$d</string>
