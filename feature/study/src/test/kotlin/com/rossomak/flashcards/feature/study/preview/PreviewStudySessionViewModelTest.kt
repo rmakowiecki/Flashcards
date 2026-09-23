@@ -14,7 +14,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
-import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
+import com.rossomak.flashcards.core.domain.repository.FakePermissionRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
@@ -77,7 +77,7 @@ class PreviewStudySessionViewModelTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
-    private val permissionGateway = FakePermissionGateway()
+    private val permissionRepository = FakePermissionRepository()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     /** Anything but [StudySessionConfig.DEFAULT_RATED_ATTEMPTS], so a commit is visible. */
@@ -145,8 +145,8 @@ class PreviewStudySessionViewModelTest {
         SaveStudySessionPreferenceUseCase(studySessionPreferencesRepository),
         ObserveUserPreferencesUseCase(userPreferencesRepository),
         SaveUserPreferenceUseCase(userPreferencesRepository),
-        ObservePermissionStatusUseCase(permissionGateway),
-        RequestPermissionUseCase(permissionGateway),
+        ObservePermissionStatusUseCase(permissionRepository),
+        RequestPermissionUseCase(permissionRepository),
         voiceSettingsController,
     )
 
@@ -1217,7 +1217,7 @@ class PreviewStudySessionViewModelTest {
     }
 
     private fun setMicPermissionStatus(status: PermissionStatus) {
-        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to status)
+        permissionRepository.statuses.value = mapOf(AppPermission.RecordAudio to status)
     }
 
     @Test
@@ -1279,7 +1279,7 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.activeDialog shouldBe VoiceAnsweringInfo
-            permissionGateway.launchedRequests shouldBe emptyList()
+            permissionRepository.launchedRequests shouldBe emptyList()
             viewModel.events.test { expectNoEvents() }
         }
 
@@ -1295,7 +1295,7 @@ class PreviewStudySessionViewModelTest {
 
             userPreferencesRepository.preferences.value.hasSeenVoiceAnsweringInfo shouldBe true
             viewModel.state.value.activeDialog shouldBe null
-            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            permissionRepository.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
             viewModel.events.test {
                 val destination = awaitItem() as PreviewStudySessionDestination.RatedStudySession
                 destination.route.voiceAnsweringEnabled shouldBe true
@@ -1313,7 +1313,7 @@ class PreviewStudySessionViewModelTest {
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
-            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            permissionRepository.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
             viewModel.events.test {
                 awaitItem() as PreviewStudySessionDestination.RatedStudySession
             }
@@ -1331,7 +1331,7 @@ class PreviewStudySessionViewModelTest {
 
             userPreferencesRepository.preferences.value.hasSeenVoiceAnsweringInfo shouldBe true
             viewModel.state.value.activeDialog shouldBe null
-            permissionGateway.launchedRequests shouldBe emptyList()
+            permissionRepository.launchedRequests shouldBe emptyList()
             viewModel.events.test { expectNoEvents() }
         }
 
@@ -1348,7 +1348,7 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.activeDialog shouldBe null
-            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            permissionRepository.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
             viewModel.events.test {
                 awaitItem() as PreviewStudySessionDestination.RatedStudySession
             }
@@ -1364,7 +1364,7 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.activeDialog shouldBe null
-            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            permissionRepository.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
             viewModel.events.test {
                 awaitItem() as PreviewStudySessionDestination.RatedStudySession
             }
@@ -1374,7 +1374,7 @@ class PreviewStudySessionViewModelTest {
     fun `a soft denial keeps the user here and lets Start ask again`() =
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
-            permissionGateway.nextRequestResult = Denied
+            permissionRepository.nextRequestResult = Denied
             val viewModel = createVoiceAnsweringViewModel()
 
             repeat(2) { index ->
@@ -1384,7 +1384,7 @@ class PreviewStudySessionViewModelTest {
                 viewModel.state.value.micPermissionStatus shouldBe Denied
                 viewModel.state.value.config.voiceAnsweringEnabled shouldBe true
                 viewModel.state.value.canStart shouldBe true
-                permissionGateway.launchedRequests.size shouldBe index + 1
+                permissionRepository.launchedRequests.size shouldBe index + 1
             }
             viewModel.events.test { expectNoEvents() }
         }
@@ -1393,7 +1393,7 @@ class PreviewStudySessionViewModelTest {
     fun `a first permanent denial shows the empty state, keeps Start enabled and shows no snackbar`() =
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
-            permissionGateway.nextRequestResult = PermanentlyDenied
+            permissionRepository.nextRequestResult = PermanentlyDenied
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.messages.test {
@@ -1412,7 +1412,7 @@ class PreviewStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
             setMicPermissionStatus(PermanentlyDenied)
-            permissionGateway.nextRequestResult = PermanentlyDenied
+            permissionRepository.nextRequestResult = PermanentlyDenied
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.messages.test {
@@ -1421,7 +1421,7 @@ class PreviewStudySessionViewModelTest {
 
                 awaitItem() shouldBe PreviewStudySessionMessage.MicPermissionStillDenied
             }
-            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            permissionRepository.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
             viewModel.state.value.isMicPermissionRejected shouldBe true
             viewModel.events.test { expectNoEvents() }
         }
@@ -1431,7 +1431,7 @@ class PreviewStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
             setMicPermissionStatus(PermanentlyDenied)
-            permissionGateway.nextRequestResult = Granted
+            permissionRepository.nextRequestResult = Granted
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.messages.test {
@@ -1451,7 +1451,7 @@ class PreviewStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
             setMicPermissionStatus(PermanentlyDenied)
-            permissionGateway.nextRequestResult = Denied
+            permissionRepository.nextRequestResult = Denied
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.messages.test {
@@ -1474,7 +1474,7 @@ class PreviewStudySessionViewModelTest {
             viewModel.onStartSession()
             advanceUntilIdle()
 
-            permissionGateway.launchedRequests shouldBe emptyList()
+            permissionRepository.launchedRequests shouldBe emptyList()
             viewModel.events.test {
                 awaitItem() as PreviewStudySessionDestination.RatedStudySession
             }
@@ -1506,7 +1506,7 @@ class PreviewStudySessionViewModelTest {
             manualViewModel.events.test {
                 awaitItem() as PreviewStudySessionDestination.RatedStudySession
             }
-            permissionGateway.launchedRequests shouldBe emptyList()
+            permissionRepository.launchedRequests shouldBe emptyList()
         }
 
     @Test

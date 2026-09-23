@@ -7,7 +7,7 @@ import com.rossomak.flashcards.core.domain.model.AppPermission
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
-/** Seam over the OS grant check, so the gateway's status logic is testable without Android. */
+/** Seam over the OS grant check, so the repository's status logic is testable without Android. */
 fun interface PermissionChecker {
     fun isGranted(permission: AppPermission): Boolean
 }

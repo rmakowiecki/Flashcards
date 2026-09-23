@@ -11,7 +11,7 @@ import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDenied
-import com.rossomak.flashcards.core.domain.repository.PermissionGateway
+import com.rossomak.flashcards.core.domain.repository.PermissionRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
@@ -40,10 +40,10 @@ import kotlinx.coroutines.sync.withLock
  * prompt, and any answer other than a permanent refusal clears the flag.
  */
 @Singleton
-class DefaultPermissionGateway @Inject constructor(
+class DefaultPermissionRepository @Inject constructor(
     private val permissionChecker: PermissionChecker,
     @param:UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
-) : PermissionGateway {
+) : PermissionRepository {
 
     private val requestChannel = Channel<AppPermission>(Channel.BUFFERED)
     private val statusChanges = MutableSharedFlow<AppPermission>(extraBufferCapacity = 1)

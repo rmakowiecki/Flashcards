@@ -28,7 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-class DefaultPermissionGatewayTest {
+class DefaultPermissionRepositoryTest {
 
     @get:Rule
     val temporaryFolder = TemporaryFolder()
@@ -41,12 +41,12 @@ class DefaultPermissionGatewayTest {
         }
     }
 
-    private val permanentlyDeniedKey = booleanPreferencesKey(DefaultPermissionGateway.PERMANENTLY_DENIED_KEY_PREFIX + "recordaudio")
+    private val permanentlyDeniedKey = booleanPreferencesKey(DefaultPermissionRepository.PERMANENTLY_DENIED_KEY_PREFIX + "recordaudio")
 
     private var isRecordAudioGranted = false
 
-    private val gateway by lazy {
-        DefaultPermissionGateway(permissionChecker = { isRecordAudioGranted }, dataStore = dataStore)
+    private val repository by lazy {
+        DefaultPermissionRepository(permissionChecker = { isRecordAudioGranted }, dataStore = dataStore)
     }
 
     @After
@@ -60,32 +60,32 @@ class DefaultPermissionGatewayTest {
 
     private suspend fun storedPermanentlyDenied(): Boolean? = dataStore.data.first()[permanentlyDeniedKey]
 
-    /** Runs [DefaultPermissionGateway.request], answers the launched prompt with the given raw result, and returns the classified status. */
+    /** Runs [DefaultPermissionRepository.request], answers the launched prompt with the given raw result, and returns the classified status. */
     private suspend fun TestScope.requestAnswering(isGranted: Boolean, shouldShowRationale: Boolean): PermissionStatus {
-        val result = async { gateway.request(RecordAudio) }
-        gateway.permissionRequests.first() shouldBe RecordAudio
+        val result = async { repository.request(RecordAudio) }
+        repository.permissionRequests.first() shouldBe RecordAudio
         runCurrent()
-        gateway.onPermissionResult(RecordAudio, isGranted = isGranted, shouldShowRationale = shouldShowRationale)
+        repository.onPermissionResult(RecordAudio, isGranted = isGranted, shouldShowRationale = shouldShowRationale)
         return result.await()
     }
 
     @Test
     fun `observeStatus emits Denied when not granted and no flag is stored`() = runTest {
-        gateway.observeStatus(RecordAudio).first() shouldBe Denied
+        repository.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
     fun `observeStatus emits PermanentlyDenied when the flag is stored`() = runTest {
         storePermanentlyDenied()
 
-        gateway.observeStatus(RecordAudio).first() shouldBe PermanentlyDenied
+        repository.observeStatus(RecordAudio).first() shouldBe PermanentlyDenied
     }
 
     @Test
     fun `observeStatus emits Granted when the system reports the permission granted`() = runTest {
         isRecordAudioGranted = true
 
-        gateway.observeStatus(RecordAudio).first() shouldBe Granted
+        repository.observeStatus(RecordAudio).first() shouldBe Granted
     }
 
     @Test
@@ -93,11 +93,11 @@ class DefaultPermissionGatewayTest {
         storePermanentlyDenied()
         isRecordAudioGranted = true
 
-        gateway.observeStatus(RecordAudio).first() shouldBe Granted
+        repository.observeStatus(RecordAudio).first() shouldBe Granted
         isRecordAudioGranted = false
 
         storedPermanentlyDenied() shouldBe null
-        gateway.observeStatus(RecordAudio).first() shouldBe Denied
+        repository.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
@@ -109,7 +109,7 @@ class DefaultPermissionGatewayTest {
 
         status shouldBe Granted
         storedPermanentlyDenied() shouldBe null
-        gateway.observeStatus(RecordAudio).first() shouldBe Granted
+        repository.observeStatus(RecordAudio).first() shouldBe Granted
     }
 
     @Test
@@ -118,7 +118,7 @@ class DefaultPermissionGatewayTest {
 
         status shouldBe Denied
         storedPermanentlyDenied() shouldBe null
-        gateway.observeStatus(RecordAudio).first() shouldBe Denied
+        repository.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
@@ -129,7 +129,7 @@ class DefaultPermissionGatewayTest {
 
         status shouldBe Denied
         storedPermanentlyDenied() shouldBe null
-        gateway.observeStatus(RecordAudio).first() shouldBe Denied
+        repository.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
@@ -138,7 +138,7 @@ class DefaultPermissionGatewayTest {
 
         status shouldBe PermanentlyDenied
         storedPermanentlyDenied() shouldBe true
-        gateway.observeStatus(RecordAudio).first() shouldBe PermanentlyDenied
+        repository.observeStatus(RecordAudio).first() shouldBe PermanentlyDenied
     }
 
     @Test
@@ -155,13 +155,13 @@ class DefaultPermissionGatewayTest {
     fun `request when already granted returns Granted without launching a prompt`() = runTest {
         isRecordAudioGranted = true
 
-        gateway.request(RecordAudio) shouldBe Granted
-        withTimeoutOrNull(NO_LAUNCH_TIMEOUT_MS) { gateway.permissionRequests.first() } shouldBe null
+        repository.request(RecordAudio) shouldBe Granted
+        withTimeoutOrNull(NO_LAUNCH_TIMEOUT_MS) { repository.permissionRequests.first() } shouldBe null
     }
 
     @Test
     fun `observeStatus re-emits after a request result`() = runTest {
-        val emissions = async { gateway.observeStatus(RecordAudio).take(2).toList() }
+        val emissions = async { repository.observeStatus(RecordAudio).take(2).toList() }
         runCurrent()
 
         requestAnswering(isGranted = false, shouldShowRationale = false)

@@ -372,7 +372,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * without prompting when the microphone is already granted.
      *
      * The result only steers this tap; [PreviewStudySessionScreenState.micPermissionStatus] is
-     * written solely by the observed status, which the gateway re-emits after every request. A
+     * written solely by the observed status, which the repository re-emits after every request. A
      * refusal that was already permanent before this tap shows no prompt at all, so it gets a
      * snackbar instead of a silent no-op.
      */
