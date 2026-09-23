@@ -9,6 +9,8 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.rossomak.flashcards.BuildConfig
+import com.rossomak.flashcards.feature.debug.BuildInfo
 import com.rossomak.flashcards.feature.debug.DebugGraph
 import com.rossomak.flashcards.feature.debug.DebugRoot
 import com.rossomak.flashcards.feature.debug.DebugScreen
@@ -34,6 +36,9 @@ internal fun debugTabs(): List<TabItem> = listOf(
  * The harness is nested in this graph rather than registered on the app's outer one so that
  * navigating to it — and the whole `DebugVoiceRoot` symbol — stays inside the debug source set.
  * It renders above the bottom bar as a result, which is what any tab's nested destination does.
+ *
+ * This source set also backs the profiling build type, so everything here must hold up in an
+ * R8-optimized, non-debuggable build.
  */
 internal fun NavGraphBuilder.debugNavGraphEntries(
     navController: NavHostController,
@@ -42,6 +47,12 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
     navigation<DebugGraph>(startDestination = DebugRoot) {
         composable<DebugRoot> {
             DebugScreen(
+                buildInfo = BuildInfo(
+                    buildType = BuildConfig.BUILD_TYPE,
+                    versionName = BuildConfig.VERSION_NAME,
+                    versionCode = BuildConfig.VERSION_CODE,
+                    gitShortSha = BuildConfig.GIT_SHORT_SHA,
+                ),
                 onNavigateToOnboarding = onNavigateToOnboarding,
                 onNavigateToVoiceDebug = { navController.navigate(DebugVoiceRoot) },
             )

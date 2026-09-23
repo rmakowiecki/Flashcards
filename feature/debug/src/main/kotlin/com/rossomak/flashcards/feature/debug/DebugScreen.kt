@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
+import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -47,6 +48,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 fun DebugScreen(
     modifier: Modifier = Modifier,
     viewModel: DebugViewModel = hiltViewModel(),
+    buildInfo: BuildInfo,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
 ) {
@@ -62,6 +64,7 @@ fun DebugScreen(
 
     DebugContent(
         modifier = modifier,
+        buildInfo = buildInfo,
         showcaseIntent = showcaseIntent,
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
@@ -72,6 +75,7 @@ fun DebugScreen(
 @Composable
 private fun DebugContent(
     modifier: Modifier = Modifier,
+    buildInfo: BuildInfo,
     showcaseIntent: Intent?,
     onVoiceDebugClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
@@ -98,6 +102,7 @@ private fun DebugContent(
                     vertical = MaterialTheme.spacing.small,
                 ),
         ) {
+            BuildInfoHeader(buildInfo = buildInfo)
             FlashcardsListGroup(
                 items = buildList {
                     add(
@@ -152,11 +157,41 @@ private fun DebugContent(
     }
 }
 
+@Composable
+private fun BuildInfoHeader(buildInfo: BuildInfo) {
+    Column(modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal)) {
+        FlashcardsOverlineLabel(text = stringResource(R.string.debug_build_info_title))
+        Text(
+            text = stringResource(
+                R.string.debug_build_info_version_label,
+                buildInfo.versionName,
+                buildInfo.versionCode,
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            text = stringResource(
+                R.string.debug_build_info_variant_label,
+                buildInfo.buildType,
+                buildInfo.gitShortSha,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @PreviewLightDark
 @Composable
 private fun DebugContentPreview() {
     FlashcardsTheme {
         DebugContent(
+            buildInfo = BuildInfo(
+                buildType = "profiling",
+                versionName = "0.1.1234-profiling",
+                versionCode = 1234,
+                gitShortSha = "7f57c64",
+            ),
             showcaseIntent = null,
             onVoiceDebugClick = {},
             onReplayOnboardingClick = {},
