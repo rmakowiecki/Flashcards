@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.study.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 
@@ -19,6 +20,8 @@ private fun PreviewStudySessionLoadingPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -38,6 +41,8 @@ private fun PreviewStudySessionErrorPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -64,6 +69,8 @@ private fun PreviewStudySessionEmptyStatePreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -90,6 +97,8 @@ private fun PreviewStudySessionSingleSubcategoryRatedManualPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -117,6 +126,35 @@ private fun PreviewStudySessionSingleSubcategoryRatedVoicePreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
+        onStartSession = {},
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreviewStudySessionMicPermissionRejectedPreview() {
+    PreviewStudySessionContent(
+        state = PreviewStudySessionScreenState(
+            categoryName = "Android",
+            subcategoryNames = listOf("Compose"),
+            isLoading = false,
+            config = StudySessionConfig(
+                subcategoryIds = listOf("compose"),
+                voiceAnsweringEnabled = true,
+            ),
+            selectedCardCount = 18,
+            estimatedMinutes = 12,
+            micPermissionStatus = PermissionStatus.PermanentlyDenied,
+        ),
+        onNavigateBack = {},
+        onRetry = {},
+        onReshuffleSubcategories = {},
+        onDialogEvent = {},
+        onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -138,6 +176,8 @@ private fun PreviewStudySessionQuickSessionPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -159,6 +199,8 @@ private fun PreviewStudySessionCustomSessionPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -180,6 +222,8 @@ private fun PreviewStudySessionFastReadAloudPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
     )
 }
@@ -206,6 +250,8 @@ private fun PreviewStudySessionSheetOpenPreview() {
         onReshuffleSubcategories = {},
         onDialogEvent = {},
         onResetFilters = {},
+        onOpenAppSettings = {},
+        onSwitchToManualAnswering = {},
         onStartSession = {},
         initiallySettingsSheetOpen = true,
     )

@@ -1,5 +1,8 @@
 package com.rossomak.flashcards.feature.study.preview
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
@@ -33,18 +37,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -54,6 +63,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
@@ -83,6 +94,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCo
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun PreviewStudySessionScreen(
@@ -93,6 +105,9 @@ fun PreviewStudySessionScreen(
     onNavigateToRatedStudySession: (RatedStudySessionRoute) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
@@ -104,6 +119,17 @@ fun PreviewStudySessionScreen(
         }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val micPermissionStillDeniedText = stringResource(R.string.preview_session_mic_permission_still_denied_message)
+    val snackbarScope = rememberCoroutineScope()
+    observeAsEvents(viewModel.messages) { message ->
+        when (message) {
+            PreviewStudySessionMessage.MicPermissionStillDenied -> snackbarScope.launch {
+                snackbarHostState.showSnackbar(message = micPermissionStillDeniedText, duration = SnackbarDuration.Short)
+            }
+        }
+    }
+
     PreviewStudySessionContent(
         modifier = modifier,
         state = state,
@@ -112,7 +138,15 @@ fun PreviewStudySessionScreen(
         onReshuffleSubcategories = viewModel::onReshuffleSubcategories,
         onDialogEvent = viewModel::onDialogEvent,
         onResetFilters = viewModel::onResetFilters,
+        onOpenAppSettings = {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+            context.startActivity(intent)
+        },
+        onSwitchToManualAnswering = viewModel::onSwitchToManualAnswering,
         onStartSession = viewModel::onStartSession,
+        snackbarHostState = snackbarHostState,
     )
 }
 
@@ -147,7 +181,7 @@ fun PreviewStudySessionScreen(
 // downstream duplicates it — splitting that ownership into a separate hoisted controller class was
 // tried and dropped: it added an indirection layer (a class plus its own remember-function) for a
 // detekt threshold alone, with no state actually shared outside this function.
-@Suppress("LongMethod")
+@Suppress("LongMethod", "LongParameterList")
 @Composable
 fun PreviewStudySessionContent(
     modifier: Modifier = Modifier,
@@ -157,7 +191,10 @@ fun PreviewStudySessionContent(
     onReshuffleSubcategories: () -> Unit,
     onDialogEvent: (PreviewDialogEvent) -> Unit,
     onResetFilters: () -> Unit,
+    onOpenAppSettings: () -> Unit,
+    onSwitchToManualAnswering: () -> Unit,
     onStartSession: () -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     initiallySettingsSheetOpen: Boolean = false,
 ) {
     PreviewDialogHost(
@@ -213,6 +250,7 @@ fun PreviewStudySessionContent(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 FlashcardsGradientTopBar(
                     title = screenTitle(
@@ -261,6 +299,8 @@ fun PreviewStudySessionContent(
                     onOpenSettingsDialog = onOpenSettingsDialog,
                     onReshuffleSubcategories = onReshuffleSubcategories,
                     onResetFilters = onResetFilters,
+                    onOpenAppSettings = onOpenAppSettings,
+                    onSwitchToManualAnswering = onSwitchToManualAnswering,
                     onStartSession = onStartSession,
                 )
             }
@@ -314,7 +354,8 @@ private fun ErrorContent(
 
 /**
  * The ready-state body: the hero (play circle, title, scope sentence and badges — or, once the
- * pool is empty, [FlashcardsEmptyState] in its place), top-anchored, with [HeroActions] pinned to
+ * pool is empty or the microphone a voice-answering session needs is permanently denied,
+ * [FlashcardsEmptyState] in its place), top-anchored, with [HeroActions] pinned to
  * the screen's true bottom edge below a flexible [Spacer] — the same bottom edge
  * [SessionSettingsSheet][com.rossomak.flashcards.feature.study.preview.SessionSettingsSheet] docks
  * up from (see [PreviewStudySessionContent]'s doc), so an expanded sheet — comfortably taller than
@@ -336,6 +377,8 @@ private fun ReadyContent(
     onOpenSettingsDialog: (PreviewDialog) -> Unit,
     onReshuffleSubcategories: () -> Unit,
     onResetFilters: () -> Unit,
+    onOpenAppSettings: () -> Unit,
+    onSwitchToManualAnswering: () -> Unit,
     onStartSession: () -> Unit,
 ) {
     val isEmpty = state.selectedCardCount == 0
@@ -349,14 +392,17 @@ private fun ReadyContent(
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (!isEmpty) {
-            HeroTop()
-            Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
-        }
-        if (isEmpty) {
-            EmptyHeroBody(onResetFilters = onResetFilters)
-        } else {
-            ScopeHeroBody(state = state, onOpenSettings = onOpenSettings, onOpenSettingsDialog = onOpenSettingsDialog)
+        when {
+            isEmpty -> EmptyHeroBody(onResetFilters = onResetFilters)
+            state.isMicPermissionRejected -> MicPermissionRejectedHeroBody(
+                onOpenAppSettings = onOpenAppSettings,
+                onSwitchToManualAnswering = onSwitchToManualAnswering,
+            )
+            else -> {
+                HeroTop()
+                Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
+                ScopeHeroBody(state = state, onOpenSettings = onOpenSettings, onOpenSettingsDialog = onOpenSettingsDialog)
+            }
         }
         Spacer(modifier = Modifier.weight(1f))
         HeroActions(
@@ -557,6 +603,43 @@ private fun EmptyHeroBody(modifier: Modifier = Modifier, onResetFilters: () -> U
                 icon = Icons.Default.Refresh,
                 style = OnGradient,
             )
+        },
+    )
+}
+
+/**
+ * Takes the same hero slot as [EmptyHeroBody], which wins when both apply — with no cards there is
+ * no session to fix the microphone for. Switch to manual turns voice answering off for this session
+ * only.
+ */
+@Composable
+private fun MicPermissionRejectedHeroBody(
+    modifier: Modifier = Modifier,
+    onOpenAppSettings: () -> Unit,
+    onSwitchToManualAnswering: () -> Unit,
+) {
+    FlashcardsEmptyState(
+        modifier = modifier,
+        icon = Icons.Default.MicOff,
+        title = stringResource(R.string.preview_session_mic_permission_empty_state_title),
+        supportingText = stringResource(R.string.preview_session_mic_permission_empty_state_message),
+        style = OnGradient,
+        button = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+            ) {
+                FlashcardsFilledButton(
+                    text = stringResource(R.string.preview_session_mic_permission_open_settings_button),
+                    onClick = onOpenAppSettings,
+                    style = OnGradient,
+                )
+                FlashcardsOutlinedButton(
+                    text = stringResource(R.string.preview_session_mic_permission_switch_to_manual_button),
+                    onClick = onSwitchToManualAnswering,
+                    style = OnGradient,
+                )
+            }
         },
     )
 }
