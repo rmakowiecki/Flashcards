@@ -4,15 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -25,99 +24,92 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSiz
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
- * The primary CTA button — filled with [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient].
- * One per screen, reserved for the single most important action ("Start studying", "New deck").
+ * The family's gradient-filled icon-only type — a circular affordance filled with
+ * [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient], for icon-only actions that
+ * carry the same visual weight as [FlashcardsFilledButton] (e.g. a session's voice play/pause
+ * transport control). Color scheme mirrors [FlashcardsFilledButton] exactly via the shared
+ * [filledButtonColorsFor] helper. See [FlashcardsTonalIconButton] for the tonal counterpart.
  */
 @Composable
-fun FlashcardsFilledButton(
-    text: String,
+fun FlashcardsFilledIconButton(
+    icon: ImageVector,
+    contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     enabled: Boolean = true,
-    icon: ImageVector? = null,
-    iconPosition: FlashcardsButtonIconPosition = FlashcardsButtonIconPosition.Leading,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
 ) {
     val onGradient = style == FlashcardsComponentStyle.OnGradient
     val metrics = size.metrics()
-    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.full)
     val colors = filledButtonColorsFor(style)
     val gradientModifier = if (onGradient) {
         Modifier
     } else {
         Modifier.background(
             brush = MaterialTheme.brandColors.ctaButtonGradient,
-            shape = shape,
+            shape = CircleShape,
             alpha = if (enabled) 1f else DISABLED_GRADIENT_ALPHA,
         )
     }
 
-    Button(
+    FilledIconButton(
         onClick = onClick,
-        modifier = modifier.height(metrics.height).then(gradientModifier),
         enabled = enabled,
-        shape = shape,
-        colors = ButtonDefaults.buttonColors(
+        modifier = modifier.size(metrics.height).then(gradientModifier),
+        colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = colors.containerColor,
             contentColor = colors.contentColor,
             disabledContainerColor = colors.disabledContainerColor,
             disabledContentColor = colors.disabledContentColor,
         ),
-        contentPadding = PaddingValues(horizontal = metrics.horizontalPadding, vertical = MaterialTheme.spacing.none),
     ) {
-        FlashcardsButtonContent(text = text, icon = icon, iconPosition = iconPosition, metrics = metrics)
+        Icon(imageVector = icon, contentDescription = contentDescription)
     }
 }
 
-@ShowkaseComposable(name = "Filled", group = "Buttons")
+@ShowkaseComposable(name = "Icon — filled", group = "Buttons")
 @Composable
-fun FlashcardsFilledButtonShowcase() {
+fun FlashcardsFilledIconButtonShowcase() {
     FlashcardsTheme {
         Surface {
-            FlashcardsFilledButton(text = "Start studying", onClick = {})
+            FlashcardsFilledIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Play", onClick = {})
         }
     }
 }
 
-@ShowkaseComposable(name = "Filled — with icon", group = "Buttons")
+@ShowkaseComposable(name = "Icon — filled, small", group = "Buttons")
 @Composable
-fun FlashcardsFilledButtonWithIconShowcase() {
+fun FlashcardsFilledIconButtonSmallShowcase() {
     FlashcardsTheme {
         Surface {
-            FlashcardsFilledButton(text = "New deck", onClick = {}, icon = Icons.Default.Add)
+            FlashcardsFilledIconButton(
+                icon = Icons.Default.PlayArrow,
+                contentDescription = "Play",
+                onClick = {},
+                size = FlashcardsComponentSize.Small,
+            )
         }
     }
 }
 
-@ShowkaseComposable(name = "Filled — small", group = "Buttons")
+@ShowkaseComposable(name = "Icon — filled, disabled", group = "Buttons")
 @Composable
-fun FlashcardsFilledButtonSmallShowcase() {
+fun FlashcardsFilledIconButtonDisabledShowcase() {
     FlashcardsTheme {
         Surface {
-            FlashcardsFilledButton(text = "Add card", onClick = {}, size = FlashcardsComponentSize.Small, icon = Icons.Default.Add)
+            FlashcardsFilledIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Play", onClick = {}, enabled = false)
         }
     }
 }
 
-@ShowkaseComposable(name = "Filled — disabled", group = "Buttons")
-@Composable
-fun FlashcardsFilledButtonDisabledShowcase() {
-    FlashcardsTheme {
-        Surface {
-            FlashcardsFilledButton(text = "Start studying", onClick = {}, enabled = false)
-        }
-    }
-}
-
-@ShowkaseComposable(name = "Filled — on gradient", group = "Buttons")
+@ShowkaseComposable(name = "Icon — filled, on gradient", group = "Buttons")
 @Preview
 @Composable
-fun FlashcardsFilledButtonOnGradientShowcase() {
+fun FlashcardsFilledIconButtonOnGradientShowcase() {
     FlashcardsTheme {
         Box(
             modifier = Modifier
@@ -125,16 +117,16 @@ fun FlashcardsFilledButtonOnGradientShowcase() {
                 .padding(MaterialTheme.spacing.small),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall)) {
-                FlashcardsFilledButton(
-                    text = "Study now",
+                FlashcardsFilledIconButton(
+                    icon = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
                     onClick = {},
-                    icon = Icons.Default.School,
                     style = FlashcardsComponentStyle.OnGradient,
                 )
-                FlashcardsFilledButton(
-                    text = "Study now",
+                FlashcardsFilledIconButton(
+                    icon = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
                     onClick = {},
-                    icon = Icons.Default.School,
                     style = FlashcardsComponentStyle.OnGradient,
                     enabled = false,
                 )
@@ -145,15 +137,15 @@ fun FlashcardsFilledButtonOnGradientShowcase() {
 
 @PreviewLightDark
 @Composable
-private fun FlashcardsFilledButtonPreview() {
+private fun FlashcardsFilledIconButtonPreview() {
     FlashcardsTheme {
         Surface {
             Column(
                 modifier = Modifier.padding(MaterialTheme.spacing.small),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
             ) {
-                FlashcardsFilledButton(text = "New deck", onClick = {}, icon = Icons.Default.Add)
-                FlashcardsFilledButton(text = "New deck", onClick = {}, icon = Icons.Default.Add, enabled = false)
+                FlashcardsFilledIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Play", onClick = {})
+                FlashcardsFilledIconButton(icon = Icons.Default.PlayArrow, contentDescription = "Play", onClick = {}, enabled = false)
             }
         }
     }

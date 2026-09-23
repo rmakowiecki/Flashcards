@@ -90,8 +90,43 @@ internal fun disabledButtonContentColorFor(style: FlashcardsComponentStyle): Col
 }
 
 /**
+ * Container fill alpha for [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient]
+ * when disabled, shared by every gradient-filled `Flashcards*Button`
+ * ([FlashcardsFilledButton], [FlashcardsFilledIconButton]). M3's `disabledContainerColor` only
+ * takes a flat [Color], so the gradient itself keeps painting (via a background modifier behind a
+ * transparent container) and is dimmed with this alpha instead of being swapped out for a solid fill.
+ */
+internal const val DISABLED_GRADIENT_ALPHA = 0.38f
+
+/**
+ * Resolved colors for a gradient-filled `Flashcards*Button` ([FlashcardsFilledButton],
+ * [FlashcardsFilledIconButton]), shared so both stay in sync. Fixed white content on [OnSurface]
+ * rather than `colorScheme.onPrimary` — that style's container is the `ctaButtonGradient` brush,
+ * itself fixed across themes, so its content color must be fixed too.
+ */
+internal data class FilledButtonColors(
+    val containerColor: Color,
+    val contentColor: Color,
+    val disabledContainerColor: Color,
+    val disabledContentColor: Color,
+)
+
+/** Resolves [FilledButtonColors] for the given [style], shared by every gradient-filled `Flashcards*Button`. */
+@Composable
+@ReadOnlyComposable
+internal fun filledButtonColorsFor(style: FlashcardsComponentStyle): FilledButtonColors {
+    val onGradient = style == OnGradient
+    return FilledButtonColors(
+        containerColor = if (onGradient) Color.White else Color.Transparent,
+        contentColor = if (onGradient) MaterialTheme.brandColors.onGradientFilled else Color.White,
+        disabledContainerColor = if (onGradient) disabledButtonContainerColorFor(style) else Color.Transparent,
+        disabledContentColor = disabledButtonContentColorFor(style),
+    )
+}
+
+/**
  * Enabled container color for the given [style], shared by every tonal-treatment
- * `Flashcards*Button` ([FlashcardsTonalButton], [FlashcardsIconButton]). [onSurfaceContainer]
+ * `Flashcards*Button` ([FlashcardsTonalButton], [FlashcardsTonalIconButton]). [onSurfaceContainer]
  * is the one part that varies per type — each picks its own `OnSurface` token — while the
  * `OnGradient` branch is always [com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContainer].
  */

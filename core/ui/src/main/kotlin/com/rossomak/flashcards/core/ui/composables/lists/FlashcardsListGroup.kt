@@ -33,7 +33,7 @@ import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsStepper
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsIconButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
@@ -427,7 +427,7 @@ fun FlashcardsListGroupSearchResultsShowcase() {
                         secondaryText = "in Android",
                         trailing = {
                             Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall)) {
-                                FlashcardsIconButton(
+                                FlashcardsTonalIconButton(
                                     icon = Icons.Default.PlayArrow,
                                     contentDescription = "Study Compose",
                                     onClick = {},
@@ -443,7 +443,7 @@ fun FlashcardsListGroupSearchResultsShowcase() {
                         secondaryText = "in Android",
                         trailing = {
                             Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall)) {
-                                FlashcardsIconButton(
+                                FlashcardsTonalIconButton(
                                     icon = Icons.Default.PlayArrow,
                                     contentDescription = "Study Compose Navigation",
                                     onClick = {},

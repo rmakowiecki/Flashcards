@@ -18,7 +18,7 @@ import androidx.compose.ui.text.withStyle
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsIconButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -131,7 +131,7 @@ internal fun Subcategory.toSearchResultListGroupItem(
                 horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FlashcardsIconButton(
+                FlashcardsTonalIconButton(
                     icon = Icons.Default.PlayArrow,
                     contentDescription = startSessionContentDescription,
                     onClick = { onSubcategorySessionStart(subcategory) },

@@ -64,9 +64,9 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsIconButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
@@ -98,6 +98,7 @@ fun PreviewStudySessionScreen(
         when (destination) {
             is PreviewStudySessionDestination.FastStudySession ->
                 onNavigateToFastStudySession(destination.route)
+
             is PreviewStudySessionDestination.RatedStudySession ->
                 onNavigateToRatedStudySession(destination.route)
         }
@@ -240,6 +241,7 @@ fun PreviewStudySessionContent(
                 ) {
                     CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
                 }
+
                 state.error != null -> ErrorContent(
                     modifier = Modifier
                         .fillMaxSize()
@@ -247,6 +249,7 @@ fun PreviewStudySessionContent(
                     error = state.error,
                     onRetry = onRetry,
                 )
+
                 else -> ReadyContent(
                     modifier = Modifier
                         .fillMaxSize()
@@ -519,10 +522,12 @@ private fun interactionBadgeContent(isRated: Boolean, enabled: Boolean): Interac
         label = stringResource(R.string.preview_session_interaction_manual_label),
         icon = Icons.Default.TouchApp,
     )
+
     isRated -> InteractionBadgeContent(
         label = stringResource(R.string.preview_session_interaction_voice_label),
         icon = Icons.Default.Mic,
     )
+
     else -> InteractionBadgeContent(
         label = stringResource(R.string.preview_session_interaction_auto_label),
         icon = Icons.AutoMirrored.Filled.VolumeUp,
@@ -648,21 +653,15 @@ private fun StartSessionButton(
  * close a sheet the user opened from here — ticket per grill. [Icons.Default.Tune], not a gear —
  * this button opens *session* settings (mode, length, filters…), not the app's Settings screen, so
  * a gear risks reading as a navigation shortcut to the wrong destination. Purely behavioural: no
- * visual "active" state exists on [FlashcardsIconButton] to reflect open/closed, only the announced
+ * visual "active" state exists on [FlashcardsTonalIconButton] to reflect open/closed, only the announced
  * content description changes. A badge- or empty-state-triggered open never routes through this
  * button, so those stay force-open (never toggled shut) regardless of this value.
  */
 @Composable
 private fun SettingsToggleButton(settingsSheetOpen: Boolean, onToggleSettings: () -> Unit) {
-    FlashcardsIconButton(
+    FlashcardsTonalIconButton(
         icon = Icons.Default.Tune,
-        contentDescription = stringResource(
-            if (settingsSheetOpen) {
-                R.string.preview_session_close_settings_cd
-            } else {
-                R.string.preview_session_open_settings_cd
-            },
-        ),
+        contentDescription = stringResource(if (settingsSheetOpen) R.string.preview_session_close_settings_cd else R.string.preview_session_open_settings_cd),
         onClick = onToggleSettings,
         style = OnGradient,
     )
@@ -725,12 +724,14 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
                     listFinalConjunction,
                 )
             }
+
             state.isSingleSubcategory -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_single_subcategory_prefix_message))
                 appendBold(state.subcategoryNames.first())
                 append(stringResource(R.string.preview_session_scope_single_subcategory_suffix_message))
             }
+
             else -> {
                 appendBold(cardsText)
                 append(stringResource(R.string.preview_session_scope_multi_subcategory_message))

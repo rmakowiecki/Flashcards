@@ -26,9 +26,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,11 +51,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsButtonIconPosition
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
@@ -75,6 +77,9 @@ import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
 import kotlinx.coroutines.launch
+
+private val SHEET_PEEK_HEIGHT_READ_ALOUD: Dp = 176.dp
+private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 128.dp
 
 @Composable
 fun FastStudySessionScreen(
@@ -207,11 +212,7 @@ fun FastStudySessionContent(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             sheetSwipeEnabled = false,
-            sheetPeekHeight = when {
-                state.isReadAloudMode -> 176.dp
-                state.isAnswerRevealed -> 128.dp
-                else -> 128.dp
-            },
+            sheetPeekHeight = if (state.isReadAloudMode) SHEET_PEEK_HEIGHT_READ_ALOUD else SHEET_PEEK_HEIGHT_DEFAULT,
             sheetDragHandle = {},
             topBar = {
                 StudySessionHeader(
@@ -261,7 +262,6 @@ fun FastStudySessionContent(
                 innerPadding = innerPadding,
                 onExtendedContextClick = { actions.onDialogEvent(Open(CurrentCardExtendedContext(it))) },
             )
-
             StudySessionDialogHost(
                 activeDialog = state.activeDialog,
                 onDialogEvent = actions.onDialogEvent,
@@ -296,14 +296,12 @@ private fun FastStudySessionSheetContent(
                 onVoiceSettingsCogClick = onVoiceSettingsCogClick,
             )
         } else if (!state.isAnswerRevealed) {
-            Button(
+            FlashcardsFilledButton(
+                text = stringResource(R.string.study_session_show_answer_button),
                 onClick = onShowAnswer,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(imageVector = Icons.Default.Flip, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(stringResource(R.string.study_session_show_answer_button))
-            }
+                icon = Icons.Default.Flip,
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.study_session_show_answer_caption_message),
@@ -313,14 +311,13 @@ private fun FastStudySessionSheetContent(
                 textAlign = TextAlign.Center,
             )
         } else {
-            Button(
+            FlashcardsFilledButton(
+                text = stringResource(R.string.fast_study_session_next_button),
                 onClick = onNextCard,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.fast_study_session_next_button))
-                Spacer(modifier = Modifier.size(8.dp))
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
+                icon = Icons.AutoMirrored.Filled.ArrowForward,
+                iconPosition = FlashcardsButtonIconPosition.Trailing,
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.fast_study_session_next_caption_message),
@@ -372,22 +369,14 @@ private fun FastVoiceTransportControls(
                     )
                 }
                 Spacer(modifier = Modifier.size(16.dp))
-                FilledIconButton(
+                FlashcardsFilledIconButton(
+                    icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = stringResource(
+                        if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd
+                    ),
                     onClick = onVoicePlayPause,
-                    modifier = Modifier.size(56.dp),
                     enabled = state.isVoiceActive,
-                ) {
-                    Icon(
-                        imageVector = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = stringResource(
-                            if (state.isVoicePlaying) {
-                                R.string.study_session_voice_pause_cd
-                            } else {
-                                R.string.study_session_voice_play_cd
-                            }
-                        ),
-                    )
-                }
+                )
                 Spacer(modifier = Modifier.size(16.dp))
                 IconButton(
                     onClick = if (state.isAnswerRevealed) onVoiceNext else onShowAnswer,
@@ -396,11 +385,7 @@ private fun FastVoiceTransportControls(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = stringResource(
-                            if (state.isAnswerRevealed) {
-                                R.string.study_session_next_flashcard_cd
-                            } else {
-                                R.string.study_session_show_answer_cd
-                            }
+                            if (state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
                         ),
                     )
                 }

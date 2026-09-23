@@ -25,9 +25,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,12 +50,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButtonRow
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
@@ -84,6 +85,10 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.Voic
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import kotlinx.coroutines.launch
+
+private val SHEET_PEEK_HEIGHT_EXPANDED: Dp = 176.dp
+private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 152.dp
+private val VOICE_TRANSPORT_ROW_HEIGHT: Dp = 96.dp
 
 @Composable
 fun RatedStudySessionScreen(
@@ -197,10 +202,10 @@ fun RatedStudySessionContent(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             sheetSwipeEnabled = false,
-            sheetPeekHeight = when {
-                state.isVoiceMode -> 176.dp
-                state.isAnswerRevealed -> 176.dp
-                else -> 152.dp
+            sheetPeekHeight = if (state.isVoiceMode || state.isAnswerRevealed) {
+                SHEET_PEEK_HEIGHT_EXPANDED
+            } else {
+                SHEET_PEEK_HEIGHT_DEFAULT
             },
             sheetDragHandle = {},
             topBar = {
@@ -290,14 +295,12 @@ private fun RatedStudySessionSheetContent(
             )
         } else {
             if (!state.isAnswerRevealed) {
-                Button(
+                FlashcardsFilledButton(
+                    text = stringResource(R.string.study_session_show_answer_button),
                     onClick = onShowAnswer,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(imageVector = Icons.Default.Flip, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.study_session_show_answer_button))
-                }
+                    icon = Icons.Default.Flip,
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.study_session_show_answer_caption_message),
@@ -401,7 +404,7 @@ private fun RatedVoiceTransportRow(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp),
+            .height(VOICE_TRANSPORT_ROW_HEIGHT),
     ) {
         // While voice-answering is actively listening/grading/speaking feedback, manual skip
         // controls must stay disabled: skipping to the answer here would start TtsPlayer reading
@@ -431,16 +434,12 @@ private fun RatedVoiceTransportRow(
                 )
             }
             Spacer(modifier = Modifier.size(16.dp))
-            FilledIconButton(
+            FlashcardsFilledIconButton(
+                icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd),
                 onClick = onVoicePlayPause,
-                modifier = Modifier.size(56.dp),
                 enabled = state.isVoiceActive && !isVoiceAnswerListening,
-            ) {
-                Icon(
-                    imageVector = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd)
-                )
-            }
+            )
             Spacer(modifier = Modifier.size(16.dp))
             IconButton(
                 onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
@@ -455,6 +454,17 @@ private fun RatedVoiceTransportRow(
             }
         }
     }
+}
+
+private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
+    VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
+    VoiceAnswerConsentSaveFailed -> context.getString(R.string.study_session_voice_answer_consent_save_error_message)
+    CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
+    VoiceAnswerGradingFailed -> context.getString(R.string.study_session_voice_answer_error_message)
+    VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
+    VoiceAnswerSilencePause -> context.getString(R.string.study_session_voice_answer_skip_pause_message)
+    VoiceAnswerMicPermissionRevoked -> context.getString(R.string.study_session_voice_answer_mic_permission_revoked_message)
+    VoiceAnswerCaptureUnavailable -> context.getString(R.string.study_session_voice_answer_capture_unavailable_message)
 }
 
 @Composable
@@ -529,15 +539,4 @@ private fun RatedStudySessionManualPreview() {
         onVoicePrevious = {},
         onDialogEvent = {},
     )
-}
-
-private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
-    VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
-    VoiceAnswerConsentSaveFailed -> context.getString(R.string.study_session_voice_answer_consent_save_error_message)
-    CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
-    VoiceAnswerGradingFailed -> context.getString(R.string.study_session_voice_answer_error_message)
-    VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
-    VoiceAnswerSilencePause -> context.getString(R.string.study_session_voice_answer_skip_pause_message)
-    VoiceAnswerMicPermissionRevoked -> context.getString(R.string.study_session_voice_answer_mic_permission_revoked_message)
-    VoiceAnswerCaptureUnavailable -> context.getString(R.string.study_session_voice_answer_capture_unavailable_message)
 }
