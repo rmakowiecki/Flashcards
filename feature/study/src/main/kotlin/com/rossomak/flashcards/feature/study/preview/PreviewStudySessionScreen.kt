@@ -120,7 +120,7 @@ fun PreviewStudySessionScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val micPermissionStillDeniedText = stringResource(R.string.preview_session_mic_permission_still_denied_message)
+    val micPermissionStillDeniedText = stringResource(CoreUiR.string.common_mic_permission_still_denied_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         when (message) {

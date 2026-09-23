@@ -114,7 +114,6 @@
     <string name="preview_session_mic_permission_empty_state_message">Voice answering needs the microphone. Allow it in system settings, then tap Start, or study this session with manual rating.</string>
     <string name="preview_session_mic_permission_open_settings_button">Open settings</string>
     <string name="preview_session_mic_permission_switch_to_manual_button">Switch to manual</string>
-    <string name="preview_session_mic_permission_still_denied_message">Microphone is still off. Allow it in system settings.</string>
     <string name="preview_session_scope_quick_session_message">" auto-selected across "</string>
     <string name="preview_session_scope_single_subcategory_prefix_message">" from your "</string>
     <string name="preview_session_scope_single_subcategory_suffix_message">" deck."</string>

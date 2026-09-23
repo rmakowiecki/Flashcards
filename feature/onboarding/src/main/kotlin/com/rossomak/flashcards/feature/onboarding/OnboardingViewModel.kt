@@ -2,14 +2,17 @@ package com.rossomak.flashcards.feature.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.DailyGoal
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
-import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
@@ -22,6 +25,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +50,8 @@ class OnboardingViewModel @Inject constructor(
     private val startVoiceDemo: StartVoiceDemoUseCase,
     private val playVoiceDemo: PlayVoiceDemoUseCase,
     private val stopVoiceDemo: StopVoiceDemoUseCase,
+    private val observePermissionStatus: ObservePermissionStatusUseCase,
+    private val requestPermission: RequestPermissionUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingScreenState())
@@ -54,9 +60,13 @@ class OnboardingViewModel @Inject constructor(
     private val eventChannel = Channel<OnboardingDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
-    private val _voiceDemoFailureMessages = MutableSharedFlow<VoiceDemoFailureReason>(extraBufferCapacity = 1)
+    private val _messages = MutableSharedFlow<OnboardingMessage>(extraBufferCapacity = 1)
+    val messages: SharedFlow<OnboardingMessage> = _messages.asSharedFlow()
 
-    val voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason> = _voiceDemoFailureMessages.asSharedFlow()
+    private var permissionStatusJob: Job? = null
+
+    /** Guards "Test your voice" against a second tap while the microphone request is still pending. */
+    private var micRequestInFlight = false
 
     init {
         viewModelScope.launch {
@@ -68,15 +78,51 @@ class OnboardingViewModel @Inject constructor(
             observeVoiceDemoState().collect { voiceDemoState ->
                 _state.update { it.copy(voiceDemoState = voiceDemoState) }
                 if (voiceDemoState is VoiceDemoState.Failed) {
-                    _voiceDemoFailureMessages.tryEmit(voiceDemoState.reason)
+                    _messages.tryEmit(OnboardingMessage.VoiceDemoFailed(voiceDemoState.reason))
                 }
             }
         }
     }
 
-    /** Called by the screen once RECORD_AUDIO is confirmed granted — tap-to-start and Retry both route here. */
+    /**
+     * Restarts the microphone status collection. The status flow is cold and never polls, so each
+     * resume — first composition, return from system Settings, or the end of a system prompt — is
+     * what picks up a change made outside the app.
+     */
+    fun onResume() {
+        permissionStatusJob?.cancel()
+        permissionStatusJob = viewModelScope.launch {
+            observePermissionStatus(AppPermission.RecordAudio).collect { status ->
+                _state.update { it.copy(micPermissionStatus = status) }
+            }
+        }
+    }
+
+    /**
+     * "Test your voice" and every Retry route here. The microphone is requested through the shared
+     * permission layer first, which returns without prompting when it is already granted; only a
+     * grant starts the demo.
+     *
+     * The result only steers this tap; [OnboardingScreenState.micPermissionStatus] is written solely
+     * by the observed status. A refusal that was already permanent before this tap shows no prompt
+     * at all, so it gets a snackbar instead of a silent no-op.
+     */
     fun onVoiceDemoStart() {
-        viewModelScope.launch { startVoiceDemo() }
+        if (micRequestInFlight) return
+        micRequestInFlight = true
+        viewModelScope.launch {
+            try {
+                val statusBeforeRequest = _state.value.micPermissionStatus
+                val status = requestPermission(AppPermission.RecordAudio)
+                when {
+                    status == PermissionStatus.Granted -> startVoiceDemo()
+                    statusBeforeRequest == PermissionStatus.PermanentlyDenied && status == PermissionStatus.PermanentlyDenied ->
+                        _messages.tryEmit(OnboardingMessage.MicPermissionStillDenied)
+                }
+            } finally {
+                micRequestInFlight = false
+            }
+        }
     }
 
     fun onVoiceDemoPlay() {

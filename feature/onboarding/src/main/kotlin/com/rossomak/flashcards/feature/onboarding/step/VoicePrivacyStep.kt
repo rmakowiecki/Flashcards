@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Failed
@@ -42,6 +43,7 @@ import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
@@ -57,8 +59,9 @@ import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
  * everyone, and only the AI grading of the spoken answer is gated — hence a premium line scoped to
  * grading rather than a badge over the whole screen.
  *
- * RECORD_AUDIO is requested and checked by the caller, not here: [permissionDenied] is the only
- * signal this composable gets about it.
+ * The ViewModel requests the microphone through the shared permission layer whenever [onTestVoice]
+ * fires; [permissionDenied] (a permanent refusal) is the only signal this composable gets about it,
+ * and its row keeps a Retry next to Open settings so a false "permanently denied" can still heal.
  */
 @Composable
 internal fun VoicePrivacyStep(
@@ -146,7 +149,7 @@ private fun VoiceTestCard(
         ) {
             MicBadge(voiceDemoState = voiceDemoState)
             // Fixed height, sized to the tallest of the states below (permission-denied's two-line
-            // message + button), so the card never visibly resizes as the voice demo state changes.
+            // message + button row), so the card never visibly resizes as the voice demo state changes.
             // verticalScroll is a safety net only, for oversized a11y font scale overflowing it.
             Box(
                 modifier = Modifier
@@ -214,10 +217,17 @@ private fun VoiceTestCardBody(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            FlashcardsFilledButton(
-                text = stringResource(R.string.voice_privacy_open_settings_button),
-                onClick = onOpenSettings,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)) {
+                FlashcardsFilledButton(
+                    text = stringResource(R.string.voice_privacy_open_settings_button),
+                    onClick = onOpenSettings,
+                )
+                FlashcardsTextButton(
+                    text = stringResource(R.string.voice_privacy_retry_button),
+                    onClick = onTestVoice,
+                    icon = Icons.Default.Replay,
+                )
+            }
         }
     } else {
         when (voiceDemoState) {
@@ -306,4 +316,18 @@ private fun VoiceTestStatus(text: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+private fun VoicePrivacyStepPermissionDeniedPreview() {
+    FlashcardsTheme {
+        VoicePrivacyStep(
+            voiceDemoState = Idle,
+            permissionDenied = true,
+            onTestVoice = {},
+            onPlay = {},
+            onOpenSettings = {},
+        )
+    }
 }
