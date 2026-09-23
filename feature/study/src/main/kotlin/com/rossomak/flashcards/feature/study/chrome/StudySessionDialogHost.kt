@@ -13,7 +13,6 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCa
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.dialogs.ExtendedContextDialog
 import com.rossomak.flashcards.feature.study.dialogs.ReportProblemDialog
 
@@ -36,14 +35,6 @@ internal fun StudySessionDialogHost(
             onCancel = onDismiss,
         )
         is CurrentCardExtendedContext -> ExtendedContextDialog(extendedContext = activeDialog.text, onDismiss = onDismiss)
-        VoiceAnswerConsent -> FlashcardsDecisionDialog(
-            title = stringResource(R.string.study_session_voice_answer_consent_title),
-            confirmLabel = stringResource(R.string.study_session_voice_answer_consent_accept_button),
-            onConfirm = onConfirm,
-            onCancel = onDismiss,
-            supportingText = stringResource(R.string.study_session_voice_answer_consent_message),
-            cancelLabel = stringResource(R.string.study_session_voice_answer_consent_decline_button),
-        )
         is SessionVoiceSettings -> VoiceSettingsDialog(
             availableVoices = activeDialog.draftState.availableVoices,
             draftVoiceId = activeDialog.draftState.draftVoiceId,

@@ -16,14 +16,11 @@ import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
-import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
-import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -38,10 +35,8 @@ import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
-import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerConsentSaveFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
@@ -96,7 +91,6 @@ class RatedStudySessionViewModelTest {
     private val xpConfigRepository = FakeXpConfigRepository()
     private val getXpConfig = GetXpConfigUseCase(xpConfigRepository)
     private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress, getXpConfig)
-    private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val voiceGateway = FakeVoiceGateway()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
@@ -132,8 +126,6 @@ class RatedStudySessionViewModelTest {
             savedStateHandle,
             getSessionStartData,
             SubmitCurationReportUseCase(curationRepository),
-            ObserveUserPreferencesUseCase(userPreferencesRepository),
-            SaveUserPreferenceUseCase(userPreferencesRepository),
             voiceGateway,
             voiceSettingsController,
         )
@@ -902,22 +894,9 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `a routed voice-answering choice without consent opens the consent dialog on entry`() =
+    fun `a routed voice-answering choice requests the mic permission on entry`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(route.copy(voiceAnsweringEnabled = true))
-            loadThreeCards()
-
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.state.value.activeDialog shouldBe VoiceAnswerConsent
-        }
-
-    @Test
-    fun `a routed voice-answering choice with consent requests the mic permission on entry`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            stubRoute(route.copy(voiceAnsweringEnabled = true))
-            userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(voiceAnswerConsentGranted = true)
             loadThreeCards()
 
             val viewModel = createViewModel()
@@ -938,41 +917,6 @@ class RatedStudySessionViewModelTest {
 
         voiceGateway.stopCalls shouldBe 1
     }
-
-    @Test
-    fun `accepting voice-answer consent persists it and requests the mic permission`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(route.copy(voiceAnsweringEnabled = true))
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onDialogEvent(Confirm)
-        advanceUntilIdle()
-
-        userPreferencesRepository.preferences.value.voiceAnswerConsentGranted shouldBe true
-        viewModel.state.value.activeDialog shouldBe null
-        viewModel.state.value.isMicPermissionRequestPending shouldBe true
-    }
-
-    @Test
-    fun `a failed consent save keeps the dialog open, surfaces an error, and skips the mic request`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            stubRoute(route.copy(voiceAnsweringEnabled = true))
-            loadThreeCards()
-            userPreferencesRepository.saveError = IllegalStateException("disk full")
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.messages.test {
-                viewModel.onDialogEvent(Confirm)
-                advanceUntilIdle()
-
-                awaitItem() shouldBe VoiceAnswerConsentSaveFailed
-            }
-            userPreferencesRepository.preferences.value.voiceAnswerConsentGranted shouldBe false
-            viewModel.state.value.activeDialog shouldBe VoiceAnswerConsent
-            viewModel.state.value.isMicPermissionRequestPending shouldBe false
-        }
 
     @Test
     fun `onMicPermissionResult granted enables voice answering on the gateway`() = runTest(mainDispatcherRule.testDispatcher) {

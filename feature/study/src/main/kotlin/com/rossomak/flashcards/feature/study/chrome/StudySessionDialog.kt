@@ -31,8 +31,6 @@ sealed interface StudySessionDialog {
 
     data class CurrentCardExtendedContext(val text: String) : StudySessionDialog
 
-    data object VoiceAnswerConsent : StudySessionDialog
-
     data class SessionVoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState(), val keepAsDefault: Boolean = false) : StudySessionDialog
 
     data object ExitSession : StudySessionDialog

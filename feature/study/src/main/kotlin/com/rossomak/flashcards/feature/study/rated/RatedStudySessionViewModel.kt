@@ -9,7 +9,6 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.SessionClock
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.UserPreference.VoiceAnswerConsent as VoiceAnswerConsentPreference
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
@@ -21,8 +20,6 @@ import com.rossomak.flashcards.core.domain.model.sealSessionResult
 import com.rossomak.flashcards.core.domain.model.startClock
 import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
-import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -38,7 +35,6 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCa
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
@@ -62,19 +58,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
  * Runs a Rated Study Session end to end — reveal, the Failed/Partial/Correct row, and the
- * session-entry voice-answering consent-and-microphone handshake
+ * session-entry microphone check for voice answering
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)).
  * Knows nothing about Read-aloud or auto-start playback — those are Fast concepts.
- *
- * The user-preferences use cases live here and only here: their sole current purpose is the
- * voice-answering consent flag (ADR-0025), and Fast has no path to it.
  *
  * The rating callback drives a [RatedSessionState]: a Correct rating finishes a card as Mastered,
  * Failed/Partial re-insert it further down the queue (or finish it, per
@@ -88,8 +80,6 @@ class RatedStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSessionStartData: GetSessionStartDataUseCase,
     private val submitCurationReport: SubmitCurationReportUseCase,
-    private val observeUserPreferences: ObserveUserPreferencesUseCase,
-    private val saveUserPreference: SaveUserPreferenceUseCase,
     private val voiceGateway: VoiceGateway,
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
@@ -256,12 +246,9 @@ class RatedStudySessionViewModel @Inject constructor(
             // The clock starts here, once a card is actually on screen — never at route entry, so
             // a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
-            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry. Consent
-            // is read as a one-shot rather than from hasVoiceAnswerConsent, whose collector may not
-            // have emitted yet by the time the cards land.
+            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry.
             if (route.voiceAnsweringEnabled && sessionCards.isNotEmpty()) {
-                val hasConsent = observeUserPreferences().first().voiceAnswerConsentGranted
-                requestVoiceAnswering(hasConsent)
+                _state.update { it.copy(isMicPermissionRequestPending = true) }
             }
         }
     }
@@ -516,34 +503,6 @@ class RatedStudySessionViewModel @Inject constructor(
         if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
     }
 
-    /** Consent first, then the microphone. Both gates are one-time; neither is skippable. */
-    private fun requestVoiceAnswering(hasConsent: Boolean) {
-        if (hasConsent) {
-            _state.update { it.copy(isMicPermissionRequestPending = true) }
-        } else {
-            _state.update { it.copy(activeDialog = VoiceAnswerConsent) }
-        }
-    }
-
-    private fun onVoiceAnswerConsentAccept() {
-        viewModelScope.launch {
-            saveUserPreference(VoiceAnswerConsentPreference(true))
-                .onSuccess {
-                    _state.update {
-                        it.copy(
-                            activeDialog = null,
-                            isMicPermissionRequestPending = true,
-                        )
-                    }
-                }
-                .onFailure {
-                    // Consent wasn't actually recorded — leave the dialog up rather than starting
-                    // the mic as if it had been, so a retry is a single tap on the same dialog.
-                    _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerConsentSaveFailed)
-                }
-        }
-    }
-
     fun onMicPermissionResult(isGranted: Boolean) {
         _state.update { it.copy(isMicPermissionRequestPending = false) }
         if (!isGranted) {
@@ -768,8 +727,7 @@ class RatedStudySessionViewModel @Inject constructor(
             is ReportCurrentCardProblem -> onReportProblemOpen(dialog)
             is CurrentCardExtendedContext -> onExtendedContextDialogOpen(dialog)
             is SessionVoiceSettings -> onVoiceSettingsOpen()
-            VoiceAnswerConsent, ExitSession ->
-                _state.update { it.copy(activeDialog = dialog) }
+            ExitSession -> _state.update { it.copy(activeDialog = dialog) }
         }
     }
 
@@ -787,7 +745,6 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun onDialogConfirm() {
         when (_state.value.activeDialog) {
             is ReportCurrentCardProblem -> onReportProblemSubmit()
-            VoiceAnswerConsent -> onVoiceAnswerConsentAccept()
             is SessionVoiceSettings -> onVoiceSettingsSave()
             ExitSession -> {
                 onDialogDismiss()
@@ -805,9 +762,6 @@ class RatedStudySessionViewModel @Inject constructor(
         when (dialog) {
             is CurrentCardExtendedContext -> onExtendedContextDialogDismissed()
             is SessionVoiceSettings -> onVoiceSettingsDismiss()
-            // Declining consent means the gateway never bootstraps — falls back to the manual-mode
-            // sheet rather than leaving voice's controls up with no engine behind them.
-            VoiceAnswerConsent -> _state.update { it.copy(isVoiceMode = false) }
             else -> Unit
         }
     }

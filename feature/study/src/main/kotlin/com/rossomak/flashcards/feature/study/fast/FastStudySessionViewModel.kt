@@ -30,7 +30,6 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCa
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
-import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.VoiceAnswerConsent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import com.rossomak.flashcards.feature.study.voice.VoiceGateway
@@ -483,17 +482,13 @@ class FastStudySessionViewModel @Inject constructor(
 
     /**
      * The caller hands over the dialog it wants shown, already seeded from what it was rendering.
-     * [VoiceAnswerConsent] is unreachable here — Fast never toggles voice answering (ADR-0025) —
-     * but the `when` still names it: the dialog type is shared with Rated rather than split,
-     * so this screen simply never constructs that case.
      */
     private fun onDialogOpen(dialog: StudySessionDialog) {
         when (dialog) {
             is ReportCurrentCardProblem -> onReportProblemOpen(dialog)
             is CurrentCardExtendedContext -> onExtendedContextDialogOpen(dialog)
             is SessionVoiceSettings -> onVoiceSettingsOpen()
-            VoiceAnswerConsent, ExitSession ->
-                _state.update { it.copy(activeDialog = dialog) }
+            ExitSession -> _state.update { it.copy(activeDialog = dialog) }
         }
     }
 
@@ -516,9 +511,8 @@ class FastStudySessionViewModel @Inject constructor(
                 onDialogDismiss()
                 terminate(abandoned = true)
             }
-            // Unreachable in Fast (VoiceAnswerConsent is never opened, ADR-0025); "Got it" and a
-            // scrim tap on the single-action Extended Context dialog are the same act.
-            VoiceAnswerConsent, is CurrentCardExtendedContext, null -> onDialogDismiss()
+            // "Got it" and a scrim tap on the single-action Extended Context dialog are the same act.
+            is CurrentCardExtendedContext, null -> onDialogDismiss()
         }
     }
 
