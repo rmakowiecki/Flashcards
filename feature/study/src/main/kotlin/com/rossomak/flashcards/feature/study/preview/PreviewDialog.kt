@@ -41,4 +41,11 @@ sealed interface PreviewDialog {
      * [availableTags] is the pool's tag vocabulary
      */
     data class Filters(val draftState: FlashcardFilters, val availableTags: List<String>) : PreviewDialog
+
+    /**
+     * One-time privacy notice for voice answering, shown from the Start tap before the microphone
+     * is first requested. OK-only: acknowledging it continues the same Start; dismissing it starts
+     * nothing and it shows again next time. Never opened from a settings row.
+     */
+    data object VoiceAnsweringInfo : PreviewDialog
 }
