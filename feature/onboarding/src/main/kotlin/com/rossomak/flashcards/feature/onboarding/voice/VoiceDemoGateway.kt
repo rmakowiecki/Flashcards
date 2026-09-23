@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.feature.onboarding.voice
 
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.voice.CapturedUtterance
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import kotlinx.coroutines.flow.StateFlow
 
 sealed interface VoiceDemoState {

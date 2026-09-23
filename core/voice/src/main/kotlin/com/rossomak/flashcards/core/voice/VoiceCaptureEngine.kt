@@ -9,6 +9,7 @@ import androidx.annotation.RequiresPermission
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logi
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.CaptureFailed
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean

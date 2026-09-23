@@ -55,6 +55,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.AudioRecordInitFailed
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.BluetoothMicUnavailable
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.CaptureLoopError
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.PermissionMissing
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -67,11 +72,6 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.AudioRecordInitFailed
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.BluetoothMicUnavailable
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.CaptureLoopError
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.PermissionMissing
 import com.rossomak.flashcards.feature.onboarding.step.AllSetStep
 import com.rossomak.flashcards.feature.onboarding.step.DailyGoalStep
 import com.rossomak.flashcards.feature.onboarding.step.FavoritesStep
