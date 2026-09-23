@@ -246,9 +246,13 @@ class RatedStudySessionViewModel @Inject constructor(
             // The clock starts here, once a card is actually on screen — never at route entry, so
             // a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
-            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry.
+            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry. Preview only
+            // launches a voice-answering session with the microphone already granted; a later
+            // revocation is handled by observeVoiceAnswerState. Enabling voice answering is what
+            // bootstraps the gateway here (ADR-0025).
             if (route.voiceAnsweringEnabled && sessionCards.isNotEmpty()) {
-                _state.update { it.copy(isMicPermissionRequestPending = true) }
+                ensureVoiceGatewayStarted()
+                voiceGateway.setVoiceAnswering(true)
             }
         }
     }
@@ -501,20 +505,6 @@ class RatedStudySessionViewModel @Inject constructor(
         _state.update { it.copy(isVoiceAnswerPaused = false) }
         voiceGateway.setVoiceAnswering(true)
         if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
-    }
-
-    fun onMicPermissionResult(isGranted: Boolean) {
-        _state.update { it.copy(isMicPermissionRequestPending = false) }
-        if (!isGranted) {
-            // The gateway never gets bootstrapped without the mic — falls back to the manual-mode
-            // sheet rather than leaving voice's controls up with no engine behind them.
-            _state.update { it.copy(isVoiceMode = false) }
-            return
-        }
-        // Rated sessions never auto-start the gateway; enabling voice answering is what
-        // bootstraps it here (ADR-0025).
-        ensureVoiceGatewayStarted()
-        voiceGateway.setVoiceAnswering(true)
     }
 
     fun onShowAnswer() {

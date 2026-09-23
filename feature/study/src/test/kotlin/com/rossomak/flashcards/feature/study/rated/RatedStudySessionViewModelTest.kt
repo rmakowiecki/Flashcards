@@ -894,16 +894,30 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `a routed voice-answering choice requests the mic permission on entry`() =
+    fun `a routed voice-answering choice bootstraps voice answering on entry`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(route.copy(voiceAnsweringEnabled = true))
             loadThreeCards()
 
-            val viewModel = createViewModel()
+            createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.isMicPermissionRequestPending shouldBe true
+            voiceGateway.startCalls shouldBe 1
+            voiceGateway.lastStartCards?.map { it.id } shouldBe route.cardIds
+            voiceGateway.lastVoiceAnswering shouldBe true
         }
+
+    @Test
+    fun `voice answering off in the route never starts the voice gateway`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(voiceAnsweringEnabled = false))
+        loadThreeCards()
+
+        createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.startCalls shouldBe 0
+        voiceGateway.lastVoiceAnswering shouldBe null
+    }
 
     private fun reportDraft(viewModel: RatedStudySessionViewModel): ReportCurrentCardProblem =
         viewModel.state.value.activeDialog as ReportCurrentCardProblem
@@ -916,41 +930,6 @@ class RatedStudySessionViewModelTest {
         viewModel.onCleared()
 
         voiceGateway.stopCalls shouldBe 1
-    }
-
-    @Test
-    fun `onMicPermissionResult granted enables voice answering on the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onMicPermissionResult(true)
-
-        voiceGateway.lastVoiceAnswering shouldBe true
-        viewModel.state.value.isMicPermissionRequestPending shouldBe false
-    }
-
-    @Test
-    fun `onMicPermissionResult granted bootstraps the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onMicPermissionResult(true)
-
-        voiceGateway.startCalls shouldBe 1
-        voiceGateway.lastStartCards?.map { it.id } shouldBe route.cardIds
-        voiceGateway.lastVoiceAnswering shouldBe true
-    }
-
-    @Test
-    fun `onMicPermissionResult denied leaves voice answering off`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onMicPermissionResult(false)
-
-        voiceGateway.lastVoiceAnswering shouldBe null
-        viewModel.state.value.isMicPermissionRequestPending shouldBe false
     }
 
     @Test

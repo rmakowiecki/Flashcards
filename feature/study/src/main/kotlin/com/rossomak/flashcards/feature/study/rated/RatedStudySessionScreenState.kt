@@ -50,7 +50,6 @@ data class RatedStudySessionScreenState(
     // text (RatedVoiceGradeFeedback) rather than a snackbar. One-shot voice-answering failures go
     // through RatedStudySessionMessage instead — see RatedStudySessionViewModel.messages.
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
-    val isMicPermissionRequestPending: Boolean = false,
     val activeDialog: StudySessionDialog? = null,
     // Mirrors RatedSessionState.masteredCount. No longer the header's counter (see completedCount
     // below) — kept for the Session Summary screen's own mastered tally.
