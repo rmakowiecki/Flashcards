@@ -195,12 +195,10 @@ class FastStudySessionViewModel @Inject constructor(
                 it.copy(
                     isLoading = false,
                     flashcards = sessionCards,
-                    // Auto-start honours Read-aloud: with the flag off, this is a manual
-                    // tap-to-reveal/tap-to-advance session and never requests notification
-                    // permission or starts text-to-speech.
-                    isVoiceAutoStartPending = route.readAloudEnabled && sessionCards.isNotEmpty(),
                 )
             }
+            // Read-aloud off is a manual tap-to-reveal/tap-to-advance session and never starts text-to-speech.
+            if (route.readAloudEnabled) ensureVoiceGatewayStarted()
             // The clock starts here, once a card is actually on screen — never at route entry, so
             // a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
@@ -309,18 +307,6 @@ class FastStudySessionViewModel @Inject constructor(
                 )
             }
         }
-    }
-
-    fun onVoiceAutoStartDeclined() {
-        // The gateway never gets bootstrapped without notification permission — falls back to the
-        // manual-mode sheet rather than leaving read-aloud's controls up with no engine behind
-        // them.
-        _state.update { it.copy(isVoiceAutoStartPending = false, isReadAloudMode = false) }
-    }
-
-    fun onVoiceAutoStart() {
-        _state.update { it.copy(isVoiceAutoStartPending = false) }
-        ensureVoiceGatewayStarted()
     }
 
     private fun ensureVoiceGatewayStarted() {
