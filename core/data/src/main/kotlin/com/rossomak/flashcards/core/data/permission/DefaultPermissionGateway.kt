@@ -2,15 +2,14 @@ package com.rossomak.flashcards.core.data.permission
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.di.UserPreferencesDataStore
 import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
-import com.rossomak.flashcards.core.domain.model.PermissionStatus.NotRequested
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDenied
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import javax.inject.Inject
@@ -30,10 +29,15 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * The OS only says whether a permission is granted, not whether the user still gets a prompt, so
- * this remembers each permission's last denial in the user preferences DataStore. A denial with
- * rationale `true` is soft; a later denial with rationale `false` means the system stopped
- * prompting. A first denial with rationale `false` is how Android 11+ reports a prompt dismissed
- * without an answer, so it is not treated as permanent.
+ * this keeps one "permanently denied" flag per permission in the user preferences DataStore.
+ *
+ * A request result decides the flag: granted or refused with rationale `true` clears it (the system
+ * will prompt again), refused with rationale `false` sets it. Reading the status outside a request
+ * never asks for rationale, so it needs no Activity: granted, else the flag, else [Denied].
+ *
+ * Android 11+ reports a first prompt dismissed without an answer exactly like a permanent refusal,
+ * so that dismissal sets the flag too. It heals on the next request: the system still shows its
+ * prompt, and any answer other than a permanent refusal clears the flag.
  */
 @Singleton
 class DefaultPermissionGateway @Inject constructor(
@@ -55,7 +59,7 @@ class DefaultPermissionGateway @Inject constructor(
 
     override suspend fun request(permission: AppPermission): PermissionStatus = requestMutex.withLock {
         if (permissionChecker.isGranted(permission)) {
-            clearLastDenial(permission)
+            clearPermanentlyDenied(permission)
             return@withLock Granted
         }
         val deferred = CompletableDeferred<RawResult>().also { pendingResult = it }
@@ -79,53 +83,41 @@ class DefaultPermissionGateway @Inject constructor(
 
     private suspend fun currentStatus(permission: AppPermission): PermissionStatus {
         if (permissionChecker.isGranted(permission)) {
-            clearLastDenial(permission)
+            clearPermanentlyDenied(permission)
             return Granted
         }
-        return when (readLastDenial(permission)) {
-            null -> NotRequested
-            LastDenial.Soft -> Denied
-            LastDenial.Permanent -> PermanentlyDenied
-        }
+        return if (isPermanentlyDenied(permission)) PermanentlyDenied else Denied
     }
 
     private suspend fun classify(permission: AppPermission, rawResult: RawResult): PermissionStatus = when {
         rawResult.isGranted -> {
-            clearLastDenial(permission)
+            clearPermanentlyDenied(permission)
             Granted
         }
         rawResult.shouldShowRationale -> {
-            writeLastDenial(permission, LastDenial.Soft)
+            clearPermanentlyDenied(permission)
             Denied
         }
-        readLastDenial(permission) != null -> {
-            writeLastDenial(permission, LastDenial.Permanent)
+        else -> {
+            dataStore.edit { it[permanentlyDeniedKey(permission)] = true }
             PermanentlyDenied
         }
-        else -> NotRequested
     }
 
-    private suspend fun readLastDenial(permission: AppPermission): LastDenial? =
-        dataStore.data.first()[lastDenialKey(permission)]
-            ?.let { stored -> LastDenial.entries.firstOrNull { it.name == stored } }
+    private suspend fun isPermanentlyDenied(permission: AppPermission): Boolean =
+        dataStore.data.first()[permanentlyDeniedKey(permission)] == true
 
-    private suspend fun writeLastDenial(permission: AppPermission, lastDenial: LastDenial) {
-        dataStore.edit { it[lastDenialKey(permission)] = lastDenial.name }
-    }
-
-    private suspend fun clearLastDenial(permission: AppPermission) {
-        val key = lastDenialKey(permission)
+    private suspend fun clearPermanentlyDenied(permission: AppPermission) {
+        val key = permanentlyDeniedKey(permission)
         if (dataStore.data.first().contains(key)) dataStore.edit { it.remove(key) }
     }
 
-    private fun lastDenialKey(permission: AppPermission): Preferences.Key<String> =
-        stringPreferencesKey(LAST_DENIAL_KEY_PREFIX + permission.name.lowercase())
-
-    private enum class LastDenial { Soft, Permanent }
+    private fun permanentlyDeniedKey(permission: AppPermission): Preferences.Key<Boolean> =
+        booleanPreferencesKey(PERMANENTLY_DENIED_KEY_PREFIX + permission.name.lowercase())
 
     private data class RawResult(val isGranted: Boolean, val shouldShowRationale: Boolean)
 
     companion object {
-        const val LAST_DENIAL_KEY_PREFIX = "permission_last_denial_"
+        const val PERMANENTLY_DENIED_KEY_PREFIX = "permission_permanently_denied_"
     }
 }

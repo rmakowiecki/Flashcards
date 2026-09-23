@@ -2,8 +2,8 @@ package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
-import com.rossomak.flashcards.core.domain.model.PermissionStatus.NotRequested
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
 
 class FakePermissionGateway : PermissionGateway {
 
-    /** Current status per permission; an absent entry reads as [NotRequested]. */
+    /** Current status per permission; an absent entry reads as [Denied]. */
     val statuses = MutableStateFlow<Map<AppPermission, PermissionStatus>>(emptyMap())
 
     /** The status the next prompting [request] resolves to (and stores in [statuses]). */
@@ -24,7 +24,7 @@ class FakePermissionGateway : PermissionGateway {
     override val permissionRequests: Flow<AppPermission> = emptyFlow()
 
     override fun observeStatus(permission: AppPermission): Flow<PermissionStatus> =
-        statuses.map { it[permission] ?: NotRequested }
+        statuses.map { it[permission] ?: Denied }
 
     override suspend fun request(permission: AppPermission): PermissionStatus {
         if (statuses.value[permission] == Granted) return Granted

@@ -3,13 +3,12 @@ package com.rossomak.flashcards.core.data.permission
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import com.rossomak.flashcards.core.domain.model.AppPermission.RecordAudio
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
-import com.rossomak.flashcards.core.domain.model.PermissionStatus.NotRequested
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDenied
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +41,7 @@ class DefaultPermissionGatewayTest {
         }
     }
 
-    private val lastDenialKey = stringPreferencesKey(DefaultPermissionGateway.LAST_DENIAL_KEY_PREFIX + "recordaudio")
+    private val permanentlyDeniedKey = booleanPreferencesKey(DefaultPermissionGateway.PERMANENTLY_DENIED_KEY_PREFIX + "recordaudio")
 
     private var isRecordAudioGranted = false
 
@@ -55,11 +54,11 @@ class DefaultPermissionGatewayTest {
         dataStoreScope.cancel()
     }
 
-    private suspend fun storeLastDenial(value: String) {
-        dataStore.edit { it[lastDenialKey] = value }
+    private suspend fun storePermanentlyDenied() {
+        dataStore.edit { it[permanentlyDeniedKey] = true }
     }
 
-    private suspend fun storedLastDenial(): String? = dataStore.data.first()[lastDenialKey]
+    private suspend fun storedPermanentlyDenied(): Boolean? = dataStore.data.first()[permanentlyDeniedKey]
 
     /** Runs [DefaultPermissionGateway.request], answers the launched prompt with the given raw result, and returns the classified status. */
     private suspend fun TestScope.requestAnswering(isGranted: Boolean, shouldShowRationale: Boolean): PermissionStatus {
@@ -71,20 +70,13 @@ class DefaultPermissionGatewayTest {
     }
 
     @Test
-    fun `observeStatus emits NotRequested when not granted and no denial is stored`() = runTest {
-        gateway.observeStatus(RecordAudio).first() shouldBe NotRequested
-    }
-
-    @Test
-    fun `observeStatus emits Denied for a stored soft denial`() = runTest {
-        storeLastDenial("Soft")
-
+    fun `observeStatus emits Denied when not granted and no flag is stored`() = runTest {
         gateway.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
-    fun `observeStatus emits PermanentlyDenied for a stored permanent denial`() = runTest {
-        storeLastDenial("Permanent")
+    fun `observeStatus emits PermanentlyDenied when the flag is stored`() = runTest {
+        storePermanentlyDenied()
 
         gateway.observeStatus(RecordAudio).first() shouldBe PermanentlyDenied
     }
@@ -97,66 +89,66 @@ class DefaultPermissionGatewayTest {
     }
 
     @Test
-    fun `reading Granted clears a stored permanent denial`() = runTest {
-        storeLastDenial("Permanent")
+    fun `reading Granted clears a stored flag`() = runTest {
+        storePermanentlyDenied()
         isRecordAudioGranted = true
 
         gateway.observeStatus(RecordAudio).first() shouldBe Granted
         isRecordAudioGranted = false
 
-        storedLastDenial() shouldBe null
-        gateway.observeStatus(RecordAudio).first() shouldBe NotRequested
+        storedPermanentlyDenied() shouldBe null
+        gateway.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
-    fun `a granted result returns Granted and clears the stored denial`() = runTest {
-        storeLastDenial("Soft")
+    fun `a granted result returns Granted and clears the flag`() = runTest {
+        storePermanentlyDenied()
 
         val status = requestAnswering(isGranted = true, shouldShowRationale = false)
         isRecordAudioGranted = true
 
         status shouldBe Granted
-        storedLastDenial() shouldBe null
+        storedPermanentlyDenied() shouldBe null
         gateway.observeStatus(RecordAudio).first() shouldBe Granted
     }
 
     @Test
-    fun `a denial with rationale returns Denied and stores a soft denial`() = runTest {
+    fun `a denial with rationale returns Denied without setting the flag`() = runTest {
         val status = requestAnswering(isGranted = false, shouldShowRationale = true)
 
         status shouldBe Denied
-        storedLastDenial() shouldBe "Soft"
+        storedPermanentlyDenied() shouldBe null
         gateway.observeStatus(RecordAudio).first() shouldBe Denied
     }
 
     @Test
-    fun `a denial without rationale after a soft denial returns PermanentlyDenied`() = runTest {
-        storeLastDenial("Soft")
+    fun `a denial with rationale clears a stale flag`() = runTest {
+        storePermanentlyDenied()
 
+        val status = requestAnswering(isGranted = false, shouldShowRationale = true)
+
+        status shouldBe Denied
+        storedPermanentlyDenied() shouldBe null
+        gateway.observeStatus(RecordAudio).first() shouldBe Denied
+    }
+
+    @Test
+    fun `a denial without rationale returns PermanentlyDenied and sets the flag`() = runTest {
         val status = requestAnswering(isGranted = false, shouldShowRationale = false)
 
         status shouldBe PermanentlyDenied
-        storedLastDenial() shouldBe "Permanent"
+        storedPermanentlyDenied() shouldBe true
         gateway.observeStatus(RecordAudio).first() shouldBe PermanentlyDenied
     }
 
     @Test
-    fun `a denial without rationale after a permanent denial stays PermanentlyDenied`() = runTest {
-        storeLastDenial("Permanent")
+    fun `a denial without rationale while flagged stays PermanentlyDenied`() = runTest {
+        storePermanentlyDenied()
 
         val status = requestAnswering(isGranted = false, shouldShowRationale = false)
 
         status shouldBe PermanentlyDenied
-        storedLastDenial() shouldBe "Permanent"
-    }
-
-    @Test
-    fun `a denial without rationale and no prior denial is a dismissed prompt and stays NotRequested`() = runTest {
-        val status = requestAnswering(isGranted = false, shouldShowRationale = false)
-
-        status shouldBe NotRequested
-        storedLastDenial() shouldBe null
-        gateway.observeStatus(RecordAudio).first() shouldBe NotRequested
+        storedPermanentlyDenied() shouldBe true
     }
 
     @Test
@@ -172,9 +164,9 @@ class DefaultPermissionGatewayTest {
         val emissions = async { gateway.observeStatus(RecordAudio).take(2).toList() }
         runCurrent()
 
-        requestAnswering(isGranted = false, shouldShowRationale = true)
+        requestAnswering(isGranted = false, shouldShowRationale = false)
 
-        emissions.await() shouldBe listOf(NotRequested, Denied)
+        emissions.await() shouldBe listOf(Denied, PermanentlyDenied)
     }
 
     private companion object {
