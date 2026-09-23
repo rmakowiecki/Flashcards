@@ -227,7 +227,7 @@ Designed:
 
 **Voice**
 - Voice settings (voice selection + playback speed — implemented, `VoiceSettingsDialog`, persisted via `DataStoreVoiceSettingsLocalDataSource`)
-- Voice answering **consent** (has the user accepted the mic-permission disclosure) — implemented and persisted, `VoiceAnswerConsentRepository`/`SetVoiceAnswerConsentUseCase`. Premium-gated with real server-side entitlement enforcement (ADR-0024/0029).
+- Voice answering **privacy info** — a one-time notice the Preview screen shows on the first voice-answering Start tap, before the microphone is requested; persisted as `UserPreferences.hasSeenVoiceAnsweringInfo`. Premium-gated with real server-side entitlement enforcement (ADR-0024/0029).
 - Voice answering **default-enabled** — persisted as `StudySessionPreferences.voiceAnsweringEnabled`, editable from the Preview screen's Voice answering popup
 - Read-aloud/auto-play default (Fast) — persisted as `StudySessionPreferences.readAloudEnabled`. Note the session screen does not yet *act* on it — see the Fast mode entry point bug above
 
