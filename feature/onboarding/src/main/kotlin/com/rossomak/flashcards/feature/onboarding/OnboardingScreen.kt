@@ -60,6 +60,10 @@ import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.Bluet
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.CaptureLoopError
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.PermissionMissing
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.CaptureError
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.RouteUnavailable
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -80,10 +84,6 @@ import com.rossomak.flashcards.feature.onboarding.step.SessionModesStep
 import com.rossomak.flashcards.feature.onboarding.step.StructureStep
 import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason.CaptureError
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason.RouteUnavailable
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -389,8 +389,8 @@ private fun OnboardingStepPage(
 }
 
 /**
- * Owns the RECORD_AUDIO check/request for the voice demo — the ViewModel and its voice gateway
- * assume the permission is already granted.
+ * Owns the RECORD_AUDIO check/request for the voice demo — the ViewModel and its voice demo use
+ * cases assume the permission is already granted.
  * [onTestVoice] doubles as Retry: both a first tap and a retry start a fresh listening attempt.
  */
 @Composable

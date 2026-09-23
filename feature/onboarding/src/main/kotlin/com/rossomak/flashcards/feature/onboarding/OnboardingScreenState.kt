@@ -2,8 +2,8 @@ package com.rossomak.flashcards.feature.onboarding
 
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf

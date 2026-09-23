@@ -4,15 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
+import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -32,13 +35,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 @HiltViewModel
+@Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class OnboardingViewModel @Inject constructor(
     private val getCurrentAuthUser: GetCurrentAuthUserUseCase,
     private val saveOnboardingPreferences: SaveOnboardingPreferencesUseCase,
     private val getOnboardingSubcategories: GetOnboardingSubcategoriesUseCase,
     private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
     private val signInAnonymously: SignInAnonymouslyUseCase,
-    private val voiceDemoGateway: VoiceDemoGateway,
+    private val observeVoiceDemoState: ObserveVoiceDemoStateUseCase,
+    private val startVoiceDemo: StartVoiceDemoUseCase,
+    private val playVoiceDemo: PlayVoiceDemoUseCase,
+    private val stopVoiceDemo: StopVoiceDemoUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingScreenState())
@@ -58,7 +65,7 @@ class OnboardingViewModel @Inject constructor(
             _state.update { it.copy(userName = userName) }
         }
         viewModelScope.launch {
-            voiceDemoGateway.state.collect { voiceDemoState ->
+            observeVoiceDemoState().collect { voiceDemoState ->
                 _state.update { it.copy(voiceDemoState = voiceDemoState) }
                 if (voiceDemoState is VoiceDemoState.Failed) {
                     _voiceDemoFailureMessages.tryEmit(voiceDemoState.reason)
@@ -69,21 +76,16 @@ class OnboardingViewModel @Inject constructor(
 
     /** Called by the screen once RECORD_AUDIO is confirmed granted — tap-to-start and Retry both route here. */
     fun onVoiceDemoStart() {
-        voiceDemoGateway.start()
+        viewModelScope.launch { startVoiceDemo() }
     }
 
     fun onVoiceDemoPlay() {
-        voiceDemoGateway.play()
+        viewModelScope.launch { playVoiceDemo() }
     }
 
     /** Hard-stops the demo: pager navigation away from the step, or the app backgrounding. */
     fun onVoiceDemoStop() {
-        voiceDemoGateway.stop()
-    }
-
-    override fun onCleared() {
-        voiceDemoGateway.stop()
-        voiceDemoGateway.release()
+        viewModelScope.launch { stopVoiceDemo() }
     }
 
     fun onStudyModeSelect(studyMode: StudyMode) {

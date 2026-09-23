@@ -31,6 +31,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Failed
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Idle
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Listening
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Playing
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Ready
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.SpeechDetected
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
@@ -42,13 +49,6 @@ import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingContentColors
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Failed
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Idle
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Listening
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Playing
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.Ready
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState.SpeechDetected
 
 /**
  * Introduces Voice Answering and the on-device privacy transform.
@@ -232,7 +232,7 @@ private fun VoiceTestCardBody(
             is SpeechDetected -> VoiceTestStatus(
                 text = stringResource(R.string.voice_privacy_speech_detected_hint),
             )
-            is Ready, is Playing -> Column(
+            Ready, Playing -> Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             ) {

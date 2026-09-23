@@ -5,25 +5,28 @@ import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeOnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeVoiceDemoGateway
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
+import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -51,7 +54,10 @@ class OnboardingViewModelTest {
         getOnboardingSubcategories = GetOnboardingSubcategoriesUseCase(onboardingSubcategoriesRepository),
         setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
         signInAnonymously = SignInAnonymouslyUseCase(authRepository),
-        voiceDemoGateway = voiceDemoGateway,
+        observeVoiceDemoState = ObserveVoiceDemoStateUseCase(voiceDemoGateway),
+        startVoiceDemo = StartVoiceDemoUseCase(voiceDemoGateway),
+        playVoiceDemo = PlayVoiceDemoUseCase(voiceDemoGateway),
+        stopVoiceDemo = StopVoiceDemoUseCase(voiceDemoGateway),
     )
 
     private fun authUser(displayName: String?, email: String?) = AuthUser(
@@ -388,27 +394,42 @@ class OnboardingViewModelTest {
             userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe false
             userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe null
         }
-}
 
-private class FakeVoiceDemoGateway : VoiceDemoGateway {
-    val stateFlow = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
-    override val state: StateFlow<VoiceDemoState> = stateFlow
+    @Test
+    fun `voice demo state is mirrored into screen state`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
 
-    var startCalls = 0
-    var playCalls = 0
-    var stopCalls = 0
-    var releaseCalls = 0
+        voiceDemoGateway.state.value = VoiceDemoState.Ready
+        advanceUntilIdle()
 
-    override fun start() {
-        startCalls++
+        viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Ready
     }
-    override fun play() {
-        playCalls++
+
+    @Test
+    fun `voice demo failure emits its reason`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.voiceDemoFailureMessages.test {
+            voiceDemoGateway.state.value = VoiceDemoState.Failed(VoiceDemoFailureReason.RouteUnavailable)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe VoiceDemoFailureReason.RouteUnavailable
+        }
     }
-    override fun stop() {
-        stopCalls++
-    }
-    override fun release() {
-        releaseCalls++
+
+    @Test
+    fun `voice demo start, play and stop reach the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onVoiceDemoStart()
+        viewModel.onVoiceDemoPlay()
+        viewModel.onVoiceDemoStop()
+        advanceUntilIdle()
+
+        voiceDemoGateway.startCount shouldBe 1
+        voiceDemoGateway.playCount shouldBe 1
+        voiceDemoGateway.stopCount shouldBe 1
     }
 }
