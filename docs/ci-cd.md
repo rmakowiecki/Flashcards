@@ -35,6 +35,7 @@ No instrumented (`androidTest`) tests exist yet, so no emulator step is configur
 - `versionCode` = `git rev-list --count HEAD` — total commit count, monotonic, no tagging required.
 - `versionName` = `MAJOR.MINOR.<commit count>` — `MAJOR`/`MINOR` are hand-edited constants in `app/build.gradle.kts`; the patch segment is the same commit count as `versionCode` and climbs across the whole repo history (doesn't reset per release).
 - To cut a new `MAJOR`/`MINOR`: edit the constants directly in `app/build.gradle.kts`.
+- Non-release build types append a `versionNameSuffix`: `-debug` or `-profiling` (e.g. `0.1.1234-profiling`); release has none. The Debug tab's hub also shows build type, version name/code and the short commit SHA (`BuildConfig.GIT_SHORT_SHA`).
 
 ## Signing
 
@@ -49,46 +50,71 @@ No instrumented (`androidTest`) tests exist yet, so no emulator step is configur
 - Both apps' config lives in the single `google-services.json` (keyed internally by `package_name`) — one file, no per-build-type file swapping needed.
 - `app/src/debug/res/values/strings.xml` overrides `app_name` to "Flashcards Debug" so the two are visually distinguishable on-device too.
 
-## Local WIP debug distribution (dev-only, outside Bitrise)
+## Profiling build type
+
+`buildTypes.profiling` exists to judge real-world performance without losing developer tools. It is initialized from release (R8 shrinking + optimization, not debuggable, so ART honors baseline profiles) with these differences:
+
+- **Same package as debug** (`.debug` suffix) and **debug signing**, so it installs over a debug build and reuses the debug Firebase app entry and its registered SHA-1 — no extra Firebase app, no `google-services.json` change. Launcher label "Flashcards Profiling" (`app/src/profiling/res`).
+- **No obfuscation** (`app/proguard-rules-profiling.pro`: `-dontobfuscate`) so stack traces and traces stay readable.
+- **Profileable by shell** (`app/src/profiling/AndroidManifest.xml`) so Android Studio's profiler and Perfetto attach.
+- **Logging on** (`BuildConfig.LOGGING_ENABLED`: true for debug and profiling, false for release).
+- **Debug hub included**: `:feature:debug` via `profilingImplementation`, and the Debug-tab wiring in `app/src/debug/java` is added to the profiling source set. LeakCanary, Compose UI tooling and Showkase stay debug-only.
+- Library modules have no profiling variant; `matchingFallbacks` resolves them to release.
+- Not built by Bitrise; ship one with the WIP script below (`--variant profiling`).
+
+Baseline profiles: `androidx.profileinstaller` is an explicit `:app` dependency, so the library-shipped profiles merged into `assets/dexopt/baseline.prof` are installed for sideloaded builds too (Firebase App Distribution, adb), not only Play installs. ART compiles them at the next background dexopt; to judge a fresh install immediately, force it:
+
+```
+adb shell cmd package compile -f -m speed-profile com.rossomak.flashcards.debug
+```
+
+## R8 keep rules
+
+Release and profiling are minified. Firestore's reflection-based `toObject()` maps documents onto `:core:data`'s `core.data.model` classes, so `core/data/consumer-rules.pro` keeps that package's constructors and members — without it, reads silently yield default-valued objects. kotlinx-serialization and Hilt rely on their bundled rules.
+
+## Local WIP distribution (dev-only, outside Bitrise)
 
 Separate from everything above — no Bitrise workflow, no git push required.
 Lets a dev build the *current, possibly-uncommitted* working tree and ship
 it straight to a device for a mid-feature progress check. No PR, no
 review, no static analysis; just "does it compile, ship it."
 
-- **Script**: `scripts/distribute-wip-debug.sh`. Standalone-runnable
-  (bare terminal, cron, or the skill below — zero args, same behavior).
-  Preflight (firebase CLI + service-account JSON present) →
-  `./gradlew compileDebugKotlin` (fail fast before wasting time on a full
-  build) → `./gradlew assembleDebug` → `firebase appdistribution:distribute`
-  to the `wip-debug` tester group. All build/upload output goes to stdout
+- **Script**: `scripts/distribute-wip.sh [--variant debug|profiling]`
+  (default `debug`). Standalone-runnable (bare terminal, cron, or the skill
+  below — same behavior). Preflight (firebase CLI + service-account JSON
+  present) → `./gradlew compile<Variant>Kotlin` (fail fast before wasting
+  time on a full build) → `./gradlew assemble<Variant>` →
+  `firebase appdistribution:distribute` to the `wip-debug` or
+  `wip-profiling` tester group. Release notes name the variant alongside the
+  timestamp and short commit hash. All build/upload output goes to stdout
   (no separate logfile, no status file); the last line is always one
   plain-English outcome (`SUCCESS: ...` / `FAILED: <stage> — see output
   above`) that a caller reads off the tail of that same output.
-- **Skill**: `.claude/skills/distribute-wip-debug/SKILL.md` (untracked —
+- **Skill**: `.claude/skills/distribute-wip/SKILL.md` (untracked —
   see note below) — thin wrapper, no business logic: runs the script via
   `Bash(run_in_background: true)` so the calling session is never blocked
   on the multi-minute Gradle build, then tails the background output for
   the final `SUCCESS:`/`FAILED:` line and relays it verbatim via
   `PushNotification` + in-session.
-- Uses the **same** debug app id / debug signing / `.debug`-suffixed
-  package as `deploy-internal` above, and the same
-  `firebase-app-distribution-service-account.json` — but its own tester
-  group (`wip-debug`, distinct from `internal-debug`) so ad-hoc WIP noise
+- Both variants use the **same** debug app id / debug signing /
+  `.debug`-suffixed package as `deploy-internal` above, and the same
+  `firebase-app-distribution-service-account.json` — but their own tester
+  groups (`wip-debug` / `wip-profiling`, distinct from `internal-debug`) so ad-hoc WIP noise
   never mixes with "latest clean push to main."
-- No `versionName`/`versionCode` change — distinguishing marker between
-  snapshots is the Firebase release notes (timestamp + short commit
-  hash), so `app/build.gradle.kts`'s versioning scheme above stays
-  untouched.
+- WIP snapshots get no versioning of their own — the distinguishing marker
+  between them is the Firebase release notes (timestamp + short commit
+  hash); the build type shows in the `versionNameSuffix` and on the Debug
+  tab's hub.
 - Install path: Firebase's tester client, **Firebase App Tester** (not on
   Play Store — sideloaded via the tester-invite link itself). One-time
   per device; subsequent `wip-debug` uploads notify inside that same app.
 - One-time setup: `firebase-tools` CLI + `firebase login` under a personal
   Google account (not the service account, which is reserved for the
-  upload step); create the `wip-debug` tester group with
-  `firebase appdistribution:groups:create "wip-debug" wip-debug`
+  upload step); create the tester groups with
+  `firebase appdistribution:groups:create "wip-debug" wip-debug` and
+  `firebase appdistribution:groups:create "wip-profiling" wip-profiling`
   (`firebase-tools` ≥15.29).
-- The skill file above (`.claude/skills/distribute-wip-debug/SKILL.md`) is
+- The skill file above (`.claude/skills/distribute-wip/SKILL.md`) is
   local-only by design — `.claude/` is gitignored repo-wide, so it never
   reaches git and won't exist for a fresh clone. The script itself is
   fully standalone and doesn't need it; a new dev who wants the skill too
