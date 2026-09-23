@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
  * Activity-scoped launcher host consumes [permissionRequests] and reports back through
  * [onPermissionResult].
  */
-interface PermissionRepository {
+interface PermissionGateway {
 
     /**
      * Cold: reads the current status on every new collection and re-emits after every request

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-class FakePermissionRepository : PermissionRepository {
+class FakePermissionGateway : PermissionGateway {
 
     /** Current status per permission; an absent entry reads as [Denied]. */
     val statuses = MutableStateFlow<Map<AppPermission, PermissionStatus>>(emptyMap())

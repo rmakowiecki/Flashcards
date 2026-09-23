@@ -1,9 +1,9 @@
 package com.rossomak.flashcards.core.data.di
 
 import com.rossomak.flashcards.core.data.permission.DefaultPermissionChecker
-import com.rossomak.flashcards.core.data.permission.DefaultPermissionRepository
+import com.rossomak.flashcards.core.data.permission.DefaultPermissionGateway
 import com.rossomak.flashcards.core.data.permission.PermissionChecker
-import com.rossomak.flashcards.core.domain.repository.PermissionRepository
+import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -16,9 +16,9 @@ abstract class PermissionModule {
 
     @Binds
     @Singleton
-    abstract fun bindPermissionRepository(
-        impl: DefaultPermissionRepository,
-    ): PermissionRepository
+    abstract fun bindPermissionGateway(
+        impl: DefaultPermissionGateway,
+    ): PermissionGateway
 
     @Binds
     abstract fun bindPermissionChecker(

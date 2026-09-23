@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
-import com.rossomak.flashcards.core.domain.repository.FakePermissionRepository
+import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
@@ -51,7 +51,7 @@ class PreviewStudySessionSortSeedingTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val preferencesRepository = FakeStudySessionPreferencesRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
-    private val permissionRepository = FakePermissionRepository()
+    private val permissionGateway = FakePermissionGateway()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private val route = PreviewStudySessionRoute(
@@ -88,8 +88,8 @@ class PreviewStudySessionSortSeedingTest {
         SaveStudySessionPreferenceUseCase(preferencesRepository),
         ObserveUserPreferencesUseCase(userPreferencesRepository),
         SaveUserPreferenceUseCase(userPreferencesRepository),
-        ObservePermissionStatusUseCase(permissionRepository),
-        RequestPermissionUseCase(permissionRepository),
+        ObservePermissionStatusUseCase(permissionGateway),
+        RequestPermissionUseCase(permissionGateway),
         voiceSettingsController,
     )
 
