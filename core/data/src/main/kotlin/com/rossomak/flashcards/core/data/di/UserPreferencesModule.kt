@@ -24,7 +24,7 @@ private val Context.userPreferencesDataStore: DataStore<Preferences> by preferen
 
 /**
  * One file, two data sources, two repositories, backed by the single [UserPreferencesDataStore]
- * below — the app's only `DataStore<Preferences>`, voice settings and mic consent included. One
+ * below — the app's only `DataStore<Preferences>`, voice settings and the voice answering info flag included. One
  * file also means one thing for debug to clear.
  */
 @Module

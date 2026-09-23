@@ -17,6 +17,6 @@ package com.rossomak.flashcards.core.domain.model
 data class UserPreferences(
     val hasSeenOnboarding: Boolean = false,
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
-    val voiceAnswerConsentGranted: Boolean = false,
+    val hasSeenVoiceAnsweringInfo: Boolean = false,
     val localCacheSeed: Int? = null,
 )
