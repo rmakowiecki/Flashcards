@@ -1320,7 +1320,7 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
-    fun `dismissing the info dialog acts like OK - persists the seen flag, requests and navigates once granted`() =
+    fun `dismissing the info dialog persists the seen flag without requesting or navigating`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createVoiceAnsweringViewModel()
             viewModel.onStartSession()
@@ -1330,6 +1330,23 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             userPreferencesRepository.preferences.value.hasSeenVoiceAnsweringInfo shouldBe true
+            viewModel.state.value.activeDialog shouldBe null
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Start after dismissing the info dialog requests the microphone directly`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+            viewModel.onDialogEvent(Dismiss)
+            advanceUntilIdle()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
             viewModel.state.value.activeDialog shouldBe null
             permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
             viewModel.events.test {

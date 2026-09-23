@@ -262,12 +262,12 @@ class PreviewStudySessionViewModel @Inject constructor(
      * playback is stopped only when it could have been started — every other dialog is silent, and
      * stopping the shared player from one of those could cut off audio this screen never began.
      *
-     * The voice answering info dialog is the exception: it has nothing to discard and only one
-     * action, so dismissing it counts as acknowledging it.
+     * The voice answering info dialog has nothing to discard, but it has still been shown, so
+     * dismissing it marks it seen — without continuing the Start that opened it.
      */
     private fun onDialogDismiss() {
         if (_state.value.activeDialog == VoiceAnsweringInfo) {
-            onVoiceAnsweringInfoAcknowledge()
+            markVoiceAnsweringInfoSeen()
             return
         }
         if (_state.value.activeDialog is SessionVoiceSettings) {
@@ -287,7 +287,8 @@ class PreviewStudySessionViewModel @Inject constructor(
     private fun onDialogConfirm() {
         val dialog = _state.value.activeDialog ?: return
         if (dialog == VoiceAnsweringInfo) {
-            onVoiceAnsweringInfoAcknowledge()
+            markVoiceAnsweringInfoSeen()
+            onStartSession()
             return
         }
         val updatedConfig = _state.value.config.foldInDialog(dialog)
@@ -337,17 +338,17 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * Continues the Start that opened the info dialog. The seen flag takes effect in memory
-     * straight away; a failed write only means the notice shows again on a later launch.
+     * Closes the info dialog; OK then continues the Start that opened it, dismissal does not. The
+     * seen flag takes effect in memory straight away; a failed write only means the notice shows
+     * again on a later launch.
      */
-    private fun onVoiceAnsweringInfoAcknowledge() {
+    private fun markVoiceAnsweringInfoSeen() {
         hasSeenVoiceAnsweringInfo = true
         _state.update { it.copy(activeDialog = null) }
         viewModelScope.launch {
             saveUserPreference(HasSeenVoiceAnsweringInfo(true))
                 .onFailure { error -> logw(error) { "Failed to persist voice answering info seen flag" } }
         }
-        onStartSession()
     }
 
     /**
