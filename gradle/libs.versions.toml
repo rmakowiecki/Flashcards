@@ -27,6 +27,7 @@ turbine = "1.2.1"
 kotestAssertions = "5.9.1"
 kotlinxCoroutinesTest = "1.11.0"
 coreSplashscreen = "1.2.0"
+profileinstaller = "1.4.1"
 syntaxmp = "0.3.0"
 androidxMedia = "1.8.0"
 media3 = "1.10.1"
@@ -46,6 +47,7 @@ timber = "5.0.1"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
 javax-inject = { group = "javax.inject", name = "javax.inject", version = "1" }
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntimeAndroid" }
