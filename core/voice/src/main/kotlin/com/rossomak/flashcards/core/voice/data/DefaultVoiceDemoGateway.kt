@@ -47,14 +47,16 @@ class DefaultVoiceDemoGateway @Inject constructor(
     private val _state = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
     override val state: StateFlow<VoiceDemoState> = _state.asStateFlow()
 
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    // Main.immediate: the public calls arrive on Main, so every job field and state write runs on one
+    // thread and a late capture event can't race stop().
+    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private var captureEventsJob: Job? = null
     private var sessionAudioRouteAcquireJob: Job? = null
     private var listenJob: Job? = null
     private var noSpeechTimeoutJob: Job? = null
     private var playbackResetJob: Job? = null
 
-    @Volatile private var capturedUtterance: CapturedUtterance? = null
+    private var capturedUtterance: CapturedUtterance? = null
 
     init {
         viewModelLifecycle.addOnClearedListener {
