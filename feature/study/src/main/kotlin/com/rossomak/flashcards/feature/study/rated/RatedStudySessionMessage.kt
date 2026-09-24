@@ -17,7 +17,7 @@ sealed interface RatedStudySessionMessage {
 
     data object VoiceAnswerSilencePause : RatedStudySessionMessage
 
-    /** Microphone permission was revoked mid-session (e.g. via system Settings); the session ends. */
+    /** A session restored after the microphone was revoked in system Settings; the session ends. */
     data object VoiceAnswerMicPermissionRevoked : RatedStudySessionMessage
 
     /**

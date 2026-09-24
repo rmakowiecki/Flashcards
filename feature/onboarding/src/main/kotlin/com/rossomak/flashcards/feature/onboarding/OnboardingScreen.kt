@@ -1,15 +1,9 @@
 package com.rossomak.flashcards.feature.onboarding
 
-import android.Manifest
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -31,14 +25,10 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,14 +37,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.AudioRecordInitFailed
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.BluetoothMicUnavailable
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.CaptureLoopError
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.PermissionMissing
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.CaptureError
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.RouteUnavailable
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -67,11 +64,8 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.AudioRecordInitFailed
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.BluetoothMicUnavailable
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.CaptureLoopError
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason.PermissionMissing
+import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.MicPermissionStillDenied
+import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.VoiceDemoFailed
 import com.rossomak.flashcards.feature.onboarding.step.AllSetStep
 import com.rossomak.flashcards.feature.onboarding.step.DailyGoalStep
 import com.rossomak.flashcards.feature.onboarding.step.FavoritesStep
@@ -80,10 +74,6 @@ import com.rossomak.flashcards.feature.onboarding.step.SessionModesStep
 import com.rossomak.flashcards.feature.onboarding.step.StructureStep
 import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason.CaptureError
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason.RouteUnavailable
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -123,6 +113,8 @@ fun OnboardingScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
+
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             OnboardingDestination.Main -> onNavigateToMain()
@@ -133,7 +125,7 @@ fun OnboardingScreen(
     OnboardingContent(
         modifier = modifier,
         state = state,
-        voiceDemoFailureMessages = viewModel.voiceDemoFailureMessages,
+        messages = viewModel.messages,
         actions = OnboardingActions(
             onStudyModeSelect = viewModel::onStudyModeSelect,
             onDailyGoalDecrement = viewModel::onDailyGoalDecrement,
@@ -162,7 +154,7 @@ private fun OnboardingContent(
     modifier: Modifier = Modifier,
     state: OnboardingScreenState,
     actions: OnboardingActions,
-    voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason>,
+    messages: SharedFlow<OnboardingMessage>,
 ) {
     val pagerState = rememberPagerState { OnboardingStep.entries.size }
     val coroutineScope = rememberCoroutineScope()
@@ -184,14 +176,7 @@ private fun OnboardingContent(
 
     // Same hard stop for the app leaving the foreground (recents, lock screen, backgrounding) while
     // still parked on the VoicePrivacy step — the mic must not keep listening once the screen isn't.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) actions.onVoiceDemoStop()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { actions.onVoiceDemoStop() }
 
     // The entrance runs once per visit to the flow, staged behind the logo the splash screen hands
     // over: the logo settles first, then the cover's copy rises into place, then the buttons appear.
@@ -240,7 +225,7 @@ private fun OnboardingContent(
                     state = state,
                     copyRevealProgress = copyReveal.value,
                     actions = actions,
-                    voiceDemoFailureMessages = voiceDemoFailureMessages,
+                    messages = messages,
                 )
             }
             OnboardingCta(
@@ -341,7 +326,7 @@ private fun OnboardingStepPage(
     state: OnboardingScreenState,
     copyRevealProgress: Float,
     actions: OnboardingActions,
-    voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason>,
+    messages: SharedFlow<OnboardingMessage>,
     modifier: Modifier = Modifier,
 ) {
     when (step) {
@@ -363,10 +348,10 @@ private fun OnboardingStepPage(
         )
         OnboardingStep.VoicePrivacy -> VoicePrivacyStepRoute(
             voiceDemoState = state.voiceDemoState,
-            voiceDemoFailureMessages = voiceDemoFailureMessages,
+            micPermissionStatus = state.micPermissionStatus,
+            messages = messages,
             onTestVoice = actions.onVoiceDemoStart,
             onPlay = actions.onVoiceDemoPlay,
-            onVoiceDemoStop = actions.onVoiceDemoStop,
             modifier = modifier,
         )
         OnboardingStep.Favorites -> FavoritesStep(
@@ -389,68 +374,30 @@ private fun OnboardingStepPage(
 }
 
 /**
- * Owns the RECORD_AUDIO check/request for the voice demo — the ViewModel and its voice gateway
- * assume the permission is already granted.
- * [onTestVoice] doubles as Retry: both a first tap and a retry start a fresh listening attempt.
+ * Hosts the voice demo's snackbars and the Open Settings intent. The microphone itself is requested
+ * by the ViewModel through the shared permission layer when [onTestVoice] fires — a first tap and
+ * every Retry alike — so this route only reflects the observed [micPermissionStatus].
  */
 @Composable
 private fun VoicePrivacyStepRoute(
     voiceDemoState: VoiceDemoState,
-    voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason>,
+    micPermissionStatus: PermissionStatus,
+    messages: SharedFlow<OnboardingMessage>,
     onTestVoice: () -> Unit,
     onPlay: () -> Unit,
-    onVoiceDemoStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var permissionDenied by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val micPermissionStillDeniedText = stringResource(CoreUiR.string.common_mic_permission_still_denied_message)
     val snackbarScope = rememberCoroutineScope()
-    observeAsEvents(voiceDemoFailureMessages) { reason ->
-        snackbarScope.launch {
-            snackbarHostState.showSnackbar(
-                message = resolveVoiceDemoFailureMessage(context = context, reason = reason),
-                duration = SnackbarDuration.Short,
-            )
+    observeAsEvents(messages) { message ->
+        val text = when (message) {
+            is VoiceDemoFailed -> resolveVoiceDemoFailureMessage(context = context, reason = message.reason)
+            MicPermissionStillDenied -> micPermissionStillDeniedText
         }
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        // shouldShowRequestPermissionRationale is false both before the first-ever request and
-        // after a "don't ask again" denial; checking it right after this callback (rather than
-        // before launch()) disambiguates: a standard denial still returns true here.
-        val canAskAgain = granted ||
-            ActivityCompat.shouldShowRequestPermissionRationale(
-                context.findActivity(),
-                Manifest.permission.RECORD_AUDIO,
-            )
-        permissionDenied = !granted && !canAskAgain
-        if (granted) onTestVoice()
-    }
-
-    // Catches the case the launcher callback above can't: user denies, leaves to the system
-    // Settings app, grants it there, and comes back. That round-trip never fires the launcher
-    // callback, so only a resume-time recheck notices the permission actually changed.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val latestPermissionDenied by rememberUpdatedState(permissionDenied)
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                val isGranted = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.RECORD_AUDIO,
-                ) == PackageManager.PERMISSION_GRANTED
-                val wasDenied = latestPermissionDenied
-                if (wasDenied) {
-                    permissionDenied = !isGranted
-                    if (isGranted) onVoiceDemoStop()
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        snackbarScope.launch { snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short) }
     }
 
     Scaffold(
@@ -460,19 +407,8 @@ private fun VoicePrivacyStepRoute(
     ) { innerPadding ->
         VoicePrivacyStep(
             voiceDemoState = voiceDemoState,
-            permissionDenied = permissionDenied,
-            onTestVoice = {
-                val isGranted = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.RECORD_AUDIO,
-                ) == PackageManager.PERMISSION_GRANTED
-                if (isGranted) {
-                    permissionDenied = false
-                    onTestVoice()
-                } else {
-                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
-            },
+            permissionDenied = micPermissionStatus == PermissionStatus.PermanentlyDenied,
+            onTestVoice = onTestVoice,
             onPlay = onPlay,
             onOpenSettings = {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -483,12 +419,6 @@ private fun VoicePrivacyStepRoute(
             modifier = Modifier.padding(innerPadding),
         )
     }
-}
-
-private tailrec fun Context.findActivity(): Activity = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> error("Permission rationale check requires an Activity context")
 }
 
 private fun resolveVoiceDemoFailureMessage(context: Context, reason: VoiceDemoFailureReason): String = when (reason) {
@@ -508,7 +438,7 @@ private fun OnboardingContentPreview() {
     FlashcardsTheme {
         OnboardingContent(
             state = remember { OnboardingScreenState(userName = "Radek") },
-            voiceDemoFailureMessages = remember { MutableSharedFlow() },
+            messages = remember { MutableSharedFlow() },
             actions = OnboardingActions(
                 onStudyModeSelect = {},
                 onDailyGoalDecrement = {},

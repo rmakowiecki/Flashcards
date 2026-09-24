@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.konsist
 
 import com.lemonappdev.konsist.api.Konsist
+import com.lemonappdev.konsist.api.declaration.KoTypeArgumentDeclaration
 import com.lemonappdev.konsist.api.verify.assertFalse
 import com.lemonappdev.konsist.api.verify.assertTrue
 import org.junit.Test
@@ -103,6 +104,9 @@ class ArchitectureKonsistTest {
     // --- Second pass (grilled 2026-09-18): opt out per-class/function with
     // @ArchConventionExempt("reason") from core:domain.annotation. ---
 
+    private fun typeArgumentNames(typeArguments: List<KoTypeArgumentDeclaration>?): List<String> =
+        typeArguments.orEmpty().flatMap { listOf(it.name) + typeArgumentNames(it.typeArguments) }
+
     private fun isExempt(annotations: List<com.lemonappdev.konsist.api.declaration.KoAnnotationDeclaration>) =
         annotations.any { it.name == "ArchConventionExempt" }
 
@@ -188,6 +192,27 @@ class ArchitectureKonsistTest {
                                 property.type?.name == "MutableSharedFlow" ||
                                 mutableFlowInitializer.containsMatchIn(property.text)
                             )
+                }
+            }
+    }
+
+    @Test
+    fun `HiltViewModel classes do not inject Repositories, Gateways or DataSources`() {
+        // ADR-0051: a ViewModel reaches data seams through use cases only. *Controller
+        // collaborators are presentation-side helpers, not data seams, so they're out of scope.
+        // Type arguments are checked too, so wrapping a seam in Lazy<T> or Provider<T> can't hide it.
+        val dataSeamSuffixes = listOf("Repository", "Gateway", "DataSource")
+        projectScope
+            .classes()
+            .filter { koClass -> koClass.annotations.any { it.name == "HiltViewModel" } }
+            .filter { !isExempt(it.annotations) }
+            .assertTrue { koClass ->
+                koClass.primaryConstructor?.parameters.orEmpty().none { parameter ->
+                    val typeNames = listOf(parameter.type.name) + typeArgumentNames(parameter.type.typeArguments)
+                    typeNames.any { name ->
+                        val typeName = name.substringBefore('<').removeSuffix("?")
+                        dataSeamSuffixes.any { typeName.endsWith(it) }
+                    }
                 }
             }
     }

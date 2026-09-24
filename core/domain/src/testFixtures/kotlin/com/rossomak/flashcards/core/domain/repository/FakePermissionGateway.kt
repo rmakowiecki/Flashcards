@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -21,6 +22,9 @@ class FakePermissionGateway : PermissionGateway {
     /** Every permission [request] actually prompted for, in order; already-granted requests are not recorded. */
     val launchedRequests = mutableListOf<AppPermission>()
 
+    /** When set, a prompting [request] suspends until this completes, simulating a prompt still on screen. */
+    var requestGate: CompletableDeferred<Unit>? = null
+
     override val permissionRequests: Flow<AppPermission> = emptyFlow()
 
     override fun observeStatus(permission: AppPermission): Flow<PermissionStatus> =
@@ -29,6 +33,7 @@ class FakePermissionGateway : PermissionGateway {
     override suspend fun request(permission: AppPermission): PermissionStatus {
         if (statuses.value[permission] == Granted) return Granted
         launchedRequests += permission
+        requestGate?.await()
         val result = nextRequestResult
         statuses.update { it + (permission to result) }
         return result

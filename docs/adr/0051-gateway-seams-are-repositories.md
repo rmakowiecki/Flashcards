@@ -62,3 +62,20 @@ is exactly the premature layering this project's own conventions ask to avoid.
   exception (`VoiceGateway`, tracked separately for future correction).
 - "Gateway" is not retroactively purged from the codebase by this ADR — `VoicePreviewGateway` and
   `VoiceGateway` keep their names until touched for unrelated reasons.
+
+## Amendments
+
+**2026-09-23 — "Gateway" stays permissible for platform-API seams.** A seam that wraps a device/OS
+API rather than persisted or remote data may keep the `XyzGateway` / `DefaultXyzGateway` naming, in
+line with `VoicePreviewGateway`: `PermissionGateway` and `VoiceDemoGateway` follow it. The layering
+above is unchanged: the interface lives in `core:domain/.../repository/`, the implementation in a
+`data` package, UseCases depend on it directly, and ViewModels reach it only through UseCases.
+
+**2026-09-23 — a seam backed by a specialised core module is implemented in that module.** Some
+platform seams need an implementation stack that lives in its own core module rather than in
+`core:data`, e.g. the onboarding voice demo, which runs on `core:voice`'s native capture and
+playback stack. Such a seam keeps its interface in `core:domain/.../repository/` as usual, but its
+default implementation lives in that module's `data` package (for the voice demo,
+`com.rossomak.flashcards.core.voice.data.DefaultVoiceDemoGateway`), bound by a Hilt module in the
+same module. It does not pull the specialised module into `core:data`. The specialised module
+therefore depends on `core:domain`; `core:domain` never depends back on it.

@@ -2,23 +2,30 @@ package com.rossomak.flashcards.feature.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.DailyGoal
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
+import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoFailureReason
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,13 +39,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 @HiltViewModel
+@Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class OnboardingViewModel @Inject constructor(
     private val getCurrentAuthUser: GetCurrentAuthUserUseCase,
     private val saveOnboardingPreferences: SaveOnboardingPreferencesUseCase,
     private val getOnboardingSubcategories: GetOnboardingSubcategoriesUseCase,
     private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
     private val signInAnonymously: SignInAnonymouslyUseCase,
-    private val voiceDemoGateway: VoiceDemoGateway,
+    private val observeVoiceDemoState: ObserveVoiceDemoStateUseCase,
+    private val startVoiceDemo: StartVoiceDemoUseCase,
+    private val playVoiceDemo: PlayVoiceDemoUseCase,
+    private val stopVoiceDemo: StopVoiceDemoUseCase,
+    private val observePermissionStatus: ObservePermissionStatusUseCase,
+    private val requestPermission: RequestPermissionUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingScreenState())
@@ -47,9 +60,21 @@ class OnboardingViewModel @Inject constructor(
     private val eventChannel = Channel<OnboardingDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
-    private val _voiceDemoFailureMessages = MutableSharedFlow<VoiceDemoFailureReason>(extraBufferCapacity = 1)
+    private val _messages = MutableSharedFlow<OnboardingMessage>(extraBufferCapacity = 1)
+    val messages: SharedFlow<OnboardingMessage> = _messages.asSharedFlow()
 
-    val voiceDemoFailureMessages: SharedFlow<VoiceDemoFailureReason> = _voiceDemoFailureMessages.asSharedFlow()
+    private var permissionStatusJob: Job? = null
+
+    /** Guards "Test your voice" against a second tap while the microphone request is still pending. */
+    private var micRequestInFlight = false
+
+    /**
+     * Set by [onVoiceDemoStop] so a request still pending when the user leaves the step (or the app
+     * stops) settles without effect. The request itself is never cancelled: the permission layer
+     * must still see the answer to record a permanent refusal. Should a device stop the app for the
+     * system prompt itself, a grant then needs one more tap, which fails safe.
+     */
+    private var micRequestStopped = false
 
     init {
         viewModelScope.launch {
@@ -58,32 +83,66 @@ class OnboardingViewModel @Inject constructor(
             _state.update { it.copy(userName = userName) }
         }
         viewModelScope.launch {
-            voiceDemoGateway.state.collect { voiceDemoState ->
+            observeVoiceDemoState().collect { voiceDemoState ->
                 _state.update { it.copy(voiceDemoState = voiceDemoState) }
                 if (voiceDemoState is VoiceDemoState.Failed) {
-                    _voiceDemoFailureMessages.tryEmit(voiceDemoState.reason)
+                    _messages.tryEmit(OnboardingMessage.VoiceDemoFailed(voiceDemoState.reason))
                 }
             }
         }
     }
 
-    /** Called by the screen once RECORD_AUDIO is confirmed granted — tap-to-start and Retry both route here. */
+    /**
+     * Restarts the microphone status collection. The status flow is cold and never polls, so each
+     * resume — first composition, return from system Settings, or the end of a system prompt — is
+     * what picks up a change made outside the app.
+     */
+    fun onResume() {
+        permissionStatusJob?.cancel()
+        permissionStatusJob = viewModelScope.launch {
+            observePermissionStatus(AppPermission.RecordAudio).collect { status ->
+                _state.update { it.copy(micPermissionStatus = status) }
+            }
+        }
+    }
+
+    /**
+     * "Test your voice" and every Retry route here. The microphone is requested through the shared
+     * permission layer first, which returns without prompting when it is already granted; only a
+     * grant starts the demo.
+     *
+     * The result only steers this tap; [OnboardingScreenState.micPermissionStatus] is written solely
+     * by the observed status. A refusal that was already permanent before this tap shows no prompt
+     * at all, so it gets a snackbar instead of a silent no-op.
+     */
     fun onVoiceDemoStart() {
-        voiceDemoGateway.start()
+        if (micRequestInFlight) return
+        micRequestInFlight = true
+        micRequestStopped = false
+        viewModelScope.launch {
+            try {
+                val statusBeforeRequest = _state.value.micPermissionStatus
+                val status = requestPermission(AppPermission.RecordAudio)
+                when {
+                    micRequestStopped -> Unit
+                    status == PermissionStatus.Granted -> startVoiceDemo()
+                    statusBeforeRequest == PermissionStatus.PermanentlyDenied && status == PermissionStatus.PermanentlyDenied ->
+                        _messages.tryEmit(OnboardingMessage.MicPermissionStillDenied)
+                }
+            } finally {
+                micRequestInFlight = false
+            }
+        }
     }
 
     fun onVoiceDemoPlay() {
-        voiceDemoGateway.play()
+        viewModelScope.launch { playVoiceDemo() }
     }
 
     /** Hard-stops the demo: pager navigation away from the step, or the app backgrounding. */
     fun onVoiceDemoStop() {
-        voiceDemoGateway.stop()
-    }
-
-    override fun onCleared() {
-        voiceDemoGateway.stop()
-        voiceDemoGateway.release()
+        micRequestStopped = true
+        viewModelScope.launch { stopVoiceDemo() }
     }
 
     fun onStudyModeSelect(studyMode: StudyMode) {
@@ -172,7 +231,7 @@ class OnboardingViewModel @Inject constructor(
      * way: nothing the user can do from this screen would fix a write failure, and trapping them on
      * the last page of onboarding is worse than re-showing the flow next launch.
      *
-     * Onboarding now runs before Login (see docs/temp/onboarding-before-login-spec.md), so finishing
+     * Onboarding runs before Login (see docs/design/onboarding-flow.md), so finishing
      * it does not guarantee a signed-in user: an anonymous session does not count, since sign-in is
      * mandatory, never a standing alternative to it. Main is reachable only for an already-real
      * signed-in user (e.g. Replay onboarding on an authenticated device); everyone else is sent to

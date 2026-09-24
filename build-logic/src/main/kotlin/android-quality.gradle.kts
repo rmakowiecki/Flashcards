@@ -78,8 +78,8 @@ pluginManager.withPlugin("com.android.application") {
 
 // Per-module entry point, e.g. `./gradlew :feature:study:staticAnalysis` — faster than the root
 // aggregate when only one module changed. Konsist stays whole-repo (its cross-module layer rules
-// can't be scoped to one module), so it still runs every time; the speedup comes from skipping
-// every other module's Spotless/detekt/Lint.
+// can't be scoped to one module), and it reruns whenever any module's Kotlin sources change; the
+// speedup comes from skipping every other module's Spotless/detekt/Lint.
 val moduleStaticAnalysis = tasks.register("staticAnalysis") {
     group = "verification"
     description = "Runs Spotless, detekt and (Android modules) Lint for this module, plus Konsist."

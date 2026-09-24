@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.rated
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
@@ -28,7 +29,6 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -76,6 +76,7 @@ import kotlinx.coroutines.launch
  * finishing it.
  */
 @HiltViewModel
+@ArchConventionExempt("Injects VoiceGateway directly, pending a use-case wrap (ADR-0051)")
 class RatedStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSessionStartData: GetSessionStartDataUseCase,
@@ -247,9 +248,9 @@ class RatedStudySessionViewModel @Inject constructor(
             // a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
             // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry. Preview only
-            // launches a voice-answering session with the microphone already granted; a later
-            // revocation is handled by observeVoiceAnswerState. Enabling voice answering is what
-            // bootstraps the gateway here (ADR-0025).
+            // launches a voice-answering session with the microphone already granted; a session
+            // restored after the microphone was revoked is ended by observeVoiceAnswerState. Enabling
+            // voice answering is what bootstraps the gateway here (ADR-0025).
             if (route.voiceAnsweringEnabled && sessionCards.isNotEmpty()) {
                 ensureVoiceGatewayStarted()
                 voiceGateway.setVoiceAnswering(true)
@@ -351,20 +352,14 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun observeVoiceAnswerState() {
         viewModelScope.launch {
             voiceGateway.voiceAnswerState.collect { voiceAnswer ->
-                // Mic permission missing right now ends the session outright — checked
-                // unconditionally, not gated behind entering SpeakingNotice below, because a
-                // mid-listen capture failure (VoiceAnswerController.handleCaptureEvent) resets
-                // phase to WaitingForQuestion and never reaches SpeakingNotice at all; without this
-                // check the session would otherwise silently freeze on the current card forever.
-                // Covers both shapes: CaptureFailed wrapping a VoiceCaptureFailureReason from an
-                // active listen attempt (revoked mid-session, e.g. via system Settings), and the
-                // bare PermissionMissing VoiceAnswerController.start() sets if the permission is
-                // already gone the moment voice answering (re)enables — reachable via onResumeSession()
-                // after a pause.
+                // A voice-answering session restored after process death with the microphone
+                // revoked ends outright. Revoking in system Settings kills the process, so the
+                // revocation is never seen live: the restored route re-enables voice answering and
+                // VoiceAnswerController.start() reports the bare PermissionMissing. Checked
+                // unconditionally, before the phase handling below, since that state never reaches
+                // SpeakingNotice and the session would otherwise freeze on its card.
                 val error = voiceAnswer.error
-                val isMicPermissionMissing = error is VoiceAnswerFailureReason.PermissionMissing ||
-                    (error is VoiceAnswerFailureReason.CaptureFailed && error.reason is VoiceCaptureFailureReason.PermissionMissing)
-                if (isMicPermissionMissing) {
+                if (error is VoiceAnswerFailureReason.PermissionMissing) {
                     if (!micPermissionRevokedHandled) {
                         micPermissionRevokedHandled = true
                         voiceGateway.stop()
@@ -377,8 +372,8 @@ class RatedStudySessionViewModel @Inject constructor(
                     }
                     return@collect
                 }
-                // A non-permission capture failure (Bluetooth mic dropped, capture-loop error, etc.)
-                // is recoverable, unlike a revoked permission — pause on the current card rather than ending the session
+                // A capture failure (Bluetooth mic dropped, capture-loop error, etc.) is recoverable —
+                // pause on the current card rather than ending the session
                 if (error is VoiceAnswerFailureReason.CaptureFailed) {
                     if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
                     voiceGateway.setVoiceAnswering(false)

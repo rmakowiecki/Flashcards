@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.fast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
@@ -63,6 +64,7 @@ import kotlinx.coroutines.launch
  * and voice answering is Rated-only (ADR-0025). Fast has no path to it.
  */
 @HiltViewModel
+@ArchConventionExempt("Injects VoiceGateway directly, pending a use-case wrap (ADR-0051)")
 class FastStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSessionStartData: GetSessionStartDataUseCase,
@@ -173,8 +175,7 @@ class FastStudySessionViewModel @Inject constructor(
         observeVoiceState()
     }
 
-    // Card selection happens on the Preview Study Session screen (ADR-0004); the session only
-    // resolves the routed cardIds to full Flashcards, preserving the routed order.
+    // Card selection happens on the Preview Study Session screen (ADR-0004); the session only resolves the routed cardIds to full Flashcards
     private fun loadFlashcards() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -183,9 +184,6 @@ class FastStudySessionViewModel @Inject constructor(
                 _state.update { state -> state.copy(isLoading = false, error = R.string.study_session_load_error_message) }
                 return@launch
             }
-            // A failed Subcategory progress read and a never-studied one are already folded into
-            // "no entries" by GetSessionStartDataUseCase — never fatal, never surfaced, exactly the
-            // graceful degradation this design calls for.
             priorProgressByCardId = sessionStartData.priorProgressByCardId
             sessionXpConfig = sessionStartData.xpConfig
 
@@ -199,8 +197,7 @@ class FastStudySessionViewModel @Inject constructor(
             }
             // Read-aloud off is a manual tap-to-reveal/tap-to-advance session and never starts text-to-speech.
             if (route.readAloudEnabled) ensureVoiceGatewayStarted()
-            // The clock starts here, once a card is actually on screen — never at route entry, so
-            // a session whose card load fails never banks time.
+            // The clock starts here, once a card is actually on screen — never at route entry, so a session whose card load fails never banks time.
             if (sessionCards.isNotEmpty()) startStudyClock()
         }
     }

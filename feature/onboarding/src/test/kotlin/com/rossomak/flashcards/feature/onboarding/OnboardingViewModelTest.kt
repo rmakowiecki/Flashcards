@@ -1,29 +1,38 @@
 package com.rossomak.flashcards.feature.onboarding
 
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeOnboardingSubcategoriesRepository
+import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeVoiceDemoGateway
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
+import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveOnboardingPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoGateway
-import com.rossomak.flashcards.feature.onboarding.voice.VoiceDemoState
+import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
+import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -41,6 +50,7 @@ class OnboardingViewModelTest {
     private val onboardingSubcategoriesRepository = FakeOnboardingSubcategoriesRepository()
     private val userFavoritesRepository = FakeUserFavoritesRepository()
     private val voiceDemoGateway = FakeVoiceDemoGateway()
+    private val permissionGateway = FakePermissionGateway()
 
     private fun createViewModel(): OnboardingViewModel = OnboardingViewModel(
         getCurrentAuthUser = GetCurrentAuthUserUseCase(authRepository),
@@ -51,8 +61,17 @@ class OnboardingViewModelTest {
         getOnboardingSubcategories = GetOnboardingSubcategoriesUseCase(onboardingSubcategoriesRepository),
         setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
         signInAnonymously = SignInAnonymouslyUseCase(authRepository),
-        voiceDemoGateway = voiceDemoGateway,
+        observeVoiceDemoState = ObserveVoiceDemoStateUseCase(voiceDemoGateway),
+        startVoiceDemo = StartVoiceDemoUseCase(voiceDemoGateway),
+        playVoiceDemo = PlayVoiceDemoUseCase(voiceDemoGateway),
+        stopVoiceDemo = StopVoiceDemoUseCase(voiceDemoGateway),
+        observePermissionStatus = ObservePermissionStatusUseCase(permissionGateway),
+        requestPermission = RequestPermissionUseCase(permissionGateway),
     )
+
+    private fun setMicStatus(status: PermissionStatus) {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to status)
+    }
 
     private fun authUser(displayName: String?, email: String?) = AuthUser(
         uid = "uid-1",
@@ -388,27 +407,213 @@ class OnboardingViewModelTest {
             userPreferencesRepository.preferences.value.hasSeenOnboarding shouldBe false
             userFavoritesRepository.lastSetSubcategoriesFavoriteCall shouldBe null
         }
-}
 
-private class FakeVoiceDemoGateway : VoiceDemoGateway {
-    val stateFlow = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
-    override val state: StateFlow<VoiceDemoState> = stateFlow
+    @Test
+    fun `voice demo state is mirrored into screen state`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
 
-    var startCalls = 0
-    var playCalls = 0
-    var stopCalls = 0
-    var releaseCalls = 0
+        voiceDemoGateway.state.value = VoiceDemoState.Ready
+        advanceUntilIdle()
 
-    override fun start() {
-        startCalls++
+        viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Ready
     }
-    override fun play() {
-        playCalls++
+
+    @Test
+    fun `voice demo failure emits a failure message with its reason`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            voiceDemoGateway.state.value = VoiceDemoState.Failed(VoiceDemoFailureReason.RouteUnavailable)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe OnboardingMessage.VoiceDemoFailed(VoiceDemoFailureReason.RouteUnavailable)
+        }
     }
-    override fun stop() {
-        stopCalls++
+
+    @Test
+    fun `voice demo start, play and stop reach the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
+        setMicStatus(PermissionStatus.Granted)
+        val viewModel = createViewModel()
+
+        viewModel.onVoiceDemoStart()
+        advanceUntilIdle()
+        viewModel.onVoiceDemoPlay()
+        viewModel.onVoiceDemoStop()
+        advanceUntilIdle()
+
+        voiceDemoGateway.startCount shouldBe 1
+        voiceDemoGateway.playCount shouldBe 1
+        voiceDemoGateway.stopCount shouldBe 1
     }
-    override fun release() {
-        releaseCalls++
+
+    @Test
+    fun `resume reflects the observed microphone status`() = runTest(mainDispatcherRule.testDispatcher) {
+        setMicStatus(PermissionStatus.PermanentlyDenied)
+        val viewModel = createViewModel()
+
+        viewModel.onResume()
+        advanceUntilIdle()
+
+        viewModel.state.value.micPermissionStatus shouldBe PermissionStatus.PermanentlyDenied
     }
+
+    @Test
+    fun `resume picks up a status changed outside the app`() = runTest(mainDispatcherRule.testDispatcher) {
+        setMicStatus(PermissionStatus.PermanentlyDenied)
+        val viewModel = createViewModel()
+        viewModel.onResume()
+        advanceUntilIdle()
+
+        setMicStatus(PermissionStatus.Granted)
+        viewModel.onResume()
+        advanceUntilIdle()
+
+        viewModel.state.value.micPermissionStatus shouldBe PermissionStatus.Granted
+    }
+
+    @Test
+    fun `voice test tap requests the microphone and starts the demo when granted`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            voiceDemoGateway.startCount shouldBe 1
+        }
+
+    @Test
+    fun `voice test tap stays silent and does not start the demo on a soft denial`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            permissionGateway.nextRequestResult = PermissionStatus.Denied
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            voiceDemoGateway.startCount shouldBe 0
+        }
+
+    @Test
+    fun `voice test tap on a permanent denial that stays permanent shows the still denied message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicStatus(PermissionStatus.PermanentlyDenied)
+            permissionGateway.nextRequestResult = PermissionStatus.PermanentlyDenied
+            val viewModel = createViewModel()
+            viewModel.onResume()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe OnboardingMessage.MicPermissionStillDenied
+            }
+            voiceDemoGateway.startCount shouldBe 0
+        }
+
+    @Test
+    fun `voice test tap on a false permanent denial that heals starts the demo without a message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicStatus(PermissionStatus.PermanentlyDenied)
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+            viewModel.onResume()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            voiceDemoGateway.startCount shouldBe 1
+        }
+
+    @Test
+    fun `voice test tap ignores a second tap while the request is pending`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+            requestGate.complete(Unit)
+            advanceUntilIdle()
+
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            voiceDemoGateway.startCount shouldBe 1
+        }
+
+    @Test
+    fun `voice test tap stopped while the request is pending does not start the demo on a grant`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+                viewModel.onVoiceDemoStop()
+                requestGate.complete(Unit)
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            voiceDemoGateway.startCount shouldBe 0
+        }
+
+    @Test
+    fun `voice test tap stopped while a still permanent denial is pending shows no message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicStatus(PermissionStatus.PermanentlyDenied)
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.PermanentlyDenied
+            val viewModel = createViewModel()
+            viewModel.onResume()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+                viewModel.onVoiceDemoStop()
+                requestGate.complete(Unit)
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `voice test tap after an earlier stopped request starts the demo on a grant`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+            viewModel.onVoiceDemoStop()
+            requestGate.complete(Unit)
+            advanceUntilIdle()
+
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+
+            voiceDemoGateway.startCount shouldBe 1
+        }
 }

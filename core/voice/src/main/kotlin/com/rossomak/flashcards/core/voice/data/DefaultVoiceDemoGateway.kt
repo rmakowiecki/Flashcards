@@ -1,7 +1,11 @@
-package com.rossomak.flashcards.feature.onboarding.voice
+package com.rossomak.flashcards.core.voice.data
 
 import android.annotation.SuppressLint
+import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState
+import com.rossomak.flashcards.core.domain.repository.VoiceDemoGateway
 import com.rossomak.flashcards.core.voice.AudioRouteManager
+import com.rossomak.flashcards.core.voice.CapturedUtterance
 import com.rossomak.flashcards.core.voice.PcmPlayer
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
@@ -9,6 +13,7 @@ import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.CaptureFailed
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechEnded
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechStarted
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.UtteranceCaptured
+import dagger.hilt.android.ViewModelLifecycle
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -25,33 +30,48 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Onboarding's only consumer of core:voice concretes — see [VoiceDemoGateway]. Unlike the study
- * session's continuous voice answering ([com.rossomak.flashcards.feature.study.voice.StudySessionVoiceGateway]),
- * this is a single tap-scoped listen bound to one screen visit: no foreground service, and [stop]
- * is a hard cut rather than a graceful drain.
+ * The onboarding voice demo over core:voice's capture, routing and playback stack. Unlike the study
+ * session's continuous voice answering, this is a single tap-scoped listen bound to one screen
+ * visit: no foreground service, and [stop] is a hard cut rather than a graceful drain.
+ *
+ * ViewModel-scoped: it stops itself and cancels its own scope when the owning ViewModel is cleared,
+ * so the ViewModel needs no teardown call.
  */
-class OnboardingVoiceDemoGateway @Inject constructor(
+class DefaultVoiceDemoGateway @Inject constructor(
     private val voiceCaptureEngine: VoiceCaptureEngine,
     private val audioRouteManager: AudioRouteManager,
     private val pcmPlayer: PcmPlayer,
+    viewModelLifecycle: ViewModelLifecycle,
 ) : VoiceDemoGateway {
 
     private val _state = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
     override val state: StateFlow<VoiceDemoState> = _state.asStateFlow()
 
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    // Main.immediate: the public calls arrive on Main, so every job field and state write runs on one
+    // thread and a late capture event can't race stop().
+    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private var captureEventsJob: Job? = null
     private var sessionAudioRouteAcquireJob: Job? = null
     private var listenJob: Job? = null
     private var noSpeechTimeoutJob: Job? = null
     private var playbackResetJob: Job? = null
 
-    // The screen already confirmed RECORD_AUDIO before calling this (see VoiceDemoGateway's KDoc);
-    // that guard lives outside this class, so lint can't trace it back to this call site.
+    private var capturedUtterance: CapturedUtterance? = null
+
+    init {
+        viewModelLifecycle.addOnClearedListener {
+            stop()
+            scope.cancel()
+        }
+    }
+
+    // The ViewModel confirms the microphone grant through RequestPermissionUseCase before calling
+    // StartVoiceDemoUseCase; that guard lives outside this class, so lint can't trace it here.
     @SuppressLint("MissingPermission")
     override fun start() {
         resetPlayback()
         stopListeningInternal()
+        capturedUtterance = null
         _state.value = VoiceDemoState.Listening
         captureEventsJob = scope.launch {
             voiceCaptureEngine.events.collect { event -> handleCaptureEvent(event) }
@@ -72,24 +92,22 @@ class OnboardingVoiceDemoGateway @Inject constructor(
     }
 
     override fun play() {
-        val ready = _state.value as? VoiceDemoState.Ready ?: return
+        if (_state.value != VoiceDemoState.Ready) return
+        val utterance = capturedUtterance ?: return
         playbackResetJob?.cancel()
-        pcmPlayer.play(ready.utterance.obfuscatedPcm)
+        pcmPlayer.play(utterance.obfuscatedPcm)
         _state.value = VoiceDemoState.Playing
         playbackResetJob = scope.launch {
-            delay(ready.utterance.durationMs.milliseconds)
-            if (_state.value == VoiceDemoState.Playing) _state.value = ready
+            delay(utterance.durationMs.milliseconds)
+            if (_state.value == VoiceDemoState.Playing) _state.value = VoiceDemoState.Ready
         }
     }
 
     override fun stop() {
         resetPlayback()
         stopListeningInternal()
+        capturedUtterance = null
         _state.value = VoiceDemoState.Idle
-    }
-
-    override fun release() {
-        scope.cancel()
     }
 
     private fun resetPlayback() {
@@ -119,14 +137,13 @@ class OnboardingVoiceDemoGateway @Inject constructor(
                 noSpeechTimeoutJob?.cancel()
                 _state.value = VoiceDemoState.SpeechDetected
             }
-            // A short blip (below MIN_UTTERANCE_FRAMES) ends without UtteranceCaptured following,
-            // so restart the timeout here or the demo is stuck listening with nothing to time it out.
-            is SpeechEnded -> restartNoSpeechTimeout()
+            is SpeechEnded -> Unit
             is UtteranceCaptured -> {
                 noSpeechTimeoutJob?.cancel()
                 noSpeechTimeoutJob = null
                 voiceCaptureEngine.stopListening()
-                _state.value = VoiceDemoState.Ready(event.utterance)
+                capturedUtterance = event.utterance
+                _state.value = VoiceDemoState.Ready
             }
             is CaptureFailed -> {
                 stopListeningInternal()

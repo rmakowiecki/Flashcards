@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.feature.study.voice
 
-import com.rossomak.flashcards.core.voice.VoiceCaptureFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 
 /**
  * Why [VoiceAnswerController] failed. Non-string per the domain/UI string split (AGENTS.md, "String
