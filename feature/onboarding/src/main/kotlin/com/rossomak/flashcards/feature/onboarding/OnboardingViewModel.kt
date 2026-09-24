@@ -220,7 +220,7 @@ class OnboardingViewModel @Inject constructor(
      * way: nothing the user can do from this screen would fix a write failure, and trapping them on
      * the last page of onboarding is worse than re-showing the flow next launch.
      *
-     * Onboarding now runs before Login (see docs/temp/onboarding-before-login-spec.md), so finishing
+     * Onboarding runs before Login (see docs/design/onboarding-flow.md), so finishing
      * it does not guarantee a signed-in user: an anonymous session does not count, since sign-in is
      * mandatory, never a standing alternative to it. Main is reachable only for an already-real
      * signed-in user (e.g. Replay onboarding on an authenticated device); everyone else is sent to

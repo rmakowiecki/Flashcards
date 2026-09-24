@@ -2,29 +2,28 @@
 
 First-run panned gallery: one step per page, swipe (or tap Continue) to advance, explains structure/session modes/mastery, then captures daily goal, session default, and favorites — with a free voice-answering preview along the way as a premium-feature teaser.
 
-Status: **built** (first release, UI-complete). This doc is updated as decisions are made; what the first release deliberately leaves unwired is listed under [Deferred to follow-ups](#deferred-to-follow-ups).
+Status: **built**. This doc is updated as decisions are made; see [As built](#as-built) for implementation notes.
 
 ## Navigation placement
 
 ```
-Splash → Login → Onboarding (8 screens) → Main
+Splash → Onboarding (8 screens) → Login → Main
 ```
 
-- **Login precedes onboarding.** Screen 7 (Favorites) will write to `users/{uid}/favorites`, and Screen 8 greets the user by `displayName`, so a uid must exist first. No guest mode exists yet — see [ADR pending] Auth architecture note below.
-  - Onboarding-first (value-before-ask) was weighed and rejected for now: it would force staging every captured preference across the login boundary and drop Screen 8's name greeting, and the ask here is a single Google tap rather than a form, which is where value-before-ask pays least. Revisit if signup conversion becomes a measured concern — the staged-write mechanism it needs has to be built anyway once favourites persist.
-- **Implemented branching** (`SplashViewModel`, `LoginViewModel`), both reading the same device-scoped flag:
+- **Onboarding precedes Login on a first-run device** (value before ask). Captured preferences are device-scoped and need no uid; the one uid-scoped write, Screen 7's Favorites, is covered by a transient **Guest** session (see [Skip and commit](#skip-and-commit)).
+- **Implemented branching** (`SplashViewModel`, `OnboardingViewModel`, `LoginViewModel`), all reading the same device-scoped flag:
 
-  | Splash | | Login (after sign-in success) | |
-  |---|---|---|---|
-  | not authenticated | → Login | onboarding seen | → Main |
-  | authenticated, onboarding not seen | → Onboarding | onboarding not seen | → Onboarding |
-  | authenticated, onboarding seen | → Main | | |
+  | Splash | | Onboarding (after Screen 8) | | Login (after sign-in success) | |
+  |---|---|---|---|---|---|
+  | onboarding not seen | → Onboarding | real signed-in user | → Main | onboarding seen | → Main |
+  | seen, not authenticated | → Login | anyone else (incl. Guest) | → Login | onboarding not seen | → Onboarding |
+  | seen, authenticated | → Main | | | | |
 
-  Splash reads the flag under a 1s timeout alongside the auth check and falls back to *seen* if the read stalls — a slow local read must not hold the splash open, and wrongly re-showing onboarding to an existing user is the worse of the two failures.
+  "Authenticated" never counts a Guest (anonymous) session: sign-in stays mandatory, so a Guest is routed through Login like a signed-out user. Splash reads the auth state and the flag under 1s timeouts and falls back to *seen* if the flag read stalls — a slow local read must not hold the splash open, and wrongly re-showing onboarding to an existing user is the worse of the two failures.
 - **Onboarding-seen flag**: stored in local DataStore, not Firestore. Device-scoped, not uid-scoped.
   - Consequence (accepted): same device + new account login → onboarding skipped. New device + same account → onboarding shown again.
-- **Future guest mode**: build on Firebase Anonymous Auth, not a separate local-only mode. Anonymous sign-in still returns a non-null uid, so it satisfies `SplashViewModel`'s existing `getCurrentAuthUser() != null` check, ADR-0002's sign-out `popUpTo<AuthedGraph>` logic, and Firestore rules (`request.auth != null`, no provider check) without any rework. This keeps Login-before-Onboarding valid even after guest mode ships — a future anonymous user still has a uid by the time onboarding's Favorites screen runs.
-  - Side finding (unrelated to onboarding, flagged for separate follow-up): `firestore.rules` only has explicit rules for `users/{uid}/voiceAnswers` and `users/{uid}/curationRequests`. `favorites`, `sessions`, `progress`, `state`, `privateCards` have no explicit rule → default-deny. Needs its own investigation.
+- **Guest → User**: Login links the Guest to the Google credential (`linkWithCredential`), so the real account keeps the Guest's uid and the Favorites written under it. On a collision (the credential already belongs to another User — a returning user on a new device) the Guest session and its writes are discarded, not merged, and Login falls back to a plain sign-in.
+- **Greeting**: Screen 8 greets by `displayName` (falling back to email) only when a user is already signed in, e.g. Replay onboarding on an authenticated device. A first run has no user yet, so the greeting drops the name.
 
 ## Screens
 
@@ -122,34 +121,22 @@ Splash → Login → Onboarding (8 screens) → Main
   - Exactly one code path commits, so a skipped run and a completed run cannot diverge.
   - The recap on Screen 8 needs no "was this skipped?" branch: badges read state, and after a Skip that state is the defaults the app is about to save. The user sees the assumed values rather than having them applied silently.
   - Process death mid-flow discards everything *and* leaves the flag unset, so the user restarts at Screen 1. No half-committed state exists.
-- **Commit order**: write `StudyPreferences` → only on success set `hasSeenOnboarding = true` → navigate. The flag doubles as an "everything was written" gate, so a failed write re-shows the flow next launch instead of silently losing the user's choices.
+- **Commit order**: if any Favorites were picked, start a **Guest** session (unless someone is already signed in) and write them under its uid → write `StudyPreferences` → only on success set `hasSeenOnboarding = true` → navigate. Skip, or picking nothing, never starts a Guest session. The flag doubles as an "everything was written" gate, so a failed write re-shows the flow next launch instead of silently losing the user's choices.
 - **Navigation happens even if the write fails.** Nothing the user can do from Screen 8 fixes local storage, and trapping them on the last page of onboarding is worse than re-showing the flow.
 - Repeat taps on "Start studying" are ignored while a commit is in flight.
-- ⚠️ **When favourites become real, this gate needs care.** Firestore's offline persistence applies a write to the local cache immediately but leaves the returned `Task` pending until the server acks, so `await()`-ing a favourites write would hang an offline user on Screen 8 forever. Use a timeout, or treat the local write as success. A `TODO(favorites)` in `OnboardingViewModel.onFinish` records this.
+- **Offline bound**: the Guest sign-in and the Favorites write each run under an 8s timeout. Firestore's offline persistence applies a write to the local cache immediately but leaves the returned `Task` pending until the server acks, so an unbounded await would hang an offline user on Screen 8. A timeout counts as a failed step: the flag stays unset and the flow replays next launch.
 
 ## As built
 
-> ⚠️ **Pending persistence.** The two entries below describe the target design. This release binds an in-memory `UserPreferencesRepository` from `:app` instead (see `TemporaryUserPreferencesModule`), and `:feature:onboarding` depends only on `:core:ui` and `:core:domain` — not `:core:data`. Both land together in the follow-up persistence PR.
-
-- **Module**: `:feature:onboarding` (`android-feature` convention plugin), depending only on `:core:ui`, `:core:domain`, `:core:data`.
+- **Module**: `:feature:onboarding` (`android-feature` convention plugin), depending on `:core:ui`, `:core:domain` and `:core:voice` (the on-device voice demo).
 - **Navigation**: one `OnboardingRoute` destination hosting a `HorizontalPager` of all eight steps. Gradient, progress bar, Skip and the CTA are fixed chrome outside the pager, so a swipe moves content only. Skip uses an instant `scrollToPage`, not an animated one — animating a jump of up to seven pages would fling the user through every screen they just chose to skip.
 - **Progress bar**: six segments over Screens 2–7; the two bookends show none. The Skip and progress slots keep their height on the steps that hide them, so content never shifts between steps.
-- **Persistence**: a new device-scoped `user_preferences` DataStore in `:core:data` holding `hasSeenOnboarding`, `defaultStudyMode` and `dailyGoalMinutes`. Note that `VoiceDataModule` already provided an *unqualified* `DataStore<Preferences>`; both stores are now behind `@VoiceDataStore` / `@UserPreferencesDataStore` qualifiers, since a second unqualified binding would not compile.
-- **Debug entry point**: Settings carries a debug-only "Replay onboarding" button. It clears the flag before navigating, so the replay behaves exactly like a first run — including committing preferences again — rather than being a read-only walkthrough that behaves differently from the real thing.
+- **Persistence**: a new device-scoped `user_preferences` DataStore in `:core:data` holding `hasSeenOnboarding`, `defaultStudyMode` and `dailyGoalMinutes`. It is bound under the `@UserPreferencesDataStore` qualifier. Favorites are the one exception: they live in Firestore at `users/{uid}/favorites/state` ([firestore-schema.md](firestore-schema.md)).
+- **Favorites grid**: Screen 7 loads its options through `GetOnboardingSubcategoriesUseCase`, which reads the single, publicly readable `onboarding/subcategories` document: an admin-curated subset, readable before sign-in ([firestore-schema.md](firestore-schema.md#onboardings-curated-subcategory-picker)).
+- **Debug entry point**: the debug hub (not Settings, which ships in release) carries a "Replay onboarding" button. It clears the flag before navigating, so the replay behaves exactly like a first run — including committing preferences again — rather than being a read-only walkthrough that behaves differently from the real thing.
 - **Design-system work pulled in by this flow**:
   - `FlashcardsRatingButton` / `FlashcardsRatingButtonRow` + `RatingColors` promoted to `:core:ui` out of `StudySessionScreen`'s private copies (which carried raw hex and raw dp). A `null` `onClick` renders the read-only form Voice Answering will use to display the grade it assigned, so a grade badge cannot drift from the button the user would have tapped for the same rating.
   - `BrandColors.screenGradient` (+ `screenGradientBase`) added, and the ad-hoc `splashGradient` and `loginGradient` collapsed into it. It reuses the existing CTA gradient's two stops, so the whole brand now resolves to one colour pair: diagonal on a button, vertical full-bleed behind a screen.
-
-## Deferred to follow-ups
-
-The first release is UI-complete; two things are deliberately not wired.
-
-| Deferred | Shipped instead | Notes |
-|---|---|---|
-| Favourites persistence (`users/{uid}/favorites`) | Selections held in screen state; Screen 8's badge counts them | Needs the domain model, repository, subcollection **and** a `firestore.rules` change — favourites currently default-deny. See the side finding under Navigation placement. |
-| Real Subcategory fetch for Screen 7's grid | Hardcoded option list in `OnboardingViewModel` | Deliberate while favourites go nowhere: a real query would add loading/error/empty states to a screen whose selections are discarded. `Category.featuredSubcategoryNames` cannot back this — it holds names, not ids. |
-
-Three `:core:ui` components are also stubbed locally in `:feature:onboarding` pending their real versions: the attempts indicator, the info banner, and the extended radio card. Each call site already matches the expected signature, so adoption should be an import change.
 
 ## Open items (pending further grilling)
 
