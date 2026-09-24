@@ -4,10 +4,10 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -101,17 +101,6 @@ class GlyphCacheTest {
     }
 
     @Test
-    fun `an evicted key re-renders even when the load dispatcher runs eagerly`() = runTest {
-        val cache = createCache(UnconfinedTestDispatcher(testScheduler), capacity = 1)
-        cache.load(key(svgSource = SVG_A))
-        cache.load(key(svgSource = SVG_B))
-
-        cache.load(key(svgSource = SVG_A)) shouldBe CachedGlyph.Ready("glyph:$SVG_A")
-
-        renderedKeys shouldBe listOf(key(svgSource = SVG_A), key(svgSource = SVG_B), key(svgSource = SVG_A))
-    }
-
-    @Test
     fun `render throwing an Error is not cached and a later load retries`() = runTest {
         val cache = createCache(StandardTestDispatcher(testScheduler))
         val flakyKey = key(svgSource = OUT_OF_MEMORY_SVG)
@@ -119,6 +108,17 @@ class GlyphCacheTest {
         shouldThrow<OutOfMemoryError> { cache.load(flakyKey) }
 
         cache.peek(flakyKey) shouldBe null
+        cache.load(flakyKey) shouldBe CachedGlyph.Ready("glyph:$OUT_OF_MEMORY_SVG")
+        renderedKeys.size shouldBe 2
+    }
+
+    @Test
+    fun `render throwing an Error on an inline dispatcher is not cached and a later load retries`() = runTest {
+        val cache = createCache(Dispatchers.Unconfined)
+        val flakyKey = key(svgSource = OUT_OF_MEMORY_SVG)
+
+        shouldThrow<OutOfMemoryError> { cache.load(flakyKey) }
+
         cache.load(flakyKey) shouldBe CachedGlyph.Ready("glyph:$OUT_OF_MEMORY_SVG")
         renderedKeys.size shouldBe 2
     }

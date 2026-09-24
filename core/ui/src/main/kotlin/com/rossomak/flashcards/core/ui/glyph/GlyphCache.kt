@@ -56,11 +56,10 @@ class GlyphCache<T : Any>(
     suspend fun load(key: GlyphKey): CachedGlyph<T> {
         val pendingLoad = synchronized(lock) {
             entries[key]?.let { return it }
-            // Started only after it is registered: an eager dispatcher would otherwise finish the
-            // render, and clear the registration, before getOrPut stores it.
+            // Lazy so the Deferred is registered before rendering starts — an inline dispatcher would otherwise
+            // run renderAndCache's cleanup before getOrPut inserts, leaving a stale (possibly failed) load behind.
             inFlightLoads.getOrPut(key) { loadScope.async(start = CoroutineStart.LAZY) { renderAndCache(key) } }
         }
-        pendingLoad.start()
         return pendingLoad.await()
     }
 
