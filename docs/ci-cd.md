@@ -108,9 +108,13 @@ review, no static analysis; just "does it compile, ship it."
 - Install path: Firebase's tester client, **Firebase App Tester** (not on
   Play Store — sideloaded via the tester-invite link itself). One-time
   per device; subsequent `wip-debug` uploads notify inside that same app.
-- One-time setup: `firebase-tools` CLI + `firebase login` under a personal
-  Google account (not the service account, which is reserved for the
-  upload step); create the tester groups with
+- Uploads always run as the service account, whatever the local login
+  state: the script hands the firebase CLI a throwaway config dir, so a
+  personal `firebase login` (which the CLI would otherwise prefer) and a
+  `FIREBASE_TOKEN` are both ignored for the upload.
+- One-time setup: `firebase-tools` CLI; a personal `firebase login` is only
+  needed for managing tester groups, not for uploading. Create the tester
+  groups with
   `firebase appdistribution:groups:create "wip-debug" wip-debug` and
   `firebase appdistribution:groups:create "wip-profiling" wip-profiling`
   (`firebase-tools` ≥15.29).

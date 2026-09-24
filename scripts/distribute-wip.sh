@@ -20,7 +20,9 @@
 # status file or logfile to go looking for.
 #
 # Never reads firebase-app-distribution-service-account.json -- only points
-# GOOGLE_APPLICATION_CREDENTIALS at its path.
+# GOOGLE_APPLICATION_CREDENTIALS at its path. The upload always runs as that
+# service account: the firebase CLI gets a throwaway config dir, so a personal
+# `firebase login` (which the CLI would otherwise prefer) is never picked up.
 #
 # Usage:
 #   scripts/distribute-wip.sh [--variant debug|profiling]
@@ -29,7 +31,7 @@ set -euo pipefail
 
 fail() {
   local stage="$1"
-  echo "FAILED: $stage -- see output above" >&2
+  echo "FAILED: $stage -- see output above"
   exit 1
 }
 
@@ -60,6 +62,7 @@ case "$VARIANT" in
     ;;
 esac
 
+# Deliberately the caller's checkout, not the script's: ships the working tree you're in.
 SRC="$(git rev-parse --show-toplevel)"
 cd "$SRC"
 
@@ -106,8 +109,14 @@ RELEASE_NOTES="wip ${VARIANT} build ${TIMESTAMP}
 $(git rev-parse --short HEAD)
 ${BUILT_FROM}"
 
+FIREBASE_CONFIG_DIR="$(mktemp -d)"
+trap 'rm -rf "$FIREBASE_CONFIG_DIR"' EXIT
+
 echo "== uploading to Firebase App Distribution (${GROUP}) =="
-if ! GOOGLE_APPLICATION_CREDENTIALS="$SERVICE_ACCOUNT" firebase appdistribution:distribute \
+if ! env -u FIREBASE_TOKEN \
+  XDG_CONFIG_HOME="$FIREBASE_CONFIG_DIR" \
+  GOOGLE_APPLICATION_CREDENTIALS="$SERVICE_ACCOUNT" \
+  firebase appdistribution:distribute --non-interactive \
   "$APK_PATH" \
   --app "$FIREBASE_APP_ID" \
   --groups "$GROUP" \
