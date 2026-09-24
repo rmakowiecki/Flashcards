@@ -18,6 +18,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionPreference.Subcateg
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoiceAnsweringEnabled
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePlayback
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
@@ -107,6 +108,40 @@ class DataStoreStudySessionPreferencesLocalDataSourceTest {
 
         preferences.voiceSettings.voiceId shouldBe null
         preferences.voiceSettings.speechRate shouldBe speechRate
+    }
+
+    @Test
+    fun `voice label round-trips next to the voice id`() = runTest {
+        val localDataSource = createLocalDataSource()
+        val voiceSettings = VoiceSettings(speechRate = 1.25f, voiceId = "en-gb-x-2", voiceLabel = VoiceLabel(countryCode = "GB", variantIndex = 2))
+
+        localDataSource.save(VoicePlayback(voiceSettings))
+        val preferences = localDataSource.studySessionPreferences().first()
+
+        preferences.voiceSettings shouldBe voiceSettings
+    }
+
+    @Test
+    fun `a voice saved without label data reads back as label-missing`() = runTest {
+        dataStore.edit { it[stringPreferencesKey("voice_id")] = "en-us-x-1" }
+
+        val preferences = createLocalDataSource().studySessionPreferences().first()
+
+        preferences.voiceSettings.voiceId shouldBe "en-us-x-1"
+        preferences.voiceSettings.voiceLabel shouldBe null
+    }
+
+    @Test
+    fun `saving settings without a label clears a previously stored label`() = runTest {
+        val localDataSource = createLocalDataSource()
+        localDataSource.save(
+            VoicePlayback(VoiceSettings(voiceId = "en-us-x-1", voiceLabel = VoiceLabel(countryCode = "US", variantIndex = 1))),
+        )
+
+        localDataSource.save(VoicePlayback(VoiceSettings(voiceId = "en-us-x-3")))
+        val preferences = localDataSource.studySessionPreferences().first()
+
+        preferences.voiceSettings.voiceLabel shouldBe null
     }
 
     @Test

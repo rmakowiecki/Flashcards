@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
+import com.rossomak.flashcards.core.domain.model.voiceLabel
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
@@ -353,25 +354,45 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `the voice row summary follows the saved settings`() = runTest(mainDispatcherRule.testDispatcher) {
-        val savedVoice = VoiceOption(id = VOICE_ID, countryCode = VOICE_COUNTRY_CODE, variantIndex = VOICE_VARIANT_INDEX)
-        every { voiceSettingsController.loadVoices(any(), any()) } answers {
-            secondArg<(List<VoiceOption>) -> Unit>().invoke(listOf(savedVoice))
+    fun `a stored voice label fills the row without requesting the voice list`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            studySessionPreferencesRepository.preferences.value = studySessionPreferencesRepository.preferences.value.copy(
+                voiceSettings = SavedVoiceSettings(speechRate = FASTER_SPEECH_RATE, voiceId = VOICE_ID, voiceLabel = SAVED_VOICE.voiceLabel),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.voiceLabel shouldBe SAVED_VOICE.voiceLabel
+            viewModel.state.value.speechRate shouldBe FASTER_SPEECH_RATE
+            verify(exactly = 0) { voiceSettingsController.loadVoices(any(), any()) }
         }
-        studySessionPreferencesRepository.preferences.value = studySessionPreferencesRepository.preferences.value.copy(
-            voiceSettings = SavedVoiceSettings(speechRate = FASTER_SPEECH_RATE, voiceId = VOICE_ID),
-        )
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.state.value.selectedVoice shouldBe savedVoice
-        viewModel.state.value.speechRate shouldBe FASTER_SPEECH_RATE
-    }
 
     @Test
-    fun `the voice row summary has no name until the voice list arrives`() =
+    fun `a voice saved without a label requests the list once and saves the resolved label back`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            every { voiceSettingsController.loadVoices(any(), any()) } answers {
+                secondArg<(List<VoiceOption>) -> Unit>().invoke(listOf(SAVED_VOICE))
+            }
+            studySessionPreferencesRepository.preferences.value = studySessionPreferencesRepository.preferences.value.copy(
+                voiceSettings = SavedVoiceSettings(speechRate = FASTER_SPEECH_RATE, voiceId = VOICE_ID),
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            studySessionPreferencesRepository.preferences.value.voiceSettings shouldBe
+                SavedVoiceSettings(speechRate = FASTER_SPEECH_RATE, voiceId = VOICE_ID, voiceLabel = SAVED_VOICE.voiceLabel)
+            viewModel.state.value.voiceLabel shouldBe SAVED_VOICE.voiceLabel
+            verify(exactly = 1) { voiceSettingsController.loadVoices(any(), any()) }
+        }
+
+    @Test
+    fun `a voice saved without a label that is no longer installed keeps the row nameless`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { voiceSettingsController.loadVoices(any(), any()) } answers {
+                secondArg<(List<VoiceOption>) -> Unit>().invoke(emptyList())
+            }
             studySessionPreferencesRepository.preferences.value = studySessionPreferencesRepository.preferences.value.copy(
                 voiceSettings = SavedVoiceSettings(voiceId = VOICE_ID),
             )
@@ -380,8 +401,46 @@ class SettingsViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.voiceId shouldBe VOICE_ID
-            viewModel.state.value.selectedVoice shouldBe null
+            viewModel.state.value.voiceLabel shouldBe null
+            studySessionPreferencesRepository.preferences.value.voiceSettings shouldBe SavedVoiceSettings(voiceId = VOICE_ID)
         }
+
+    @Test
+    fun `a second unlabelled voice requests the list again after the first could not be named`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { voiceSettingsController.loadVoices(any(), any()) } answers {
+                secondArg<(List<VoiceOption>) -> Unit>().invoke(listOf(SAVED_VOICE))
+            }
+            studySessionPreferencesRepository.preferences.value = studySessionPreferencesRepository.preferences.value.copy(
+                voiceSettings = SavedVoiceSettings(voiceId = UNINSTALLED_VOICE_ID),
+            )
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            studySessionPreferencesRepository.preferences.value = studySessionPreferencesRepository.preferences.value.copy(
+                voiceSettings = SavedVoiceSettings(voiceId = VOICE_ID),
+            )
+            advanceUntilIdle()
+
+            viewModel.state.value.voiceLabel shouldBe SAVED_VOICE.voiceLabel
+            verify(exactly = 2) { voiceSettingsController.loadVoices(any(), any()) }
+        }
+
+    @Test
+    fun `opening the voice dialog seeds it from the cached voice list`() = runTest(mainDispatcherRule.testDispatcher) {
+        every { voiceSettingsController.seedDraft(any()) } returns VoiceSettingsDraftState(draftVoiceId = VOICE_ID)
+        every { voiceSettingsController.loadVoices(any(), any()) } answers {
+            secondArg<(List<VoiceOption>) -> Unit>().invoke(listOf(SAVED_VOICE))
+        }
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(SessionVoiceSettings()))
+
+        viewModel.state.value.activeDialog shouldBe SessionVoiceSettings(
+            VoiceSettingsDraftState(availableVoices = listOf(SAVED_VOICE), draftVoiceId = VOICE_ID),
+        )
+    }
 
     @Test
     fun `confirming sign out signs out and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -453,7 +512,9 @@ class SettingsViewModelTest {
         const val LONGER_GOAL = DailyGoal.DEFAULT_MINUTES + DailyGoal.STEP_MINUTES
         const val FASTER_SPEECH_RATE = 1.25f
         const val VOICE_ID = "en-us-x-tpf-local"
+        const val UNINSTALLED_VOICE_ID = "en-au-x-afh-local"
         const val VOICE_COUNTRY_CODE = "US"
         const val VOICE_VARIANT_INDEX = 1
+        val SAVED_VOICE = VoiceOption(id = VOICE_ID, countryCode = VOICE_COUNTRY_CODE, variantIndex = VOICE_VARIANT_INDEX)
     }
 }

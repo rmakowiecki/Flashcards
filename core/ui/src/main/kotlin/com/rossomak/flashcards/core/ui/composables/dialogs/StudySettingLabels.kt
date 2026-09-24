@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceOption
+import com.rossomak.flashcards.core.domain.model.voiceLabel
 import com.rossomak.flashcards.core.ui.R
 import java.util.Locale
 
@@ -64,7 +66,11 @@ fun partialRatingCardRequeueingLabel(isEnabled: Boolean): String = if (isEnabled
  * a second, shorter variant to omit.
  */
 @Composable
-fun VoiceOption.label(): String = stringResource(R.string.voice_option_label, countryCode, variantIndex)
+fun VoiceOption.label(): String = voiceLabel.label()
+
+/** The same label as [VoiceOption.label], built from a saved voice's persisted [VoiceLabel]. */
+@Composable
+fun VoiceLabel.label(): String = stringResource(R.string.voice_option_label, countryCode, variantIndex)
 
 /**
  * Formats a speech rate as e.g. `1.25×`, capped at 2 decimal places. Fixed [Locale.US] so the
