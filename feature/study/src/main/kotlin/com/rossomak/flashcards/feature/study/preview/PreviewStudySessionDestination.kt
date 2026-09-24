@@ -30,6 +30,8 @@ internal fun PreviewStudySessionScreenState.toSessionDestination(categoryId: Str
                 readAloudEnabled = config.readAloudEnabled,
                 speechRate = config.voiceSettings.speechRate,
                 voiceId = config.voiceSettings.voiceId,
+                voiceCountryCode = config.voiceSettings.voiceLabel?.countryCode,
+                voiceVariantIndex = config.voiceSettings.voiceLabel?.variantIndex,
                 categoryName = categoryName,
                 subcategoryNames = subcategoryNames,
             )
@@ -46,6 +48,8 @@ internal fun PreviewStudySessionScreenState.toSessionDestination(categoryId: Str
                 partialRatingCardRequeueingEnabled = config.partialRatingCardRequeueingEnabled,
                 speechRate = config.voiceSettings.speechRate,
                 voiceId = config.voiceSettings.voiceId,
+                voiceCountryCode = config.voiceSettings.voiceLabel?.countryCode,
+                voiceVariantIndex = config.voiceSettings.voiceLabel?.variantIndex,
                 categoryName = categoryName,
                 subcategoryNames = subcategoryNames,
             )

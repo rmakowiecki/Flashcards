@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import kotlinx.serialization.Serializable
@@ -45,6 +46,8 @@ data class PreviewStudySessionRoute(
  * routes only derive a NavType for primitives and enums.
  * @param voiceId the Preview screen's confirmed `VoiceSettings.voiceId`, flattened for the same
  * reason as [speechRate].
+ * @param voiceCountryCode and [voiceVariantIndex]: the confirmed voice's `VoiceLabel`, flattened the
+ * same way, so the voice dialog can name the voice before the voice list loads.
  * @param categoryName and [subcategoryNames]: not used inside the session itself, only carried so
  * termination can build a complete `SessionResult` without a second lookup —
  * the same denormalize-alongside-the-id idiom `Subcategory`/`Category` already use
@@ -60,11 +63,13 @@ data class FastStudySessionRoute(
     val readAloudEnabled: Boolean = false,
     val speechRate: Float = VoiceSettings().speechRate,
     val voiceId: String? = VoiceSettings().voiceId,
+    val voiceCountryCode: String? = null,
+    val voiceVariantIndex: Int? = null,
     val categoryName: String,
     val subcategoryNames: List<String>,
 ) {
     val voiceSettings: VoiceSettings
-        get() = VoiceSettings(speechRate = speechRate, voiceId = voiceId)
+        get() = VoiceSettings(speechRate = speechRate, voiceId = voiceId, voiceLabel = voiceLabel(voiceCountryCode, voiceVariantIndex))
 }
 
 /**
@@ -88,6 +93,7 @@ data class FastStudySessionRoute(
  * androidx.navigation's typesafe routes only derive a NavType for primitives and enums.
  * @param voiceId the Preview screen's confirmed `VoiceSettings.voiceId`, flattened for the same
  * reason as [speechRate].
+ * @param voiceCountryCode and [voiceVariantIndex]: flattened like [FastStudySessionRoute.voiceCountryCode].
  * @param categoryName and [subcategoryNames]: not used inside the session itself, only carried so
  * termination can build a complete `SessionResult` without a second lookup —
  * the same denormalize-alongside-the-id idiom `Subcategory`/`Category` already use
@@ -104,11 +110,13 @@ data class RatedStudySessionRoute(
     val partialRatingCardRequeueingEnabled: Boolean = true,
     val speechRate: Float = VoiceSettings().speechRate,
     val voiceId: String? = VoiceSettings().voiceId,
+    val voiceCountryCode: String? = null,
+    val voiceVariantIndex: Int? = null,
     val categoryName: String,
     val subcategoryNames: List<String>,
 ) {
     val voiceSettings: VoiceSettings
-        get() = VoiceSettings(speechRate = speechRate, voiceId = voiceId)
+        get() = VoiceSettings(speechRate = speechRate, voiceId = voiceId, voiceLabel = voiceLabel(voiceCountryCode, voiceVariantIndex))
 }
 
 /**
@@ -194,3 +202,6 @@ data class StudySessionSummaryRoute(
             levelCurveExponent = xpLevelCurveExponent,
         )
 }
+
+private fun voiceLabel(countryCode: String?, variantIndex: Int?): VoiceLabel? =
+    if (countryCode != null && variantIndex != null) VoiceLabel(countryCode = countryCode, variantIndex = variantIndex) else null
