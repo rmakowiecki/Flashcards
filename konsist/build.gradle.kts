@@ -11,4 +11,15 @@ dependencies {
 
 tasks.test {
     useJUnit()
+    // Konsist reads every module's Kotlin sources at test time, which Gradle can't see on its own:
+    // without these inputs an edit elsewhere leaves this task UP-TO-DATE (or restored from the
+    // build cache) and the architecture rules silently pass on stale results.
+    inputs
+        .files(
+            fileTree(rootDir) {
+                include("**/*.kt", "**/*.kts")
+                exclude("**/build/**", "**/.gradle/**", "**/.kotlin/**")
+            },
+        ).withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("projectKotlinSources")
 }
