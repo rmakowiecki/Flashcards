@@ -12,7 +12,6 @@ import androidx.core.content.ContextCompat
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
-import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndGradeSpokenAnswerUseCase
 import com.rossomak.flashcards.core.voice.AudioRouteManager
 import com.rossomak.flashcards.core.voice.CaptureRouteType
@@ -235,11 +234,9 @@ class VoiceAnswerController @Inject constructor(
                         error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
                     )
                 }
-                if (event.reason !is VoiceCaptureFailureReason.PermissionMissing) {
-                    // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
-                    // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
-                    speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
-                }
+                // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
+                // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
+                speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
             }
         }
     }

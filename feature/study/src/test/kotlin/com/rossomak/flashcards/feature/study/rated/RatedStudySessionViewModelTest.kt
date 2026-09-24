@@ -1188,15 +1188,15 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a mid-session capture failure from a missing mic permission ends the session`() =
+    fun `a capture failure from a missing mic permission pauses the session like any other capture failure`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            // Revoking in system Settings kills the process, so a capture-time SecurityException is
+            // only a narrow race; it takes the recoverable path rather than a dedicated one.
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
             viewModel.messages.test {
-                // CaptureFailed resets phase to WaitingForQuestion, never SpeakingNotice — this must
-                // still be caught, unlike an ordinary grading/transcription failure.
                 voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
                     isEnabled = true,
                     phase = VoiceAnswerPhase.WaitingForQuestion,
@@ -1204,19 +1204,17 @@ class RatedStudySessionViewModelTest {
                 )
                 advanceUntilIdle()
 
-                awaitItem() shouldBe VoiceAnswerMicPermissionRevoked
+                awaitItem() shouldBe VoiceAnswerCaptureUnavailable
             }
-            viewModel.events.test {
-                awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
-            }
+            viewModel.events.test { expectNoEvents() }
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
         }
 
     @Test
-    fun `a bare mic-permission-missing voice-answer state also ends the session`() =
+    fun `a session restored with the mic permission revoked ends the session`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            // VoiceAnswerController.start() sets this bare (unwrapped) form directly if the
-            // permission is already gone the moment voice answering (re)enables — e.g. resuming
-            // after a pause with the permission revoked in the meantime.
+            // Revoking in system Settings kills the process; the restored route re-enables voice
+            // answering and VoiceAnswerController.start() reports this bare form.
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
