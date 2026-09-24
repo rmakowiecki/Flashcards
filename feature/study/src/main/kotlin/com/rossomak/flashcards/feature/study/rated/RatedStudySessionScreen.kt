@@ -69,6 +69,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
+import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
@@ -185,15 +186,12 @@ fun RatedStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progressLabel = if (state.distinctCardCount > 0) {
-                        stringResource(R.string.rated_study_session_progress_label)
-                    } else {
-                        null
-                    },
-                    completedCount = if (state.distinctCardCount > 0) state.completedCount else null,
-                    totalCount = if (state.distinctCardCount > 0) state.distinctCardCount else null,
-                    progressFraction = if (state.distinctCardCount > 0) {
-                        state.completedCount / state.distinctCardCount.toFloat()
+                    progress = if (state.distinctCardCount > 0) {
+                        StudySessionProgress(
+                            label = stringResource(R.string.rated_study_session_progress_label),
+                            completedCount = state.completedCount,
+                            totalCount = state.distinctCardCount,
+                        )
                     } else {
                         null
                     },

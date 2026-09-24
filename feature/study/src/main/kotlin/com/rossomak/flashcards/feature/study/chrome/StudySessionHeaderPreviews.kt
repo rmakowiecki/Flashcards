@@ -29,10 +29,7 @@ private fun StudySessionHeaderFastVariantPreview() {
     StudySessionHeader(
         title = "Fast Session",
         reportableCard = previewCard,
-        progressLabel = "Card",
-        completedCount = 5,
-        totalCount = 15,
-        progressFraction = 5 / 15f,
+        progress = StudySessionProgress(label = "Card", completedCount = 5, totalCount = 15),
         onClose = {},
         onReportProblem = {},
     )
@@ -44,10 +41,7 @@ private fun StudySessionHeaderRatedVariantPreview() {
     StudySessionHeader(
         title = "Rated Session",
         reportableCard = previewCard,
-        progressLabel = "Completed cards",
-        completedCount = 5,
-        totalCount = 15,
-        progressFraction = 5 / 15f,
+        progress = StudySessionProgress(label = "Completed cards", completedCount = 5, totalCount = 15),
         onClose = {},
         onReportProblem = {},
     )
@@ -59,10 +53,7 @@ private fun StudySessionHeaderNoProgressPreview() {
     StudySessionHeader(
         title = "Session",
         reportableCard = null,
-        progressLabel = null,
-        completedCount = null,
-        totalCount = null,
-        progressFraction = null,
+        progress = null,
         onClose = {},
         onReportProblem = {},
     )
@@ -74,10 +65,7 @@ private fun StudySessionHeaderWithTagsPreview() {
     StudySessionHeader(
         title = "Rated Session",
         reportableCard = previewCardWithTags,
-        progressLabel = "Completed cards",
-        completedCount = 8,
-        totalCount = 15,
-        progressFraction = 8 / 15f,
+        progress = StudySessionProgress(label = "Completed cards", completedCount = 8, totalCount = 15),
         onClose = {},
         onReportProblem = {},
     )
@@ -89,10 +77,7 @@ private fun StudySessionHeaderNoFlagPreview() {
     StudySessionHeader(
         title = "Rated Session",
         reportableCard = null,
-        progressLabel = "Completed cards",
-        completedCount = 5,
-        totalCount = 15,
-        progressFraction = 5 / 15f,
+        progress = StudySessionProgress(label = "Completed cards", completedCount = 5, totalCount = 15),
         onClose = {},
         onReportProblem = {},
     )
