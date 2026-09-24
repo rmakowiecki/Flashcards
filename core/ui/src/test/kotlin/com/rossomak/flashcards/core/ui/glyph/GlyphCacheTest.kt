@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -107,6 +108,17 @@ class GlyphCacheTest {
         shouldThrow<OutOfMemoryError> { cache.load(flakyKey) }
 
         cache.peek(flakyKey) shouldBe null
+        cache.load(flakyKey) shouldBe CachedGlyph.Ready("glyph:$OUT_OF_MEMORY_SVG")
+        renderedKeys.size shouldBe 2
+    }
+
+    @Test
+    fun `render throwing an Error on an inline dispatcher is not cached and a later load retries`() = runTest {
+        val cache = createCache(Dispatchers.Unconfined)
+        val flakyKey = key(svgSource = OUT_OF_MEMORY_SVG)
+
+        shouldThrow<OutOfMemoryError> { cache.load(flakyKey) }
+
         cache.load(flakyKey) shouldBe CachedGlyph.Ready("glyph:$OUT_OF_MEMORY_SVG")
         renderedKeys.size shouldBe 2
     }

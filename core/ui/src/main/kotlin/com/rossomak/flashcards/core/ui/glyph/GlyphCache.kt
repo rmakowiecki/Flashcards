@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.ui.glyph
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,7 +56,9 @@ class GlyphCache<T : Any>(
     suspend fun load(key: GlyphKey): CachedGlyph<T> {
         val pendingLoad = synchronized(lock) {
             entries[key]?.let { return it }
-            inFlightLoads.getOrPut(key) { loadScope.async { renderAndCache(key) } }
+            // Lazy so the Deferred is registered before rendering starts — an inline dispatcher would otherwise
+            // run renderAndCache's cleanup before getOrPut inserts, leaving a stale (possibly failed) load behind.
+            inFlightLoads.getOrPut(key) { loadScope.async(start = CoroutineStart.LAZY) { renderAndCache(key) } }
         }
         return pendingLoad.await()
     }
