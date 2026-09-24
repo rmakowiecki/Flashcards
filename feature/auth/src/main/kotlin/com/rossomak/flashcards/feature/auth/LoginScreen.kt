@@ -37,7 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoAccountOnDevice
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.SignInFailed
 import kotlinx.coroutines.launch
 
@@ -148,7 +148,7 @@ fun LoginContent(
 }
 
 private fun LoginFailureReason.messageRes(): Int = when (this) {
-    NoAccountOnDevice -> R.string.login_no_account_error
+    NoCredentialAvailable -> R.string.login_no_credential_error
     is SignInFailed -> R.string.login_signin_error
 }
 

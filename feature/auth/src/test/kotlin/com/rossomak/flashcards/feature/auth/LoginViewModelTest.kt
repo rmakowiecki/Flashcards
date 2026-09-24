@@ -78,7 +78,7 @@ class LoginViewModelTest {
     @Test
     fun `onSignInFailed emits no navigation event`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
-        viewModel.onSignInFailed(LoginFailureReason.NoAccountOnDevice)
+        viewModel.onSignInFailed(LoginFailureReason.NoCredentialAvailable)
         advanceUntilIdle()
 
         viewModel.events.test {
