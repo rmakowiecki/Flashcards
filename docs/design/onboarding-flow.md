@@ -95,6 +95,12 @@ Splash → Login → Onboarding (8 screens) → Main
 - New line/badge added below subcopy (or near the card), scoped specifically to grading, not the whole screen:
   *"⭐ Premium: automatic AI grading of your spoken answer."*
 - "Private voice" card, its description, and the "Test your voice" button/interaction: unchanged — still a free, fully working preview of capture + on-device obfuscation only.
+- **"Test your voice" as built.** The demo is on-device only: capture → `PitchShiftVoiceObfuscator` → play back. It never shows a transcript, because `TranscribeAndSanitizeUseCase` is a server callable and would contradict the screen's "runs on-device, always free" copy. The ViewModel drives it through the voice demo use cases over `VoiceDemoGateway`.
+- **Microphone permission.** The tap requests the microphone through the app-wide launcher and `PermissionGateway` ([ADR-0052](../adr/0052-runtime-permission-architecture.md)), the same path the Preview Study Session Screen uses; onboarding has no launcher of its own.
+  - A grant starts the demo. A soft refusal stays silent, and the next tap asks again.
+  - A permanent refusal, given here or earlier on Preview, replaces the demo card's body with an "Open settings" message plus **Retry**. Retry shows the real prompt when Android 11+ misreported a dismissed prompt as permanent, and otherwise shows a "microphone is still off" snackbar.
+  - Coming back from system Settings re-reads the status on resume, so a grant made there restores the normal card.
+  - Onboarding never sets the voice-answering privacy-notice flag (`hasSeenVoiceAnsweringInfo`) or the persisted Voice Answering default. The privacy notice stays with the Preview screen's first voice-answering Start.
 
 ### 7. Favorites — formerly Screen 8
 - Headline: shipped as **"Make it truly yours"** (eyebrow: CONVENIENT BOOKMARKS), per the latest mockup; supersedes "Favorite a few topics". The terminology note below still holds — "Starred" remains banned wherever favourites are named.
@@ -136,13 +142,12 @@ Splash → Login → Onboarding (8 screens) → Main
 
 ## Deferred to follow-ups
 
-The first release is UI-complete; three things are deliberately not wired.
+The first release is UI-complete; two things are deliberately not wired.
 
 | Deferred | Shipped instead | Notes |
 |---|---|---|
 | Favourites persistence (`users/{uid}/favorites`) | Selections held in screen state; Screen 8's badge counts them | Needs the domain model, repository, subcollection **and** a `firestore.rules` change — favourites currently default-deny. See the side finding under Navigation placement. |
 | Real Subcategory fetch for Screen 7's grid | Hardcoded option list in `OnboardingViewModel` | Deliberate while favourites go nowhere: a real query would add loading/error/empty states to a screen whose selections are discarded. `Category.featuredSubcategoryNames` cannot back this — it holds names, not ids. |
-| Voice capture on Screen 6's "Test your voice" | Button renders but does nothing | Keeps `RECORD_AUDIO` out of onboarding for now. The intended demo is on-device only — capture → `PitchShiftVoiceObfuscator` → play back — and must **not** show a transcript: `TranscribeAndSanitizeUseCase` is a server callable, which would contradict this screen's own "runs on-device, always free" copy. The consent flag stays owned by `StudySessionViewModel`. |
 
 Three `:core:ui` components are also stubbed locally in `:feature:onboarding` pending their real versions: the attempts indicator, the info banner, and the extended radio card. Each call site already matches the expected signature, so adoption should be an import change.
 
