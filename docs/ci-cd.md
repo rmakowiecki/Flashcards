@@ -35,7 +35,7 @@ No instrumented (`androidTest`) tests exist yet, so no emulator step is configur
 - `versionCode` = `git rev-list --count HEAD` — total commit count, monotonic, no tagging required.
 - `versionName` = `MAJOR.MINOR.<commit count>` — `MAJOR`/`MINOR` are hand-edited constants in `app/build.gradle.kts`; the patch segment is the same commit count as `versionCode` and climbs across the whole repo history (doesn't reset per release).
 - To cut a new `MAJOR`/`MINOR`: edit the constants directly in `app/build.gradle.kts`.
-- Non-release build types append a `versionNameSuffix`: `-debug` or `-profiling` (e.g. `0.1.1234-profiling`); release has none. The Debug tab's hub also shows build type, version name/code and the short commit SHA (`BuildConfig.GIT_SHORT_SHA`).
+- Non-release build types append a `versionNameSuffix`: `-debug` or `-profiling` (e.g. `0.1.1234-profiling`); release has none. The Debug tab's hub shows version name/code and the short commit SHA (`BuildConfig.GIT_SHORT_SHA`) under its title while the app bar is expanded.
 
 ## Signing
 
