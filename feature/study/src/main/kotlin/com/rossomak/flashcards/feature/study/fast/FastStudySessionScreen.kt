@@ -68,6 +68,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
+import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
@@ -195,10 +196,15 @@ fun FastStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progressLabel = if (state.flashcards.isNotEmpty()) stringResource(R.string.fast_study_session_progress_label) else null,
-                    completedCount = if (state.flashcards.isNotEmpty()) state.currentCardIndex + 1 else null,
-                    totalCount = if (state.flashcards.isNotEmpty()) state.flashcards.size else null,
-                    progressFraction = if (state.flashcards.isNotEmpty()) (state.currentCardIndex + 1) / state.flashcards.size.toFloat() else null,
+                    progress = if (state.flashcards.isNotEmpty()) {
+                        StudySessionProgress(
+                            label = stringResource(R.string.fast_study_session_progress_label),
+                            completedCount = state.currentCardIndex + 1,
+                            totalCount = state.flashcards.size,
+                        )
+                    } else {
+                        null
+                    },
                     onClose = { actions.onDialogEvent(Open(ExitSession)) },
                     onReportProblem = { card ->
                         actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
