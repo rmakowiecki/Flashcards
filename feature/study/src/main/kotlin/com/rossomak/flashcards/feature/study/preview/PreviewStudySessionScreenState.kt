@@ -3,7 +3,6 @@ package com.rossomak.flashcards.feature.study.preview
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
-import com.rossomak.flashcards.core.domain.model.VoiceOption
 
 data class PreviewStudySessionScreenState(
     val categoryName: String = "",
@@ -19,8 +18,6 @@ data class PreviewStudySessionScreenState(
      * sessions, which filter by difficulty only (ADR-0030).
      */
     val availableTags: List<String> = emptyList(),
-    /** Resolves `config.voiceSettings.voiceId` to a [VoiceOption] for the voice row's summary. */
-    val availableVoices: List<VoiceOption> = emptyList(),
     /**
      * Quick Session's sampled subcategory ids, held here rather than re-derived per selection:
      * sampling runs on load and on Re-randomise only, and every other selection reuses this

@@ -152,8 +152,7 @@ class PreviewStudySessionViewModel @Inject constructor(
             }
             selectCards()
         }
-        // The voice row shows the voice's name, not its id, so the list is needed before the
-        // dialog is ever opened — same reason Settings loads it eagerly.
+        // Warms the process-wide voice cache so the voice dialogs, here and in the session, open complete.
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
@@ -224,17 +223,11 @@ class PreviewStudySessionViewModel @Inject constructor(
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
-    /**
-     * The voice list feeds two things: the row's summary, which needs it to turn the saved id into
-     * a name, and an open voice dialog, which has to be found to be filled in — the one narrowing
-     * cast left in the dialog path, once per load rather than once per edit. A dismissal in the
-     * meantime correctly drops the dialog half.
-     */
+    /** Fills the voice dialog if it is open; a dismissal in the meantime drops the list. */
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
-            val withVoices = state.copy(availableVoices = voices)
-            val dialog = withVoices.activeDialog as? SessionVoiceSettings ?: return@update withVoices
-            withVoices.copy(
+            val dialog = state.activeDialog as? SessionVoiceSettings ?: return@update state
+            state.copy(
                 activeDialog = dialog.copy(
                     draftState = dialog.draftState.copy(
                         availableVoices = voices,
