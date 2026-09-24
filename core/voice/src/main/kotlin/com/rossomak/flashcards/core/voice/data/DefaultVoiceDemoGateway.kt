@@ -135,9 +135,7 @@ class DefaultVoiceDemoGateway @Inject constructor(
                 noSpeechTimeoutJob?.cancel()
                 _state.value = VoiceDemoState.SpeechDetected
             }
-            // A short blip (below MIN_UTTERANCE_FRAMES) ends without UtteranceCaptured following,
-            // so restart the timeout here or the demo is stuck listening with nothing to time it out.
-            is SpeechEnded -> restartNoSpeechTimeout()
+            is SpeechEnded -> Unit
             is UtteranceCaptured -> {
                 noSpeechTimeoutJob?.cancel()
                 noSpeechTimeoutJob = null

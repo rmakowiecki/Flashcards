@@ -255,6 +255,18 @@ class VoiceCaptureEngine @Inject constructor(
         var isInUtterance = false
         var trailingSilenceFrames = 0
         var speechFrameCount = 0
+        var speechStartEmitted = false
+
+        /**
+         * True exactly once per utterance: when it first has enough speech for [finishUtterance] to
+         * keep it. SpeechStarted waits for this so a blip that is later discarded never announces
+         * itself. Counts speech frames across pauses, the same total [finishUtterance] checks.
+         */
+        fun claimSpeechStart(): Boolean {
+            if (speechStartEmitted || speechFrameCount < MIN_UTTERANCE_FRAMES) return false
+            speechStartEmitted = true
+            return true
+        }
     }
 
     /** Returns true if a pending route change was honored and the caller should return [CaptureResult.RouteChanged]. */
@@ -281,11 +293,12 @@ class VoiceCaptureEngine @Inject constructor(
         state.isInUtterance = true
         state.trailingSilenceFrames = 0
         state.speechFrameCount = 1
+        state.speechStartEmitted = false
         state.frames.clear()
         state.frames.addAll(state.preRoll)
         state.preRoll.clear()
         state.frames.add(frame.copyOf())
-        _events.emit(VoiceCaptureEvent.SpeechStarted)
+        if (state.claimSpeechStart()) _events.emit(VoiceCaptureEvent.SpeechStarted)
     }
 
     /** Returns true if a pending route change was honored and the caller should return [CaptureResult.RouteChanged]. */
@@ -298,6 +311,7 @@ class VoiceCaptureEngine @Inject constructor(
         state.frames.add(frame.copyOf())
         state.speechFrameCount++
         state.trailingSilenceFrames = 0
+        if (state.claimSpeechStart()) _events.emit(VoiceCaptureEvent.SpeechStarted)
         if (state.frames.size < maxUtteranceFrames) return false
         return finishUtteranceAndCheckRoute(state, isRouteChangePending)
     }
@@ -331,11 +345,13 @@ class VoiceCaptureEngine @Inject constructor(
         isRouteChangePending: () -> Boolean,
     ): Boolean {
         state.isInUtterance = false
-        _events.emit(VoiceCaptureEvent.SpeechEnded)
+        // Paired with SpeechStarted: a discarded blip emitted neither.
+        if (state.speechStartEmitted) _events.emit(VoiceCaptureEvent.SpeechEnded)
         finishUtterance(state.frames, state.speechFrameCount)
         state.frames.clear()
         state.trailingSilenceFrames = 0
         state.speechFrameCount = 0
+        state.speechStartEmitted = false
         // Finished the in-flight utterance; now it's safe to switch devices.
         return isRouteChangePending()
     }
