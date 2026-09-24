@@ -21,6 +21,10 @@ val gitCommitCount: Int = providers.exec {
     commandLine("git", "rev-list", "--count", "HEAD")
 }.standardOutput.asText.get().trim().toInt()
 
+val gitShortSha: String = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+}.standardOutput.asText.get().trim()
+
 val versionMajor = 0
 val versionMinor = 1
 
@@ -48,20 +52,44 @@ android {
         versionName = "$versionMajor.$versionMinor.$gitCommitCount"
 
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "GIT_SHORT_SHA", "\"$gitShortSha\"")
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("Boolean", "LOGGING_ENABLED", "true")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("Boolean", "LOGGING_ENABLED", "false")
+        }
+        // Release performance with debug conveniences: R8-optimized and not debuggable, so ART
+        // honors baseline profiles, but unobfuscated, logging, carrying the debug hub, and
+        // installed over the debug package so its Firebase app and Google Sign-In config apply.
+        create("profiling") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-profiling"
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFile("proguard-rules-profiling.pro")
+            buildConfigField("Boolean", "LOGGING_ENABLED", "true")
+            matchingFallbacks += "release"
+        }
+    }
+    // The debug-hub wiring (Debug tab + its nav graph) is shared with profiling; release keeps its
+    // own no-op stub in src/release.
+    sourceSets {
+        getByName("profiling") {
+            kotlin.directories += "src/debug/java"
         }
     }
     buildFeatures {
@@ -82,8 +110,10 @@ dependencies {
     implementation(project(":feature:study"))
     implementation(project(":feature:settings"))
     debugImplementation(project(":feature:debug"))
+    "profilingImplementation"(project(":feature:debug"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "com.rossomak.flashcards.core.data"
+    defaultConfig {
+        consumerProguardFiles("consumer-rules.pro")
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
     }

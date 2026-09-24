@@ -37,7 +37,7 @@ class FlashcardsApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.LOGGING_ENABLED) {
             Timber.plant(Timber.DebugTree())
         }
         logd { "App start: scheduling session submission drain for recovery" }
