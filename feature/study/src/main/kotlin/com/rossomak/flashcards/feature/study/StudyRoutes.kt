@@ -39,8 +39,7 @@ data class PreviewStudySessionRoute(
  * attempts, voice answering — do not appear; Fast has no path to either.
  *
  * @param readAloudEnabled the Preview screen's confirmed choice. Auto-start is conditional on this
- * flag as well as on having cards, so a session with it off never requests notification permission
- * and never starts text-to-speech.
+ * flag as well as on having cards, so a session with it off never starts text-to-speech.
  * @param speechRate the Preview screen's confirmed `VoiceSettings.speechRate`, flattened onto the
  * route for the same reason as [RatedStudySessionRoute.speechRate] — androidx.navigation's typesafe
  * routes only derive a NavType for primitives and enums.

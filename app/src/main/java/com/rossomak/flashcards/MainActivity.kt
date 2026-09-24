@@ -10,16 +10,20 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
 import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
+import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.presentation.startup.AppStartViewModel
 import com.rossomak.flashcards.presentation.startup.AppStartupState
 import com.rossomak.flashcards.ui.navigation.FlashcardsNavGraph
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val appStartViewModel: AppStartViewModel by viewModels()
+
+    @Inject lateinit var permissionGateway: PermissionGateway
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -46,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 FlashcardsNavGraph(
                     navController = navController,
+                    permissionGateway = permissionGateway,
                     modifier = Modifier.fillMaxSize(),
                     launchRoute = launchRoute,
                 )

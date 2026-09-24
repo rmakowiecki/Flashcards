@@ -10,7 +10,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.rossomak.flashcards.core.common.loge
-import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoAccountOnDevice
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.SignInFailed
 
 /** Thrown when the user dismisses the account picker — not a [LoginFailureReason], never shown. */
@@ -39,8 +39,8 @@ class GoogleSignInLauncher(private val context: Context) {
         } catch (@Suppress("SwallowedException") exception: GetCredentialCancellationException) {
             Result.failure(GoogleSignInCancelled)
         } catch (exception: NoCredentialException) {
-            loge(exception) { "No Google account on device" }
-            Result.failure(NoAccountOnDevice)
+            loge(exception) { "No usable Google credential" }
+            Result.failure(NoCredentialAvailable)
         } catch (exception: GetCredentialException) {
             loge(exception) { "Credential Manager failed" }
             Result.failure(SignInFailed(exception))

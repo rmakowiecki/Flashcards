@@ -35,7 +35,7 @@ import com.rossomak.flashcards.feature.study.R
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)):
  * [FlashcardsGradientTopBar] (a close action opening the exit-confirmation dialog, and a flag
  * action shown only while a card is on screen that opens Report a problem for that card) plus,
- * whenever [progressFraction] is non-null, a [progressLabel]/[completedCount]/[totalCount] row and a
+ * whenever [progress] is non-null, its label/completed/total row and a
  * [FlashcardsLinearProgressBar] beneath it, followed by [reportableCard]'s tags (when any) as an
  * on-gradient badge row.
  *
@@ -50,10 +50,7 @@ fun StudySessionHeader(
     modifier: Modifier = Modifier,
     title: String,
     reportableCard: Flashcard?,
-    progressLabel: String?,
-    completedCount: Int?,
-    totalCount: Int?,
-    progressFraction: Float?,
+    progress: StudySessionProgress?,
     onClose: () -> Unit,
     onReportProblem: (card: Flashcard) -> Unit,
 ) {
@@ -79,7 +76,7 @@ fun StudySessionHeader(
                 }
             },
         )
-        if (progressLabel != null && completedCount != null && totalCount != null && progressFraction != null) {
+        if (progress != null) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -91,21 +88,21 @@ fun StudySessionHeader(
                     // different descent, so box-bottom alignment leaves their glyphs visibly
                     // offset — see the LEVEL/level-number pair in FlashcardsLevelCard.
                     Text(
-                        text = progressLabel,
+                        text = progress.label,
                         modifier = Modifier.alignByBaseline(),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.brandColors.onGradientContent,
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
-                        text = completedCount.toString(),
+                        text = progress.completedCount.toString(),
                         modifier = Modifier.alignByBaseline(),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.brandColors.onGradientContent,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = stringResource(R.string.study_session_progress_total_label, totalCount),
+                        text = stringResource(R.string.study_session_progress_total_label, progress.totalCount),
                         modifier = Modifier.alignByBaseline(),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.brandColors.onGradientContent,
@@ -113,7 +110,7 @@ fun StudySessionHeader(
                 }
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.xxsmall))
                 FlashcardsLinearProgressBar(
-                    progress = progressFraction,
+                    progress = progress.fraction,
                     style = OnGradient,
                 )
             }

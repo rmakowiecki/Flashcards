@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.feature.study.preview
 
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 
@@ -26,6 +28,8 @@ data class PreviewStudySessionScreenState(
      */
     val quickSessionSampledSubcategoryIds: List<String>? = null,
     val activeDialog: PreviewDialog? = null,
+    /** Re-read on every resume; only consulted when [isMicPermissionNeeded]. */
+    val micPermissionStatus: PermissionStatus = PermissionStatus.Denied,
 ) {
     val isSingleSubcategory: Boolean get() = subcategoryNames.size == 1
     val subcategoryCount: Int get() = subcategoryNames.size
@@ -34,5 +38,16 @@ data class PreviewStudySessionScreenState(
     // hand-picked by the user — nothing to reshuffle, so Custom never offers it, single-subcategory
     // or not.
     val canReshuffleSubcategories: Boolean get() = isQuickSession
+
+    /** Only a Rated session with voice answering listens through the microphone. */
+    val isMicPermissionNeeded: Boolean get() = config.mode == StudyMode.Rated && config.voiceAnsweringEnabled
+
+    /**
+     * The last request came back refused with no prompt left to show, so the hero points at
+     * Settings or switching this session to manual answering. Start stays enabled and asks again:
+     * that request either shows the real prompt (and clears this) or confirms the refusal.
+     */
+    val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
+
     val canStart: Boolean get() = !isLoading && error == null && selectedCardCount > 0
 }

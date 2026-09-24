@@ -26,7 +26,6 @@ data class FastStudySessionScreenState(
     val isReadAloudMode: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
-    val isVoiceAutoStartPending: Boolean = false,
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
     val activeDialog: StudySessionDialog? = null,
 ) {

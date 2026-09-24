@@ -3,14 +3,21 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.logw
+import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.Flashcard
-import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
+import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
+import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
+import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SelectSessionFlashcardsUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -18,17 +25,19 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
-import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
-import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -36,12 +45,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
+@Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class PreviewStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val selectSessionFlashcards: SelectSessionFlashcardsUseCase,
     private val sampleQuickSessionSubcategories: SampleQuickSessionSubcategoriesUseCase,
     private val observeStudySessionPreferences: ObserveStudySessionPreferencesUseCase,
     private val saveStudySessionPreference: SaveStudySessionPreferenceUseCase,
+    private val observeUserPreferences: ObserveUserPreferencesUseCase,
+    private val saveUserPreference: SaveUserPreferenceUseCase,
+    private val observePermissionStatus: ObservePermissionStatusUseCase,
+    private val requestPermission: RequestPermissionUseCase,
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
 
@@ -68,7 +82,19 @@ class PreviewStudySessionViewModel @Inject constructor(
     private val eventChannel = Channel<PreviewStudySessionDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
+    private val _messages = MutableSharedFlow<PreviewStudySessionMessage>(extraBufferCapacity = 1)
+    val messages: SharedFlow<PreviewStudySessionMessage> = _messages.asSharedFlow()
+
     private var sessionStartInFlight = false
+
+    /**
+     * Seeded once in `init` before the first selection, so it is known before Start can ever be
+     * enabled. Held in memory afterwards: acknowledging the info dialog must take effect even when
+     * persisting it fails.
+     */
+    private var hasSeenVoiceAnsweringInfo = false
+
+    private var permissionStatusJob: Job? = null
 
     /**
      * The in-flight [selectCards] job, if any. A new call cancels whatever's still running so a
@@ -103,6 +129,7 @@ class PreviewStudySessionViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val defaults = observeStudySessionPreferences().first()
+            hasSeenVoiceAnsweringInfo = observeUserPreferences().first().hasSeenVoiceAnsweringInfo
             _state.update { state ->
                 state.copy(
                     config = state.config.copy(
@@ -128,6 +155,28 @@ class PreviewStudySessionViewModel @Inject constructor(
         // The voice row shows the voice's name, not its id, so the list is needed before the
         // dialog is ever opened — same reason Settings loads it eagerly.
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
+    }
+
+    /**
+     * Restarts the microphone status collection. The status flow is cold and never polls, so each
+     * resume — first composition, return from system Settings, or the end of a system prompt — is
+     * what picks up a change made outside the app.
+     */
+    fun onResume() {
+        permissionStatusJob?.cancel()
+        permissionStatusJob = viewModelScope.launch {
+            observePermissionStatus(AppPermission.RecordAudio).collect { status ->
+                _state.update { it.copy(micPermissionStatus = status) }
+            }
+        }
+    }
+
+    /**
+     * Turns voice answering off for this session only — the saved default is left alone, and the
+     * card draw is unaffected, so there is nothing to reselect.
+     */
+    fun onSwitchToManualAnswering() {
+        _state.update { it.copy(config = it.config.copy(voiceAnsweringEnabled = false)) }
     }
 
     fun onRetry() {
@@ -212,8 +261,15 @@ class PreviewStudySessionViewModel @Inject constructor(
      * Dismissal is the discard path: the draftState dies with the field, so nothing is applied. Preview
      * playback is stopped only when it could have been started — every other dialog is silent, and
      * stopping the shared player from one of those could cut off audio this screen never began.
+     *
+     * The voice answering info dialog has nothing to discard, but it has still been shown, so
+     * dismissing it marks it seen — without continuing the Start that opened it.
      */
     private fun onDialogDismiss() {
+        if (_state.value.activeDialog == VoiceAnsweringInfo) {
+            markVoiceAnsweringInfoSeen()
+            return
+        }
         if (_state.value.activeDialog is SessionVoiceSettings) {
             voiceSettingsController.stopPreview()
         }
@@ -230,6 +286,11 @@ class PreviewStudySessionViewModel @Inject constructor(
      */
     private fun onDialogConfirm() {
         val dialog = _state.value.activeDialog ?: return
+        if (dialog == VoiceAnsweringInfo) {
+            markVoiceAnsweringInfoSeen()
+            onStartSession()
+            return
+        }
         val updatedConfig = _state.value.config.foldInDialog(dialog)
         dialog.toStudySessionPreferenceIfKept()?.let { preference ->
             viewModelScope.launch { saveStudySessionPreference(preference) }
@@ -277,46 +338,55 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * The confirmed Study Mode picks the destination (ADR-0045): Fast and Rated each open their
-     * own screen, carrying only the settings that mode uses.
+     * Closes the info dialog; OK then continues the Start that opened it, dismissal does not. The
+     * seen flag takes effect in memory straight away; a failed write only means the notice shows
+     * again on a later launch.
+     */
+    private fun markVoiceAnsweringInfoSeen() {
+        hasSeenVoiceAnsweringInfo = true
+        _state.update { it.copy(activeDialog = null) }
+        viewModelScope.launch {
+            saveUserPreference(HasSeenVoiceAnsweringInfo(true))
+                .onFailure { error -> logw(error) { "Failed to persist voice answering info seen flag" } }
+        }
+    }
+
+    /**
+     * A Rated session with voice answering only leaves this screen with the microphone granted —
+     * anything else keeps the user here with voice answering still selected.
      */
     fun onStartSession() {
         if (selectedCardIds.isEmpty() || sessionStartInFlight) return
         sessionStartInFlight = true
         viewModelScope.launch {
-            val destination = if (_state.value.config.mode == StudyMode.Fast) {
-                PreviewStudySessionDestination.FastStudySession(
-                    FastStudySessionRoute(
-                        categoryId = route.categoryId,
-                        sessionTitle = sessionTitle(),
-                        subcategoryIds = _state.value.config.subcategoryIds,
-                        cardIds = selectedCardIds,
-                        readAloudEnabled = _state.value.config.readAloudEnabled,
-                        speechRate = _state.value.config.voiceSettings.speechRate,
-                        voiceId = _state.value.config.voiceSettings.voiceId,
-                        categoryName = route.categoryName,
-                        subcategoryNames = _state.value.subcategoryNames,
-                    )
-                )
-            } else {
-                PreviewStudySessionDestination.RatedStudySession(
-                    RatedStudySessionRoute(
-                        categoryId = route.categoryId,
-                        sessionTitle = sessionTitle(),
-                        subcategoryIds = _state.value.config.subcategoryIds,
-                        cardIds = selectedCardIds,
-                        voiceAnsweringEnabled = _state.value.config.voiceAnsweringEnabled,
-                        ratedAttempts = _state.value.config.ratedAttempts,
-                        partialRatingCardRequeueingEnabled = _state.value.config.partialRatingCardRequeueingEnabled,
-                        speechRate = _state.value.config.voiceSettings.speechRate,
-                        voiceId = _state.value.config.voiceSettings.voiceId,
-                        categoryName = route.categoryName,
-                        subcategoryNames = _state.value.subcategoryNames,
-                    )
-                )
+            if (_state.value.isMicPermissionNeeded && !ensureMicPermission()) {
+                sessionStartInFlight = false
+                return@launch
             }
-            eventChannel.send(destination)
+            eventChannel.send(_state.value.toSessionDestination(categoryId = route.categoryId, cardIds = selectedCardIds))
         }
+    }
+
+    /**
+     * The privacy notice comes first, once ever; only then the system prompt, which returns
+     * without prompting when the microphone is already granted.
+     *
+     * The result only steers this tap; [PreviewStudySessionScreenState.micPermissionStatus] is
+     * written solely by the observed status, which the gateway re-emits after every request. A
+     * refusal that was already permanent before this tap shows no prompt at all, so it gets a
+     * snackbar instead of a silent no-op.
+     */
+    private suspend fun ensureMicPermission(): Boolean {
+        if (!hasSeenVoiceAnsweringInfo) {
+            _state.update { it.copy(activeDialog = VoiceAnsweringInfo) }
+            return false
+        }
+        val statusBeforeRequest = _state.value.micPermissionStatus
+        val status = requestPermission(AppPermission.RecordAudio)
+        if (statusBeforeRequest == PermissionStatus.PermanentlyDenied && status == PermissionStatus.PermanentlyDenied) {
+            _messages.tryEmit(PreviewStudySessionMessage.MicPermissionStillDenied)
+        }
+        return status == PermissionStatus.Granted
     }
 
     /**
@@ -413,15 +483,4 @@ class PreviewStudySessionViewModel @Inject constructor(
         )
         _state.update { it.copy(quickSessionSampledSubcategoryIds = sampledIds) }
     }
-
-    private fun sessionTitle(): String =
-        if (_state.value.isSingleSubcategory) _state.value.subcategoryNames.first() else route.categoryName
-
-    /**
-     * Tags belong to one subcategory, so a multi-Subcategory pool has no coherent tag vocabulary
-     * to filter by at all — asserted here rather than relied on staying empty by omission
-     * elsewhere (ADR-0030).
-     */
-    private fun StudySessionConfig.forSelection(isSingleSubcategory: Boolean): StudySessionConfig =
-        if (isSingleSubcategory) this else copy(tagIds = emptySet())
 }

@@ -23,6 +23,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCo
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 
 /**
  * Pure [StudySessionConfig]/[PreviewDialog] mapping helpers pulled out of
@@ -49,6 +50,7 @@ internal fun StudySessionConfig.foldInDialog(dialog: PreviewDialog): StudySessio
         tagIds = dialog.draftState.selectedTags,
         difficultyRange = dialog.draftState.difficultyRange,
     )
+    VoiceAnsweringInfo -> this
 }
 
 /**
@@ -76,5 +78,13 @@ internal fun PreviewDialog.toStudySessionPreferenceIfKept(): StudySessionPrefere
     is SessionCardsSortingOrder -> SortOrder(draftState).takeIf { keepAsDefault }
     is QuickSessionSubcategoryCountRange -> SubcategoryCountRangePreference(draftState).takeIf { keepAsDefault }
     is SessionVoiceSettings -> VoicePlayback(draftState.toVoiceSettings()).takeIf { keepAsDefault }
-    is Filters -> null
+    is Filters, VoiceAnsweringInfo -> null
 }
+
+/**
+ * Tags belong to one subcategory, so a multi-Subcategory pool has no coherent tag vocabulary
+ * to filter by at all — asserted here rather than relied on staying empty by omission
+ * elsewhere (ADR-0030).
+ */
+internal fun StudySessionConfig.forSelection(isSingleSubcategory: Boolean): StudySessionConfig =
+    if (isSingleSubcategory) this else copy(tagIds = emptySet())

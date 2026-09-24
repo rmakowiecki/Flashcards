@@ -14,6 +14,6 @@ package com.rossomak.flashcards.feature.auth
  * [GoogleSignInLauncher]'s cancellation handling.
  */
 sealed class LoginFailureReason : Exception() {
-    data object NoAccountOnDevice : LoginFailureReason()
+    data object NoCredentialAvailable : LoginFailureReason()
     data class SignInFailed(override val cause: Throwable? = null) : LoginFailureReason()
 }
