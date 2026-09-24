@@ -3,6 +3,7 @@ package com.rossomak.flashcards.presentation.splash
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
 import com.rossomak.flashcards.core.domain.model.ShortcutRoute
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
@@ -24,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 @HiltViewModel
+@ArchConventionExempt("Injects FlashcardRepository directly, pending a use-case wrap (ADR-0051)")
 class SplashViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getCurrentAuthUser: GetCurrentAuthUserUseCase,

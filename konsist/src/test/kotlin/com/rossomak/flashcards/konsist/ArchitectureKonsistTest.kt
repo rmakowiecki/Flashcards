@@ -193,6 +193,23 @@ class ArchitectureKonsistTest {
     }
 
     @Test
+    fun `HiltViewModel classes do not inject Repositories, Gateways or DataSources`() {
+        // ADR-0051: a ViewModel reaches data seams through use cases only. *Controller
+        // collaborators are presentation-side helpers, not data seams, so they're out of scope.
+        val dataSeamSuffixes = listOf("Repository", "Gateway", "DataSource")
+        projectScope
+            .classes()
+            .filter { koClass -> koClass.annotations.any { it.name == "HiltViewModel" } }
+            .filter { !isExempt(it.annotations) }
+            .assertTrue { koClass ->
+                koClass.primaryConstructor?.parameters.orEmpty().none { parameter ->
+                    val typeName = parameter.type.name.substringBefore('<').removeSuffix("?")
+                    dataSeamSuffixes.any { typeName.endsWith(it) }
+                }
+            }
+    }
+
+    @Test
     fun `Route classes are Serializable data classes`() {
         // Scoped to nav-arg Route classes only — core:voice's CaptureRoute is an unrelated
         // audio-routing concept that happens to share the suffix.

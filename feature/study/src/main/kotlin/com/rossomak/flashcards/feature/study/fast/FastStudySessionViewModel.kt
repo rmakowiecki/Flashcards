@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.fast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
@@ -63,6 +64,7 @@ import kotlinx.coroutines.launch
  * and voice answering is Rated-only (ADR-0025). Fast has no path to it.
  */
 @HiltViewModel
+@ArchConventionExempt("Injects VoiceGateway directly, pending a use-case wrap (ADR-0051)")
 class FastStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSessionStartData: GetSessionStartDataUseCase,

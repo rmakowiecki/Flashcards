@@ -473,7 +473,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `test voice requests the microphone and starts the demo when granted`() =
+    fun `voice test tap requests the microphone and starts the demo when granted`() =
         runTest(mainDispatcherRule.testDispatcher) {
             permissionGateway.nextRequestResult = PermissionStatus.Granted
             val viewModel = createViewModel()
@@ -486,7 +486,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `test voice stays silent and does not start the demo on a soft denial`() =
+    fun `voice test tap stays silent and does not start the demo on a soft denial`() =
         runTest(mainDispatcherRule.testDispatcher) {
             permissionGateway.nextRequestResult = PermissionStatus.Denied
             val viewModel = createViewModel()
@@ -501,7 +501,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `test voice on a permanent denial that stays permanent shows the still denied message`() =
+    fun `voice test tap on a permanent denial that stays permanent shows the still denied message`() =
         runTest(mainDispatcherRule.testDispatcher) {
             setMicStatus(PermissionStatus.PermanentlyDenied)
             permissionGateway.nextRequestResult = PermissionStatus.PermanentlyDenied
@@ -519,7 +519,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `test voice on a false permanent denial that heals starts the demo without a message`() =
+    fun `voice test tap on a false permanent denial that heals starts the demo without a message`() =
         runTest(mainDispatcherRule.testDispatcher) {
             setMicStatus(PermissionStatus.PermanentlyDenied)
             permissionGateway.nextRequestResult = PermissionStatus.Granted
@@ -537,7 +537,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `test voice ignores a second tap while the request is pending`() =
+    fun `voice test tap ignores a second tap while the request is pending`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val requestGate = CompletableDeferred<Unit>()
             permissionGateway.requestGate = requestGate
