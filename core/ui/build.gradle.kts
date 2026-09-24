@@ -13,6 +13,7 @@ ksp {
 dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
+    implementation(project(":core:common"))
     implementation(project(":core:domain"))
     api(libs.kotlinx.collections.immutable)
     implementation(libs.androidx.navigation.compose)

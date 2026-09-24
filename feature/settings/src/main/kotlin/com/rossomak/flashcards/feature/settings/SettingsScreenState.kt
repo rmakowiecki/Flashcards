@@ -16,9 +16,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceLabel
  * the real value in memory by the time this screen is reached (`SplashViewModel` reads the same
  * store on every cold start).
  *
- * [speechRate], [voiceId] and [voiceLabel] mirror `StudySessionPreferences.voiceSettings`, folded
- * in the same way as every other study-session row. The row names the voice from [voiceLabel]
- * alone, so showing it never needs the platform voice list.
+ * [speechRate], [voiceId] and [voiceLabel] mirror `StudySessionPreferences.voiceSettings`.
  */
 data class SettingsScreenState(
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
@@ -32,12 +30,7 @@ data class SettingsScreenState(
     val readAloudEnabled: Boolean = false,
     val speechRate: Float = 1f,
     val voiceId: String? = null,
-    /**
-     * The saved voice's label data, or `null` when no voice is saved, or while a voice saved
-     * before labels were stored is being resolved — the row then shows the speech rate alone.
-     * Formatted at the `@Composable` call site (`core:ui`'s `VoiceLabel.label()`), since labeling
-     * needs `stringResource`.
-     */
+    /** Null when no voice is saved or its label is still being resolved. */
     val voiceLabel: VoiceLabel? = null,
     val isSigningOut: Boolean = false,
     val activeDialog: SettingsDialog? = null,

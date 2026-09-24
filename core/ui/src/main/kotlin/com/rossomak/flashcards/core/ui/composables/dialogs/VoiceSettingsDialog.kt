@@ -42,8 +42,7 @@ private const val MAX_SPEECH_RATE = 2f
  * persisted until [onConfirm]. Dismissing discards them. Note that *previewing* a voice is not
  * persistence — the caller is free to play a sample on every draft change.
  *
- * [seededVoiceLabel] names the saved voice while [availableVoices] is still loading, so the field
- * shows it rather than the "pick a voice" hint for that moment.
+ * [seededVoiceLabel] names the saved voice until [availableVoices] loads.
  *
  * Pass [keepAsDefault] as non-null where the choice is session-scoped (the Preview Study Session
  * screen); `null` on the Settings screen, where the change is permanent by definition.

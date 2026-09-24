@@ -17,10 +17,8 @@ class VoiceOptionsDataSource @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     /**
-     * Starts a short-lived engine purely to enumerate its voices, then shuts it down. Only the
-     * engine's init callback lands on the main thread; enumerating (binder IPC, often hundreds of
-     * voices), curating and mapping run on [Dispatchers.Default]. Throws if the engine fails to
-     * initialize, so a caller can tell a failed load from an engine with no curated voices.
+     * Android lists voices only through an initialized engine, so this starts a short-lived one.
+     * Throws if it fails to initialize.
      */
     suspend fun getAvailableVoices(): List<VoiceOption> {
         val engine = withContext(Dispatchers.Main.immediate) { initializedEngine() }
@@ -32,11 +30,8 @@ class VoiceOptionsDataSource @Inject constructor(
     }
 
     /**
-     * Must run on the main thread: the init callback is posted there, so it can only run once the
-     * constructor has returned and `engine` is assigned — off-main, a fast callback could see no
-     * engine and report a working one as failed. A failure to bind the engine service is still
-     * reported synchronously, from inside the constructor, so that engine is shut down once the
-     * constructor returns instead of from the callback.
+     * Main thread only: the init callback is posted there, so it runs after `engine` is assigned.
+     * A bind failure is reported synchronously from the constructor, hence the shutdown after it.
      */
     private suspend fun initializedEngine(): TextToSpeech = suspendCancellableCoroutine { continuation ->
         var engine: TextToSpeech? = null
@@ -57,12 +52,7 @@ class VoiceOptionsDataSource @Inject constructor(
     private fun TextToSpeech.curatedVoiceOptions(): List<VoiceOption> {
         // App is English-only content — never leave this on the device's system locale.
         language = Locale.US
-        // Grouped by ISO country code (VoiceCuration guarantees one of US/GB/AU, never blank)
-        // purely to number each group's voices 1-based — Voice.name is Android's own unique id,
-        // but its format is engine-opaque (not documented as delimited in any particular way), so
-        // parsing it for a display label risks collisions between unrelated voices; a friendly,
-        // collision-free label is built in core:ui instead, from countryCode + this index alone
-        // (see VoiceOption's own doc).
+        // Numbered 1-based per country for the display label; Voice.name is engine-opaque, never parsed.
         return VoiceCuration.curate(voices.orEmpty())
             .groupBy { it.locale.country }
             .flatMap { (countryCode, countryVoices) ->

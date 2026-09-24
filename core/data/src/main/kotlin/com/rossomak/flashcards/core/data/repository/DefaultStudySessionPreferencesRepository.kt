@@ -14,11 +14,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Guarantees a saved voice carries its label whenever the voice list can name it: a [VoicePlayback]
- * arriving without one (its dialog was confirmed before the list loaded) is labelled here from the
- * process-wide voice cache, so no save path has to remember to. When the list can't name the voice —
- * the load failed, or the voice is no longer installed — the voice is saved unlabelled rather than
- * dropped, and a reader resolves the label later.
+ * Labels an unlabelled [VoicePlayback] from the voice cache before writing it. If the list can't
+ * name the voice, it is saved unlabelled and Settings fills the label in later.
  */
 class DefaultStudySessionPreferencesRepository @Inject constructor(
     private val localDataSource: StudySessionPreferencesLocalDataSource,

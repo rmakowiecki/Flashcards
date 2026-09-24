@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.data.repository
 
+import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.source.VoiceOptionsDataSource
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.repository.VoiceOptionsRepository
@@ -8,12 +9,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/**
- * Process-wide cache of the curated voice list: enumerating it starts a text-to-speech engine, so
- * it happens at most once per app run, shared by every screen. Concurrent callers queue behind the
- * one load in flight and read its result. A failed load throws to its caller and is not cached, so
- * a later call retries.
- */
+/** Loads the voice list at most once per app run. A failed load is not cached; the next call retries. */
 @Singleton
 class DefaultVoiceOptionsRepository @Inject constructor(
     private val dataSource: VoiceOptionsDataSource,
@@ -25,6 +21,9 @@ class DefaultVoiceOptionsRepository @Inject constructor(
     private var cachedVoices: List<VoiceOption>? = null
 
     override suspend fun getAvailableVoices(): List<VoiceOption> = cachedVoices ?: loadLock.withLock {
-        cachedVoices ?: dataSource.getAvailableVoices().also { cachedVoices = it }
+        cachedVoices ?: dataSource.getAvailableVoices().also { voices ->
+            cachedVoices = voices
+            logd { "Voice list loaded: ${voices.size} voices" }
+        }
     }
 }

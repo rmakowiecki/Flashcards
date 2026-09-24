@@ -3,10 +3,8 @@ package com.rossomak.flashcards.core.domain.model
 import kotlinx.serialization.Serializable
 
 /**
- * @param voiceLabel The label data of [voiceId], stored beside it so a screen can name the saved
- *   voice without starting a text-to-speech engine to enumerate voices. Null when no voice is
- *   saved, or for a voice saved before the label was stored — a reader resolves that lazily from
- *   the voice list and writes it back.
+ * @param voiceLabel names [voiceId] without loading the voice list. Null when no voice is saved,
+ *   or the voice was saved before labels were stored.
  */
 @Serializable
 data class VoiceSettings(
@@ -15,10 +13,7 @@ data class VoiceSettings(
     val voiceLabel: VoiceLabel? = null,
 )
 
-/**
- * The data a voice's user-facing label is built from — [VoiceOption.countryCode] and
- * [VoiceOption.variantIndex] — detached from the voice list so it can be persisted.
- */
+/** The persistable part of a [VoiceOption] its display label is built from. */
 @Serializable
 data class VoiceLabel(val countryCode: String, val variantIndex: Int)
 

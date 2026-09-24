@@ -134,11 +134,7 @@ class SettingsViewModel @Inject constructor(
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
-    /**
-     * The voice list arrives after the dialog is already up, so it has to find the open dialog to
-     * fill in — the one narrowing cast left in the dialog path, once per load rather than once per
-     * edit. A dismissal in the meantime correctly drops it.
-     */
+    /** Fills the voice dialog if it is still open. */
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
             val dialog = state.activeDialog as? SessionVoiceSettings ?: return@update state
@@ -154,10 +150,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * A voice saved before its label was stored has an id the row cannot name. The voice list is
-     * loaded once per voice, lazily, to resolve it, and the label is written back so later visits never need
-     * the list. The write lands back through [observeStudySessionPreferences]. If the voice is no
-     * longer installed, nothing is written and the row keeps showing the speech rate alone.
+     * Resolves a missing label from the voice list, once per voice id, and saves it back. An
+     * uninstalled voice stays unlabelled.
      */
     private fun healVoiceLabel(saved: SavedVoiceSettings) {
         val voiceId = saved.voiceId
@@ -167,7 +161,6 @@ class SettingsViewModel @Inject constructor(
             val current = _state.value
             val voice = voices.firstOrNull { it.id == voiceId }
             if (voice == null || current.voiceId != voiceId || current.voiceLabel != null) return@loadVoices
-            // A failed write needs no handling: the label is still missing, so the next visit retries.
             viewModelScope.launch {
                 saveStudySessionPreference(
                     VoicePlayback(SavedVoiceSettings(speechRate = current.speechRate, voiceId = voiceId, voiceLabel = voice.voiceLabel)),

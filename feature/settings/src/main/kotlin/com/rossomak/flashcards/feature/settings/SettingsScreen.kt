@@ -300,10 +300,7 @@ private fun voiceRows(
     ),
 )
 
-/**
- * Rate and name, or the rate alone while the saved voice has no label — an unresolved id is not
- * worth showing, and the rate is true either way.
- */
+/** Name and rate, or the rate alone when the saved voice has no label. */
 @Composable
 private fun voicePlaybackSummary(state: SettingsScreenState): String {
     val rateLabel = speechRateLabel(state.speechRate)

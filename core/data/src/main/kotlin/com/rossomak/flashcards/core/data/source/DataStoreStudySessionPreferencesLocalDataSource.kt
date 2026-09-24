@@ -105,10 +105,7 @@ class DataStoreStudySessionPreferencesLocalDataSource @Inject constructor(
     private fun String?.toSortOrder(): FlashcardSortOrder =
         FlashcardSortOrder.entries.firstOrNull { it.name == this } ?: DEFAULT_SORT_ORDER
 
-    /**
-     * Null unless both halves are stored — a voice saved before its label was persisted has
-     * neither, and reads back as label-missing rather than as a made-up label.
-     */
+    /** Null unless both halves are stored. */
     private fun Preferences.toVoiceLabel(): VoiceLabel? {
         val countryCode = this[VOICE_COUNTRY_CODE_KEY] ?: return null
         val variantIndex = this[VOICE_VARIANT_INDEX_KEY] ?: return null
