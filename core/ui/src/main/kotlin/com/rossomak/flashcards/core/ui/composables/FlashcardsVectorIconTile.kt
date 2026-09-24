@@ -1,8 +1,9 @@
 package com.rossomak.flashcards.core.ui.composables
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,26 +17,19 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
-import com.caverock.androidsvg.SVG
+import com.rossomak.flashcards.core.ui.glyph.CachedGlyph.Ready
+import com.rossomak.flashcards.core.ui.glyph.CachedGlyph.Unavailable
+import com.rossomak.flashcards.core.ui.glyph.rememberCategoryGlyph
 import com.rossomak.flashcards.core.ui.theme.AppSizes
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.toCategoryColor
-import com.rossomak.flashcards.core.ui.theme.toCategorySvg
 
 /**
  * Glyph shown when [iconSvg] is absent (not yet curated) or malformed (invalid SVG) — both cases
@@ -47,14 +41,16 @@ private val FallbackIcon = Icons.Default.Folder
 private val ICON_CONTENT_SIZE = 24.dp
 
 /**
- * Rounded, tinted square that hosts a category's monochrome SVG glyph, rasterized at render time
- * from a plain SVG document that arrives embedded on the `Category` object itself — sibling of
- * [FlashcardsIconTile] for callers whose icon/color are curated, nullable Firestore data rather
- * than a fixed local [androidx.compose.ui.graphics.vector.ImageVector]. Named `Vector`, not
+ * Rounded, tinted square that hosts a category's monochrome SVG glyph, rendered through
+ * [CategoryGlyphCache][com.rossomak.flashcards.core.ui.glyph.CategoryGlyphCache] (once per process,
+ * off the main thread) from a plain SVG document that arrives embedded on the `Category` object
+ * itself — sibling of [FlashcardsIconTile] for callers whose icon/color are curated, nullable
+ * Firestore data rather than a fixed local [androidx.compose.ui.graphics.vector.ImageVector]. Named `Vector`, not
  * `Remote`: nothing is fetched separately, no network/image-cache story.
  *
  * [iconSvg] and [color] are both nullable and independently fault-tolerant — an absent field and
- * a malformed one land on the same themed default, no crash either way. All of that handling
+ * a malformed one land on the same themed default, no crash either way. While an uncached glyph
+ * loads, the tile shows its tinted container alone. All of that handling
  * lives here, not at the call site: [FlashcardsListGroup][com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup]
  * callers pass `category.color`/`category.iconSvg` straight through. See
  * docs/design/category-icon-color.md's Rendering section.
@@ -69,9 +65,7 @@ fun FlashcardsVectorIconTile(
     val tintColor = color?.let { runCatching { it.toCategoryColor() }.getOrNull() }
         ?: MaterialTheme.colorScheme.onSecondaryContainer
     val containerColor = tintColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
-    val svg = remember(iconSvg) {
-        iconSvg?.let { runCatching { it.toCategorySvg() }.getOrNull() }
-    }
+    val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = ICON_CONTENT_SIZE)
 
     Box(
         modifier = modifier
@@ -82,16 +76,17 @@ fun FlashcardsVectorIconTile(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (svg == null) {
-            CompositionLocalProvider(LocalContentColor provides tintColor) {
+        when (glyphCache) {
+            // Still loading: the tinted container alone, never the fallback glyph as a placeholder.
+            null -> Unit
+            Unavailable -> CompositionLocalProvider(LocalContentColor provides tintColor) {
                 Icon(imageVector = FallbackIcon, contentDescription = contentDescription)
             }
-        } else {
-            SvgGlyph(
-                svg = svg,
-                tint = tintColor,
+            is Ready -> Image(
+                bitmap = glyphCache.glyph,
                 contentDescription = contentDescription,
                 modifier = Modifier.size(ICON_CONTENT_SIZE),
+                colorFilter = rememberTintFilter(tintColor),
             )
         }
     }
@@ -116,60 +111,30 @@ fun FlashcardsInlineCategoryGlyph(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
-    val svg = remember(iconSvg) {
-        iconSvg?.let { runCatching { it.toCategorySvg() }.getOrNull() }
-    }
-    if (svg == null) {
-        Icon(
+    when (val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = INLINE_GLYPH_SIZE)) {
+        // Still loading: reserve the glyph's space so the text line doesn't shift when it arrives.
+        null -> Spacer(modifier = modifier.size(INLINE_GLYPH_SIZE))
+        Unavailable -> Icon(
             imageVector = FallbackIcon,
             contentDescription = contentDescription,
             modifier = modifier.size(INLINE_GLYPH_SIZE),
             tint = tint,
         )
-    } else {
-        SvgGlyph(
-            svg = svg,
-            tint = tint,
+        is Ready -> Image(
+            bitmap = glyphCache.glyph,
             contentDescription = contentDescription,
             modifier = modifier.size(INLINE_GLYPH_SIZE),
+            colorFilter = rememberTintFilter(tint),
         )
     }
 }
 
 /**
- * Rasterizes [svg] into a `Picture` sized to fill this composable, then recolors it with [tint]
- * via the same `BlendMode.SrcIn` mechanism `Icon(tint = ...)` uses internally — a manual
- * `saveLayer`/[Paint] is needed here (instead of just calling `Icon`) because a `Picture` isn't an
- * [androidx.compose.ui.graphics.vector.ImageVector]. This recolors every opaque pixel regardless
- * of the SVG's own internal fill color, so the source document's actual `fill` value never
- * matters.
+ * `SrcIn` tint for a cached glyph mask — recolors every opaque pixel regardless of the source SVG's
+ * own fill, the same mechanism `Icon(tint = ...)` uses. A paint-level filter, so no offscreen layer.
  */
 @Composable
-private fun SvgGlyph(
-    svg: SVG,
-    tint: Color,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-) {
-    val tintPaint = remember(tint) { Paint().apply { colorFilter = ColorFilter.tint(tint, BlendMode.SrcIn) } }
-    // Rendered once at the SVG's own native size (its width/height or viewBox), then stretched to
-    // fit via drawPicture(picture, dst) below — Canvas.drawPicture(Picture)'s no-bounds overload
-    // draws at native size with no scaling, so a bare renderToPicture(widthPx, heightPx) call
-    // alone isn't a reliable substitute for an explicit stretch-to-fit draw.
-    val picture = remember(svg) { svg.renderToPicture() }
-    Canvas(
-        modifier = modifier.let {
-            if (contentDescription != null) it.semantics { this.contentDescription = contentDescription } else it
-        },
-    ) {
-        val dst = android.graphics.RectF(0f, 0f, size.width, size.height)
-        drawIntoCanvas { canvas ->
-            canvas.saveLayer(Rect(Offset.Zero, size), tintPaint)
-            canvas.nativeCanvas.drawPicture(picture, dst)
-            canvas.restore()
-        }
-    }
-}
+private fun rememberTintFilter(tint: Color): ColorFilter = remember(tint) { ColorFilter.tint(tint) }
 
 @ShowkaseComposable(name = "Vector icon tile", group = "Lists")
 @Composable
