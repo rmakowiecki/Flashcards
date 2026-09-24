@@ -68,6 +68,14 @@ class OnboardingViewModel @Inject constructor(
     /** Guards "Test your voice" against a second tap while the microphone request is still pending. */
     private var micRequestInFlight = false
 
+    /**
+     * Set by [onVoiceDemoStop] so a request still pending when the user leaves the step (or the app
+     * stops) settles without effect. The request itself is never cancelled: the permission layer
+     * must still see the answer to record a permanent refusal. Should a device stop the app for the
+     * system prompt itself, a grant then needs one more tap, which fails safe.
+     */
+    private var micRequestStopped = false
+
     init {
         viewModelScope.launch {
             val authUser = getCurrentAuthUser()
@@ -110,11 +118,13 @@ class OnboardingViewModel @Inject constructor(
     fun onVoiceDemoStart() {
         if (micRequestInFlight) return
         micRequestInFlight = true
+        micRequestStopped = false
         viewModelScope.launch {
             try {
                 val statusBeforeRequest = _state.value.micPermissionStatus
                 val status = requestPermission(AppPermission.RecordAudio)
                 when {
+                    micRequestStopped -> Unit
                     status == PermissionStatus.Granted -> startVoiceDemo()
                     statusBeforeRequest == PermissionStatus.PermanentlyDenied && status == PermissionStatus.PermanentlyDenied ->
                         _messages.tryEmit(OnboardingMessage.MicPermissionStillDenied)
@@ -131,6 +141,7 @@ class OnboardingViewModel @Inject constructor(
 
     /** Hard-stops the demo: pager navigation away from the step, or the app backgrounding. */
     fun onVoiceDemoStop() {
+        micRequestStopped = true
         viewModelScope.launch { stopVoiceDemo() }
     }
 

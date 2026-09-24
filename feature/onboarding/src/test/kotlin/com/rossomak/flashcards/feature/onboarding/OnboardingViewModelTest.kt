@@ -438,6 +438,7 @@ class OnboardingViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onVoiceDemoStart()
+        advanceUntilIdle()
         viewModel.onVoiceDemoPlay()
         viewModel.onVoiceDemoStop()
         advanceUntilIdle()
@@ -552,6 +553,67 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            voiceDemoGateway.startCount shouldBe 1
+        }
+
+    @Test
+    fun `voice test tap stopped while the request is pending does not start the demo on a grant`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+                viewModel.onVoiceDemoStop()
+                requestGate.complete(Unit)
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            voiceDemoGateway.startCount shouldBe 0
+        }
+
+    @Test
+    fun `voice test tap stopped while a still permanent denial is pending shows no message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicStatus(PermissionStatus.PermanentlyDenied)
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.PermanentlyDenied
+            val viewModel = createViewModel()
+            viewModel.onResume()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onVoiceDemoStart()
+                advanceUntilIdle()
+                viewModel.onVoiceDemoStop()
+                requestGate.complete(Unit)
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `voice test tap after an earlier stopped request starts the demo on a grant`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val requestGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = requestGate
+            permissionGateway.nextRequestResult = PermissionStatus.Granted
+            val viewModel = createViewModel()
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+            viewModel.onVoiceDemoStop()
+            requestGate.complete(Unit)
+            advanceUntilIdle()
+
+            viewModel.onVoiceDemoStart()
+            advanceUntilIdle()
+
             voiceDemoGateway.startCount shouldBe 1
         }
 }
