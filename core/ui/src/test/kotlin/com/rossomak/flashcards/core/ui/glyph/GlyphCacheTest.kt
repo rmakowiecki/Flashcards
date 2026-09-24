@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -97,6 +98,17 @@ class GlyphCacheTest {
         cache.peek(key(sizePx = SIZE_LARGE)) shouldBe null
         cache.load(key(sizePx = SIZE_LARGE))
         renderedKeys shouldBe listOf(key(sizePx = SIZE_SMALL), key(sizePx = SIZE_LARGE))
+    }
+
+    @Test
+    fun `an evicted key re-renders even when the load dispatcher runs eagerly`() = runTest {
+        val cache = createCache(UnconfinedTestDispatcher(testScheduler), capacity = 1)
+        cache.load(key(svgSource = SVG_A))
+        cache.load(key(svgSource = SVG_B))
+
+        cache.load(key(svgSource = SVG_A)) shouldBe CachedGlyph.Ready("glyph:$SVG_A")
+
+        renderedKeys shouldBe listOf(key(svgSource = SVG_A), key(svgSource = SVG_B), key(svgSource = SVG_A))
     }
 
     @Test
