@@ -1,11 +1,7 @@
 package com.rossomak.flashcards.feature.study.fast
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,7 +35,6 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,7 +48,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -74,6 +68,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
+import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
@@ -109,29 +104,6 @@ fun FastStudySessionScreen(
     // Summary screen.
     BackHandler {
         viewModel.onDialogEvent(Open(ExitSession))
-    }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { isGranted ->
-        if (isGranted) viewModel.onVoiceAutoStart() else viewModel.onVoiceAutoStartDeclined()
-    }
-
-    // Read-aloud off never sets isVoiceAutoStartPending (FastStudySessionViewModel.loadFlashcards),
-    // so this effect — and the permission prompt it can trigger — never fires for a manual session.
-    LaunchedEffect(state.isVoiceAutoStartPending) {
-        if (!state.isVoiceAutoStartPending) return@LaunchedEffect
-        val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) !=
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (needsNotificationPermission) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            viewModel.onVoiceAutoStart()
-        }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -224,10 +196,15 @@ fun FastStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progressLabel = if (state.flashcards.isNotEmpty()) stringResource(R.string.fast_study_session_progress_label) else null,
-                    completedCount = if (state.flashcards.isNotEmpty()) state.currentCardIndex + 1 else null,
-                    totalCount = if (state.flashcards.isNotEmpty()) state.flashcards.size else null,
-                    progressFraction = if (state.flashcards.isNotEmpty()) (state.currentCardIndex + 1) / state.flashcards.size.toFloat() else null,
+                    progress = if (state.flashcards.isNotEmpty()) {
+                        StudySessionProgress(
+                            label = stringResource(R.string.fast_study_session_progress_label),
+                            completedCount = state.currentCardIndex + 1,
+                            totalCount = state.flashcards.size,
+                        )
+                    } else {
+                        null
+                    },
                     onClose = { actions.onDialogEvent(Open(ExitSession)) },
                     onReportProblem = { card ->
                         actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))

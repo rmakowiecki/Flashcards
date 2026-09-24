@@ -1,11 +1,8 @@
 package com.rossomak.flashcards.feature.study.rated
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,7 +35,6 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +48,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
@@ -74,10 +69,10 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
+import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
-import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerConsentSaveFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
@@ -119,23 +114,6 @@ fun RatedStudySessionScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-
-    val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { isGranted -> viewModel.onMicPermissionResult(isGranted) }
-
-    LaunchedEffect(state.isMicPermissionRequestPending) {
-        if (!state.isMicPermissionRequestPending) return@LaunchedEffect
-        val isAlreadyGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO,
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (isAlreadyGranted) {
-            viewModel.onMicPermissionResult(true)
-        } else {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
 
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
@@ -208,15 +186,12 @@ fun RatedStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progressLabel = if (state.distinctCardCount > 0) {
-                        stringResource(R.string.rated_study_session_progress_label)
-                    } else {
-                        null
-                    },
-                    completedCount = if (state.distinctCardCount > 0) state.completedCount else null,
-                    totalCount = if (state.distinctCardCount > 0) state.distinctCardCount else null,
-                    progressFraction = if (state.distinctCardCount > 0) {
-                        state.completedCount / state.distinctCardCount.toFloat()
+                    progress = if (state.distinctCardCount > 0) {
+                        StudySessionProgress(
+                            label = stringResource(R.string.rated_study_session_progress_label),
+                            completedCount = state.completedCount,
+                            totalCount = state.distinctCardCount,
+                        )
                     } else {
                         null
                     },
@@ -447,7 +422,6 @@ private fun RatedVoiceTransportRow(
 
 private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
     VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
-    VoiceAnswerConsentSaveFailed -> context.getString(R.string.study_session_voice_answer_consent_save_error_message)
     CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
     VoiceAnswerGradingFailed -> context.getString(R.string.study_session_voice_answer_error_message)
     VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)

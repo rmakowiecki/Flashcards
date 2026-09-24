@@ -4,12 +4,18 @@ import androidx.lifecycle.SavedStateHandle
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
+import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SelectSessionFlashcardsUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
@@ -44,6 +50,8 @@ class PreviewStudySessionSortSeedingTest {
     private val savedStateHandle: SavedStateHandle = mockk()
     private val flashcardRepository = FakeFlashcardRepository()
     private val preferencesRepository = FakeStudySessionPreferencesRepository()
+    private val userPreferencesRepository = FakeUserPreferencesRepository()
+    private val permissionGateway = FakePermissionGateway()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private val route = PreviewStudySessionRoute(
@@ -78,6 +86,10 @@ class PreviewStudySessionSortSeedingTest {
         SampleQuickSessionSubcategoriesUseCase(random = Random.Default),
         ObserveStudySessionPreferencesUseCase(preferencesRepository),
         SaveStudySessionPreferenceUseCase(preferencesRepository),
+        ObserveUserPreferencesUseCase(userPreferencesRepository),
+        SaveUserPreferenceUseCase(userPreferencesRepository),
+        ObservePermissionStatusUseCase(permissionGateway),
+        RequestPermissionUseCase(permissionGateway),
         voiceSettingsController,
     )
 

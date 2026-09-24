@@ -290,25 +290,36 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `read-aloud off never marks voice auto start pending`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `read-aloud off never starts the voice gateway`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(route.copy(readAloudEnabled = false))
         loadThreeCards()
 
-        val viewModel = createViewModel()
+        createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.isVoiceAutoStartPending shouldBe false
+        voiceGateway.startCalls shouldBe 0
     }
 
     @Test
-    fun `read-aloud on marks voice auto start pending once cards load`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `read-aloud on starts the voice gateway once cards load`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(route.copy(readAloudEnabled = true))
         loadThreeCards()
 
-        val viewModel = createViewModel()
+        createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.isVoiceAutoStartPending shouldBe true
+        voiceGateway.startCalls shouldBe 1
+    }
+
+    @Test
+    fun `read-aloud on with no loaded cards never starts the voice gateway`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(readAloudEnabled = true))
+        flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(emptyList())
+
+        createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.startCalls shouldBe 0
     }
 
     @Test
@@ -321,7 +332,6 @@ class FastStudySessionViewModelTest {
         viewModel.onShowAnswer()
         viewModel.onNextCard()
 
-        viewModel.state.value.isVoiceAutoStartPending shouldBe false
         voiceGateway.startCalls shouldBe 0
         viewModel.state.value.currentCardIndex shouldBe 1
         viewModel.state.value.isAnswerRevealed shouldBe false
@@ -619,26 +629,12 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `onVoiceAutoStartDeclined clears the pending flag`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(route.copy(readAloudEnabled = true))
-        loadThreeCards()
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        viewModel.onVoiceAutoStartDeclined()
-
-        viewModel.state.value.isVoiceAutoStartPending shouldBe false
-    }
-
-    @Test
-    fun `onVoiceAutoStart starts the gateway with loaded cards and applies saved settings`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `read-aloud on starts the gateway with loaded cards and applies saved settings`() = runTest(mainDispatcherRule.testDispatcher) {
         val savedSettings = VoiceSettings(speechRate = 1.5f, voiceId = "voice-1")
         stubRoute(route.copy(readAloudEnabled = true, speechRate = savedSettings.speechRate, voiceId = savedSettings.voiceId))
         loadThreeCards()
 
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        viewModel.onVoiceAutoStart()
+        createViewModel()
         advanceUntilIdle()
 
         voiceGateway.startCalls shouldBe 1
@@ -646,19 +642,6 @@ class FastStudySessionViewModelTest {
         voiceGateway.lastStartSubcategoryName shouldBe sessionTitle
         voiceGateway.lastSpeechRate shouldBe savedSettings.speechRate
         voiceGateway.lastVoiceId shouldBe savedSettings.voiceId
-        viewModel.state.value.isVoiceAutoStartPending shouldBe false
-    }
-
-    @Test
-    fun `onVoiceAutoStart ignores repeat calls while a session is already started`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        viewModel.onVoiceAutoStart()
-        viewModel.onVoiceAutoStart()
-
-        voiceGateway.startCalls shouldBe 1
     }
 
     @Test

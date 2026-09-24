@@ -4,7 +4,6 @@
   <CurrentIssues>
     <ID>LongMethod:RatedStudySessionScreen.kt$@Composable fun RatedStudySessionScreen( modifier: Modifier = Modifier, viewModel: RatedStudySessionViewModel = hiltViewModel(), onNavigateToSummary: (StudySessionSummaryRoute) -&gt; Unit, )</ID>
     <ID>LongParameterList:RatedStudySessionScreen.kt$( modifier: Modifier = Modifier, state: RatedStudySessionScreenState, snackbarHostState: SnackbarHostState, onShowAnswer: () -&gt; Unit, onAttemptRating: (FlashcardAttemptRating) -&gt; Unit, onVoicePlayPause: () -&gt; Unit, onVoiceNext: () -&gt; Unit, onVoicePrevious: () -&gt; Unit, onDialogEvent: (StudySessionDialogEvent) -&gt; Unit, )</ID>
-    <ID>LongParameterList:StudySessionHeader.kt$( modifier: Modifier = Modifier, title: String, reportableCard: Flashcard?, progressLabel: String?, completedCount: Int?, totalCount: Int?, progressFraction: Float?, onClose: () -&gt; Unit, onReportProblem: (card: Flashcard) -&gt; Unit, )</ID>
     <ID>TooManyFunctions:FastStudySessionViewModel.kt$FastStudySessionViewModel : ViewModel</ID>
     <ID>TooManyFunctions:RatedStudySessionViewModel.kt$RatedStudySessionViewModel : ViewModel</ID>
     <ID>TooManyFunctions:TtsPlayer.kt$TtsPlayer : SimpleBasePlayer</ID>

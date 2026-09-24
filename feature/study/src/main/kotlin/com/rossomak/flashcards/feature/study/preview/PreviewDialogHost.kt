@@ -1,11 +1,13 @@
 package com.rossomak.flashcards.feature.study.preview
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig.Companion.LENGTH_STEP
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig.Companion.RATED_ATTEMPTS_STEP
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFiltersDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardSortOrderDialog
+import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.PartialRatingCardRequeueingDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.RatedAttemptsDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.ReadAloudDialog
@@ -17,6 +19,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.VoiceSettingsDialog
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
+import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
@@ -27,6 +30,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCo
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 
 private val SESSION_CARD_COUNT_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
 private val RATED_ATTEMPTS_RANGE = StudySessionConfig.MIN_RATED_ATTEMPTS..StudySessionConfig.MAX_RATED_ATTEMPTS
@@ -136,6 +140,13 @@ internal fun PreviewDialogHost(
             onFiltersChange = { onDialogEvent(DraftChange(activeDialog.copy(draftState = it))) },
             onConfirm = onConfirm,
             onDismiss = onDismiss,
+        )
+        VoiceAnsweringInfo -> FlashcardsSingleActionDialog(
+            title = stringResource(R.string.preview_session_voice_answering_info_title),
+            onConfirm = onConfirm,
+            onDismiss = onDismiss,
+            supportingText = stringResource(R.string.preview_session_voice_answering_info_message),
+            actionLabel = stringResource(R.string.preview_session_voice_answering_info_ok_button),
         )
     }
 }

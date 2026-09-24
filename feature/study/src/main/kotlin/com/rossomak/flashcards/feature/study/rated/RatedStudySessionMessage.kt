@@ -9,8 +9,6 @@ sealed interface RatedStudySessionMessage {
 
     data object VoicePlaybackUnavailable : RatedStudySessionMessage
 
-    data object VoiceAnswerConsentSaveFailed : RatedStudySessionMessage
-
     data object CurationSubmissionFailed : RatedStudySessionMessage
 
     data object VoiceAnswerGradingFailed : RatedStudySessionMessage

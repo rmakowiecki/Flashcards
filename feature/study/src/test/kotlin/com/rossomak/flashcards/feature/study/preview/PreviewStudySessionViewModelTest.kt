@@ -2,19 +2,30 @@ package com.rossomak.flashcards.feature.study.preview
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
+import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
+import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDenied
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
+import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SelectSessionFlashcardsUseCase
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -35,6 +46,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCo
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
@@ -47,6 +59,7 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlin.random.Random
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -63,6 +76,8 @@ class PreviewStudySessionViewModelTest {
     private val savedStateHandle: SavedStateHandle = mockk()
     private val flashcardRepository = FakeFlashcardRepository()
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
+    private val userPreferencesRepository = FakeUserPreferencesRepository()
+    private val permissionGateway = FakePermissionGateway()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     /** Anything but [StudySessionConfig.DEFAULT_RATED_ATTEMPTS], so a commit is visible. */
@@ -128,6 +143,10 @@ class PreviewStudySessionViewModelTest {
         SampleQuickSessionSubcategoriesUseCase(random = Random(SUBCATEGORY_SAMPLE_RANDOM_SEED)),
         ObserveStudySessionPreferencesUseCase(studySessionPreferencesRepository),
         SaveStudySessionPreferenceUseCase(studySessionPreferencesRepository),
+        ObserveUserPreferencesUseCase(userPreferencesRepository),
+        SaveUserPreferenceUseCase(userPreferencesRepository),
+        ObservePermissionStatusUseCase(permissionGateway),
+        RequestPermissionUseCase(permissionGateway),
         voiceSettingsController,
     )
 
@@ -748,6 +767,7 @@ class PreviewStudySessionViewModelTest {
     fun `onStartSession emits RatedStudySession route with selected cards, voice answering and attempts`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(singleSubcategoryRoute)
+            markVoiceAnsweringInfoSeen()
             flashcardRepository.flashcardsToReturn = Result.success(
                 listOf(flashcard(id = "card-1"), flashcard(id = "card-2"))
             )
@@ -1177,6 +1197,353 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.selectedCardIds.toSet() shouldBe cardIdsBeforeSort
+        }
+
+    private fun markVoiceAnsweringInfoSeen() {
+        userPreferencesRepository.preferences.value =
+            userPreferencesRepository.preferences.value.copy(hasSeenVoiceAnsweringInfo = true)
+    }
+
+    /** A loaded single-subcategory Rated session whose saved default has voice answering on. */
+    private fun TestScope.createVoiceAnsweringViewModel(): PreviewStudySessionViewModel {
+        stubRoute(singleSubcategoryRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+        studySessionPreferencesRepository.preferences.value = StudySessionPreferences(voiceAnsweringEnabled = true)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onResume()
+        advanceUntilIdle()
+        return viewModel
+    }
+
+    private fun setMicPermissionStatus(status: PermissionStatus) {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to status)
+    }
+
+    @Test
+    fun `canStart stays true for every microphone status, a permanent denial included`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceAnsweringViewModel()
+
+            listOf(Denied, PermanentlyDenied, Granted).forEach { status ->
+                setMicPermissionStatus(status)
+                viewModel.onResume()
+                advanceUntilIdle()
+                viewModel.state.value.canStart shouldBe true
+                viewModel.state.value.isMicPermissionRejected shouldBe (status == PermanentlyDenied)
+            }
+        }
+
+    @Test
+    fun `a permanent denial is not a rejection once the session no longer needs the microphone`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicPermissionStatus(PermanentlyDenied)
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.state.value.isMicPermissionRejected shouldBe true
+
+            viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Fast)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            viewModel.state.value.isMicPermissionRejected shouldBe false
+
+            viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Rated)))
+            viewModel.onDialogEvent(Confirm)
+            viewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = true)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            viewModel.state.value.isMicPermissionRejected shouldBe true
+
+            viewModel.onSwitchToManualAnswering()
+            viewModel.state.value.isMicPermissionRejected shouldBe false
+            viewModel.state.value.canStart shouldBe true
+        }
+
+    @Test
+    fun `onResume re-reads the microphone status`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceAnsweringViewModel()
+        viewModel.state.value.micPermissionStatus shouldBe Denied
+
+        setMicPermissionStatus(Granted)
+        viewModel.onResume()
+        advanceUntilIdle()
+
+        viewModel.state.value.micPermissionStatus shouldBe Granted
+    }
+
+    @Test
+    fun `Start with the info unseen shows the info dialog and neither requests nor navigates`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe VoiceAnsweringInfo
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `OK on the info dialog persists the seen flag, requests the microphone and navigates once granted`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            userPreferencesRepository.preferences.value.hasSeenVoiceAnsweringInfo shouldBe true
+            viewModel.state.value.activeDialog shouldBe null
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            viewModel.events.test {
+                val destination = awaitItem() as PreviewStudySessionDestination.RatedStudySession
+                destination.route.voiceAnsweringEnabled shouldBe true
+            }
+        }
+
+    @Test
+    fun `OK on the info dialog still requests and navigates when saving the seen flag fails`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userPreferencesRepository.saveError = IllegalStateException("disk full")
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
+
+    @Test
+    fun `dismissing the info dialog persists the seen flag without requesting or navigating`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.onDialogEvent(Dismiss)
+            advanceUntilIdle()
+
+            userPreferencesRepository.preferences.value.hasSeenVoiceAnsweringInfo shouldBe true
+            viewModel.state.value.activeDialog shouldBe null
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Start after dismissing the info dialog requests the microphone directly`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+            viewModel.onDialogEvent(Dismiss)
+            advanceUntilIdle()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe null
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
+
+    @Test
+    fun `Start with the info already seen requests the microphone directly`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe null
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
+
+    @Test
+    fun `a soft denial keeps the user here and lets Start ask again`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            permissionGateway.nextRequestResult = Denied
+            val viewModel = createVoiceAnsweringViewModel()
+
+            repeat(2) { index ->
+                viewModel.onStartSession()
+                advanceUntilIdle()
+
+                viewModel.state.value.micPermissionStatus shouldBe Denied
+                viewModel.state.value.config.voiceAnsweringEnabled shouldBe true
+                viewModel.state.value.canStart shouldBe true
+                permissionGateway.launchedRequests.size shouldBe index + 1
+            }
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `a first permanent denial shows the empty state, keeps Start enabled and shows no snackbar`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            permissionGateway.nextRequestResult = PermanentlyDenied
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.messages.test {
+                viewModel.onStartSession()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.isMicPermissionRejected shouldBe true
+            viewModel.state.value.canStart shouldBe true
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Start while permanently denied asks again and shows a snackbar when still refused`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            setMicPermissionStatus(PermanentlyDenied)
+            permissionGateway.nextRequestResult = PermanentlyDenied
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.messages.test {
+                viewModel.onStartSession()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe PreviewStudySessionMessage.MicPermissionStillDenied
+            }
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            viewModel.state.value.isMicPermissionRejected shouldBe true
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Start while permanently denied navigates when the new request is granted`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            setMicPermissionStatus(PermanentlyDenied)
+            permissionGateway.nextRequestResult = Granted
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.messages.test {
+                viewModel.onStartSession()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.isMicPermissionRejected shouldBe false
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
+
+    @Test
+    fun `Start while permanently denied clears the empty state when the system prompts again and the user soft-denies`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            setMicPermissionStatus(PermanentlyDenied)
+            permissionGateway.nextRequestResult = Denied
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.messages.test {
+                viewModel.onStartSession()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.isMicPermissionRejected shouldBe false
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `an already granted microphone navigates without prompting`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            setMicPermissionStatus(Granted)
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
+
+    @Test
+    fun `Start without voice answering navigates with no info dialog and no request`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val fastViewModel = createVoiceAnsweringViewModel()
+            fastViewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Fast)))
+            fastViewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            fastViewModel.onStartSession()
+            advanceUntilIdle()
+
+            fastViewModel.state.value.activeDialog shouldBe null
+            fastViewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.FastStudySession
+            }
+
+            val manualViewModel = createVoiceAnsweringViewModel()
+            manualViewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = false)))
+            manualViewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            manualViewModel.onStartSession()
+            advanceUntilIdle()
+
+            manualViewModel.state.value.activeDialog shouldBe null
+            manualViewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+            permissionGateway.launchedRequests shouldBe emptyList()
+        }
+
+    @Test
+    fun `Switch to manual turns voice answering off for this session only`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicPermissionStatus(PermanentlyDenied)
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.onSwitchToManualAnswering()
+            advanceUntilIdle()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe false
+            studySessionPreferencesRepository.preferences.value.voiceAnsweringEnabled shouldBe true
+            viewModel.events.test {
+                val destination = awaitItem() as PreviewStudySessionDestination.RatedStudySession
+                destination.route.voiceAnsweringEnabled shouldBe false
+            }
+        }
+
+    @Test
+    fun `keeping voice answering as the default persists it even with the microphone permanently denied`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            setMicPermissionStatus(PermanentlyDenied)
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onResume()
+
+            viewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = true, keepAsDefault = true)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            studySessionPreferencesRepository.preferences.value.voiceAnsweringEnabled shouldBe true
+            viewModel.state.value.isMicPermissionRejected shouldBe true
         }
 
     private companion object {

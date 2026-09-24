@@ -6,7 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.UserPreference.DailyGoalMinutes
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenOnboarding
-import com.rossomak.flashcards.core.domain.model.UserPreference.VoiceAnswerConsent
+import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.UserPreferences
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
@@ -82,12 +82,12 @@ class DataStoreUserPreferencesLocalDataSourceTest {
     }
 
     @Test
-    fun `save then read round-trips voice answer consent`() = runTest {
+    fun `save then read round-trips the voice answering info seen flag`() = runTest {
         val localDataSource = createLocalDataSource()
 
-        localDataSource.save(VoiceAnswerConsent(true))
+        localDataSource.save(HasSeenVoiceAnsweringInfo(true))
         val preferences = localDataSource.userPreferences().first()
 
-        preferences.voiceAnswerConsentGranted shouldBe true
+        preferences.hasSeenVoiceAnsweringInfo shouldBe true
     }
 }
