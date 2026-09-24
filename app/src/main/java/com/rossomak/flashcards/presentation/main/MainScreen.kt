@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.presentation.main
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -161,7 +163,13 @@ fun MainScreen(
                 // Declares the bottom-bar inset already spent, so any descendant applying a
                 // window-inset padding of its own adds only the part beyond the bar rather than
                 // double-counting it.
-                .consumeWindowInsets(innerPadding)
+                .consumeWindowInsets(innerPadding),
+            // Tab switches are an instant swap: the default crossfade keeps both tabs composed and
+            // drawing for its whole duration, starving the bottom bar's tint/indicator animations.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
         ) {
             navigation<HomeGraph>(startDestination = HomeRoot) {
                 composable<HomeRoot> {

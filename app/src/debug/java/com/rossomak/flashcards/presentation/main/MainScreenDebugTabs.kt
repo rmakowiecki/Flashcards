@@ -48,7 +48,6 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
         composable<DebugRoot> {
             DebugScreen(
                 buildInfo = BuildInfo(
-                    buildType = BuildConfig.BUILD_TYPE,
                     versionName = BuildConfig.VERSION_NAME,
                     versionCode = BuildConfig.VERSION_CODE,
                     gitShortSha = BuildConfig.GIT_SHORT_SHA,
