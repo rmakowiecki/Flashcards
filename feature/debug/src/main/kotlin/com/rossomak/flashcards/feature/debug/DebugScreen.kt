@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.debug
 
 import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -8,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,6 +23,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -52,6 +55,7 @@ fun DebugScreen(
     buildInfo: BuildInfo,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
+    onNavigateToVoiceIndicatorDebug: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -68,6 +72,7 @@ fun DebugScreen(
         buildInfo = buildInfo,
         showcaseIntent = showcaseIntent,
         onVoiceDebugClick = onNavigateToVoiceDebug,
+        onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
     )
 }
@@ -79,6 +84,7 @@ private fun DebugContent(
     buildInfo: BuildInfo,
     showcaseIntent: Intent?,
     onVoiceDebugClick: () -> Unit,
+    onVoiceIndicatorDebugClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -103,48 +109,38 @@ private fun DebugContent(
             FlashcardsListGroup(
                 items = buildList {
                     add(
-                        FlashcardsListGroupItem.Row(
-                            title = stringResource(R.string.debug_voice_harness_label),
+                        debugToolRow(
+                            titleRes = R.string.debug_voice_harness_label,
+                            messageRes = R.string.debug_voice_harness_message,
+                            icon = Icons.Default.GraphicEq,
                             onClick = onVoiceDebugClick,
-                            secondaryText = stringResource(R.string.debug_voice_harness_message),
-                            leading = {
-                                FlashcardsIconTile(
-                                    icon = Icons.Default.GraphicEq,
-                                    contentDescription = null,
-                                )
-                            },
-                            trailing = { FlashcardsChevron() },
                         ),
                     )
                     add(
-                        FlashcardsListGroupItem.Row(
-                            title = stringResource(R.string.debug_replay_onboarding_label),
+                        debugToolRow(
+                            titleRes = R.string.debug_voice_indicator_label,
+                            messageRes = R.string.debug_voice_indicator_message,
+                            icon = Icons.Default.Mic,
+                            onClick = onVoiceIndicatorDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_replay_onboarding_label,
+                            messageRes = R.string.debug_replay_onboarding_message,
+                            icon = Icons.Default.Refresh,
                             onClick = onReplayOnboardingClick,
-                            secondaryText = stringResource(R.string.debug_replay_onboarding_message),
-                            leading = {
-                                FlashcardsIconTile(
-                                    icon = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                )
-                            },
-                            trailing = { FlashcardsChevron() },
                         ),
                     )
                     // Absent when Showkase is not on the classpath, which is every non-debug build
                     // of :core:ui — the row would open nothing.
                     if (showcaseIntent != null) {
                         add(
-                            FlashcardsListGroupItem.Row(
-                                title = stringResource(R.string.debug_showcase_label),
+                            debugToolRow(
+                                titleRes = R.string.debug_showcase_label,
+                                messageRes = R.string.debug_showcase_message,
+                                icon = Icons.Default.Widgets,
                                 onClick = { context.startActivity(showcaseIntent) },
-                                secondaryText = stringResource(R.string.debug_showcase_message),
-                                leading = {
-                                    FlashcardsIconTile(
-                                        icon = Icons.Default.Widgets,
-                                        contentDescription = null,
-                                    )
-                                },
-                                trailing = { FlashcardsChevron() },
                             ),
                         )
                     }
@@ -153,6 +149,21 @@ private fun DebugContent(
         }
     }
 }
+
+/** One drill-in row of the hub: an icon tile, a title with a one-line explanation, and a chevron. */
+@Composable
+private fun debugToolRow(
+    @StringRes titleRes: Int,
+    @StringRes messageRes: Int,
+    icon: ImageVector,
+    onClick: () -> Unit,
+): FlashcardsListGroupItem.Row = FlashcardsListGroupItem.Row(
+    title = stringResource(titleRes),
+    onClick = onClick,
+    secondaryText = stringResource(messageRes),
+    leading = { FlashcardsIconTile(icon = icon, contentDescription = null) },
+    trailing = { FlashcardsChevron() },
+)
 
 /**
  * [TwoRowsTopAppBar] rather than a flexible app bar: its subtitle slot is told which row it renders
@@ -195,6 +206,7 @@ private fun DebugContentPreview() {
             ),
             showcaseIntent = null,
             onVoiceDebugClick = {},
+            onVoiceIndicatorDebugClick = {},
             onReplayOnboardingClick = {},
         )
     }
