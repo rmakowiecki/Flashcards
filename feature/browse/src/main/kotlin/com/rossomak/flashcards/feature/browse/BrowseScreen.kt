@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CategorySearchResults
 import com.rossomak.flashcards.core.domain.model.CategoryWithSubcategorySummary
+import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -61,11 +62,12 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsDetailedListRow
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
-import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
+import com.rossomak.flashcards.feature.browse.details.category.subcategoryProgressFor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -156,6 +158,8 @@ fun BrowseContent(
 
     val barColors = containedSearchBarColors()
 
+    val progressFor = rememberProgressFor(state.progressSummary, state.isProgressResolved)
+
     val inputField = @Composable {
         SearchBarDefaults.InputField(
             textFieldState = textFieldState,
@@ -199,7 +203,13 @@ fun BrowseContent(
     Column(modifier = modifier.fillMaxSize()) {
         TopSearchBar(state = searchBarState, inputField = inputField, colors = barColors)
         Box(modifier = Modifier.fillMaxSize()) {
-            CategoryListContent(state = state, onRefresh = onRefresh, onCategoryClick = onCategoryClick)
+            CategoryListContent(
+                isLoading = state.isLoading,
+                categories = state.categories,
+                favorites = state.favorites,
+                onRefresh = onRefresh,
+                onCategoryClick = onCategoryClick,
+            )
         }
     }
 
@@ -211,7 +221,10 @@ fun BrowseContent(
         colors = barColors,
     ) {
         ExpandedSearchContent(
-            state = state,
+            searchStatus = state.searchStatus,
+            categories = state.categories,
+            favorites = state.favorites,
+            progressFor = progressFor,
             onCategoryClick = onCategoryClick,
             onSubcategoryClick = onSubcategoryClick,
             onSubcategorySessionStart = onSubcategorySessionStart,
@@ -220,20 +233,36 @@ fun BrowseContent(
 }
 
 /**
+ * Keyed on the two fields it reads, so a search keystroke hands the results the same function
+ * instance and unchanged rows skip. A `state::progressFor` reference would capture the whole state
+ * and be new on every recomposition.
+ */
+@Composable
+private fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressResolved: Boolean): (String) -> SubcategoryProgress =
+    remember(progressSummary, isProgressResolved) {
+        { subcategoryId -> progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved) }
+    }
+
+/**
  * The three things this content slot can show: a spinner during the initial load, an error card,
- * or the category list. An empty [BrowseScreenState.categories] always reads as failure — whether
+ * or the category list. An empty [categories] always reads as failure — whether
  * a real load error or genuinely zero categories, there's nothing useful to show and retry is the
  * only recourse — so both collapse into the same error state.
+ *
+ * Takes only the fields it renders rather than the whole screen state, so a search keystroke
+ * (which changes only the search fields) doesn't recompose the list hidden under the search bar.
  */
 @Composable
 private fun BoxScope.CategoryListContent(
-    state: BrowseScreenState,
+    isLoading: Boolean,
+    categories: List<Category>,
+    favorites: UserFavorites,
     onRefresh: () -> Unit,
     onCategoryClick: (String, String) -> Unit,
 ) {
     when {
-        state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        state.categories.isEmpty() -> CenteredEmptyState(
+        isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        categories.isEmpty() -> CenteredEmptyState(
             icon = Icons.Filled.ErrorOutline,
             title = stringResource(R.string.browse_categories_error_title),
             supportingText = stringResource(R.string.browse_categories_error_message),
@@ -246,7 +275,7 @@ private fun BoxScope.CategoryListContent(
                 )
             },
         )
-        else -> CategoryList(categories = state.categories, favorites = state.favorites, onCategoryClick = onCategoryClick)
+        else -> CategoryList(categories = categories, favorites = favorites, onCategoryClick = onCategoryClick)
     }
 }
 
@@ -304,12 +333,15 @@ private fun containedSearchBarColors(): SearchBarColors = SearchBarDefaults.colo
 /** The five things the expanded bar can show, one per [SearchStatus]. */
 @Composable
 private fun ExpandedSearchContent(
-    state: BrowseScreenState,
+    searchStatus: SearchStatus,
+    categories: List<Category>,
+    favorites: UserFavorites,
+    progressFor: (String) -> SubcategoryProgress,
     onCategoryClick: (String, String) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
-    when (val status = state.searchStatus) {
+    when (searchStatus) {
         SearchStatus.Prompt -> CenteredEmptyState(
             icon = Icons.Filled.Search,
             title = stringResource(R.string.browse_search_prompt_title),
@@ -321,10 +353,10 @@ private fun ExpandedSearchContent(
         }
 
         is SearchStatus.Results -> SearchResults(
-            results = status.results,
-            categories = state.categories,
-            favorites = state.favorites,
-            progressFor = state::progressFor,
+            results = searchStatus.results,
+            categories = categories,
+            favorites = favorites,
+            progressFor = progressFor,
             onCategoryClick = onCategoryClick,
             onSubcategoryClick = onSubcategoryClick,
             onSubcategorySessionStart = onSubcategorySessionStart,
@@ -373,8 +405,10 @@ private fun CenteredEmptyState(
  * Categories are a short, fixed set (roughly a dozen) so this binds [FlashcardsListGroup]
  * directly rather than a `LazyColumn` — every row composes up front at negligible cost. A
  * subcategory list nested under one category can run into the dozens and should use
- *
  * `flashcardsListGroupItems` inside a `LazyColumn` instead.
+ *
+ * Rows read [Category] directly through the builder form of [FlashcardsListGroup], so there is no
+ * per-composition mapping into an intermediate row model.
  *
  * Callers only reach this with a non-empty [categories]: the empty case is handled upstream in
  * [CategoryListContent] as an error state.
@@ -387,15 +421,21 @@ internal fun CategoryList(
 ) {
     ScrollableSectionColumn {
         FlashcardsOverlineLabel(text = stringResource(R.string.browse_categories_label))
-        CategoryListGroup(
-            // Outside search there is nothing to hoist, so a category's chip line is exactly its
-            // stored prominence order.
-            categories = categories.map { category ->
-                CategoryWithSubcategorySummary(category = category, subcategorySummary = category.featuredSubcategoryNames)
-            },
-            favorites = favorites,
-            onCategoryClick = onCategoryClick,
-        )
+        FlashcardsListGroup(
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+            items = categories,
+            key = { category -> category.id },
+        ) { category, rowModifier ->
+            CategoryRow(
+                modifier = rowModifier,
+                category = category,
+                // Outside search there is nothing to hoist, so a category's chip line is exactly
+                // its stored prominence order.
+                subcategorySummary = category.featuredSubcategoryNames,
+                isFavorited = favorites.categoryIds.containsKey(category.id),
+                onCategoryClick = onCategoryClick,
+            )
+        }
     }
 }
 
@@ -420,46 +460,61 @@ internal fun SearchResults(
     ScrollableSectionColumn {
         if (results.subcategories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_topics_label))
-            SubcategoryListGroup(results, favorites, progressFor, categories, onSubcategoryClick, onSubcategorySessionStart)
+            SubcategoryListGroup(
+                subcategories = results.subcategories,
+                categories = categories,
+                favorites = favorites,
+                progressFor = progressFor,
+                onSubcategoryClick = onSubcategoryClick,
+                onSubcategorySessionStart = onSubcategorySessionStart,
+            )
         }
         if (results.categories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_categories_label))
-            CategoryListGroup(categories = results.categories, favorites = favorites, onCategoryClick = onCategoryClick)
+            FlashcardsListGroup(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+                items = results.categories,
+                key = { categoryWithSummary -> categoryWithSummary.category.id },
+            ) { categoryWithSummary, rowModifier ->
+                CategoryRow(
+                    modifier = rowModifier,
+                    category = categoryWithSummary.category,
+                    subcategorySummary = categoryWithSummary.subcategorySummary,
+                    isFavorited = favorites.categoryIds.containsKey(categoryWithSummary.category.id),
+                    onCategoryClick = onCategoryClick,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun SubcategoryListGroup(
-    results: CategorySearchResults,
+    subcategories: List<Subcategory>,
+    categories: List<Category>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgress,
-    categories: List<Category>,
     onSubcategoryClick: (Subcategory) -> Unit,
-    onSubcategorySessionStart: (Subcategory) -> Unit
+    onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
-    val cardsStudiedSeparator = stringResource(CoreUiR.string.common_middle_dot_separator)
+    val categoriesById = remember(categories) { categories.associateBy { it.id } }
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
-        items = results.subcategories.map { subcategory ->
-            val progress = progressFor(subcategory.id)
-            subcategory.toSearchResultListGroupItem(
-                progress = progress,
-                ringContentDescription = progress.searchRingContentDescription(subcategory.cardCount),
-                cardsStudiedText = subcategory.searchResultCardsStudiedText(progress = progress, separator = cardsStudiedSeparator),
-                // Not found only for a stale/inconsistent categoryId — falls back to the
-                // glyph's own generic icon, same as a category with no iconSvg curated yet.
-                iconSvg = categories.firstOrNull { it.id == subcategory.categoryId }?.iconSvg,
-                startSessionContentDescription = stringResource(
-                    R.string.browse_search_start_session_cd,
-                    subcategory.name,
-                ),
-                isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
-                onSubcategoryClick = onSubcategoryClick,
-                onSubcategorySessionStart = onSubcategorySessionStart,
-            )
-        },
-    )
+        items = subcategories,
+        key = { subcategory -> subcategory.id },
+    ) { subcategory, rowModifier ->
+        SubcategorySearchResultRow(
+            modifier = rowModifier,
+            subcategory = subcategory,
+            progress = progressFor(subcategory.id),
+            // Not found only for a stale/inconsistent categoryId — falls back to the glyph's own
+            // generic icon, same as a category with no iconSvg curated yet.
+            iconSvg = categoriesById[subcategory.categoryId]?.iconSvg,
+            isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
+            onSubcategoryClick = onSubcategoryClick,
+            onSubcategorySessionStart = onSubcategorySessionStart,
+        )
+    }
 }
 
 @Composable
@@ -475,59 +530,42 @@ private fun ScrollableSectionColumn(content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * The subtitle line is the category's subcategory-summary chip line, e.g.
+ * `Compose · Coroutines · Testing`. The placeholder subtitle only shows for a category with no
+ * Subcategories to name at all — every other row names its most prominent Subcategories.
+ */
 @Composable
-private fun CategoryListGroup(
-    categories: List<CategoryWithSubcategorySummary>,
-    favorites: UserFavorites,
+private fun CategoryRow(
+    modifier: Modifier,
+    category: Category,
+    subcategorySummary: List<String>,
+    isFavorited: Boolean,
     onCategoryClick: (String, String) -> Unit,
 ) {
     val subcategorySummarySeparator = stringResource(CoreUiR.string.common_middle_dot_separator)
     val placeholderSubtitle = stringResource(R.string.browse_category_placeholder_subtitle)
-    FlashcardsListGroup(
-        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
-        items = categories.map { categoryWithSummary ->
-            categoryWithSummary.toListGroupItem(
-                subcategoryCountText = pluralStringResource(
-                    R.plurals.browse_category_topic_count,
-                    categoryWithSummary.category.subcategoryCount,
-                    categoryWithSummary.category.subcategoryCount,
-                ),
-                placeholderSubtitle = placeholderSubtitle,
-                subcategorySummarySeparator = subcategorySummarySeparator,
-                isFavorited = favorites.categoryIds.containsKey(categoryWithSummary.category.id),
-                onCategoryClick = onCategoryClick,
+    FlashcardsDetailedListRow(
+        modifier = modifier,
+        title = category.name,
+        subtitle = subcategorySummary.joinToString(subcategorySummarySeparator).ifEmpty { placeholderSubtitle },
+        secondaryText = pluralStringResource(
+            R.plurals.browse_category_topic_count,
+            category.subcategoryCount,
+            category.subcategoryCount,
+        ),
+        onClick = { onCategoryClick(category.id, category.name) },
+        isFavorited = isFavorited,
+        leading = {
+            FlashcardsVectorIconTile(
+                iconSvg = category.iconSvg,
+                color = category.color,
+                contentDescription = null,
             )
         },
+        trailing = { FlashcardsChevron() },
     )
 }
-
-/**
- * The subtitle line is the category's subcategory-summary chip line, e.g.
- * `Compose · Coroutines · Testing`. [placeholderSubtitle] only shows for a category with no
- * Subcategories to name at all — every other row names its most prominent Subcategories.
- */
-private fun CategoryWithSubcategorySummary.toListGroupItem(
-    subcategoryCountText: String,
-    placeholderSubtitle: String,
-    subcategorySummarySeparator: String,
-    isFavorited: Boolean,
-    onCategoryClick: (String, String) -> Unit,
-): FlashcardsListGroupItem = FlashcardsListGroupItem.DetailedRow(
-    key = category.id,
-    title = category.name,
-    subtitle = subcategorySummary.joinToString(subcategorySummarySeparator).ifEmpty { placeholderSubtitle },
-    secondaryText = subcategoryCountText,
-    onClick = { onCategoryClick(category.id, category.name) },
-    isFavorited = isFavorited,
-    leading = {
-        FlashcardsVectorIconTile(
-            iconSvg = category.iconSvg,
-            color = category.color,
-            contentDescription = null,
-        )
-    },
-    trailing = { FlashcardsChevron() },
-)
 
 private val previewSearchActions = BrowseSearchActions(
     onQueryChange = {},

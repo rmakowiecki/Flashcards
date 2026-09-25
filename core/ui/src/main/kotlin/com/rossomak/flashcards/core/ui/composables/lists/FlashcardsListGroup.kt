@@ -1,5 +1,6 @@
-// Grouping file: FlashcardsListGroupItem is the closed set of row kinds a group can render;
-// FlashcardsListGroup and flashcardsListGroupItems are the bounded and lazy containers for it.
+// Grouping file: FlashcardsListGroup and flashcardsListGroupItems are the bounded and lazy list
+// containers, each in two forms — a builder that hands every row a pre-shaped Modifier, and the
+// FlashcardsListGroupItem sealed model for short static lists.
 @file:Suppress("MatchingDeclarationName")
 
 package com.rossomak.flashcards.core.ui.composables.lists
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -41,12 +43,18 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
 /**
- * The closed set of row kinds [FlashcardsListGroup] and [flashcardsListGroupItems] can render —
- * one variant per dedicated row composable ([FlashcardsListRow], [FlashcardsDetailedListRow],
- * [FlashcardsSelectableListRow], [FlashcardsExpandableListRow]). There is no free-form
- * `content: @Composable () -> Unit` slot: a group can only ever render these row kinds, so
- * [flashcardsListItemShape] stays owned entirely by the container that dispatches on this sealed
- * type — a row composable never shapes itself.
+ * The closed set of row kinds the sealed-model [FlashcardsListGroup] and [flashcardsListGroupItems]
+ * overloads can render — one variant per dedicated row composable ([FlashcardsListRow],
+ * [FlashcardsDetailedListRow], [FlashcardsSelectableListRow], [FlashcardsExpandableListRow]).
+ *
+ * **Short static lists only** (settings sections, debug menus, showcases). Items are data classes
+ * holding lambdas, and call sites build them outside a composable scope, where the Compose compiler
+ * doesn't memoize lambdas. Every rebuild of the list therefore yields items that never equal the
+ * previous ones, and every row in the group recomposes, even rows whose data didn't change. Any
+ * list whose content changes at runtime (loaded data, selection, expansion, favorites) uses the
+ * builder overloads instead — `FlashcardsListGroup(items, key) { item, modifier -> … }` or
+ * `flashcardsListGroupItems(items, key) { item, modifier -> … }` — which build each row inside its
+ * own composable scope.
  */
 sealed interface FlashcardsListGroupItem {
 
@@ -187,6 +195,9 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
  * up front costs nothing). Once a list can grow past what fits comfortably on screen — e.g. a
  * subcategory list with dozens of rows — use [flashcardsListGroupItems] inside a `LazyColumn`
  * instead, so only visible rows get composed.
+ *
+ * Takes the [FlashcardsListGroupItem] sealed model, so it suits short static lists only (see that
+ * type's KDoc); a list whose content changes at runtime uses the builder overload.
  */
 @Composable
 fun FlashcardsListGroup(
@@ -196,13 +207,7 @@ fun FlashcardsListGroup(
     Column(modifier = modifier.flashcardsListGroupContainer()) {
         items.forEachIndexed { index, item ->
             key(item.key ?: index) {
-                val position = FlashcardsListItemPosition.of(index, items.size)
-                FlashcardsListGroupRow(
-                    item = item,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .flashcardsListItemShape(position),
-                )
+                FlashcardsListGroupRow(item = item, modifier = Modifier.groupRowShape(index, items.size))
             }
         }
     }
@@ -216,6 +221,9 @@ fun FlashcardsListGroup(
  * [FlashcardsListGroupItem.key] (falling back to its index) and types it by its sealed variant,
  * so Compose never reuses a row's composition slot — and any per-row remembered/animated state —
  * for a different item or a different row kind.
+ *
+ * Takes the [FlashcardsListGroupItem] sealed model, so it suits short static lists only (see that
+ * type's KDoc); a list whose content changes at runtime uses the builder overload.
  */
 fun LazyListScope.flashcardsListGroupItems(items: List<FlashcardsListGroupItem>) {
     itemsIndexed(
@@ -223,15 +231,70 @@ fun LazyListScope.flashcardsListGroupItems(items: List<FlashcardsListGroupItem>)
         key = { index, item -> item.key ?: index },
         contentType = { _, item -> item::class },
     ) { index, item ->
-        val position = FlashcardsListItemPosition.of(index, items.size)
-        FlashcardsListGroupRow(
-            item = item,
-            modifier = Modifier
-                .fillMaxWidth()
-                .flashcardsListItemShape(position),
-        )
+        FlashcardsListGroupRow(item = item, modifier = Modifier.groupRowShape(index, items.size))
     }
 }
+
+/**
+ * Builder form of the bounded [FlashcardsListGroup]: one rounded card wrapping a `Column` with one
+ * row per element of [items]. Each row is built by [itemContent] inside its own composable scope, so
+ * its lambdas are memoized and an unchanged row skips recomposition when the list around it
+ * changes. Prefer this over the [FlashcardsListGroupItem] overload for any list whose content
+ * changes at runtime.
+ *
+ * [itemContent] receives a `modifier` already carrying `fillMaxWidth()` and the row's
+ * [flashcardsListItemShape] for its position in the group; pass it to the row composable
+ * ([FlashcardsListRow], [FlashcardsDetailedListRow], [FlashcardsSelectableListRow],
+ * [FlashcardsExpandableListRow]) unchanged. [key] gives every row a stable identity, so per-row
+ * remembered and animated state follows its item when the list reorders or filters.
+ *
+ * For lists that can grow past what fits on screen, use [flashcardsListGroupItems] inside a
+ * `LazyColumn` instead.
+ */
+@Composable
+fun <T> FlashcardsListGroup(
+    items: List<T>,
+    key: (T) -> Any,
+    modifier: Modifier = Modifier,
+    itemContent: @Composable (item: T, modifier: Modifier) -> Unit,
+) {
+    Column(modifier = modifier.flashcardsListGroupContainer()) {
+        items.forEachIndexed { index, item ->
+            androidx.compose.runtime.key(key(item)) {
+                itemContent(item, Modifier.groupRowShape(index, items.size))
+            }
+        }
+    }
+}
+
+/**
+ * Builder form of the lazy [flashcardsListGroupItems]: adds one `LazyColumn` item per element of
+ * [items], with the same position-dependent shaping and per-row memoization as the builder
+ * [FlashcardsListGroup]. The caller wraps the `LazyColumn` in [flashcardsListGroupContainer].
+ *
+ * [itemContent] receives a `modifier` already carrying `fillMaxWidth()` and the row's
+ * [flashcardsListItemShape]; pass it to the row composable unchanged. [key] is the lazy item key;
+ * [contentType] lets Compose reuse a row's composition only for rows of the same kind.
+ */
+fun <T> LazyListScope.flashcardsListGroupItems(
+    items: List<T>,
+    key: (T) -> Any,
+    contentType: (T) -> Any? = { null },
+    itemContent: @Composable LazyItemScope.(item: T, modifier: Modifier) -> Unit,
+) {
+    itemsIndexed(
+        items,
+        key = { _, item -> key(item) },
+        contentType = { _, item -> contentType(item) },
+    ) { index, item ->
+        itemContent(item, Modifier.groupRowShape(index, items.size))
+    }
+}
+
+@Composable
+private fun Modifier.groupRowShape(index: Int, count: Int): Modifier = this
+    .fillMaxWidth()
+    .flashcardsListItemShape(FlashcardsListItemPosition.of(index, count))
 
 /**
  * [SwitchDefaults.colors] using the app's secondary (purple) role for the "on" track, matching
