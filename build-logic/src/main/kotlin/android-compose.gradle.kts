@@ -5,8 +5,10 @@ import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginE
 // Stability: `config/compose/stability-config.conf` marks :core:domain models and read-only
 // collections as stable, so composables taking them can skip.
 //
-// Reports and metrics are opt-in, so normal builds are unaffected:
-//   ./gradlew :feature:browse:compileReleaseKotlin --rerun -PcomposeCompilerReports=true
+// Reports and metrics are opt-in, so normal builds are unaffected. Generate and summarize them with
+//   python3 scripts/compose-stability.py [:module:path ...]
+// which runs `compileReleaseKotlin --rerun -PcomposeCompilerReports=true` and prints the unstable
+// params and non-skippable composables it finds. The compile
 // writes `<module>-classes.txt` and `<module>-composables.txt` to `<module>/build/compose_compiler/`
 // and `<module>-module.json` metrics to a per-variant subdirectory. Read them from a release-like
 // variant; debug builds compile with live-literal instrumentation and report differently. Keep

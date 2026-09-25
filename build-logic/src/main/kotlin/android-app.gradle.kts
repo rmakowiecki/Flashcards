@@ -5,7 +5,7 @@ plugins {
 // AGP-dependent plugins applied in the body so generatePrecompiledScriptPluginAccessors
 // does not probe them against a synthetic project without AGP's extension.
 // AGP 9 built-in Kotlin handles kotlin.android — no explicit apply needed.
-pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
+pluginManager.apply("android-compose")
 pluginManager.apply("com.google.devtools.ksp")
 pluginManager.apply("com.google.dagger.hilt.android")
 pluginManager.apply("org.jetbrains.kotlin.plugin.serialization")
