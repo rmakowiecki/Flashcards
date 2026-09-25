@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.konsist
 
 import com.lemonappdev.konsist.api.Konsist
+import com.lemonappdev.konsist.api.declaration.KoClassDeclaration
 import com.lemonappdev.konsist.api.declaration.KoTypeArgumentDeclaration
 import com.lemonappdev.konsist.api.verify.assertFalse
 import com.lemonappdev.konsist.api.verify.assertTrue
@@ -110,6 +111,28 @@ class ArchitectureKonsistTest {
     private fun isExempt(annotations: List<com.lemonappdev.konsist.api.declaration.KoAnnotationDeclaration>) =
         annotations.any { it.name == "ArchConventionExempt" }
 
+    /**
+     * The Compose stability config (`config/compose/stability-config.conf`) declares read-only
+     * `List`/`Set`/`Map` stable, trusting that a collection published into screen state or a
+     * domain model is never mutated afterwards. The compiler matches `MutableList`/`MutableSet`/
+     * `MutableMap` against those entries too, so a mutable collection type would be reported
+     * stable while breaking that promise — the rules below reject it instead.
+     */
+    private val mutableCollectionType =
+        Regex("""\b(Mutable(List|Set|Map|Collection)|ArrayList|HashMap|HashSet|LinkedHashMap|LinkedHashSet)\b""")
+
+    private fun KoClassDeclaration.hasMutableCollectionProperty(): Boolean {
+        val propertyTypes = properties().mapNotNull { it.type?.text } +
+            primaryConstructor?.parameters.orEmpty().map { it.type.text }
+        return propertyTypes.any { mutableCollectionType.containsMatchIn(it) }
+    }
+
+    private fun isComposeModuleMainSource(path: String) =
+        path.contains("/src/main/") &&
+            (path.contains("/feature/") || path.contains("/core/ui/") || path.contains("/app/src/main/"))
+
+    private fun isMainSource(path: String) = path.contains("/src/main/")
+
     @Test
     fun `Repository interfaces reside in a domain package`() {
         projectScope
@@ -133,14 +156,59 @@ class ArchitectureKonsistTest {
     }
 
     @Test
-    fun `UiState classes are immutable data classes`() {
+    fun `ScreenState classes are immutable data classes`() {
         projectScope
             .classes()
-            .filter { it.name.endsWith("UiState") }
+            .filter { it.name.endsWith("ScreenState") }
             .filter { !isExempt(it.annotations) }
             .assertTrue { koClass ->
                 koClass.hasDataModifier && koClass.properties().none { it.hasVarModifier }
             }
+    }
+
+    @Test
+    fun `Compose modules declare no mutable collection types`() {
+        // Class properties, constructor parameters and function parameters (composables included)
+        // in :feature:*, :core:ui and :app. Local variables stay free to build a collection
+        // mutably before returning it as a read-only type.
+        projectScope
+            .classes()
+            .filter { isComposeModuleMainSource(it.path) }
+            .assertFalse { koClass -> koClass.hasMutableCollectionProperty() }
+        projectScope
+            .functions()
+            .filter { isComposeModuleMainSource(it.path) }
+            .assertFalse { function -> function.parameters.any { mutableCollectionType.containsMatchIn(it.type.text) } }
+    }
+
+    @Test
+    fun `no cast to a mutable collection type`() {
+        // A cast would sidestep the declared-type rules above and mutate a collection that
+        // the Compose stability config treats as stable.
+        val mutableCollectionCast = Regex("""\bas\??\s+${mutableCollectionType.pattern}""")
+        projectScope
+            .files
+            .filter { isMainSource(it.path) }
+            .assertFalse { file -> mutableCollectionCast.containsMatchIn(file.text) }
+    }
+
+    @Test
+    fun `no read-modify-write assignment on a value holder`() {
+        // `x.value = x.value.copy(...)` loses a concurrent write between the read and the
+        // write; `x.update { it.copy(...) }` retries atomically instead.
+        val readModifyWrite = Regex("""(\b[\w.]+)\.value\s*=\s*\1\.value\b""")
+        projectScope
+            .files
+            .filter { isMainSource(it.path) }
+            .assertFalse { file -> readModifyWrite.containsMatchIn(file.text) }
+    }
+
+    @Test
+    fun `domain models have no mutable collection properties`() {
+        projectScope
+            .classes()
+            .filter { it.path.contains("/core/domain/src/main/") && it.resideInPackage("..domain.model..") }
+            .assertFalse { koClass -> koClass.hasMutableCollectionProperty() }
     }
 
     @Test
