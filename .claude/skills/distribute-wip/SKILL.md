@@ -23,8 +23,10 @@ logic here by design.
    multi-minute Gradle build:
 
    ```
-   Bash(command: "scripts/distribute-wip.sh [--variant profiling]", run_in_background: true)
+   Bash(command: "scripts/distribute-wip.sh", run_in_background: true)
    ```
+
+   For a profiling build, append `--variant profiling` to the command.
 
 2. Tell the user it's running in the background, continue the conversation
    -- don't poll or wait synchronously.
