@@ -233,12 +233,13 @@ fun BrowseContent(
 }
 
 /**
- * Keyed on the two fields it reads, so a search keystroke hands the results the same function
- * instance and unchanged rows skip. A `state::progressFor` reference would capture the whole state
- * and be new on every recomposition.
+ * Keyed on the two fields it reads, so a state change elsewhere (a search keystroke on Browse, a
+ * Selection Mode tick on Category Details) hands the rows the same function instance and unchanged
+ * rows skip. A `state::progressFor` reference would capture the whole state and be new on every
+ * recomposition.
  */
 @Composable
-private fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressResolved: Boolean): (String) -> SubcategoryProgress =
+internal fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressResolved: Boolean): (String) -> SubcategoryProgress =
     remember(progressSummary, isProgressResolved) {
         { subcategoryId -> progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved) }
     }

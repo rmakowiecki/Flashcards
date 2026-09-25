@@ -121,10 +121,9 @@ class SubcategoryDetailsViewModel @Inject constructor(
      */
     fun onResetFilters() {
         _state.update {
-            it.copy(
-                filters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = SubcategoryDetailsScreenState.DIFFICULTY_BOUNDS)
-                    .selectAllTags(it.availableTags),
-            )
+            val filters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = SubcategoryDetailsScreenState.DIFFICULTY_BOUNDS)
+                .selectAllTags(it.availableTags)
+            it.copy(filters = filters, hasActiveFilters = hasActiveFilters(filters, it.availableTags))
         }
         renderContent()
     }
@@ -202,7 +201,13 @@ class SubcategoryDetailsViewModel @Inject constructor(
                 }
                 _state.update { it.copy(sortOrder = dialog.draftState, activeDialog = null) }
             }
-            is SubcategoryDetailsDialog.Filters -> _state.update { it.copy(filters = dialog.draftState, activeDialog = null) }
+            is SubcategoryDetailsDialog.Filters -> _state.update {
+                it.copy(
+                    filters = dialog.draftState,
+                    hasActiveFilters = hasActiveFilters(dialog.draftState, it.availableTags),
+                    activeDialog = null,
+                )
+            }
         }
         renderContent()
     }
@@ -257,6 +262,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
                 )
             )
             _state.update {
+                val filters = if (seedFilters) it.filters.selectAllTags(filtered.poolTags) else it.filters
                 it.copy(
                     content = if (filtered.cards.isEmpty()) {
                         SubcategoryDetailsContentState.NoMatches
@@ -265,11 +271,8 @@ class SubcategoryDetailsViewModel @Inject constructor(
                     },
                     availableTags = filtered.poolTags,
                     totalCount = filtered.totalCount,
-                    filters = if (seedFilters) {
-                        it.filters.selectAllTags(filtered.poolTags)
-                    } else {
-                        it.filters
-                    },
+                    filters = filters,
+                    hasActiveFilters = hasActiveFilters(filters, filtered.poolTags),
                 )
             }
         }

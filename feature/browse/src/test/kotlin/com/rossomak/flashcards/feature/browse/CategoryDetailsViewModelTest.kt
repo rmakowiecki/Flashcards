@@ -12,7 +12,6 @@ import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
@@ -52,7 +51,6 @@ class CategoryDetailsViewModelTest {
     private val cardProgressRepository = FakeCardProgressRepository()
     private val observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository)
     private val userFavoritesRepository = FakeUserFavoritesRepository()
-    private val observeCategoryFavoriteState = ObserveCategoryFavoriteStateUseCase(userFavoritesRepository)
     private val setCategoryFavorite = SetCategoryFavoriteUseCase(userFavoritesRepository)
     private val appShortcutsRepository = FakeAppShortcutsRepository()
     private val pinCategoryShortcut = PinCategoryShortcutUseCase(flashcardRepository, appShortcutsRepository)
@@ -76,7 +74,6 @@ class CategoryDetailsViewModelTest {
             savedStateHandle,
             getSubcategories,
             observeProgressSummary,
-            observeCategoryFavoriteState,
             setCategoryFavorite,
             pinCategoryShortcut,
             observeUserFavorites,
@@ -178,12 +175,13 @@ class CategoryDetailsViewModelTest {
             }
         }
 
-    // --- fake favourite ---
+    // --- favourite ---
 
     @Test
-    fun `toggling the favourite flips the flag and emits a message without persisting anything`() =
+    fun `toggling the favourite persists it and emits a message`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createViewModel()
+            advanceUntilIdle()
 
             viewModel.messages.test {
                 viewModel.onFavoriteToggle()
@@ -195,11 +193,13 @@ class CategoryDetailsViewModelTest {
         }
 
     @Test
-    fun `undoing the favourite flips it back`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `undoing the favourite restores it`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         viewModel.onFavoriteToggle()
+        advanceUntilIdle()
 
         viewModel.onFavoriteUndo(restoreTo = false)
+        advanceUntilIdle()
 
         viewModel.state.value.isFavorite shouldBe false
     }
@@ -220,6 +220,17 @@ class CategoryDetailsViewModelTest {
             }
         }
 
+    @Test
+    fun `the bookmark follows a favourite written elsewhere`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        userFavoritesRepository.setCategoryFavorite(route.categoryId, isFavorite = true)
+        advanceUntilIdle()
+
+        viewModel.state.value.isFavorite shouldBe true
+    }
+
     /**
      * A snackbar outlives the tap that raised it, so Undo restores the value the toggle moved away
      * from rather than flipping whatever is current.
@@ -229,9 +240,12 @@ class CategoryDetailsViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onFavoriteToggle()
+        advanceUntilIdle()
         viewModel.onFavoriteToggle()
+        advanceUntilIdle()
 
         viewModel.onFavoriteUndo(restoreTo = false)
+        advanceUntilIdle()
 
         viewModel.state.value.isFavorite shouldBe false
     }

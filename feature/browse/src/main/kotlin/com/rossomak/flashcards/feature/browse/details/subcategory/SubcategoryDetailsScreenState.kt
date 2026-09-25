@@ -21,6 +21,9 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
  * @param availableTags the tag vocabulary of the whole pool, so a chip never vanishes because the
  * user filtered it out.
  * @param totalCount unfiltered pool size, the second number in "filtered to 4 of 80".
+ * @param hasActiveFilters drives the Filter badge and the counted CTA; sort has no badge of its own
+ * (ADR-0038). Computed by the ViewModel whenever [filters] or [availableTags] change, and held as a
+ * field so the screen's several reads per composition don't each rebuild a tag set.
  * @param isFavorite live from [UserFavoritesRepository.observeFavorites][com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository.observeFavorites], written via [SubcategoryDetailsViewModel.onFavoriteToggle].
  */
 data class SubcategoryDetailsScreenState(
@@ -32,18 +35,10 @@ data class SubcategoryDetailsScreenState(
     val filters: FlashcardFilters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = DIFFICULTY_BOUNDS),
     val availableTags: List<String> = emptyList(),
     val totalCount: Int = 0,
+    val hasActiveFilters: Boolean = false,
     val isFavorite: Boolean = false,
     val activeDialog: SubcategoryDetailsDialog? = null,
 ) {
-
-    /**
-     * Drives the Filter badge. Sort has no badge of its own (ADR-0038).
-     *
-     * Compares against the live [availableTags] rather than a fixed constant: "all tags selected"
-     * is the default, and which tags that means depends on the Subcategory's own pool.
-     */
-    val hasActiveFilters: Boolean
-        get() = filters.selectedTags != availableTags.toSet() || filters.difficultyRange != DIFFICULTY_BOUNDS
 
     /**
      * How many cards the CTA would start a session on — the *filtered pool*, which the Preview
@@ -59,6 +54,15 @@ data class SubcategoryDetailsScreenState(
             StudySessionConfig.MIN_DIFFICULTY..StudySessionConfig.MAX_DIFFICULTY
     }
 }
+
+/**
+ * Whether [filters] narrow the pool at all. Compares against the live [availableTags] rather than a
+ * fixed constant: "all tags selected" is the default, and which tags that means depends on the
+ * Subcategory's own pool.
+ */
+internal fun hasActiveFilters(filters: FlashcardFilters, availableTags: List<String>): Boolean =
+    filters.selectedTags != availableTags.toSet() ||
+        filters.difficultyRange != SubcategoryDetailsScreenState.DIFFICULTY_BOUNDS
 
 /**
  * The four situations the flashcard list area can be in.
