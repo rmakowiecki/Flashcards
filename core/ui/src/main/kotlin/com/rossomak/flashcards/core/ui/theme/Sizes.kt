@@ -131,12 +131,3 @@ object AppSizes {
 
 val MaterialTheme.sizes: AppSizes
     get() = AppSizes
-
-/**
- * The standard 1px hairline border for design-system cards and list groups, tinted with
- * [androidx.compose.material3.ColorScheme.outlineVariant].
- */
-val MaterialTheme.hairlineBorder: BorderStroke
-    @Composable
-    @ReadOnlyComposable
-    get() = BorderStroke(width = sizes.hairline, color = colorScheme.outlineVariant)
