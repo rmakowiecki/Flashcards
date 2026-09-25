@@ -8,10 +8,12 @@ Usage:
 
 Requested modules that don't apply a Compose convention plugin (one that applies
 `android-compose`) are skipped, since they have no Compose reports and pure Kotlin
-modules have no `compileReleaseKotlin` task.
+modules have no `compileReleaseKotlin` task. A requested path that isn't in
+`settings.gradle.kts` is an error, so a typo can't pass as a skipped module.
 
-Compiles the release variant with `--rerun -PcomposeCompilerReports=true` (see the
-`android-compose` convention plugin), after deleting each target module's old
+Compiles the release variant with `-PcomposeCompilerReports=true` (see the
+`android-compose` convention plugin) and `--rerun` after every compile task, since the
+option only reaches the task named right before it, after deleting each target module's old
 `build/compose_compiler/` so stale reports never mix in. Then parses the fresh reports
 and prints one dense line per finding, grouped by module:
 
@@ -23,7 +25,8 @@ and prints one dense line per finding, grouped by module:
 Each unstable finding carries the unstable fields of its type, looked up in every
 module's `*-classes.txt`. There is no allowlist: the script reports, the reader judges.
 
-Exit codes: 0 after a successful build (whatever it found), 2 when the build fails.
+Exit codes: 0 after a successful build (whatever it found), 2 when the build fails or an
+argument is unknown.
 """
 import json
 import re
@@ -74,7 +77,8 @@ def applies_compose(module_path: str, convention_plugins: set[str]) -> bool:
 
 def compile_reports(modules: list[str] | None) -> None:
     tasks = [f"{module}:compileReleaseKotlin" for module in modules] if modules else ["compileReleaseKotlin"]
-    command = ["./gradlew", *tasks, "--rerun", "-PcomposeCompilerReports=true", "--quiet"]
+    rerun_tasks = [argument for task in tasks for argument in (task, "--rerun")]
+    command = ["./gradlew", *rerun_tasks, "-PcomposeCompilerReports=true", "--quiet"]
     completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     if completed.returncode == 0:
         return
@@ -197,6 +201,11 @@ def main() -> int:
         return 2
 
     if requested_modules:
+        known_modules = set(settings_modules())
+        unknown_modules = [module for module in requested_modules if module not in known_modules]
+        if unknown_modules:
+            print(f"Unknown modules (not in settings.gradle.kts): {' '.join(unknown_modules)}")
+            return 2
         convention_plugins = compose_convention_plugins()
         for module_path in requested_modules:
             if not applies_compose(module_path, convention_plugins):

@@ -49,7 +49,10 @@ Passed straight through to the script:
    - The summary's `skippable X/Y` counts composable lambdas too, so its gap
      is not the number of `not skippable` findings — don't report it as such.
    - `uncertain` — no stability prefix (typically a sealed interface or a
-     class holding one); still skippable, compared with `equals()`.
+     class holding one); still skippable, but under strong skipping it's
+     compared by instance (`===`) like `unstable`, so a new-but-equal value
+     recomposes. Harmless when the value is carried over by `copy()`; worth
+     fixing when a mapper rebuilds it on every emission.
 
 3. Report, grouped by severity:
    - **Fix** — `not skippable` composables, and `unstable` params on
