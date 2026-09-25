@@ -26,7 +26,12 @@ scripts/seed/.venv/
 # Knowledge graph — generated locally, not committed
 graphify-out/
 
-.claude
+# Claude Code local state — only the shared project skills are committed
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/compose-stability/
+!.claude/skills/distribute-wip/
 
 # Raw docs, sources for generating the flashcards
 /docs/temp/
