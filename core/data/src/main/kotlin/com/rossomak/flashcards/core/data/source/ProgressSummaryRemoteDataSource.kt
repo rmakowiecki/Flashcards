@@ -41,9 +41,10 @@ class ProgressSummaryRemoteDataSource @Inject constructor(
     }
 
     private fun observeAuthenticatedSummary(uid: String): Flow<ProgressSummaryDto?> = callbackFlow {
-        // Delivered off the main thread so the snapshot-to-DTO mapping never costs a UI frame;
-        // `trySend` is thread-safe.
-        val registration = document(uid).addSnapshotListener(Dispatchers.Default.asExecutor()) { snapshot, error ->
+        // Delivered off the main thread so the snapshot-to-DTO mapping never costs a UI frame, one
+        // snapshot at a time: Firestore submits every snapshot to the executor separately, so a
+        // parallel one could finish mapping an older snapshot last and leave it as the latest value.
+        val registration = document(uid).addSnapshotListener(Dispatchers.Default.limitedParallelism(1).asExecutor()) { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener
