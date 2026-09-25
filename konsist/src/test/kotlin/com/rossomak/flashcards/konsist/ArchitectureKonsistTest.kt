@@ -5,6 +5,7 @@ import com.lemonappdev.konsist.api.declaration.KoClassDeclaration
 import com.lemonappdev.konsist.api.declaration.KoTypeArgumentDeclaration
 import com.lemonappdev.konsist.api.verify.assertFalse
 import com.lemonappdev.konsist.api.verify.assertTrue
+import io.kotest.matchers.shouldBe
 import org.junit.Test
 
 /**
@@ -121,10 +122,27 @@ class ArchitectureKonsistTest {
     private val mutableCollectionType =
         Regex("""\b(Mutable(List|Set|Map|Collection)|ArrayList|HashMap|HashSet|LinkedHashMap|LinkedHashSet)\b""")
 
+    private val mutableCollectionFactory = "mutable(List|Set|Map)Of|arrayListOf|hashMapOf|hashSetOf|linkedMapOf|linkedSetOf"
+
+    /** An initializer that builds a mutable collection, for a property whose type is inferred. */
+    private val mutableCollectionInitializer = Regex(
+        """^\s*(object\s*:\s*)?($mutableCollectionFactory|${mutableCollectionType.pattern})\b""" +
+            """|\.toMutable(List|Set|Map)\(\s*\)\s*$""",
+    )
+
+    /**
+     * Private properties are skipped: a private collection only reaches a composable parameter or
+     * screen state through another declaration, which these rules check in turn. Konsist leaves
+     * `type` null for an inferred property (`val ids = mutableListOf<String>()`), so that one is
+     * judged by its initializer instead.
+     */
     private fun KoClassDeclaration.hasMutableCollectionProperty(): Boolean {
-        val propertyTypes = properties().mapNotNull { it.type?.text } +
+        val publishedProperties = properties().filter { !it.hasPrivateModifier }
+        val propertyTypes = publishedProperties.mapNotNull { it.type?.text } +
             primaryConstructor?.parameters.orEmpty().map { it.type.text }
-        return propertyTypes.any { mutableCollectionType.containsMatchIn(it) }
+        val inferredInitializers = publishedProperties.filter { it.type == null }.mapNotNull { it.value }
+        return propertyTypes.any { mutableCollectionType.containsMatchIn(it) } ||
+            inferredInitializers.any { mutableCollectionInitializer.containsMatchIn(it) }
     }
 
     private fun isComposeModuleMainSource(path: String) =
@@ -205,11 +223,31 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `domain models have no mutable collection properties`() {
+        domainModelClasses().assertFalse { koClass -> koClass.hasMutableCollectionProperty() }
+    }
+
+    @Test
+    fun `domain models have no var properties`() {
+        // The stability config trusts the whole domain model package, so a `var` would let a
+        // retained instance change under a composable that skipped because it saw the same one.
+        domainModelClasses().assertFalse { koClass -> koClass.properties().any { it.hasVarModifier } }
+    }
+
+    @Test
+    fun `mutable collection rule catches declared and inferred published properties`() {
+        val flaggedClasses = Konsist.scopeFromFile(MUTABLE_COLLECTION_FIXTURE)
+            .classes()
+            .filter { it.hasMutableCollectionProperty() }
+            .map { it.name }
+            .toSet()
+
+        flaggedClasses shouldBe setOf("DeclaredMutableProperty", "InferredMutableProperty", "InferredCopiedProperty", "MutableConstructorParameter")
+    }
+
+    private fun domainModelClasses() =
         projectScope
             .classes()
             .filter { it.path.contains("/core/domain/src/main/") && it.resideInPackage("..domain.model..") }
-            .assertFalse { koClass -> koClass.hasMutableCollectionProperty() }
-    }
 
     @Test
     fun `feature modules never import other feature modules`() {
@@ -369,5 +407,9 @@ class ArchitectureKonsistTest {
             .assertTrue { file ->
                 file.imports.none { import -> import.name.startsWith("org.junit.Assert") }
             }
+    }
+
+    private companion object {
+        const val MUTABLE_COLLECTION_FIXTURE = "konsist/fixtures/MutableCollectionProperties.kt"
     }
 }

@@ -7,6 +7,7 @@ plugins {
 dependencies {
     testImplementation(libs.konsist)
     testImplementation(libs.junit)
+    testImplementation(libs.kotest.assertions.core)
 }
 
 tasks.test {
