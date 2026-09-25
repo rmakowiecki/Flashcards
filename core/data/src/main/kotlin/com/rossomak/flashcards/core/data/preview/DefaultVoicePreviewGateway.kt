@@ -2,7 +2,7 @@ package com.rossomak.flashcards.core.data.preview
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
-import android.util.Log
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.repository.VoicePreviewGateway
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,7 +36,7 @@ class DefaultVoicePreviewGateway @Inject constructor(
                 ttsReady = true
                 applyPendingPreview()
             } else {
-                Log.e(TAG, "TextToSpeech init failed with status $status")
+                loge { "TextToSpeech init failed with status $status" }
                 ttsInitFailed = true
             }
         }
@@ -71,7 +71,6 @@ class DefaultVoicePreviewGateway @Inject constructor(
     }
 
     companion object {
-        private const val TAG = "VoicePreviewGateway"
         private const val UTTERANCE_PREVIEW = "preview"
         private const val SAMPLE_TEXT =
             "Here is an example of how this voice sounds at the selected speed."

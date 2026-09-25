@@ -300,14 +300,11 @@ private fun voiceRows(
     ),
 )
 
-/**
- * Rate and name, or the rate alone while the platform voice list has not arrived — an unresolved
- * id is not worth showing, and the rate is true either way.
- */
+/** Name and rate, or the rate alone when the saved voice has no label. */
 @Composable
 private fun voicePlaybackSummary(state: SettingsScreenState): String {
     val rateLabel = speechRateLabel(state.speechRate)
-    val voiceName = state.selectedVoice?.label() ?: return rateLabel
+    val voiceName = state.voiceLabel?.label() ?: return rateLabel
     return stringResource(R.string.settings_voice_playback_summary_label, rateLabel, voiceName)
 }
 

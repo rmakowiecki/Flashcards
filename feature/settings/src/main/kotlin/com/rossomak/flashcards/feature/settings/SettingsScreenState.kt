@@ -4,7 +4,7 @@ import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
-import com.rossomak.flashcards.core.domain.model.VoiceOption
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 
 /**
  * Everything the Settings rows render.
@@ -16,11 +16,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceOption
  * the real value in memory by the time this screen is reached (`SplashViewModel` reads the same
  * store on every cold start).
  *
- * [speechRate] and [voiceId] mirror `StudySessionPreferences.voiceSettings`, folded in the same
- * way as every other study-session row; [availableVoices] resolves [voiceId] to the name the row
- * shows and comes from
- * [VoiceSettingsController][com.rossomak.flashcards.core.ui.voice.VoiceSettingsController]'s voice
- * cache, which lives outside `Preferences` entirely (it is not a user choice to persist).
+ * [speechRate], [voiceId] and [voiceLabel] mirror `StudySessionPreferences.voiceSettings`.
  */
 data class SettingsScreenState(
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
@@ -34,17 +30,8 @@ data class SettingsScreenState(
     val readAloudEnabled: Boolean = false,
     val speechRate: Float = 1f,
     val voiceId: String? = null,
-    val availableVoices: List<VoiceOption> = emptyList(),
+    /** Null when no voice is saved or its label is still being resolved. */
+    val voiceLabel: VoiceLabel? = null,
     val isSigningOut: Boolean = false,
     val activeDialog: SettingsDialog? = null,
-) {
-
-    /**
-     * The selected [VoiceOption], or `null` while the platform voice list has not arrived yet or no
-     * longer contains the saved id (an engine can be uninstalled between runs) — in which case the
-     * row falls back to showing the speech rate alone. Resolved here, not formatted here: labeling
-     * a [VoiceOption] needs `stringResource`, which this plain state class cannot call (the
-     * `core:ui` `VoiceOption.label()` extension does that at the `@Composable` call site instead).
-     */
-    val selectedVoice: VoiceOption? get() = availableVoices.firstOrNull { it.id == voiceId }
-}
+)

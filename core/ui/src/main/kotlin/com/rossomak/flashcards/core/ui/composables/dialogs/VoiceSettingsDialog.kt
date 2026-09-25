@@ -23,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceOption
+import com.rossomak.flashcards.core.domain.model.voiceLabel
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.spacing
 
@@ -40,6 +42,8 @@ private const val MAX_SPEECH_RATE = 2f
  * persisted until [onConfirm]. Dismissing discards them. Note that *previewing* a voice is not
  * persistence — the caller is free to play a sample on every draft change.
  *
+ * [seededVoiceLabel] names the saved voice until [availableVoices] loads.
+ *
  * Pass [keepAsDefault] as non-null where the choice is session-scoped (the Preview Study Session
  * screen); `null` on the Settings screen, where the change is permanent by definition.
  */
@@ -54,11 +58,13 @@ fun VoiceSettingsDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    seededVoiceLabel: VoiceLabel? = null,
     keepAsDefault: Boolean? = null,
     onKeepAsDefaultChange: (Boolean) -> Unit = {},
 ) {
     var dropdownExpanded by remember { mutableStateOf(false) }
-    val selectedVoice = availableVoices.firstOrNull { it.id == draftVoiceId }
+    val selectedVoiceLabel = availableVoices.firstOrNull { it.id == draftVoiceId }?.voiceLabel
+        ?: seededVoiceLabel.takeIf { availableVoices.isEmpty() }
 
     FlashcardsSingleActionDialog(
         title = stringResource(R.string.voice_settings_dialog_title),
@@ -80,7 +86,7 @@ fun VoiceSettingsDialog(
                 onExpandedChange = { dropdownExpanded = it },
             ) {
                 OutlinedTextField(
-                    value = selectedVoice?.label() ?: stringResource(R.string.voice_settings_voice_hint),
+                    value = selectedVoiceLabel?.label() ?: stringResource(R.string.voice_settings_voice_hint),
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },

@@ -10,9 +10,11 @@ import com.rossomak.flashcards.core.domain.model.StudySessionPreference.SessionL
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.SortOrder
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.SubcategoryCountRange as SubcategoryCountRangePreference
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoiceAnsweringEnabled
+import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePlayback
 import com.rossomak.flashcards.core.domain.model.UserPreference.DailyGoalMinutes
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
+import com.rossomak.flashcards.core.domain.model.voiceLabel
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
@@ -69,6 +71,8 @@ class SettingsViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<SettingsMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<SettingsMessage> = _messages.asSharedFlow()
 
+    private var healRequestedVoiceId: String? = null
+
     init {
         viewModelScope.launch {
             observeUserPreferences()
@@ -90,14 +94,13 @@ class SettingsViewModel @Inject constructor(
                             readAloudEnabled = preferences.readAloudEnabled,
                             speechRate = preferences.voiceSettings.speechRate,
                             voiceId = preferences.voiceSettings.voiceId,
+                            voiceLabel = preferences.voiceSettings.voiceLabel,
                         )
                     }
+                    healVoiceLabel(preferences.voiceSettings)
                 }
                 .launchIn(this)
         }
-        // The row shows the voice's name, not its id, so the list is needed before the dialog is
-        // ever opened. Cached afterwards, so opening the dialog costs no second platform query.
-        voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
     /** Single entry point for every dialog on this screen. */
@@ -125,23 +128,17 @@ class SettingsViewModel @Inject constructor(
     private fun onVoiceSettingsOpen() {
         val current = _state.value
         val draft = voiceSettingsController.seedDraft(
-            SavedVoiceSettings(speechRate = current.speechRate, voiceId = current.voiceId),
+            SavedVoiceSettings(speechRate = current.speechRate, voiceId = current.voiceId, voiceLabel = current.voiceLabel),
         )
         _state.update { it.copy(activeDialog = SessionVoiceSettings(draft)) }
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
 
-    /**
-     * The voice list feeds two things: the row's summary, which needs it to turn the saved id into
-     * a name, and an open voice dialog, which has to be found to be filled in — the one narrowing
-     * cast left in the dialog path, once per load rather than once per edit. A dismissal in the
-     * meantime correctly drops the dialog half.
-     */
+    /** Fills the voice dialog if it is still open. */
     private fun onVoicesLoaded(voices: List<VoiceOption>) {
         _state.update { state ->
-            val withVoices = state.copy(availableVoices = voices)
-            val dialog = withVoices.activeDialog as? SessionVoiceSettings ?: return@update withVoices
-            withVoices.copy(
+            val dialog = state.activeDialog as? SessionVoiceSettings ?: return@update state
+            state.copy(
                 activeDialog = dialog.copy(
                     draftState = dialog.draftState.copy(
                         availableVoices = voices,
@@ -149,6 +146,26 @@ class SettingsViewModel @Inject constructor(
                     ),
                 ),
             )
+        }
+    }
+
+    /**
+     * Resolves a missing label from the voice list, once per voice id, and saves it back. An
+     * uninstalled voice stays unlabelled.
+     */
+    private fun healVoiceLabel(saved: SavedVoiceSettings) {
+        val voiceId = saved.voiceId
+        if (voiceId == null || saved.voiceLabel != null || voiceId == healRequestedVoiceId) return
+        healRequestedVoiceId = voiceId
+        voiceSettingsController.loadVoices(viewModelScope) { voices ->
+            val current = _state.value
+            val voice = voices.firstOrNull { it.id == voiceId }
+            if (voice == null || current.voiceId != voiceId || current.voiceLabel != null) return@loadVoices
+            viewModelScope.launch {
+                saveStudySessionPreference(
+                    VoicePlayback(SavedVoiceSettings(speechRate = current.speechRate, voiceId = voiceId, voiceLabel = voice.voiceLabel)),
+                )
+            }
         }
     }
 

@@ -203,17 +203,11 @@ private fun FiltersSettingRow(
     )
 }
 
-/**
- * Name and rate, or the rate alone while the platform voice list has not arrived yet or no longer
- * contains the saved id (an engine can be uninstalled between runs).
- */
+/** Name and rate, or the rate alone when no voice label is stored. */
 @Composable
 private fun voicePlaybackSummary(state: PreviewStudySessionScreenState): String {
     val rateLabel = speechRateLabel(state.config.voiceSettings.speechRate)
-    val voiceName = state.availableVoices
-        .firstOrNull { it.id == state.config.voiceSettings.voiceId }
-        ?.label()
-        ?: return rateLabel
+    val voiceName = state.config.voiceSettings.voiceLabel?.label() ?: return rateLabel
     return stringResource(R.string.preview_session_setting_value_separator_label, voiceName, rateLabel)
 }
 

@@ -1,44 +1,45 @@
 package com.rossomak.flashcards.core.ui.voice
 
-import android.util.Log
+import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePlayback
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.model.voiceLabel
 import com.rossomak.flashcards.core.domain.repository.VoicePreviewGateway
 import com.rossomak.flashcards.core.domain.usecase.GetAvailableVoicesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import javax.inject.Inject
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * The voice-settings dialog's draft.
+ * The voice-settings dialog's draft, held in the screen's `activeDialog` (ADR-0036).
  *
- * Lives in the screen's `activeDialog` field like every other dialog's draft (ADR-0036), which is
- * why this controller neither holds nor exposes it — a second copy here would be a second source of
- * truth, and would let the draft outlive the dialog that owns it.
+ * [seededVoiceLabel] names [draftVoiceId] only while [availableVoices] is empty: the dropdown has
+ * nothing to pick until then, so the voice can't have changed.
  */
 data class VoiceSettingsDraftState(
     val availableVoices: List<VoiceOption> = emptyList(),
     val draftVoiceId: String? = null,
     val draftSpeed: Float = 1f,
+    val seededVoiceLabel: VoiceLabel? = null,
 )
 
-/** The domain value a confirmed draft folds into — what [VoiceSettingsController.save] persists. */
-fun VoiceSettingsDraftState.toVoiceSettings(): VoiceSettings =
-    VoiceSettings(speechRate = draftSpeed, voiceId = draftVoiceId)
+/** Label from the list, else the seeded label; null when neither names the voice. */
+fun VoiceSettingsDraftState.toVoiceSettings(): VoiceSettings = VoiceSettings(
+    speechRate = draftSpeed,
+    voiceId = draftVoiceId,
+    voiceLabel = availableVoices.firstOrNull { it.id == draftVoiceId }?.voiceLabel
+        ?: seededVoiceLabel.takeIf { availableVoices.isEmpty() },
+)
 
 /**
- * Owns the voice list cache, preview playback and saving for the voice-settings dialog. Shared by
- * feature:study and feature:settings; each ViewModel injects its own instance (unscoped) and binds
- * it to its own viewModelScope.
- *
- * Voice settings are session-scoped like every other study setting (`mode`, `ratedAttempts`): the
- * saved value lives on `StudySessionConfig`/`FastStudySessionRoute`/`RatedStudySessionRoute`, not
- * here. A screen hands the
- * current value to [seedDraft] itself rather than this controller tracking a subscription of its
- * own — one fewer place a value could disagree with the config the screen already has in state.
+ * Seeds, previews and saves the voice-settings dialog; one unscoped instance per ViewModel. The
+ * screen passes the current value to [seedDraft]; the voice list is cached behind
+ * [GetAvailableVoicesUseCase].
  */
 class VoiceSettingsController @Inject constructor(
     private val saveStudySessionPreference: SaveStudySessionPreferenceUseCase,
@@ -46,41 +47,25 @@ class VoiceSettingsController @Inject constructor(
     private val previewGateway: VoicePreviewGateway,
 ) {
 
-    private var cachedVoices: List<VoiceOption>? = null
-    private var loadJob: CompletableDeferred<List<VoiceOption>>? = null
+    /** The draft a newly opened dialog starts from; follow up with [loadVoices]. */
+    fun seedDraft(current: VoiceSettings): VoiceSettingsDraftState = VoiceSettingsDraftState(
+        draftVoiceId = current.voiceId,
+        draftSpeed = current.speechRate,
+        seededVoiceLabel = current.voiceLabel,
+    )
 
-    /** The draft a newly opened dialog starts from — [current] plus the voice list if cached. */
-    fun seedDraft(current: VoiceSettings): VoiceSettingsDraftState {
-        val voices = cachedVoices.orEmpty()
-        return VoiceSettingsDraftState(
-            availableVoices = voices,
-            draftVoiceId = current.voiceId ?: voices.firstOrNull()?.id,
-            draftSpeed = current.speechRate,
-        )
-    }
-
-    /**
-     * Never re-queries the platform once the list is cached — but still calls back with the cache,
-     * so a caller that needs the voices (the Settings row resolves the saved id to a display name)
-     * gets them on every call rather than only on the first. Concurrent callers that land before
-     * the first query resolves share its result rather than each starting their own.
-     */
+    /** Calls back with the voice list, or an empty one if loading failed; the next call retries. */
+    @Suppress("TooGenericExceptionCaught")
     fun loadVoices(scope: CoroutineScope, onLoaded: (List<VoiceOption>) -> Unit) {
-        cachedVoices?.let { voices ->
-            onLoaded(voices)
-            return
-        }
-        loadJob?.let { inFlight ->
-            scope.launch { onLoaded(inFlight.await()) }
-            return
-        }
-        val deferred = CompletableDeferred<List<VoiceOption>>()
-        loadJob = deferred
         scope.launch {
-            val voices = runCatching { getAvailableVoices() }.getOrDefault(emptyList())
-            cachedVoices = voices
-            loadJob = null
-            deferred.complete(voices)
+            val voices = try {
+                getAvailableVoices()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                logw(exception) { "Voice list unavailable" }
+                emptyList()
+            }
             onLoaded(voices)
         }
     }
@@ -93,7 +78,7 @@ class VoiceSettingsController @Inject constructor(
         val settings = draft.toVoiceSettings()
         scope.launch {
             saveStudySessionPreference(VoicePlayback(settings))
-                .onFailure { Log.e(TAG, "Failed to save voice settings", it) }
+                .onFailure { loge(it) { "Failed to save voice settings" } }
         }
         previewGateway.stop()
         return settings
@@ -101,9 +86,5 @@ class VoiceSettingsController @Inject constructor(
 
     fun stopPreview() {
         previewGateway.stop()
-    }
-
-    private companion object {
-        const val TAG = "VoiceSettingsController"
     }
 }

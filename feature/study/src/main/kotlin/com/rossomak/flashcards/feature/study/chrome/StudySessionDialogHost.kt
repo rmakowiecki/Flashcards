@@ -38,6 +38,7 @@ internal fun StudySessionDialogHost(
         is SessionVoiceSettings -> VoiceSettingsDialog(
             availableVoices = activeDialog.draftState.availableVoices,
             draftVoiceId = activeDialog.draftState.draftVoiceId,
+            seededVoiceLabel = activeDialog.draftState.seededVoiceLabel,
             onDraftVoiceChange = {
                 onDialogEvent(DraftChange(activeDialog.copy(draftState = activeDialog.draftState.copy(draftVoiceId = it))))
             },

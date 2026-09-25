@@ -12,6 +12,7 @@ import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDen
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
@@ -830,17 +831,17 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
-    fun `onStartSession carries the confirmed voice settings on the route`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `onStartSession carries the confirmed voice settings and label on the route`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(singleSubcategoryRoute)
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
-        val voiceSettings = SavedVoiceSettings(speechRate = 1.5f, voiceId = "voice-1")
+        val voiceSettings = SavedVoiceSettings(speechRate = 1.5f, voiceId = "voice-1", voiceLabel = VoiceLabel(countryCode = "GB", variantIndex = 2))
         every { voiceSettingsController.seedDraft(any()) } returns VoiceSettingsDraftState()
 
         val viewModel = createViewModel()
         advanceUntilIdle()
         viewModel.onDialogEvent(Open(SessionVoiceSettings()))
         val draft = (viewModel.state.value.activeDialog as SessionVoiceSettings).draftState
-            .copy(draftSpeed = voiceSettings.speechRate, draftVoiceId = voiceSettings.voiceId)
+            .copy(draftSpeed = voiceSettings.speechRate, draftVoiceId = voiceSettings.voiceId, seededVoiceLabel = voiceSettings.voiceLabel)
         viewModel.onDialogEvent(DraftChange(SessionVoiceSettings(draftState = draft)))
         viewModel.onDialogEvent(Confirm)
         advanceUntilIdle()

@@ -23,6 +23,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionPreference.Subcateg
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoiceAnsweringEnabled
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePlayback
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
+import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import java.io.IOException
 import javax.inject.Inject
@@ -51,6 +52,7 @@ class DataStoreStudySessionPreferencesLocalDataSource @Inject constructor(
                 voiceSettings = VoiceSettings(
                     speechRate = prefs[VOICE_SPEECH_RATE_KEY] ?: DEFAULT_VOICE_SPEECH_RATE,
                     voiceId = prefs[VOICE_ID_KEY],
+                    voiceLabel = prefs.toVoiceLabel(),
                 ),
                 subcategoryCountRange = prefs.toSubcategoryCountRange(),
             )
@@ -79,6 +81,14 @@ class DataStoreStudySessionPreferencesLocalDataSource @Inject constructor(
                     } else {
                         prefs.remove(VOICE_ID_KEY)
                     }
+                    val voiceLabel = preference.value.voiceLabel
+                    if (voiceLabel != null) {
+                        prefs[VOICE_COUNTRY_CODE_KEY] = voiceLabel.countryCode
+                        prefs[VOICE_VARIANT_INDEX_KEY] = voiceLabel.variantIndex
+                    } else {
+                        prefs.remove(VOICE_COUNTRY_CODE_KEY)
+                        prefs.remove(VOICE_VARIANT_INDEX_KEY)
+                    }
                 }
             }
         }
@@ -94,6 +104,13 @@ class DataStoreStudySessionPreferencesLocalDataSource @Inject constructor(
 
     private fun String?.toSortOrder(): FlashcardSortOrder =
         FlashcardSortOrder.entries.firstOrNull { it.name == this } ?: DEFAULT_SORT_ORDER
+
+    /** Null unless both halves are stored. */
+    private fun Preferences.toVoiceLabel(): VoiceLabel? {
+        val countryCode = this[VOICE_COUNTRY_CODE_KEY] ?: return null
+        val variantIndex = this[VOICE_VARIANT_INDEX_KEY] ?: return null
+        return VoiceLabel(countryCode = countryCode, variantIndex = variantIndex)
+    }
 
     private fun Preferences.toSubcategoryCountRange(): IntRange {
         val min = this[SUBCATEGORY_COUNT_MIN_KEY] ?: DEFAULT_SUBCATEGORY_COUNT_RANGE.first
@@ -120,6 +137,8 @@ class DataStoreStudySessionPreferencesLocalDataSource @Inject constructor(
         val SORT_ORDER_KEY = stringPreferencesKey("sort_order")
         val VOICE_SPEECH_RATE_KEY = floatPreferencesKey("voice_speech_rate")
         val VOICE_ID_KEY = stringPreferencesKey("voice_id")
+        val VOICE_COUNTRY_CODE_KEY = stringPreferencesKey("voice_country_code")
+        val VOICE_VARIANT_INDEX_KEY = intPreferencesKey("voice_variant_index")
         val SUBCATEGORY_COUNT_MIN_KEY = intPreferencesKey("subcategory_count_min")
         val SUBCATEGORY_COUNT_MAX_KEY = intPreferencesKey("subcategory_count_max")
     }
