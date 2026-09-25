@@ -114,7 +114,7 @@ fun BrowseScreen(
         state = state,
         onRefresh = viewModel::onCategoriesRefresh,
         searchActions = searchActions,
-        onCategoryClick = viewModel::onCategorySelected,
+        onCategoryClick = viewModel::onCategorySelect,
         onSubcategoryClick = viewModel::onSubcategorySelect,
         onSubcategorySessionStart = viewModel::onSubcategorySessionStart,
     )

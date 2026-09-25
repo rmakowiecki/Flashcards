@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesParams
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +50,7 @@ class BrowseViewModel @Inject constructor(
         loadCategories()
     }
 
-    fun onCategorySelected(categoryId: String, categoryName: String) {
+    fun onCategorySelect(categoryId: String, categoryName: String) {
         viewModelScope.launch {
             eventChannel.send(BrowseNavigationDestination.CategoryDetails(categoryId, categoryName))
         }
@@ -140,7 +141,7 @@ class BrowseViewModel @Inject constructor(
             _state
                 .map { it.searchQuery }
                 .distinctUntilChanged()
-                .debounce(SEARCH_DEBOUNCE_MILLIS)
+                .debounce(SEARCH_DEBOUNCE)
                 .collectLatest { query ->
                     if (query.meetsSearchMinimumLength()) {
                         runSearch(query)
@@ -240,6 +241,6 @@ class BrowseViewModel @Inject constructor(
     }
 
     private companion object {
-        const val SEARCH_DEBOUNCE_MILLIS = 500L
+        val SEARCH_DEBOUNCE = 500.milliseconds
     }
 }

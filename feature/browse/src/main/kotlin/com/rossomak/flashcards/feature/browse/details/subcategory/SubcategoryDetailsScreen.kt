@@ -28,10 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -39,9 +37,11 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -68,16 +68,12 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.DetailsMessagesEffect
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Error
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.FlashcardsList
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Loading
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.NoMatches
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinFailed
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinUnsupported
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.launch
 
 @Composable
 fun SubcategoryDetailsScreen(
@@ -99,67 +95,33 @@ fun SubcategoryDetailsScreen(
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is SubcategoryDetailsDestination.PreviewStudySession ->
-                onNavigateToPreviewStudySession(
-                    destination.categoryId,
-                    destination.categoryName,
-                    destination.subcategoryId,
-                    destination.subcategoryName,
-                    destination.filterTagIds,
-                    destination.difficultyRange,
-                    destination.sortOrder,
-                )
+            is SubcategoryDetailsDestination.PreviewStudySession -> onNavigateToPreviewStudySession(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryId,
+                destination.subcategoryName,
+                destination.filterTagIds,
+                destination.difficultyRange,
+                destination.sortOrder,
+            )
         }
     }
-
-    val addedToFavoritesText = stringResource(R.string.favorites_added_message)
-    val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
-    val undoLabelText = stringResource(R.string.favorites_undo_button)
-    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
-    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
-
-    // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
-    // lambda, so the wait is launched rather than blocking the collector.
-    val snackbarScope = rememberCoroutineScope()
-    observeAsEvents(viewModel.messages) { message ->
-        when (message) {
-            AddedToFavorites, RemovedFromFavorites -> {
-                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
-                snackbarScope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = text,
-                        actionLabel = undoLabelText,
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
-                    }
-                }
-            }
-            ShortcutPinUnsupported -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
-                }
-            }
-            ShortcutPinFailed -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
-                }
-            }
-        }
-    }
-
+    DetailsMessagesEffect(
+        messages = viewModel.messages,
+        snackbarHostState = snackbarHostState,
+        onFavoriteUndo = viewModel::onFavoriteUndo,
+    )
     SubcategoryDetailsContent(
         modifier = modifier,
         state = state,
+        snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
         onStartSession = viewModel::onStartSession,
         onResetFilters = viewModel::onResetFilters,
         onFavoriteToggle = viewModel::onFavoriteToggle,
-        onAddShortcut = viewModel::onAddShortcutClick,
-        onRetry = viewModel::loadFlashcards,
+        onAddShortcut = viewModel::onAddShortcut,
+        onRetry = viewModel::onRetry,
         onDialogEvent = viewModel::onDialogEvent,
-        snackbarHostState = snackbarHostState,
     )
 }
 
@@ -169,6 +131,7 @@ fun SubcategoryDetailsScreen(
 fun SubcategoryDetailsContent(
     modifier: Modifier = Modifier,
     state: SubcategoryDetailsScreenState,
+    snackbarHostState: SnackbarHostState,
     onNavigateBack: () -> Unit,
     onStartSession: () -> Unit,
     onResetFilters: () -> Unit,
@@ -176,7 +139,6 @@ fun SubcategoryDetailsContent(
     onAddShortcut: () -> Unit,
     onRetry: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
-    snackbarHostState: SnackbarHostState,
 ) {
     // Hoisted out of FlashcardList so it survives the Cards -> NoMatches -> Cards round trip, which
     // would otherwise drop the state and hide the reset below.
@@ -224,6 +186,7 @@ fun SubcategoryDetailsContent(
                     flashcards = content.flashcards,
                     listState = listState,
                 )
+
                 is Error -> FlashcardsEmptyState(
                     icon = Icons.Filled.ErrorOutline,
                     title = stringResource(CoreUiR.string.common_load_error_title),
@@ -322,7 +285,8 @@ private fun SubcategoryDetailsBottomBar(
                         Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
                     )
                 },
-            ) { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) }
+                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) },
+            )
         },
         trailing = {
             FlashcardsFilledButton(
@@ -425,7 +389,9 @@ private fun FlashcardList(
     flashcards: List<Flashcard>,
     listState: LazyListState,
 ) {
-    val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
+    // Saveable, so expanded cards stay expanded across a trip to Preview and back, rotation and
+    // process death. Still UI state: the ViewModel never reads it.
+    var expandedFlashcardIds by rememberSaveable(stateSaver = ExpandedFlashcardIdsSaver) { mutableStateOf(emptySet<String>()) }
     val expandedStateDescription = stringResource(R.string.subcategory_details_card_expanded_cd)
     val collapsedStateDescription = stringResource(R.string.subcategory_details_card_collapsed_cd)
 
@@ -443,8 +409,10 @@ private fun FlashcardList(
                     key = flashcard.id,
                     difficulty = flashcard.difficulty,
                     title = flashcard.question,
-                    expanded = expandedStates[flashcard.id] ?: false,
-                    onExpandedChange = { expanded -> expandedStates[flashcard.id] = expanded },
+                    expanded = flashcard.id in expandedFlashcardIds,
+                    onExpandedChange = { expanded ->
+                        expandedFlashcardIds = if (expanded) expandedFlashcardIds + flashcard.id else expandedFlashcardIds - flashcard.id
+                    },
                     expandedStateDescription = expandedStateDescription,
                     collapsedStateDescription = collapsedStateDescription,
                     tags = flashcard.tags.toImmutableList(),
@@ -459,3 +427,9 @@ private fun FlashcardList(
         )
     }
 }
+
+/** A Bundle can't hold a `Set`, so the expanded ids round-trip through a list. */
+private val ExpandedFlashcardIdsSaver = listSaver<Set<String>, String>(
+    save = { expandedIds -> expandedIds.toList() },
+    restore = { savedIds -> savedIds.toSet() },
+)

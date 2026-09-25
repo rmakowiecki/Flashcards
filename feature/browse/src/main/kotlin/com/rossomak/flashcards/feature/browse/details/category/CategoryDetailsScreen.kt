@@ -31,17 +31,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -74,17 +71,15 @@ import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.DetailsMessagesEffect
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.Error
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.Loading
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.SubcategoriesList
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.PreviewStudySession
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinFailed
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinUnsupported
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryDetails
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryPreviewStudySession
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Resolved
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Unresolved
-import kotlinx.coroutines.launch
 
 @Composable
 fun CategoryDetailsScreen(
@@ -104,69 +99,43 @@ fun CategoryDetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Only the two session CTAs go through the ViewModel's event channel — they're the only navigations that aggregate state across rows.
-    // The row's own tap and its play button stay inline lambdas below: each already holds the Subcategory it needs.
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is PreviewStudySession ->
-                onNavigateToPreviewStudySessionForCategory(
-                    destination.categoryId,
-                    destination.categoryName,
-                    destination.subcategoryIds,
-                    destination.subcategoryNames,
-                    destination.isQuickSession,
-                )
+            is SubcategoryDetails -> onNavigateToSubcategoryDetails(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryId,
+                destination.subcategoryName,
+            )
+
+            is SubcategoryPreviewStudySession -> onNavigateToPreviewStudySession(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryId,
+                destination.subcategoryName,
+            )
+
+            is PreviewStudySession -> onNavigateToPreviewStudySessionForCategory(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryIds,
+                destination.subcategoryNames,
+                destination.isQuickSession,
+            )
         }
     }
-
-    val addedToFavoritesText = stringResource(R.string.favorites_added_message)
-    val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
-    val undoLabelText = stringResource(R.string.favorites_undo_button)
-    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
-    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
-
-    val snackbarScope = rememberCoroutineScope()
-    observeAsEvents(viewModel.messages) { message ->
-        when (message) {
-            AddedToFavorites, RemovedFromFavorites -> {
-                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
-                snackbarScope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = text,
-                        actionLabel = undoLabelText,
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
-                    }
-                }
-            }
-            ShortcutPinUnsupported -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
-                }
-            }
-            ShortcutPinFailed -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
-                }
-            }
-        }
-    }
-
+    DetailsMessagesEffect(
+        messages = viewModel.messages,
+        snackbarHostState = snackbarHostState,
+        onFavoriteUndo = viewModel::onFavoriteUndo,
+    )
     CategoryDetailsContent(
         modifier = modifier,
         state = state,
+        snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
-        onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-        onNavigateToPreviewStudySession = { subcategory ->
-            onNavigateToPreviewStudySession(
-                subcategory.categoryId,
-                subcategory.categoryName,
-                subcategory.id,
-                subcategory.name,
-            )
-        },
+        onSubcategorySelect = viewModel::onSubcategorySelect,
+        onSubcategorySessionStart = viewModel::onSubcategorySessionStart,
         onSelectionModeToggle = viewModel::onSelectionModeToggle,
         onSubcategoryLongPress = viewModel::onSubcategoryLongPress,
         onSubcategorySelectionChange = viewModel::onSubcategorySelectionChange,
@@ -174,9 +143,8 @@ fun CategoryDetailsScreen(
         onQuickSessionStart = viewModel::onQuickSessionStart,
         onCustomSessionStart = viewModel::onCustomSessionStart,
         onFavoriteToggle = viewModel::onFavoriteToggle,
-        onAddShortcut = viewModel::onAddShortcutClick,
-        onRetry = viewModel::loadSubcategories,
-        snackbarHostState = snackbarHostState,
+        onAddShortcut = viewModel::onAddShortcut,
+        onRetry = viewModel::onRetry,
     )
 }
 
@@ -186,9 +154,10 @@ fun CategoryDetailsScreen(
 fun CategoryDetailsContent(
     modifier: Modifier = Modifier,
     state: CategoryDetailsScreenState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateBack: () -> Unit,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (Subcategory) -> Unit,
+    onSubcategorySelect: (Subcategory) -> Unit,
+    onSubcategorySessionStart: (Subcategory) -> Unit,
     onSelectionModeToggle: () -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
@@ -198,7 +167,6 @@ fun CategoryDetailsContent(
     onFavoriteToggle: () -> Unit,
     onAddShortcut: () -> Unit,
     onRetry: () -> Unit,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     // Hoisted here, and never reset: the row set is identical in both modes and only the chrome changes, unlike Subcategory Details where filtering changes which items exist.
     // Resetting on list mode switch would throw a user who long-pressed halfway down the list back to the top.
@@ -258,11 +226,12 @@ fun CategoryDetailsContent(
                     selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
                     favorites = state.favorites,
                     progressFor = state::progressFor,
-                    onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-                    onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
+                    onSubcategorySelect = onSubcategorySelect,
+                    onSubcategorySessionStart = onSubcategorySessionStart,
                     onSubcategoryLongPress = onSubcategoryLongPress,
                     onSubcategorySelectionChange = onSubcategorySelectionChange,
                 )
+
                 is Error -> FlashcardsEmptyState(
                     icon = Icons.Filled.ErrorOutline,
                     title = stringResource(CoreUiR.string.common_load_error_title),
@@ -450,8 +419,8 @@ private fun SubcategoryList(
     selectedSubcategoryIds: Set<String>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgress,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (Subcategory) -> Unit,
+    onSubcategorySelect: (Subcategory) -> Unit,
+    onSubcategorySessionStart: (Subcategory) -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
 ) {
@@ -482,8 +451,8 @@ private fun SubcategoryList(
                     ),
                     studiedText = progress.studiedLabel(resources),
                     rowSubtitleSeparator = rowSubtitleSeparator,
-                    onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-                    onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
+                    onSelect = onSubcategorySelect,
+                    onSessionStart = onSubcategorySessionStart,
                     onLongPress = onSubcategoryLongPress,
                     onSelectedChange = onSubcategorySelectionChange,
                 )
@@ -547,8 +516,8 @@ private fun Subcategory.toListGroupItem(
     cardCountLabel: String,
     studiedText: String?,
     rowSubtitleSeparator: String,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (Subcategory) -> Unit,
+    onSelect: (Subcategory) -> Unit,
+    onSessionStart: (Subcategory) -> Unit,
     onLongPress: (String) -> Unit,
     onSelectedChange: (String, Boolean) -> Unit,
 ): FlashcardsListGroupItem {
@@ -578,9 +547,7 @@ private fun Subcategory.toListGroupItem(
             key = subcategory.id,
             title = subcategory.name,
             secondaryContent = subtitle,
-            onClick = {
-                onNavigateToSubcategoryDetails(subcategory.categoryId, subcategory.categoryName, subcategory.id, subcategory.name)
-            },
+            onClick = { onSelect(subcategory) },
             onLongClick = { onLongPress(subcategory.id) },
             isFavorited = isFavorited,
             leading = ring,
@@ -592,7 +559,7 @@ private fun Subcategory.toListGroupItem(
                     FlashcardsTonalIconButton(
                         icon = Icons.Default.PlayArrow,
                         contentDescription = playContentDescription,
-                        onClick = { onNavigateToPreviewStudySession(subcategory) },
+                        onClick = { onSessionStart(subcategory) },
                         size = FlashcardsComponentSize.Small,
                     )
                     FlashcardsChevron()
