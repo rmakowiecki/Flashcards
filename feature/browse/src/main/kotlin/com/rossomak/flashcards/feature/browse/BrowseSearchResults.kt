@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -16,12 +17,13 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
-import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import kotlin.math.roundToInt
@@ -53,8 +55,7 @@ internal fun SubcategoryProgress.searchRingContentDescription(cardCount: Int): S
  * subtitle makes (see its `studiedLabel`), since a search result that resolves to zero moments
  * later looks identical anyway. The parent category itself is no longer named here as text — see
  * [SearchResultSubtitle]'s leading glyph. The separator itself is `CoreUiR.string.common_middle_dot_separator`,
- * shared with [CategoryDetailsRowSubtitle] and the chip line in BrowseScreen. [separator] is
- * resolved once by the caller and passed down rather than re-resolved per subcategory.
+ * shared with [CategoryDetailsRowSubtitle] and the chip line in BrowseScreen.
  */
 @Composable
 internal fun Subcategory.searchResultCardsStudiedText(progress: SubcategoryProgress, separator: String): AnnotatedString {
@@ -99,21 +100,30 @@ private fun SearchResultSubtitle(iconSvg: String?, categoryName: String, text: A
     }
 }
 
-@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
-internal fun Subcategory.toSearchResultListGroupItem(
+/**
+ * One matched Subcategory in the search results: progress ring, name, `[glyph] · <cards> · <studied>`
+ * subtitle, a play button that starts a session, and a chevron. [modifier] is the pre-shaped row
+ * modifier handed out by `FlashcardsListGroup`'s builder.
+ */
+@Composable
+internal fun SubcategorySearchResultRow(
+    modifier: Modifier,
+    subcategory: Subcategory,
     progress: SubcategoryProgress,
-    ringContentDescription: String,
-    cardsStudiedText: AnnotatedString,
     iconSvg: String?,
-    startSessionContentDescription: String,
     isFavorited: Boolean,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
-): FlashcardsListGroupItem {
-    val subcategory = this
+) {
     val ringFraction = (progress as? SubcategoryProgress.Resolved)?.studiedFraction(subcategory.cardCount)
-    return FlashcardsListGroupItem.Row(
-        key = subcategory.id,
+    val ringContentDescription = progress.searchRingContentDescription(subcategory.cardCount)
+    val cardsStudiedText = subcategory.searchResultCardsStudiedText(
+        progress = progress,
+        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+    )
+    val startSessionContentDescription = stringResource(R.string.browse_search_start_session_cd, subcategory.name)
+    FlashcardsListRow(
+        modifier = modifier,
         title = subcategory.name,
         secondaryContent = {
             SearchResultSubtitle(iconSvg = iconSvg, categoryName = subcategory.categoryName, text = cardsStudiedText)

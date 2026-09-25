@@ -9,6 +9,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.rossomak.flashcards.core.data.model.UserFavoritesDto
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -44,7 +46,10 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
     }
 
     private fun observeAuthenticatedFavorites(uid: String): Flow<UserFavoritesDto> = callbackFlow {
-        val registration = document(uid).addSnapshotListener { snapshot, error ->
+        // Delivered off the main thread so the snapshot-to-DTO mapping never costs a UI frame, one
+        // snapshot at a time: Firestore submits every snapshot to the executor separately, so a
+        // parallel one could finish mapping an older snapshot last and leave it as the latest value.
+        val registration = document(uid).addSnapshotListener(Dispatchers.Default.limitedParallelism(1).asExecutor()) { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener

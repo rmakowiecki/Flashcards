@@ -8,6 +8,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -22,7 +23,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             observeFavoriteItems()
                 .collect { favoriteItems ->
-                    _state.value = _state.value.copy(favoriteItems = favoriteItems)
+                    _state.update { it.copy(favoriteItems = favoriteItems) }
                 }
         }
     }
