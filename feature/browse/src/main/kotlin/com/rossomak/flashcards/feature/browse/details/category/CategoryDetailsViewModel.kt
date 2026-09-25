@@ -13,8 +13,11 @@ import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinFailed
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinUnsupported
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -47,9 +50,9 @@ class CategoryDetailsViewModel @Inject constructor(
     private val eventChannel = Channel<CategoryDetailsDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
-    private val _messages = MutableSharedFlow<CategoryDetailsMessage>(extraBufferCapacity = 1)
+    private val _messages = MutableSharedFlow<DetailsMessage>(extraBufferCapacity = 1)
 
-    val messages: SharedFlow<CategoryDetailsMessage> = _messages.asSharedFlow()
+    val messages: SharedFlow<DetailsMessage> = _messages.asSharedFlow()
 
     init {
         loadSubcategories()
@@ -97,6 +100,34 @@ class CategoryDetailsViewModel @Inject constructor(
                 } else {
                     subcategories.map { subcategory -> subcategory.id }.toSet()
                 },
+            )
+        }
+    }
+
+    /** The row itself browses: it opens Subcategory Details and starts nothing (ADR-0041). */
+    fun onSubcategorySelect(subcategory: Subcategory) {
+        viewModelScope.launch {
+            eventChannel.send(
+                CategoryDetailsDestination.SubcategoryDetails(
+                    categoryId = subcategory.categoryId,
+                    categoryName = subcategory.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            )
+        }
+    }
+
+    /** The row's play button studies: a single-subcategory session for just this row (ADR-0041). */
+    fun onSubcategorySessionStart(subcategory: Subcategory) {
+        viewModelScope.launch {
+            eventChannel.send(
+                CategoryDetailsDestination.SubcategoryPreviewStudySession(
+                    categoryId = subcategory.categoryId,
+                    categoryName = subcategory.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
             )
         }
     }
@@ -159,12 +190,12 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    fun onAddShortcutClick() {
+    fun onAddShortcut() {
         viewModelScope.launch {
             when (pinCategoryShortcut(route.categoryId)) {
                 PinShortcutResult.Pinned -> Unit
-                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(CategoryDetailsMessage.ShortcutPinFailed)
-                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(CategoryDetailsMessage.ShortcutPinUnsupported)
+                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(ShortcutPinFailed)
+                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(ShortcutPinUnsupported)
             }
         }
     }
@@ -191,7 +222,11 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    internal fun loadSubcategories() {
+    fun onRetry() {
+        loadSubcategories()
+    }
+
+    private fun loadSubcategories() {
         viewModelScope.launch {
             _state.update { it.copy(content = CategoryDetailsContentState.Loading) }
             getSubcategories(route.categoryId)

@@ -18,9 +18,9 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
@@ -124,6 +124,60 @@ class CategoryDetailsViewModelTest {
         }
     }
 
+    @Test
+    fun `retrying after a failed load shows the subcategories`() = runTest(mainDispatcherRule.testDispatcher) {
+        val subcategories = listOf(subcategory("sub-1"))
+        flashcardRepository.subcategoriesToReturn = Result.failure(IllegalStateException("boom"))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
+        }
+    }
+
+    // --- row navigation ---
+
+    @Test
+    fun `selecting a subcategory row emits its Subcategory Details destination`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategory = subcategory("sub-1")
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onSubcategorySelect(subcategory)
+
+                awaitItem() shouldBe CategoryDetailsDestination.SubcategoryDetails(
+                    categoryId = route.categoryId,
+                    categoryName = route.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            }
+        }
+
+    @Test
+    fun `a subcategory row's play button emits a single-subcategory preview`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategory = subcategory("sub-1")
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onSubcategorySessionStart(subcategory)
+
+                awaitItem() shouldBe CategoryDetailsDestination.SubcategoryPreviewStudySession(
+                    categoryId = route.categoryId,
+                    categoryName = route.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            }
+        }
+
     // --- fake favourite ---
 
     @Test
@@ -135,7 +189,7 @@ class CategoryDetailsViewModelTest {
                 viewModel.onFavoriteToggle()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe CategoryDetailsMessage.AddedToFavorites
+                awaitItem() shouldBe DetailsMessage.AddedToFavorites
                 viewModel.state.value.isFavorite shouldBe true
             }
         }
@@ -161,7 +215,7 @@ class CategoryDetailsViewModelTest {
                 viewModel.onFavoriteToggle()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe CategoryDetailsMessage.RemovedFromFavorites
+                awaitItem() shouldBe DetailsMessage.RemovedFromFavorites
                 viewModel.state.value.isFavorite shouldBe false
             }
         }
@@ -189,7 +243,7 @@ class CategoryDetailsViewModelTest {
         flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(category(route.categoryId, route.categoryName)))
         val viewModel = createViewModel()
 
-        viewModel.onAddShortcutClick()
+        viewModel.onAddShortcut()
         advanceUntilIdle()
 
         appShortcutsRepository.pinnedTargets.single().id shouldBe "category:${route.categoryId}"
@@ -202,10 +256,10 @@ class CategoryDetailsViewModelTest {
             val viewModel = createViewModel()
 
             viewModel.messages.test {
-                viewModel.onAddShortcutClick()
+                viewModel.onAddShortcut()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe CategoryDetailsMessage.ShortcutPinFailed
+                awaitItem() shouldBe DetailsMessage.ShortcutPinFailed
             }
         }
 
@@ -217,10 +271,10 @@ class CategoryDetailsViewModelTest {
             val viewModel = createViewModel()
 
             viewModel.messages.test {
-                viewModel.onAddShortcutClick()
+                viewModel.onAddShortcut()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe CategoryDetailsMessage.ShortcutPinUnsupported
+                awaitItem() shouldBe DetailsMessage.ShortcutPinUnsupported
             }
         }
 
