@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
@@ -36,7 +35,6 @@ class CategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSubcategories: GetSubcategoriesUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
-    private val observeCategoryFavoriteState: ObserveCategoryFavoriteStateUseCase,
     private val setCategoryFavorite: SetCategoryFavoriteUseCase,
     private val pinCategoryShortcut: PinCategoryShortcutUseCase,
     private val observeUserFavorites: ObserveUserFavoritesUseCase,
@@ -57,7 +55,6 @@ class CategoryDetailsViewModel @Inject constructor(
     init {
         loadSubcategories()
         collectProgressSummary()
-        observeFavoriteState()
         observeFavorites()
     }
 
@@ -167,9 +164,12 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * No optimistic flip: [CategoryDetailsScreenState.isFavorite] derives from the favorites
+     * listener, and Firestore's latency compensation delivers the local write to it immediately.
+     */
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
-        _state.update { it.copy(isFavorite = isFavorite) }
         viewModelScope.launch {
             val result = setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
             if (result.isSuccess) {
@@ -184,7 +184,6 @@ class CategoryDetailsViewModel @Inject constructor(
      * would invert a later, unrelated toggle. Emits no message of its own.
      */
     fun onFavoriteUndo(restoreTo: Boolean) {
-        _state.update { it.copy(isFavorite = restoreTo) }
         viewModelScope.launch {
             setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, restoreTo))
         }
@@ -200,17 +199,10 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    private fun observeFavoriteState() {
-        viewModelScope.launch {
-            observeCategoryFavoriteState(route.categoryId).collect { isFavorite ->
-                _state.update { it.copy(isFavorite = isFavorite) }
-            }
-        }
-    }
-
     /**
-     * Badges each subcategory row reactively — the list itself never waits on this to render, same
-     * rule as [collectProgressSummary]. [ObserveUserFavoritesUseCase] is a live Firestore listener
+     * The screen's one favorites listener: it drives both the top app bar's bookmark
+     * ([CategoryDetailsScreenState.isFavorite]) and each subcategory row's badge. The list itself
+     * never waits on this to render, same rule as [collectProgressSummary]. [ObserveUserFavoritesUseCase] is a live Firestore listener
      * too, re-attaching on its own after a network drop, so a screen left open through a
      * connectivity blip still gets its bookmark badges filled in without any retry wiring here.
      */
