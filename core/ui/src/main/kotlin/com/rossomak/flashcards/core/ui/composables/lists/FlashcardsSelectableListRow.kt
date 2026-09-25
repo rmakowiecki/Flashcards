@@ -2,7 +2,6 @@ package com.rossomak.flashcards.core.ui.composables.lists
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,10 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -59,7 +58,8 @@ fun FlashcardsSelectableListRow(
     isFavorited: Boolean = false,
     leading: @Composable (() -> Unit)? = null,
 ) {
-    val backgroundColor by animateColorAsState(
+    // Read only in the draw phase below, so animation frames redraw the tint without recomposing the row.
+    val backgroundColor = animateColorAsState(
         targetValue = if (selected) {
             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = SELECTED_TINT_ALPHA)
         } else {
@@ -77,7 +77,7 @@ fun FlashcardsSelectableListRow(
                 role = Role.Checkbox,
                 onValueChange = onSelectedChange,
             )
-            .background(backgroundColor)
+            .drawBehind { drawRect(backgroundColor.value) }
             .padding(
                 horizontal = MaterialTheme.spacing.normal,
                 vertical = MaterialTheme.spacing.small,

@@ -20,10 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +61,8 @@ fun FlashcardsExpandableListRow(
     expandedContent: @Composable (() -> Unit)? = null,
 ) {
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    val chevronRotation by animateFloatAsState(
+    // Read only in the graphics layer below, so animation frames rotate the chevron without recomposing the row.
+    val chevronRotation = animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = tween(FlashcardsMotion.DURATION_MEDIUM_MS, easing = FlashcardsMotion.EmphasizedEasing),
         label = "chevronRotation",
@@ -112,7 +112,7 @@ fun FlashcardsExpandableListRow(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.rotate(chevronRotation),
+                modifier = Modifier.graphicsLayer { rotationZ = chevronRotation.value },
             )
         }
         AnimatedVisibility(visible = expanded) {
