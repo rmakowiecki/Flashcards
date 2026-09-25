@@ -6,6 +6,10 @@ Usage:
   python3 scripts/compose-stability.py :feature:browse :core:ui
   python3 scripts/compose-stability.py --uncertain           # also list uncertain params
 
+Requested modules that don't apply a Compose convention plugin (one that applies
+`android-compose`) are skipped, since they have no Compose reports and pure Kotlin
+modules have no `compileReleaseKotlin` task.
+
 Compiles the release variant with `--rerun -PcomposeCompilerReports=true` (see the
 `android-compose` convention plugin), after deleting each target module's old
 `build/compose_compiler/` so stale reports never mix in. Then parses the fresh reports
@@ -30,6 +34,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = Path("build") / "compose_compiler"
+CONVENTION_PLUGINS_DIR = ROOT / "build-logic" / "src" / "main" / "kotlin"
 BUILD_FAILURE_TAIL_LINES = 40
 MAX_CAUSE_FIELDS = 3
 
@@ -48,6 +53,23 @@ def settings_modules() -> list[str]:
 
 def module_dir(module_path: str) -> Path:
     return ROOT / module_path.strip(":").replace(":", "/")
+
+
+def compose_convention_plugins() -> set[str]:
+    """Names of the convention plugins that apply `android-compose`, e.g. `android-feature`."""
+    return {
+        path.name.removesuffix(".gradle.kts")
+        for path in CONVENTION_PLUGINS_DIR.glob("*.gradle.kts")
+        if 'apply("android-compose")' in path.read_text()
+    }
+
+
+def applies_compose(module_path: str, convention_plugins: set[str]) -> bool:
+    build_file = module_dir(module_path) / "build.gradle.kts"
+    if not build_file.is_file():
+        return False
+    applied_plugins = set(re.findall(r'id\("([^"]+)"\)', build_file.read_text()))
+    return bool(applied_plugins & convention_plugins)
 
 
 def compile_reports(modules: list[str] | None) -> None:
@@ -173,6 +195,15 @@ def main() -> int:
     if unknown_arguments:
         print(f"Unknown arguments: {' '.join(unknown_arguments)}\n{__doc__}")
         return 2
+
+    if requested_modules:
+        convention_plugins = compose_convention_plugins()
+        for module_path in requested_modules:
+            if not applies_compose(module_path, convention_plugins):
+                print(f"{module_path}  skipped (no Compose)")
+        requested_modules = [module for module in requested_modules if applies_compose(module, convention_plugins)]
+        if not requested_modules:
+            return 0
 
     target_modules = requested_modules or settings_modules()
     for module_path in target_modules:

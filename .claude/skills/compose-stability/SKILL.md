@@ -17,7 +17,8 @@ triaged list with proposed fixes. **Never read the raw
 Passed straight through to the script:
 
 - none — every module;
-- Gradle paths, e.g. `:feature:browse :core:ui` — only those modules;
+- Gradle paths, e.g. `:feature:browse :core:ui` — only those modules; a
+  module without Compose prints `skipped (no Compose)` and isn't compiled;
 - `--uncertain` — also list params with no stability prefix (combines with either).
 
 ## Flow
