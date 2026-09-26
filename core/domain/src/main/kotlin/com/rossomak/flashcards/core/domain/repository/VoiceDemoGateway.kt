@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -12,6 +13,13 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface VoiceDemoGateway {
     val state: StateFlow<VoiceDemoState>
+
+    /**
+     * Microphone input level as bar levels in `0..1`, index 0 newest, one list per shaping interval
+     * while listening and an all-zero list when listening stops. Cold: computed only while
+     * collected, on the device only.
+     */
+    val inputLevels: Flow<List<Float>>
 
     /** Starts a fresh listening attempt. Re-randomizes the obfuscation shift for this attempt. */
     fun start()

@@ -77,6 +77,15 @@ class VoiceCaptureEngine @Inject constructor(
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
     /**
+     * Smoothed `0..1` microphone input level, updated every frame while listening and 0 otherwise.
+     * Reacts to any sound above the noise floor, not only VAD-detected speech (see [InputLevelMeter]).
+     *
+     * Privacy: computed on the device from raw PCM only. It is never logged, stored or uploaded.
+     */
+    private val _inputLevel = MutableStateFlow(0f)
+    val inputLevel: StateFlow<Float> = _inputLevel.asStateFlow()
+
+    /**
      * The mic device actually carrying audio right now, confirmed via [AudioRecord.getRoutedDevice]
      * — `null` whenever nothing is recording (debug-screen route indicator; see [isRouteHonored] for
      * the boolean form production capture already relies on).
@@ -113,6 +122,7 @@ class VoiceCaptureEngine @Inject constructor(
         captureJob = null
         _isListening.value = false
         _isSpeechDetected.value = false
+        _inputLevel.value = 0f
     }
 
     /**
@@ -178,6 +188,7 @@ class VoiceCaptureEngine @Inject constructor(
             routeChangeJob.cancel()
             _isListening.value = false
             _isSpeechDetected.value = false
+            _inputLevel.value = 0f
             _actualMicDevice.value = null
         }
     }
@@ -234,11 +245,13 @@ class VoiceCaptureEngine @Inject constructor(
     ): CaptureResult {
         val frame = ShortArray(FRAME_SIZE_SAMPLES)
         val state = UtteranceState()
+        val inputLevelMeter = InputLevelMeter()
         while (captureJob?.isActive == true) {
             if (isRouteChangePending() && !state.isInUtterance) return CaptureResult.RouteChanged
             val read = audioRecord.read(frame, 0, frame.size)
             if (read <= 0) continue
             updateActualMicDevice(audioRecord)
+            _inputLevel.value = inputLevelMeter.process(frame, read)
             if (read < frame.size) frame.fill(0, read, frame.size)
             val isSpeech = voiceActivityDetector.isSpeech(frame)
             _isSpeechDetected.value = isSpeech

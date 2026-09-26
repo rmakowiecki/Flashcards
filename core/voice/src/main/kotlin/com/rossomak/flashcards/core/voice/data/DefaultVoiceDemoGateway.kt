@@ -13,6 +13,7 @@ import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.CaptureFailed
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechEnded
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechStarted
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.UtteranceCaptured
+import com.rossomak.flashcards.core.voice.VoiceLevelWaveShaper
 import dagger.hilt.android.ViewModelLifecycle
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -23,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +48,9 @@ class DefaultVoiceDemoGateway @Inject constructor(
 
     private val _state = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
     override val state: StateFlow<VoiceDemoState> = _state.asStateFlow()
+
+    override val inputLevels: Flow<List<Float>> =
+        VoiceLevelWaveShaper().shape(level = voiceCaptureEngine.inputLevel, isListening = voiceCaptureEngine.isListening)
 
     // Main.immediate: the public calls arrive on Main, so every job field and state write runs on one
     // thread and a late capture event can't race stop().

@@ -1,10 +1,12 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeVoiceDemoGateway : VoiceDemoGateway {
     override val state = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
+    override val inputLevels = MutableSharedFlow<List<Float>>()
 
     var startCount = 0
         private set
