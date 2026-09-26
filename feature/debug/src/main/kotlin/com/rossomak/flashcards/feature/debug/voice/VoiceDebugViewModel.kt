@@ -23,11 +23,13 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -53,13 +55,23 @@ class VoiceDebugViewModel @Inject constructor(
     private val _state = MutableStateFlow(VoiceDebugScreenState())
     val state: StateFlow<VoiceDebugScreenState> = _state.asStateFlow()
 
-    /** Live microphone level for the VAD block's indicator, kept out of [state]. */
-    val inputLevels: StateFlow<ImmutableList<Float>> = VoiceLevelWaveShaper()
-        .shape(level = voiceCaptureEngine.inputLevel, isListening = voiceCaptureEngine.isListening)
+    /** True while "Play last answer" is playing; drives the VAD block's indicator instead of the microphone. */
+    private val isPlayingLastAnswer = MutableStateFlow(false)
+
+    /**
+     * Level for the VAD block's indicator, kept out of [state]: the played-back last answer while
+     * it plays, otherwise the live microphone.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val levels: StateFlow<ImmutableList<Float>> = VoiceLevelWaveShaper()
+        .shape(
+            level = isPlayingLastAnswer.flatMapLatest { playing -> if (playing) pcmPlayer.playbackLevel else voiceCaptureEngine.inputLevel },
+            isActive = combine(voiceCaptureEngine.isListening, isPlayingLastAnswer) { listening, playing -> listening || playing },
+        )
         .map { levels -> levels.toImmutableList() }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = INPUT_LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
             initialValue = persistentListOf(),
         )
 
@@ -99,6 +111,11 @@ class VoiceDebugViewModel @Inject constructor(
                 val label = device?.toRouteLabel() ?: IDLE_ROUTE_LABEL
                 _state.update { it.copy(playbackRouteLabel = label) }
                 logRouteChange("playback", ::lastLoggedPlaybackRouteLabel, label)
+            }
+        }
+        viewModelScope.launch {
+            pcmPlayer.isPlaying.collect { playing ->
+                if (!playing) setPlayingLastAnswer(false)
             }
         }
         viewModelScope.launch {
@@ -156,18 +173,28 @@ class VoiceDebugViewModel @Inject constructor(
     }
 
     fun onPlayRawClip() {
-        if (rawClip.isNotEmpty()) pcmPlayer.play(rawClip)
+        if (rawClip.isEmpty()) return
+        setPlayingLastAnswer(false)
+        pcmPlayer.play(rawClip)
     }
 
     /** Plays back the last VAD-bounded utterance (obfuscated PCM) to audit the VAD boundaries. */
     fun onPlayCapturedUtterance() {
-        if (capturedUtterance.isNotEmpty()) pcmPlayer.play(capturedUtterance)
+        if (capturedUtterance.isEmpty()) return
+        pcmPlayer.play(capturedUtterance)
+        setPlayingLastAnswer(true)
     }
 
     fun onPlayObfuscatedClip() {
         if (rawClip.isEmpty()) return
         if (obfuscatedClip.isEmpty()) obfuscatedClip = voiceObfuscator.obfuscate(rawClip)
+        setPlayingLastAnswer(false)
         pcmPlayer.play(obfuscatedClip)
+    }
+
+    private fun setPlayingLastAnswer(playing: Boolean) {
+        isPlayingLastAnswer.value = playing
+        _state.update { it.copy(isPlayingLastAnswer = playing) }
     }
 
     fun onRerandomizeObfuscation() {
@@ -272,6 +299,6 @@ class VoiceDebugViewModel @Inject constructor(
         const val RAW_CLIP_DURATION_MS = 3_000L
         const val MAX_LOG_LINES = 12
         const val IDLE_ROUTE_LABEL = "Idle"
-        val INPUT_LEVELS_STOP_TIMEOUT = 5.seconds
+        val LEVELS_STOP_TIMEOUT = 5.seconds
     }
 }
