@@ -5,9 +5,9 @@ import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
-class ObserveVoiceDemoInputLevelsUseCase @Inject constructor(
+class ObserveVoiceDemoLevelsUseCase @Inject constructor(
     private val voiceDemoGateway: VoiceDemoGateway,
 ) : NoParamUseCase<Flow<List<Float>>> {
 
-    override suspend operator fun invoke(): Flow<List<Float>> = voiceDemoGateway.inputLevels
+    override suspend operator fun invoke(): Flow<List<Float>> = voiceDemoGateway.levels
 }
