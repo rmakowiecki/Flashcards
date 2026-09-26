@@ -18,20 +18,20 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Failed
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Idle
@@ -43,6 +43,7 @@ import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
@@ -51,6 +52,10 @@ import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingContentColors
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Introduces Voice Answering and the on-device privacy transform.
@@ -66,6 +71,7 @@ import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
 @Composable
 internal fun VoicePrivacyStep(
     voiceDemoState: VoiceDemoState,
+    inputLevels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
     onPlay: () -> Unit,
@@ -83,6 +89,7 @@ internal fun VoicePrivacyStep(
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.medium))
         VoiceTestCard(
             voiceDemoState = voiceDemoState,
+            inputLevels = inputLevels,
             permissionDenied = permissionDenied,
             onTestVoice = onTestVoice,
             onPlay = onPlay,
@@ -122,6 +129,7 @@ private fun PremiumNote(modifier: Modifier = Modifier) {
 @Composable
 private fun VoiceTestCard(
     voiceDemoState: VoiceDemoState,
+    inputLevels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
     onPlay: () -> Unit,
@@ -147,7 +155,7 @@ private fun VoiceTestCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
         ) {
-            MicBadge(voiceDemoState = voiceDemoState)
+            MicBadge(voiceDemoState = voiceDemoState, inputLevels = inputLevels)
             // Fixed height, sized to the tallest of the states below (permission-denied's two-line
             // message + button row), so the card never visibly resizes as the voice demo state changes.
             // verticalScroll is a safety net only, for oversized a11y font scale overflowing it.
@@ -172,23 +180,28 @@ private fun VoiceTestCard(
 
 private val VOICE_TEST_CARD_BODY_HEIGHT = 120.dp
 
+/** While listening, the live input level indicator takes the badge's place; its disc is the same size. */
 @Composable
-private fun MicBadge(voiceDemoState: VoiceDemoState, modifier: Modifier = Modifier) {
-    val listeningContentDescription = stringResource(R.string.voice_privacy_listening_cd)
-    Surface(
-        modifier = modifier.size(MaterialTheme.sizes.ratingButton),
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.full),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (voiceDemoState is Listening || voiceDemoState is SpeechDetected) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(MaterialTheme.sizes.metadataBadgeIcon)
-                        .semantics { contentDescription = listeningContentDescription },
-                )
-            } else {
+private fun MicBadge(
+    voiceDemoState: VoiceDemoState,
+    inputLevels: StateFlow<ImmutableList<Float>>,
+    modifier: Modifier = Modifier,
+) {
+    if (voiceDemoState is Listening || voiceDemoState is SpeechDetected) {
+        val levels by inputLevels.collectAsStateWithLifecycle()
+        FlashcardsVoiceCaptureIndicator(
+            levels = levels,
+            contentDescription = stringResource(R.string.voice_privacy_listening_cd),
+            modifier = modifier,
+        )
+    } else {
+        Surface(
+            modifier = modifier.size(MaterialTheme.sizes.ratingButton),
+            shape = RoundedCornerShape(MaterialTheme.cornerRadius.full),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
                 Icon(imageVector = Icons.Default.Mic, contentDescription = null)
             }
         }
@@ -324,7 +337,25 @@ private fun VoicePrivacyStepPermissionDeniedPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = Idle,
+            inputLevels = remember { MutableStateFlow(persistentListOf()) },
             permissionDenied = true,
+            onTestVoice = {},
+            onPlay = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+private val PreviewInputLevels = persistentListOf(0.35f, 0.9f, 0.6f, 0.2f, 0.05f)
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+private fun VoicePrivacyStepListeningPreview() {
+    FlashcardsTheme {
+        VoicePrivacyStep(
+            voiceDemoState = SpeechDetected,
+            inputLevels = remember { MutableStateFlow(PreviewInputLevels) },
+            permissionDenied = false,
             onTestVoice = {},
             onPlay = {},
             onOpenSettings = {},

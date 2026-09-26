@@ -75,9 +75,13 @@ import com.rossomak.flashcards.feature.onboarding.step.StructureStep
 import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /** Fade-and-rise of the cover's copy, once the shared logo has landed. */
@@ -125,6 +129,7 @@ fun OnboardingScreen(
     OnboardingContent(
         modifier = modifier,
         state = state,
+        voiceDemoInputLevels = viewModel.voiceDemoInputLevels,
         messages = viewModel.messages,
         actions = OnboardingActions(
             onStudyModeSelect = viewModel::onStudyModeSelect,
@@ -153,6 +158,7 @@ fun OnboardingScreen(
 private fun OnboardingContent(
     modifier: Modifier = Modifier,
     state: OnboardingScreenState,
+    voiceDemoInputLevels: StateFlow<ImmutableList<Float>>,
     actions: OnboardingActions,
     messages: SharedFlow<OnboardingMessage>,
 ) {
@@ -223,6 +229,7 @@ private fun OnboardingContent(
                 OnboardingStepPage(
                     step = OnboardingStep.atPage(page),
                     state = state,
+                    voiceDemoInputLevels = voiceDemoInputLevels,
                     copyRevealProgress = copyReveal.value,
                     actions = actions,
                     messages = messages,
@@ -324,6 +331,7 @@ private fun OnboardingCta(
 private fun OnboardingStepPage(
     step: OnboardingStep,
     state: OnboardingScreenState,
+    voiceDemoInputLevels: StateFlow<ImmutableList<Float>>,
     copyRevealProgress: Float,
     actions: OnboardingActions,
     messages: SharedFlow<OnboardingMessage>,
@@ -348,6 +356,7 @@ private fun OnboardingStepPage(
         )
         OnboardingStep.VoicePrivacy -> VoicePrivacyStepRoute(
             voiceDemoState = state.voiceDemoState,
+            voiceDemoInputLevels = voiceDemoInputLevels,
             micPermissionStatus = state.micPermissionStatus,
             messages = messages,
             onTestVoice = actions.onVoiceDemoStart,
@@ -381,6 +390,7 @@ private fun OnboardingStepPage(
 @Composable
 private fun VoicePrivacyStepRoute(
     voiceDemoState: VoiceDemoState,
+    voiceDemoInputLevels: StateFlow<ImmutableList<Float>>,
     micPermissionStatus: PermissionStatus,
     messages: SharedFlow<OnboardingMessage>,
     onTestVoice: () -> Unit,
@@ -407,6 +417,7 @@ private fun VoicePrivacyStepRoute(
     ) { innerPadding ->
         VoicePrivacyStep(
             voiceDemoState = voiceDemoState,
+            inputLevels = voiceDemoInputLevels,
             permissionDenied = micPermissionStatus == PermissionStatus.PermanentlyDenied,
             onTestVoice = onTestVoice,
             onPlay = onPlay,
@@ -438,6 +449,7 @@ private fun OnboardingContentPreview() {
     FlashcardsTheme {
         OnboardingContent(
             state = remember { OnboardingScreenState(userName = "Radek") },
+            voiceDemoInputLevels = remember { MutableStateFlow(persistentListOf()) },
             messages = remember { MutableSharedFlow() },
             actions = OnboardingActions(
                 onStudyModeSelect = {},

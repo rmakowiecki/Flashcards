@@ -19,6 +19,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeVoiceDemoGateway
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoInputLevelsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -62,6 +63,7 @@ class OnboardingViewModelTest {
         setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
         signInAnonymously = SignInAnonymouslyUseCase(authRepository),
         observeVoiceDemoState = ObserveVoiceDemoStateUseCase(voiceDemoGateway),
+        observeVoiceDemoInputLevels = ObserveVoiceDemoInputLevelsUseCase(voiceDemoGateway),
         startVoiceDemo = StartVoiceDemoUseCase(voiceDemoGateway),
         playVoiceDemo = PlayVoiceDemoUseCase(voiceDemoGateway),
         stopVoiceDemo = StopVoiceDemoUseCase(voiceDemoGateway),
@@ -418,6 +420,22 @@ class OnboardingViewModelTest {
 
         viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Ready
     }
+
+    @Test
+    fun `voice demo input levels pass through as their own flow, starting at rest`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val inputLevels = listOf(0.4f, 0.2f, 0f, 0f, 0f)
+            val viewModel = createViewModel()
+
+            viewModel.voiceDemoInputLevels.test {
+                awaitItem() shouldBe listOf(0f, 0f, 0f, 0f, 0f)
+                advanceUntilIdle()
+
+                voiceDemoGateway.inputLevels.emit(inputLevels)
+
+                awaitItem() shouldBe inputLevels
+            }
+        }
 
     @Test
     fun `voice demo failure emits a failure message with its reason`() = runTest(mainDispatcherRule.testDispatcher) {
