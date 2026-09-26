@@ -96,6 +96,14 @@ class VoiceCaptureEngine @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var captureJob: Job? = null
 
+    // Raised by finishListening() and read by the capture loop on Dispatchers.Default, so atomic.
+    private val finishRequested = AtomicBoolean(false)
+
+    // The newest utterance emitted since startListening(), handed back by finishListening().
+    // Obfuscated audio only; cleared on every start and stop.
+    @Volatile
+    private var lastUtterance: CapturedUtterance? = null
+
     /**
      * Starts continuous VAD-driven capture. No-op when already listening.
      *
@@ -109,6 +117,8 @@ class VoiceCaptureEngine @Inject constructor(
         logd { "startListening" }
         voiceActivityDetector.reset()
         voiceObfuscator.randomizeSessionShift()
+        finishRequested.set(false)
+        lastUtterance = null
         _isListening.value = true
         val maxUtteranceFrames =
             (minOf(maxUtteranceDuration, MAX_UTTERANCE_DURATION).inWholeMilliseconds / FRAME_DURATION_MS).toInt()
@@ -120,9 +130,28 @@ class VoiceCaptureEngine @Inject constructor(
         logd { "stopListening" }
         captureJob?.cancel()
         captureJob = null
+        lastUtterance = null
         _isListening.value = false
         _isSpeechDetected.value = false
         _inputLevel.value = 0f
+    }
+
+    /**
+     * Graceful early stop: the capture loop finishes the in-flight utterance as if its trailing
+     * silence had just elapsed (emitting [VoiceCaptureEvent.UtteranceCaptured] when it has enough
+     * speech), then exits. Suspends until the loop has exited.
+     *
+     * Returns the newest utterance captured since [startListening], or `null` when there was none —
+     * including a blip too short to keep. Unlike [stopListening], nothing already spoken is lost.
+     */
+    suspend fun finishListening(): CapturedUtterance? {
+        val job = captureJob
+        if (job?.isActive == true) {
+            logd { "finishListening" }
+            finishRequested.set(true)
+            job.join()
+        }
+        return lastUtterance.also { lastUtterance = null }
     }
 
     /**
@@ -167,7 +196,7 @@ class VoiceCaptureEngine @Inject constructor(
             audioRouteManager.routeChanges.collect { routeChangePending.set(true) }
         }
         try {
-            while (captureJob?.isActive == true) {
+            while (captureJob?.isActive == true && !finishRequested.get()) {
                 val route = audioRouteManager.route.value
                 if (!route.isCapturable) {
                     // Bluetooth-strict (ADR-0027): a mic-capable BT device is connected but its link
@@ -233,8 +262,8 @@ class VoiceCaptureEngine @Inject constructor(
     }
 
     /**
-     * Reads VAD-bounded utterances off [audioRecord] until the job is cancelled ([CaptureResult.Stopped])
-     * or [isRouteChangePending] flips. A pending route change is honored at an utterance boundary:
+     * Reads VAD-bounded utterances off [audioRecord] until the job is cancelled or [finishListening]
+     * is requested ([CaptureResult.Stopped]), or [isRouteChangePending] flips. A pending route change is honored at an utterance boundary:
      * an in-flight utterance is finished first, then [CaptureResult.RouteChanged] is returned so the
      * caller rebuilds on the new route (never a mid-clip device switch).
      */
@@ -247,6 +276,10 @@ class VoiceCaptureEngine @Inject constructor(
         val state = UtteranceState()
         val inputLevelMeter = InputLevelMeter()
         while (captureJob?.isActive == true) {
+            if (finishRequested.get()) {
+                if (state.isInUtterance) finishUtteranceAndCheckRoute(state) { false }
+                return CaptureResult.Stopped
+            }
             if (isRouteChangePending() && !state.isInUtterance) return CaptureResult.RouteChanged
             val read = audioRecord.read(frame, 0, frame.size)
             if (read <= 0) continue
@@ -382,15 +415,13 @@ class VoiceCaptureEngine @Inject constructor(
         val obfuscated = voiceObfuscator.obfuscate(raw)
         raw.fill(0) // Raw voiceprint is dropped the moment the obfuscated copy exists.
         val durationMs = obfuscated.size * 1000L / SAMPLE_RATE_HZ
-        _events.emit(
-            VoiceCaptureEvent.UtteranceCaptured(
-                CapturedUtterance(
-                    obfuscatedPcm = obfuscated,
-                    wavBytes = WavEncoder.encode(obfuscated, SAMPLE_RATE_HZ),
-                    durationMs = durationMs,
-                )
-            )
+        val utterance = CapturedUtterance(
+            obfuscatedPcm = obfuscated,
+            wavBytes = WavEncoder.encode(obfuscated, SAMPLE_RATE_HZ),
+            durationMs = durationMs,
         )
+        lastUtterance = utterance
+        _events.emit(VoiceCaptureEvent.UtteranceCaptured(utterance))
     }
 
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
@@ -444,12 +475,6 @@ class VoiceCaptureEngine @Inject constructor(
         }
         val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
         logi { "BT warm-up timed out after ${elapsedMs}ms (route=${route.type}) — proceeding anyway" }
-    }
-
-    private fun frameEnergy(frame: ShortArray, sampleCount: Int): Long {
-        var sum = 0L
-        for (index in 0 until sampleCount) sum += kotlin.math.abs(frame[index].toInt())
-        return sum / sampleCount
     }
 
     /**
@@ -530,4 +555,11 @@ class VoiceCaptureEngine @Inject constructor(
         private const val MAX_UTTERANCE_FRAMES = 1500 // 30s hard cap per utterance
         val MAX_UTTERANCE_DURATION: Duration = (MAX_UTTERANCE_FRAMES * FRAME_DURATION_MS).milliseconds
     }
+}
+
+/** Mean absolute amplitude of the first [sampleCount] samples of [frame]. */
+private fun frameEnergy(frame: ShortArray, sampleCount: Int): Long {
+    var sum = 0L
+    for (index in 0 until sampleCount) sum += kotlin.math.abs(frame[index].toInt())
+    return sum / sampleCount
 }

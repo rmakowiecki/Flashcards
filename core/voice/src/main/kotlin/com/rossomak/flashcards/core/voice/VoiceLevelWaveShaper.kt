@@ -34,12 +34,12 @@ class VoiceLevelWaveShaper(
 
     /**
      * Cold: nothing is collected or emitted without a collector. Emits an all-zero list whenever
-     * [isListening] turns false, and nothing more until it turns true again.
+     * [isActive] turns false, and nothing more until it turns true again.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun shape(level: Flow<Float>, isListening: Flow<Boolean>): Flow<List<Float>> =
-        isListening.distinctUntilChanged().transformLatest { listening ->
-            if (listening) emitAll(wave(level)) else emit(restLevels)
+    fun shape(level: Flow<Float>, isActive: Flow<Boolean>): Flow<List<Float>> =
+        isActive.distinctUntilChanged().transformLatest { active ->
+            if (active) emitAll(wave(level)) else emit(restLevels)
         }
 
     private fun wave(level: Flow<Float>): Flow<List<Float>> {
