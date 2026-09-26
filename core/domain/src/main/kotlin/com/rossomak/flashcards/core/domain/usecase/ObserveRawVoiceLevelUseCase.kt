@@ -1,0 +1,13 @@
+package com.rossomak.flashcards.core.domain.usecase
+
+import com.rossomak.flashcards.core.domain.repository.VoiceDemoGateway
+import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
+import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+
+class ObserveRawVoiceLevelUseCase @Inject constructor(
+    private val voiceDemoGateway: VoiceDemoGateway,
+) : NoParamUseCase<Flow<Float>> {
+
+    override suspend operator fun invoke(): Flow<Float> = voiceDemoGateway.rawVoiceLevel
+}
