@@ -22,6 +22,7 @@ import com.rossomak.flashcards.core.domain.model.startClock
 import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
+import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -38,6 +39,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVo
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.NoConnection
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.ServiceError
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import com.rossomak.flashcards.feature.study.voice.VoiceGateway
 import com.rossomak.flashcards.feature.study.voice.VoicePhase
@@ -49,6 +52,7 @@ import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -149,6 +153,12 @@ class RatedStudySessionViewModel @Inject constructor(
 
     private val _messages = MutableSharedFlow<RatedStudySessionMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<RatedStudySessionMessage> = _messages.asSharedFlow()
+
+    /**
+     * Live microphone bar levels for the listening indicator. Kept out of [state] so the level
+     * stream never recomposes the rest of the screen.
+     */
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = voiceGateway.rawVoiceLevel.stateInVoiceBarsLevels(viewModelScope)
 
     private var lastObservedCardIndex = -1
 
@@ -316,13 +326,13 @@ class RatedStudySessionViewModel @Inject constructor(
                         // Grading/feedback also reveals the card (see observeVoiceAnswerState) —
                         // don't let this collector's phase check stomp that back to false while
                         // the TTS engine itself is still sitting on QUESTION. SpeakingNotice alone
-                        // is NOT enough to reveal — a silence-timeout skip or a grading/
-                        // transcription failure lands there too with no grade to show; only gate
-                        // it open when lastVoiceAnswerGrade proves this round actually graded.
+                        // is NOT enough to reveal — a silence-timeout skip lands there too with no
+                        // grade to show; only gate it open when this round actually reached
+                        // grading: it produced a grade, or its grading failed.
                         isAnswerRevealed = if (voice.isActive) {
                             voice.phase == VoicePhase.Answer ||
                                 it.voiceAnswerPhase == VoiceAnswerPhase.Grading ||
-                                (it.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice && it.lastVoiceAnswerGrade != null)
+                                (it.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice && (it.lastVoiceAnswerGrade != null || it.isVoiceAnswerGradingFailed))
                         } else {
                             it.isAnswerRevealed
                         },
@@ -378,7 +388,9 @@ class RatedStudySessionViewModel @Inject constructor(
                     if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
                     voiceGateway.setVoiceAnswering(false)
                     voiceGateway.restartCurrentCard()
-                    _state.update { it.copy(isVoiceAnswerPaused = true) }
+                    // The capture-failure notice starts with this same state, and keeps the sheet on its
+                    // status disc over the pause until the notice has finished.
+                    _state.update { it.copy(isVoiceAnswerPaused = true, isVoiceShortNoticeSpeaking = voiceAnswer.isShortNoticeSpeaking) }
                     _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
                     return@collect
                 }
@@ -401,6 +413,8 @@ class RatedStudySessionViewModel @Inject constructor(
                         voiceAnswerPhase = voiceAnswer.phase,
                         voiceAnswerSanitizedTranscript = voiceAnswer.sanitizedTranscript,
                         lastVoiceAnswerGrade = voiceAnswer.lastGrade,
+                        isVoiceShortNoticeSpeaking = voiceAnswer.isShortNoticeSpeaking,
+                        isVoiceAnswerGradingFailed = voiceAnswer.error is VoiceAnswerFailureReason.GradingFailed,
                         // Grading starts as soon as the utterance is captured, before the TTS
                         // engine's own phase would flip to ANSWER — reveal the card now so the
                         // user can check what they missed while grading/feedback plays out.
@@ -424,7 +438,7 @@ class RatedStudySessionViewModel @Inject constructor(
                     // A grading/transcription failure is not counted as a silence timeout — it
                     // just surfaces a snackbar, leaving the queue and consecutiveSilenceCount
                     // untouched.
-                    voiceAnswer.error != null -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerGradingFailed)
+                    error is VoiceAnswerFailureReason.GradingFailed -> _messages.tryEmit(error.toMessage())
                     else -> onVoiceSilenceTimeout()
                 }
             }
@@ -449,6 +463,11 @@ class RatedStudySessionViewModel @Inject constructor(
         consecutiveSilenceCount = 0
         pushNextSilenceWillPauseSession()
         applyAttemptRating(grade.toFlashcardAttemptRating(), deferSync = true)
+    }
+
+    private fun VoiceAnswerFailureReason.GradingFailed.toMessage(): RatedStudySessionMessage = when (this) {
+        NoConnection -> RatedStudySessionMessage.VoiceAnswerGradingOffline
+        ServiceError -> RatedStudySessionMessage.VoiceAnswerGradingServiceError
     }
 
     /**

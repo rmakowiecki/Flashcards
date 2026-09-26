@@ -4,7 +4,7 @@
 
 Voice answering applies **exclusively to Rated Study Sessions**. Fast Study Sessions never get voice answering, under any configuration. There is no in-between Rated submode either — e.g. "TTS reads the question, user still self-rates manually" — voice answering is Rated's all-or-nothing second submode alongside plain manual Rated.
 
-It is reachable two ways, both scoped to Rated only: as an in-session toggle, and — up front, before the session starts — as a row on the Preview Study Session Screen ([ADR-0030](0030-preview-session-settings-sheet.md)).
+It is chosen once, up front, as a row on the Preview Study Session Screen ([ADR-0030](0030-preview-session-settings-sheet.md)), and stays fixed for the whole session.
 
 Engine-sharing, silence-timeout, and grade-band mechanics are documented in [ADR-0031](0031-voice-answering-shared-tts-engine-silence-timeout-grade-bands.md).
 

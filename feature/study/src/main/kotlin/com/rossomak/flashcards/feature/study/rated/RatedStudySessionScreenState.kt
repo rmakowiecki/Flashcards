@@ -46,10 +46,15 @@ data class RatedStudySessionScreenState(
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
     val voiceAnswerSanitizedTranscript: String? = null,
     // Continuous display state, not a one-shot event: mirrors the current round's grade for as
-    // long as VoiceAnswerPhase.SpeakingNotice is reading it aloud, rendered as bottom-sheet plain
-    // text (RatedVoiceGradeFeedback) rather than a snackbar. One-shot voice-answering failures go
+    // long as VoiceAnswerPhase.SpeakingNotice is reading it aloud, rendered in the bottom sheet
+    // (RatedVoiceSheetMode.Graded) rather than as a snackbar. One-shot voice-answering failures go
     // through RatedStudySessionMessage instead — see RatedStudySessionViewModel.messages.
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
+    // Mirrors VoiceAnswerState.isShortNoticeSpeaking: outlives the pause a short notice can trigger,
+    // so the sheet stays on its status disc until the notice has actually finished.
+    val isVoiceShortNoticeSpeaking: Boolean = false,
+    // This round's grading failed: its notice keeps the card answer revealed, which grading already did.
+    val isVoiceAnswerGradingFailed: Boolean = false,
     val activeDialog: StudySessionDialog? = null,
     // Mirrors RatedSessionState.masteredCount. No longer the header's counter (see completedCount
     // below) — kept for the Session Summary screen's own mastered tally.
@@ -73,6 +78,16 @@ data class RatedStudySessionScreenState(
     val isVoiceAnswerPaused: Boolean = false,
 ) {
     val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)
+
+    val voiceSheetMode: RatedVoiceSheetMode
+        get() = voiceSheetModeOf(
+            isVoiceAnswerEnabled = isVoiceAnswerEnabled,
+            voiceAnswerPhase = voiceAnswerPhase,
+            isVoiceAnswerPaused = isVoiceAnswerPaused,
+            isShortNoticeSpeaking = isVoiceShortNoticeSpeaking,
+            sanitizedTranscript = voiceAnswerSanitizedTranscript,
+            lastGrade = lastVoiceAnswerGrade,
+        )
 
     /**
      * The current card's Rating history mapped to [FlashcardsAttemptIndicator] slots: one filled

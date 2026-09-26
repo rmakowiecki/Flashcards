@@ -12,21 +12,30 @@ import androidx.core.content.ContextCompat
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndGradeSpokenAnswerUseCase
+import com.rossomak.flashcards.core.ui.composables.rating.labelRes
 import com.rossomak.flashcards.core.voice.AudioRouteManager
 import com.rossomak.flashcards.core.voice.CaptureRouteType
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.NoConnection
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.ServiceError
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import javax.inject.Inject
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -35,23 +44,32 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class VoiceAnswerPhase { Idle, WaitingForQuestion, Listening, SpeechDetected, Grading, SpeakingNotice }
+enum class VoiceAnswerPhase {
+    Idle,
+    WaitingForQuestion,
+    Listening,
+    SpeechDetected,
+    Grading,
+    SpeakingNotice
+}
 
 data class VoiceAnswerState(
     val isEnabled: Boolean = false,
     val phase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
-    /** Sanitized transcript, set as soon as it streams in — ahead of [lastGrade] (ADR-0028). */
-    val sanitizedTranscript: String? = null,
+    val sanitizedTranscript: String? = null, // sanitized transcript, set as soon as it streams in — ahead of [lastGrade] (ADR-0028)
     val lastGrade: VoiceAnswerGrade? = null,
     val lastGradedCardId: String? = null,
     val captureRoute: CaptureRouteType = CaptureRouteType.None,
-    // Compile-safe migration only: still just a null-check trigger for one fixed snackbar
-    // message, not resolved per-reason yet.
     val error: VoiceAnswerFailureReason? = null,
+    // A short notice (silence skip or pause, grading or capture failure) is being spoken. Survives
+    // stop(): a pause can stop voice answering while its own notice is still playing.
+    val isShortNoticeSpeaking: Boolean = false,
 )
 
 /**
@@ -87,12 +105,19 @@ class VoiceAnswerController @Inject constructor(
     private val _advanceRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val advanceRequests: SharedFlow<Unit> = _advanceRequests.asSharedFlow()
 
+    /**
+     * Raw microphone input level in `0..1`, 0 whenever the capture engine is not listening.
+     * Computed on the device from raw PCM and never logged, stored or uploaded.
+     */
+    val rawVoiceLevel: Flow<Float> = voiceCaptureEngine.inputLevel
+
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var captureEventsJob: Job? = null
     private var routeObserverJob: Job? = null
     private var sessionRouteJob: Job? = null
     private var listenStartJob: Job? = null
     private var listenTimeoutJob: Job? = null
+    private var shortNoticeTimeoutJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     private var activeCard: VoiceFlashcard? = null
@@ -153,7 +178,7 @@ class VoiceAnswerController @Inject constructor(
         releaseWakeLock()
         activeCard = null
         nextSilenceWillPauseSession = false
-        _state.value = VoiceAnswerState()
+        _state.value = VoiceAnswerState(isShortNoticeSpeaking = _state.value.isShortNoticeSpeaking)
     }
 
     /** Full teardown when the owning service dies. */
@@ -161,6 +186,7 @@ class VoiceAnswerController @Inject constructor(
         stop()
         noticeTts?.shutdown()
         noticeTts = null
+        onShortNoticeFinished()
     }
 
     /** Called once the shared TTS engine finishes reading the current card's question — opens the listening window. */
@@ -203,13 +229,14 @@ class VoiceAnswerController @Inject constructor(
 
     private suspend fun onSilenceTimeout() {
         voiceCaptureEngine.stopListening()
-        _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice) }
+        _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true) }
         val messageRes = if (nextSilenceWillPauseSession) {
             R.string.study_session_voice_answer_skip_pause_spoken_message
         } else {
             R.string.study_session_voice_answer_skip_spoken_message
         }
         speakNotice(context.getString(messageRes))
+        startShortNoticeTimeout()
     }
 
     private suspend fun handleCaptureEvent(event: VoiceCaptureEvent) {
@@ -232,11 +259,13 @@ class VoiceAnswerController @Inject constructor(
                     it.copy(
                         phase = VoiceAnswerPhase.WaitingForQuestion,
                         error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
+                        isShortNoticeSpeaking = true,
                     )
                 }
                 // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
                 // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
                 speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
+                startShortNoticeTimeout()
             }
         }
     }
@@ -260,6 +289,9 @@ class VoiceAnswerController @Inject constructor(
                 obfuscatedAnswerWav = obfuscatedWav,
             )
         )
+            // Held before onEach so the grade state, its spoken notice and the failure path all start
+            // together, once the transcript has had its minimum time on screen.
+            .holdGradedUntilTranscriptShown()
             .onEach { event ->
                 when (event) {
                     is VoiceAnswerGradingEvent.TranscriptReady ->
@@ -273,10 +305,11 @@ class VoiceAnswerController @Inject constructor(
                                 error = null,
                             )
                         }
+                        // The percentage only drives the Rating band; the user hears the Rating's name and the rationale, never the number.
                         speakNotice(
                             context.getString(
                                 R.string.study_session_voice_answer_grade_spoken_message,
-                                event.grade.gradePercent,
+                                context.getString(event.grade.toFlashcardAttemptRating().labelRes),
                                 event.grade.feedback,
                             )
                         )
@@ -285,15 +318,23 @@ class VoiceAnswerController @Inject constructor(
             }
             .catch { error ->
                 loge(error) { "voice answer grading/upload failed" }
+                val failureReason = error.toGradingFailureReason()
                 _state.update {
                     it.copy(
                         phase = VoiceAnswerPhase.SpeakingNotice,
-                        error = VoiceAnswerFailureReason.GradingFailed(error.message),
+                        error = failureReason,
+                        isShortNoticeSpeaking = true,
                     )
                 }
                 // No screen to look at in this UX — failure must be audible (design doc §Upload
-                // failure handling; silent-drop was explicitly rejected).
-                speakNotice(context.getString(R.string.study_session_voice_answer_failure_spoken_message))
+                // failure handling; silent-drop was explicitly rejected), and it names the cause,
+                // since the snackbar saying the same may never be seen.
+                val messageRes = when (failureReason) {
+                    NoConnection -> R.string.study_session_voice_answer_offline_spoken_message
+                    ServiceError -> R.string.study_session_voice_answer_service_error_spoken_message
+                }
+                speakNotice(context.getString(messageRes))
+                startShortNoticeTimeout()
             }
             .collect()
     }
@@ -322,6 +363,7 @@ class VoiceAnswerController @Inject constructor(
         override fun onStart(utteranceId: String?) = Unit
 
         override fun onDone(utteranceId: String?) {
+            onShortNoticeFinished()
             if (utteranceId != NOTICE_UTTERANCE_ID) return
             scope.launch { onNoticeFinishedSpeaking() }
         }
@@ -330,6 +372,7 @@ class VoiceAnswerController @Inject constructor(
         override fun onError(utteranceId: String?) = Unit
 
         override fun onError(utteranceId: String?, errorCode: Int) {
+            onShortNoticeFinished()
             if (utteranceId != NOTICE_UTTERANCE_ID) return
             scope.launch { onNoticeFinishedSpeaking() }
         }
@@ -341,6 +384,25 @@ class VoiceAnswerController @Inject constructor(
         if (!_state.value.isEnabled) return
         _state.update { it.copy(phase = VoiceAnswerPhase.WaitingForQuestion) }
         _advanceRequests.emit(Unit)
+    }
+
+    /**
+     * Clears [VoiceAnswerState.isShortNoticeSpeaking] on its own after [SHORT_NOTICE_TIMEOUT] in case
+     * the notice engine never reports the utterance finished. Not cancelled by [stop], since the
+     * notice outlives the pause that stops voice answering.
+     */
+    private fun startShortNoticeTimeout() {
+        shortNoticeTimeoutJob?.cancel()
+        shortNoticeTimeoutJob = scope.launch {
+            delay(SHORT_NOTICE_TIMEOUT)
+            _state.update { it.copy(isShortNoticeSpeaking = false) }
+        }
+    }
+
+    private fun onShortNoticeFinished() {
+        shortNoticeTimeoutJob?.cancel()
+        shortNoticeTimeoutJob = null
+        _state.update { it.copy(isShortNoticeSpeaking = false) }
     }
 
     private fun speakNotice(text: String) {
@@ -387,5 +449,44 @@ class VoiceAnswerController @Inject constructor(
         const val CAPTURE_FAILURE_NOTICE_UTTERANCE_ID = "voice_answer_capture_failure_notice"
         const val SILENCE_TIMEOUT_MS = 8_000L
         const val ADVANCE_DELAY_MS = 1_000L
+        val SHORT_NOTICE_TIMEOUT = 5.seconds
     }
+}
+
+/** Shortest time the user's recognized answer stays on screen before the grade or a failure replaces it. */
+internal val MIN_TRANSCRIPT_DISPLAY: Duration = 1.seconds
+
+/**
+ * Holds back [VoiceAnswerGradingEvent.Graded] — or an upstream failure — until
+ * [VoiceAnswerGradingEvent.TranscriptReady] has been shown for at least [minDisplay], so the user can
+ * confirm their speech was recognized before the grade replaces it. There is no way back to the
+ * transcript afterwards. Held here rather than in the UI so the spoken grade (or failure notice) and
+ * the visual one still start together.
+ *
+ * Without a preceding transcript, the grade and failures pass through immediately. Only upstream
+ * failures are held; exceptions thrown downstream propagate untouched.
+ */
+internal fun Flow<VoiceAnswerGradingEvent>.holdGradedUntilTranscriptShown(
+    minDisplay: Duration = MIN_TRANSCRIPT_DISPLAY,
+    timeSource: TimeSource = TimeSource.Monotonic,
+): Flow<VoiceAnswerGradingEvent> = flow {
+    var transcriptShownAt: TimeMark? = null
+
+    suspend fun holdTranscript() {
+        transcriptShownAt?.let { shownAt -> delay(minDisplay - shownAt.elapsedNow()) }
+    }
+
+    emitAll(
+        this@holdGradedUntilTranscriptShown
+            .catch { error ->
+                holdTranscript()
+                throw error
+            }
+            .onEach { event ->
+                when (event) {
+                    is VoiceAnswerGradingEvent.TranscriptReady -> transcriptShownAt = timeSource.markNow()
+                    is VoiceAnswerGradingEvent.Graded -> holdTranscript()
+                }
+            }
+    )
 }

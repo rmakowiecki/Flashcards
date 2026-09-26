@@ -21,7 +21,7 @@ import com.rossomak.flashcards.core.domain.usecase.FinishVoiceDemoRecordingUseCa
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoLevelsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveRawVoiceLevelUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -32,11 +32,15 @@ import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCa
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -65,7 +69,7 @@ class OnboardingViewModelTest {
         setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
         signInAnonymously = SignInAnonymouslyUseCase(authRepository),
         observeVoiceDemoState = ObserveVoiceDemoStateUseCase(voiceDemoGateway),
-        observeVoiceDemoLevels = ObserveVoiceDemoLevelsUseCase(voiceDemoGateway),
+        observeRawVoiceLevel = ObserveRawVoiceLevelUseCase(voiceDemoGateway),
         startVoiceDemo = StartVoiceDemoUseCase(voiceDemoGateway),
         finishVoiceDemoRecording = FinishVoiceDemoRecordingUseCase(voiceDemoGateway),
         playVoiceDemo = PlayVoiceDemoUseCase(voiceDemoGateway),
@@ -425,18 +429,19 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `voice demo levels pass through as their own flow, starting at rest`() =
+    fun `voice bars levels start at rest and shape the raw voice level`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val levels = listOf(0.4f, 0.2f, 0f, 0f, 0f)
             val viewModel = createViewModel()
 
-            viewModel.voiceDemoLevels.test {
+            viewModel.voiceBarsLevels.test {
                 awaitItem() shouldBe listOf(0f, 0f, 0f, 0f, 0f)
-                advanceUntilIdle()
+                runCurrent()
 
-                voiceDemoGateway.levels.emit(levels)
+                voiceDemoGateway.rawVoiceLevel.emit(SPOKEN_RAW_VOICE_LEVEL)
+                advanceTimeBy(FlashcardsVoiceCaptureIndicatorDefaults.LEVEL_INTERVAL_MILLIS.milliseconds)
+                runCurrent()
 
-                awaitItem() shouldBe levels
+                awaitItem() shouldBe listOf(SPOKEN_RAW_VOICE_LEVEL, 0f, 0f, 0f, 0f)
             }
         }
 
@@ -692,4 +697,8 @@ class OnboardingViewModelTest {
 
             voiceDemoGateway.startCount shouldBe 1
         }
+
+    private companion object {
+        const val SPOKEN_RAW_VOICE_LEVEL = 0.4f
+    }
 }

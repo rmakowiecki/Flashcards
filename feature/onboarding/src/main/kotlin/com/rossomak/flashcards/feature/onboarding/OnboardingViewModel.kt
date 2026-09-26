@@ -14,7 +14,7 @@ import com.rossomak.flashcards.core.domain.usecase.FinishVoiceDemoRecordingUseCa
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoLevelsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveRawVoiceLevelUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -23,14 +23,12 @@ import com.rossomak.flashcards.core.domain.usecase.SetFavoriteSubcategoriesUseCa
 import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
-import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
+import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
@@ -39,15 +37,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -61,7 +56,7 @@ class OnboardingViewModel @Inject constructor(
     private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
     private val signInAnonymously: SignInAnonymouslyUseCase,
     private val observeVoiceDemoState: ObserveVoiceDemoStateUseCase,
-    private val observeVoiceDemoLevels: ObserveVoiceDemoLevelsUseCase,
+    private val observeRawVoiceLevel: ObserveRawVoiceLevelUseCase,
     private val startVoiceDemo: StartVoiceDemoUseCase,
     private val finishVoiceDemoRecording: FinishVoiceDemoRecordingUseCase,
     private val playVoiceDemo: PlayVoiceDemoUseCase,
@@ -80,17 +75,11 @@ class OnboardingViewModel @Inject constructor(
     val messages: SharedFlow<OnboardingMessage> = _messages.asSharedFlow()
 
     /**
-     * Voice test audio levels: the microphone while listening, the played-back recording while
-     * playing. Kept out of [state] so each update recomposes only the indicator.
+     * Voice test indicator bar levels, shaped from the microphone while listening and from the
+     * played-back recording while playing. Kept out of [state] so each update recomposes only the
+     * indicator.
      */
-    val voiceDemoLevels: StateFlow<ImmutableList<Float>> =
-        flow { emitAll(observeVoiceDemoLevels()) }
-            .map { levels -> levels.toImmutableList() }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
-                initialValue = RestLevels,
-            )
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = flow { emitAll(observeRawVoiceLevel()) }.stateInVoiceBarsLevels(viewModelScope)
 
     private var permissionStatusJob: Job? = null
 
@@ -321,8 +310,5 @@ class OnboardingViewModel @Inject constructor(
     private companion object {
         const val SIGN_IN_ANONYMOUSLY_TIMEOUT_MS = 8000L
         const val SET_FAVORITES_TIMEOUT_MS = 8000L
-        val LEVELS_STOP_TIMEOUT = 5.seconds
-        val RestLevels: ImmutableList<Float> =
-            List(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { 0f }.toImmutableList()
     }
 }
