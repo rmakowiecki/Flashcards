@@ -59,6 +59,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsSegmentedProgressBar
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
@@ -77,7 +78,6 @@ import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,7 +131,7 @@ fun OnboardingScreen(
     OnboardingContent(
         modifier = modifier,
         state = state,
-        voiceDemoLevels = viewModel.voiceDemoLevels,
+        voiceBarsLevels = viewModel.voiceBarsLevels,
         messages = viewModel.messages,
         actions = OnboardingActions(
             onStudyModeSelect = viewModel::onStudyModeSelect,
@@ -161,7 +161,7 @@ fun OnboardingScreen(
 private fun OnboardingContent(
     modifier: Modifier = Modifier,
     state: OnboardingScreenState,
-    voiceDemoLevels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     actions: OnboardingActions,
     messages: SharedFlow<OnboardingMessage>,
 ) {
@@ -232,7 +232,7 @@ private fun OnboardingContent(
                 OnboardingStepPage(
                     step = OnboardingStep.atPage(page),
                     state = state,
-                    voiceDemoLevels = voiceDemoLevels,
+                    voiceBarsLevels = voiceBarsLevels,
                     copyRevealProgress = copyReveal.value,
                     actions = actions,
                     messages = messages,
@@ -334,7 +334,7 @@ private fun OnboardingCta(
 private fun OnboardingStepPage(
     step: OnboardingStep,
     state: OnboardingScreenState,
-    voiceDemoLevels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     copyRevealProgress: Float,
     actions: OnboardingActions,
     messages: SharedFlow<OnboardingMessage>,
@@ -359,7 +359,7 @@ private fun OnboardingStepPage(
         )
         OnboardingStep.VoicePrivacy -> VoicePrivacyStepRoute(
             voiceDemoState = state.voiceDemoState,
-            voiceDemoLevels = voiceDemoLevels,
+            voiceBarsLevels = voiceBarsLevels,
             micPermissionStatus = state.micPermissionStatus,
             messages = messages,
             onTestVoice = actions.onVoiceDemoStart,
@@ -394,7 +394,7 @@ private fun OnboardingStepPage(
 @Composable
 private fun VoicePrivacyStepRoute(
     voiceDemoState: VoiceDemoState,
-    voiceDemoLevels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     micPermissionStatus: PermissionStatus,
     messages: SharedFlow<OnboardingMessage>,
     onTestVoice: () -> Unit,
@@ -424,7 +424,7 @@ private fun VoicePrivacyStepRoute(
     ) { innerPadding ->
         VoicePrivacyStep(
             voiceDemoState = voiceDemoState,
-            levels = voiceDemoLevels,
+            voiceBarsLevels = voiceBarsLevels,
             permissionDenied = micPermissionStatus == PermissionStatus.PermanentlyDenied,
             onTestVoice = onTestVoice,
             onStopRecording = onStopRecording,
@@ -457,7 +457,7 @@ private fun OnboardingContentPreview() {
     FlashcardsTheme {
         OnboardingContent(
             state = remember { OnboardingScreenState(userName = "Radek") },
-            voiceDemoLevels = remember { MutableStateFlow(persistentListOf()) },
+            voiceBarsLevels = remember { MutableStateFlow(FlashcardsVoiceCaptureIndicatorDefaults.restLevels) },
             messages = remember { MutableSharedFlow() },
             actions = OnboardingActions(
                 onStudyModeSelect = {},
