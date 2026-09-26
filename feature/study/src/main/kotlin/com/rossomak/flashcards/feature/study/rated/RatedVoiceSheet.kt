@@ -57,7 +57,6 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Graded
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.GradingWithTranscript
-import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Legacy
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Listening
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Pending
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Transport
@@ -69,13 +68,12 @@ import kotlinx.coroutines.flow.StateFlow
  * Groups the sheet modes that share one layout. Switching modes inside a group keeps that layout's
  * nodes alive, so only a group change swaps the sheet's content.
  */
-private enum class RatedVoiceSheetGroup { Transport, VoiceRound, Legacy }
+private enum class RatedVoiceSheetGroup { Transport, VoiceRound }
 
 private val RatedVoiceSheetMode.group: RatedVoiceSheetGroup
     get() = when (this) {
         Transport -> RatedVoiceSheetGroup.Transport
         Listening, Pending, is GradingWithTranscript, is Graded -> RatedVoiceSheetGroup.VoiceRound
-        Legacy -> RatedVoiceSheetGroup.Legacy
     }
 
 @Composable
@@ -116,13 +114,6 @@ internal fun RatedVoiceSheetContent(
             RatedVoiceSheetGroup.VoiceRound -> RatedVoiceRoundSheet(
                 voiceSheetMode = voiceSheetMode,
                 voiceBarsLevels = voiceBarsLevels,
-            )
-            RatedVoiceSheetGroup.Legacy -> RatedVoiceLegacySheet(
-                state = state,
-                onShowAnswer = onShowAnswer,
-                onVoicePlayPause = onVoicePlayPause,
-                onVoiceNext = onVoiceNext,
-                onVoicePrevious = onVoicePrevious,
             )
         }
     }
@@ -244,7 +235,7 @@ private fun ratedVoiceRoundDescription(voiceSheetMode: RatedVoiceSheetMode): Str
     Listening -> stringResource(CoreUiR.string.common_voice_capture_listening_cd)
     Pending, is GradingWithTranscript -> stringResource(R.string.study_session_voice_answer_grading_label)
     is Graded -> stringResource(voiceSheetMode.rating.labelRes)
-    Transport, Legacy -> null
+    Transport -> null
 }
 
 /** What the badge slot holds; `null` leaves it empty. */
@@ -257,14 +248,14 @@ private val RatedVoiceSheetMode.badgeContent: RatedVoiceBadgeContent?
     get() = when (this) {
         Pending, is GradingWithTranscript -> RatedVoiceBadgeContent.Progress
         is Graded -> RatedVoiceBadgeContent.Rating(rating)
-        Transport, Listening, Legacy -> null
+        Transport, Listening -> null
     }
 
 private val RatedVoiceSheetMode.badgeLabelRes: Int?
     get() = when (this) {
         is GradingWithTranscript -> R.string.study_session_voice_answer_grading_label
         is Graded -> rating.labelRes
-        Transport, Listening, Pending, Legacy -> null
+        Transport, Listening, Pending -> null
     }
 
 @Composable
@@ -316,12 +307,12 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDe
     val titleRes = when (voiceSheetMode) {
         is GradingWithTranscript -> R.string.study_session_voice_answer_transcript_title
         is Graded -> R.string.study_session_voice_answer_rating_title
-        Transport, Listening, Pending, Legacy -> null
+        Transport, Listening, Pending -> null
     }
     val paragraph = when (voiceSheetMode) {
         is GradingWithTranscript -> voiceSheetMode.transcript
         is Graded -> voiceSheetMode.rationale
-        Transport, Listening, Pending, Legacy -> null
+        Transport, Listening, Pending -> null
     }
     Column(
         modifier = modifier,
@@ -357,47 +348,6 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDe
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun RatedVoiceLegacySheet(
-    state: RatedStudySessionScreenState,
-    onShowAnswer: () -> Unit,
-    onVoicePlayPause: () -> Unit,
-    onVoiceNext: () -> Unit,
-    onVoicePrevious: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        RatedVoiceTranscript(state = state)
-        RatedVoiceTransportRow(
-            state = state,
-            onShowAnswer = onShowAnswer,
-            onVoicePlayPause = onVoicePlayPause,
-            onVoiceNext = onVoiceNext,
-            onVoicePrevious = onVoicePrevious,
-            modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
-        )
-    }
-}
-
-// Shown as soon as the sanitized transcript streams in (ADR-0028) — screen-on is a first-class
-// case, not just a background/audio-only fallback, so the transcript should be readable the
-// moment it arrives rather than waiting for the grade.
-@Composable
-private fun RatedVoiceTranscript(state: RatedStudySessionScreenState) {
-    if (state.isVoiceAnswerEnabled &&
-        !state.voiceAnswerSanitizedTranscript.isNullOrBlank() &&
-        (state.voiceAnswerPhase == VoiceAnswerPhase.Grading || state.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice)
-    ) {
-        Text(
-            text = state.voiceAnswerSanitizedTranscript,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = MaterialTheme.spacing.xxsmall),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 

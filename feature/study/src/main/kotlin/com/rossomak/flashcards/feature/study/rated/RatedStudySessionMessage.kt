@@ -11,7 +11,11 @@ sealed interface RatedStudySessionMessage {
 
     data object CurationSubmissionFailed : RatedStudySessionMessage
 
-    data object VoiceAnswerGradingFailed : RatedStudySessionMessage
+    /** Grading could not reach its service: the device is offline or the request timed out. */
+    data object VoiceAnswerGradingOffline : RatedStudySessionMessage
+
+    /** The grading service was reached but did not return a grade. */
+    data object VoiceAnswerGradingServiceError : RatedStudySessionMessage
 
     data object VoiceAnswerSilenceSkip : RatedStudySessionMessage
 

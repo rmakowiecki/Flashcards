@@ -62,7 +62,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
-import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingServiceError
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
@@ -266,7 +267,8 @@ private fun RatedManualSheetContent(isAnswerRevealed: Boolean, onShowAnswer: () 
 private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
     VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
     CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
-    VoiceAnswerGradingFailed -> context.getString(R.string.study_session_voice_answer_error_message)
+    VoiceAnswerGradingOffline -> context.getString(R.string.study_session_voice_answer_offline_message)
+    VoiceAnswerGradingServiceError -> context.getString(R.string.study_session_voice_answer_service_error_message)
     VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
     VoiceAnswerSilencePause -> context.getString(R.string.study_session_voice_answer_skip_pause_message)
     VoiceAnswerMicPermissionRevoked -> context.getString(R.string.study_session_voice_answer_mic_permission_revoked_message)

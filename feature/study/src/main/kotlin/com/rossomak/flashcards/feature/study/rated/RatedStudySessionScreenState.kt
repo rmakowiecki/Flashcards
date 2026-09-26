@@ -50,6 +50,11 @@ data class RatedStudySessionScreenState(
     // (RatedVoiceSheetMode.Graded) rather than as a snackbar. One-shot voice-answering failures go
     // through RatedStudySessionMessage instead — see RatedStudySessionViewModel.messages.
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
+    // Mirrors VoiceAnswerState.isShortNoticeSpeaking: outlives the pause a short notice can trigger,
+    // so the sheet stays on its status disc until the notice has actually finished.
+    val isVoiceShortNoticeSpeaking: Boolean = false,
+    // This round's grading failed: its notice keeps the card answer revealed, which grading already did.
+    val isVoiceAnswerGradingFailed: Boolean = false,
     val activeDialog: StudySessionDialog? = null,
     // Mirrors RatedSessionState.masteredCount. No longer the header's counter (see completedCount
     // below) — kept for the Session Summary screen's own mastered tally.
@@ -79,6 +84,7 @@ data class RatedStudySessionScreenState(
             isVoiceAnswerEnabled = isVoiceAnswerEnabled,
             voiceAnswerPhase = voiceAnswerPhase,
             isVoiceAnswerPaused = isVoiceAnswerPaused,
+            isShortNoticeSpeaking = isVoiceShortNoticeSpeaking,
             sanitizedTranscript = voiceAnswerSanitizedTranscript,
             lastGrade = lastVoiceAnswerGrade,
         )
