@@ -95,7 +95,7 @@ fun VoiceDebugScreen(
     VoiceDebugContent(
         modifier = modifier,
         state = state,
-        levels = viewModel.levels,
+        voiceBarsLevels = viewModel.voiceBarsLevels,
         onNavigateBack = onNavigateBack,
         onVadToggle = { withMicPermission(viewModel::onVadToggle) },
         onPlayCapturedUtterance = viewModel::onPlayCapturedUtterance,
@@ -113,7 +113,7 @@ fun VoiceDebugScreen(
 fun VoiceDebugContent(
     modifier: Modifier = Modifier,
     state: VoiceDebugScreenState,
-    levels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     onNavigateBack: () -> Unit,
     onVadToggle: () -> Unit,
     onPlayCapturedUtterance: () -> Unit,
@@ -155,7 +155,7 @@ fun VoiceDebugContent(
 
             DebugBlock(title = stringResource(R.string.voice_debug_vad_title)) {
                 LevelIndicator(
-                    levels = levels,
+                    voiceBarsLevels = voiceBarsLevels,
                     isPlayback = state.isPlayingLastAnswer,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
@@ -321,10 +321,10 @@ private fun DebugBlock(
  * microphone while the last answer plays back.
  */
 @Composable
-private fun LevelIndicator(levels: StateFlow<ImmutableList<Float>>, isPlayback: Boolean, modifier: Modifier = Modifier) {
-    val currentLevels by levels.collectAsStateWithLifecycle()
+private fun LevelIndicator(voiceBarsLevels: StateFlow<ImmutableList<Float>>, isPlayback: Boolean, modifier: Modifier = Modifier) {
+    val currentVoiceBarsLevels by voiceBarsLevels.collectAsStateWithLifecycle()
     FlashcardsVoiceCaptureIndicator(
-        levels = currentLevels,
+        levels = currentVoiceBarsLevels,
         contentDescription = stringResource(
             if (isPlayback) CoreUiR.string.common_voice_capture_playing_cd else CoreUiR.string.common_voice_capture_listening_cd,
         ),

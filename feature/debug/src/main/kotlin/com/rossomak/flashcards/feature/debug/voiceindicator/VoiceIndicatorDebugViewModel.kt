@@ -32,7 +32,7 @@ class VoiceIndicatorDebugViewModel @Inject constructor() : ViewModel() {
     val state: StateFlow<VoiceIndicatorDebugScreenState> = _state.asStateFlow()
 
     /** Ticks only while collected; restarts at rest on resubscription. */
-    val levels: StateFlow<ImmutableList<Float>> = flow {
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = flow {
         var history = RestLevels
         var elapsedMillis = 0L
         var silentGapEndMillis = 0L
