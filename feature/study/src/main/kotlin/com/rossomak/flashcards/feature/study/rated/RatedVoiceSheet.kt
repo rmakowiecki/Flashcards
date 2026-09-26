@@ -2,8 +2,12 @@ package com.rossomak.flashcards.feature.study.rated
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateBounds
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -33,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -158,7 +163,7 @@ private fun RatedVoiceTransportSheet(
  * The voice round: the microphone indicator while listening, then the badge slot holding the
  * progress disc or the Rating circle, with the label under it and the title and paragraph beside
  * it once there is text to show. The three discs stay separate composables; only the slot is kept
- * across the grading modes.
+ * across the grading modes, and only the slot animates its bounds when it moves to the left.
  */
 @Composable
 private fun RatedVoiceRoundSheet(voiceSheetMode: RatedVoiceSheetMode, voiceBarsLevels: StateFlow<ImmutableList<Float>>) {
@@ -167,38 +172,68 @@ private fun RatedVoiceRoundSheet(voiceSheetMode: RatedVoiceSheetMode, voiceBarsL
     val isListening = voiceSheetMode == Listening
     val isBadgeCentered = voiceSheetMode !is GradingWithTranscript && voiceSheetMode !is Graded
     val roundDescription = ratedVoiceRoundDescription(voiceSheetMode)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clearAndSetSemantics {
-                roundDescription?.let { contentDescription = it }
-                liveRegion = LiveRegionMode.Polite
-            },
-    ) {
-        AnimatedVisibility(
-            visible = isListening,
-            modifier = Modifier.align(Alignment.Center),
-            enter = fadeIn(tween(FlashcardsMotion.DURATION_MEDIUM_MS)),
-            exit = fadeOut(tween(FlashcardsMotion.DURATION_MEDIUM_MS)),
-        ) {
-            FlashcardsVoiceCaptureIndicator(
-                levels = currentVoiceBarsLevels,
-                contentDescription = stringResource(CoreUiR.string.common_voice_capture_listening_cd),
-                isActive = isListening,
-            )
-        }
-        RatedVoiceBadge(
-            voiceSheetMode = voiceSheetMode,
-            modifier = Modifier.align(if (isBadgeCentered) Alignment.Center else Alignment.CenterStart),
-        )
-        RatedVoiceRoundText(
-            voiceSheetMode = voiceSheetMode,
+    // Straight from Pending to Graded no transcript has moved the badge yet, so its slide to the
+    // left runs first and the text fades in once it ends. Every other change runs them together.
+    val modeTransition = updateTransition(targetState = voiceSheetMode, label = "ratedVoiceRoundMode")
+    val isBadgeSlideFirst = modeTransition.currentState == Pending && modeTransition.targetState is Graded
+    val textEnterDelayMillis = if (isBadgeSlideFirst) BADGE_SLIDE_DURATION_MS else 0
+    LookaheadScope {
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = FlashcardsVoiceCaptureIndicatorDefaults.discSize + MaterialTheme.spacing.normal),
-        )
+                .clearAndSetSemantics {
+                    roundDescription?.let { contentDescription = it }
+                    liveRegion = LiveRegionMode.Polite
+                },
+        ) {
+            // Listening to Pending happens in place: the indicator folds its bars into its disc
+            // and fades out while the progress disc fades in on the same center, all starting
+            // together. The indicator is symmetric, so its disc center is the centered slot's.
+            AnimatedVisibility(
+                visible = isListening,
+                modifier = Modifier.align(Alignment.Center),
+                enter = fadeIn(tween(FlashcardsMotion.DURATION_MEDIUM_MS)),
+                exit = fadeOut(tween(FlashcardsMotion.DURATION_MEDIUM_MS)),
+            ) {
+                FlashcardsVoiceCaptureIndicator(
+                    levels = currentVoiceBarsLevels,
+                    contentDescription = stringResource(CoreUiR.string.common_voice_capture_listening_cd),
+                    isActive = isListening,
+                )
+            }
+            RatedVoiceBadge(
+                voiceSheetMode = voiceSheetMode,
+                lookaheadScope = this@LookaheadScope,
+                labelEnterDelayMillis = textEnterDelayMillis,
+                modifier = Modifier.align(if (isBadgeCentered) Alignment.Center else Alignment.CenterStart),
+            )
+            RatedVoiceRoundText(
+                voiceSheetMode = voiceSheetMode,
+                textEnterDelayMillis = textEnterDelayMillis,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = FlashcardsVoiceCaptureIndicatorDefaults.discSize + MaterialTheme.spacing.normal),
+            )
+        }
     }
 }
+
+/**
+ * Swaps one text for another without the two ever overlapping: the old text fades out first, then
+ * the new one fades in, after an extra [enterDelayMillis] when the badge slides first.
+ */
+private fun sequentialTextFade(enterDelayMillis: Int): ContentTransform = ContentTransform(
+    targetContentEnter = fadeIn(tween(FlashcardsMotion.DURATION_MEDIUM_MS, delayMillis = FlashcardsMotion.DURATION_SHORT_MS + enterDelayMillis)),
+    initialContentExit = fadeOut(tween(FlashcardsMotion.DURATION_SHORT_MS)),
+    sizeTransform = null,
+)
+
+/** Position only: every disc in the slot shares one size, so the slot never resizes. */
+private val badgeSlideBoundsTransform = BoundsTransform { _, _ ->
+    tween(BADGE_SLIDE_DURATION_MS, easing = FlashcardsMotion.StandardEasing)
+}
+
+private const val BADGE_SLIDE_DURATION_MS = FlashcardsMotion.DURATION_LONG_MS
 
 /**
  * What TalkBack announces for the voice round. The user's transcript is display-only and never
@@ -233,15 +268,18 @@ private val RatedVoiceSheetMode.badgeLabelRes: Int?
     }
 
 @Composable
-private fun RatedVoiceBadge(voiceSheetMode: RatedVoiceSheetMode, modifier: Modifier = Modifier) {
+private fun RatedVoiceBadge(voiceSheetMode: RatedVoiceSheetMode, lookaheadScope: LookaheadScope, labelEnterDelayMillis: Int, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The badge slot: one invisible node for the whole voice round, so moving it between the
-        // center and the left keeps its identity.
+        // center and the left keeps its identity and animates its position. Its contents only
+        // crossfade, which also carries the change to the Rating color on Graded.
         Box(
-            modifier = Modifier.size(FlashcardsVoiceCaptureIndicatorDefaults.discSize),
+            modifier = Modifier
+                .animateBounds(lookaheadScope = lookaheadScope, boundsTransform = badgeSlideBoundsTransform)
+                .size(FlashcardsVoiceCaptureIndicatorDefaults.discSize),
             contentAlignment = Alignment.Center,
         ) {
             Crossfade(
@@ -256,9 +294,10 @@ private fun RatedVoiceBadge(voiceSheetMode: RatedVoiceSheetMode, modifier: Modif
                 }
             }
         }
-        Crossfade(
+        AnimatedContent(
             targetState = voiceSheetMode.badgeLabelRes,
-            animationSpec = tween(FlashcardsMotion.DURATION_MEDIUM_MS),
+            transitionSpec = { sequentialTextFade(labelEnterDelayMillis) },
+            contentAlignment = Alignment.Center,
             label = "ratedVoiceBadgeLabel",
         ) { labelRes ->
             if (labelRes != null) {
@@ -273,7 +312,7 @@ private fun RatedVoiceBadge(voiceSheetMode: RatedVoiceSheetMode, modifier: Modif
 }
 
 @Composable
-private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, modifier: Modifier = Modifier) {
+private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDelayMillis: Int, modifier: Modifier = Modifier) {
     val titleRes = when (voiceSheetMode) {
         is GradingWithTranscript -> R.string.study_session_voice_answer_transcript_title
         is Graded -> R.string.study_session_voice_answer_rating_title
@@ -288,9 +327,9 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, modifier: M
         modifier = modifier,
         verticalArrangement = Arrangement.Center,
     ) {
-        Crossfade(
+        AnimatedContent(
             targetState = titleRes,
-            animationSpec = tween(FlashcardsMotion.DURATION_MEDIUM_MS),
+            transitionSpec = { sequentialTextFade(textEnterDelayMillis) },
             label = "ratedVoiceRoundTitle",
         ) { shownTitleRes ->
             if (shownTitleRes != null) {
@@ -303,10 +342,10 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, modifier: M
             }
         }
         // Scrolls inside the fixed-height sheet instead of truncating a long transcript or rationale.
-        Crossfade(
+        AnimatedContent(
             targetState = paragraph,
             modifier = Modifier.weight(1f, fill = false),
-            animationSpec = tween(FlashcardsMotion.DURATION_MEDIUM_MS),
+            transitionSpec = { sequentialTextFade(textEnterDelayMillis) },
             label = "ratedVoiceRoundParagraph",
         ) { shownParagraph ->
             if (shownParagraph != null) {
