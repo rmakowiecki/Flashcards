@@ -4,10 +4,7 @@
 
 package com.rossomak.flashcards.core.ui.theme
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -131,12 +128,3 @@ object AppSizes {
 
 val MaterialTheme.sizes: AppSizes
     get() = AppSizes
-
-/**
- * The standard 1px hairline border for design-system cards and list groups, tinted with
- * [androidx.compose.material3.ColorScheme.outlineVariant].
- */
-val MaterialTheme.hairlineBorder: BorderStroke
-    @Composable
-    @ReadOnlyComposable
-    get() = BorderStroke(width = sizes.hairline, color = colorScheme.outlineVariant)

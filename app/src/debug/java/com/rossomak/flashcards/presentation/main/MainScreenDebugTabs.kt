@@ -14,9 +14,11 @@ import com.rossomak.flashcards.feature.debug.BuildInfo
 import com.rossomak.flashcards.feature.debug.DebugGraph
 import com.rossomak.flashcards.feature.debug.DebugRoot
 import com.rossomak.flashcards.feature.debug.DebugScreen
+import com.rossomak.flashcards.feature.debug.DebugVoiceIndicatorRoot
 import com.rossomak.flashcards.feature.debug.DebugVoiceRoot
 import com.rossomak.flashcards.feature.debug.R as DebugR
 import com.rossomak.flashcards.feature.debug.voice.VoiceDebugScreen
+import com.rossomak.flashcards.feature.debug.voiceindicator.VoiceIndicatorDebugScreen
 
 @Composable
 internal fun debugTabs(): List<TabItem> = listOf(
@@ -54,10 +56,14 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 ),
                 onNavigateToOnboarding = onNavigateToOnboarding,
                 onNavigateToVoiceDebug = { navController.navigate(DebugVoiceRoot) },
+                onNavigateToVoiceIndicatorDebug = { navController.navigate(DebugVoiceIndicatorRoot) },
             )
         }
         composable<DebugVoiceRoot> {
             VoiceDebugScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable<DebugVoiceIndicatorRoot> {
+            VoiceIndicatorDebugScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

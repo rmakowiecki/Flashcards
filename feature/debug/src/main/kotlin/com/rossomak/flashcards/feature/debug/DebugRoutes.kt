@@ -9,3 +9,6 @@ import kotlinx.serialization.Serializable
 
 /** The voice capture/grading harness, reached from the hub rather than from the tab directly. */
 @Serializable object DebugVoiceRoot
+
+/** The voice capture indicator preview, animated from a synthetic level stream — no audio involved. */
+@Serializable object DebugVoiceIndicatorRoot

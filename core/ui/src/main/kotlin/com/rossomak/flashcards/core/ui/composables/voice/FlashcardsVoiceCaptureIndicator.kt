@@ -1,0 +1,258 @@
+package com.rossomak.flashcards.core.ui.composables.voice
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
+import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.composables.DEFAULT_CONTAINER_ALPHA
+import com.rossomak.flashcards.core.ui.theme.AppSizes
+import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.spacing
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+
+/**
+ * Microphone disc with mirrored level bars on each side.
+ *
+ * [levels] is one snapshot of [FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT] values in `0..1`,
+ * index 0 innermost. Each new snapshot is blended in linearly over [levelIntervalMillis], which
+ * should match the producer's emission interval. The disc's size pulses independently of the level.
+ */
+@Composable
+fun FlashcardsVoiceCaptureIndicator(
+    levels: ImmutableList<Float>,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    levelIntervalMillis: Int = FlashcardsVoiceCaptureIndicatorDefaults.LEVEL_INTERVAL_MILLIS,
+) {
+    val levelBars = remember { LevelBars(levels) }
+    LaunchedEffect(levels) { levelBars.animateTo(levels = levels, durationMillis = levelIntervalMillis) }
+
+    val barColor = MaterialTheme.colorScheme.primary
+    val barsModifier = Modifier.size(width = BarsAreaWidth, height = BarMaxHeight)
+
+    Row(
+        modifier = modifier.clearAndSetSemantics {
+            this.contentDescription = contentDescription
+            liveRegion = LiveRegionMode.Polite
+        },
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(
+            modifier = barsModifier.drawBehind {
+                drawLevelBars(levelBars = levelBars, color = barColor, growsTowardStart = true)
+            },
+        )
+        PulsingMicrophoneDisc()
+        Spacer(
+            modifier = barsModifier.drawBehind {
+                drawLevelBars(levelBars = levelBars, color = barColor, growsTowardStart = false)
+            },
+        )
+    }
+}
+
+object FlashcardsVoiceCaptureIndicatorDefaults {
+    /** Bars per side, and the expected size of a `levels` snapshot. */
+    const val BAR_COUNT: Int = 5
+
+    /** Expected interval between two `levels` snapshots. */
+    const val LEVEL_INTERVAL_MILLIS: Int = 70
+
+    /** Disc diameter, equal to a Rating circle so either can replace the other in place. */
+    val discSize: Dp = AppSizes.ratingButton
+
+    val discContentColor: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.onSecondaryContainer
+
+    /** Same tint as the default `FlashcardsIconTile` container. */
+    val discContainerColor: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = discContentColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
+}
+
+/**
+ * Bar levels blended by a single progress animation. Values are read only while drawing, so an
+ * animation frame redraws the bars without recomposing.
+ */
+private class LevelBars(initialLevels: ImmutableList<Float>) {
+    private val startLevels = FloatArray(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { index ->
+        initialLevels.levelAt(index)
+    }
+    private val targetLevels = startLevels.copyOf()
+    private val progress = Animatable(1f)
+
+    fun levelAt(index: Int): Float = lerp(startLevels[index], targetLevels[index], progress.value)
+
+    /** Blends from the current bar levels, so an interrupted blend continues without a jump. */
+    suspend fun animateTo(levels: ImmutableList<Float>, durationMillis: Int) {
+        for (index in startLevels.indices) {
+            startLevels[index] = levelAt(index)
+            targetLevels[index] = levels.levelAt(index)
+        }
+        progress.snapTo(0f)
+        progress.animateTo(targetValue = 1f, animationSpec = tween(durationMillis, easing = LinearEasing))
+    }
+}
+
+@Composable
+private fun PulsingMicrophoneDisc() {
+    val pulse = rememberInfiniteTransition(label = "voiceCapturePulse").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = PULSE_HALF_CYCLE_MILLIS, easing = FlashcardsMotion.StandardEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "voiceCapturePulseFraction",
+    )
+
+    Box(
+        modifier = Modifier.size(FlashcardsVoiceCaptureIndicatorDefaults.discSize),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    val scale = lerp(1f, PULSE_MAX_SCALE, pulse.value)
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .background(color = FlashcardsVoiceCaptureIndicatorDefaults.discContainerColor, shape = CircleShape),
+        )
+        Icon(
+            imageVector = Icons.Default.Mic,
+            // Decorative: the root node carries the announcement.
+            contentDescription = null,
+            tint = FlashcardsVoiceCaptureIndicatorDefaults.discContentColor,
+        )
+    }
+}
+
+/** Draws one side's bars; index 0 sits next to the disc. */
+private fun DrawScope.drawLevelBars(levelBars: LevelBars, color: Color, growsTowardStart: Boolean) {
+    val barWidth = BarWidth.toPx()
+    val barStep = barWidth + BarGap.toPx()
+    val restHeight = BarRestHeight.toPx()
+    val maxHeight = size.height
+    repeat(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { index ->
+        val level = levelBars.levelAt(index)
+        val barHeight = lerp(restHeight, maxHeight * BAR_HEIGHT_ENVELOPE[index], level)
+        val barLeft = if (growsTowardStart) size.width - barWidth - index * barStep else index * barStep
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(x = barLeft, y = (maxHeight - barHeight) / 2f),
+            size = Size(width = barWidth, height = barHeight),
+            cornerRadius = CornerRadius(barWidth / 2f),
+            alpha = lerp(BAR_MIN_ALPHA, 1f, level),
+        )
+    }
+}
+
+private fun ImmutableList<Float>.levelAt(index: Int): Float = getOrElse(index) { 0f }.coerceIn(0f, 1f)
+
+private val BarWidth = 4.dp
+private val BarGap = 5.dp
+private val BarRestHeight = 6.dp
+private val BarMaxHeight = 40.dp
+private val BarsAreaWidth = BarWidth * FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT +
+    BarGap * (FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT - 1)
+
+/** Max height fraction per bar, innermost first. */
+private val BAR_HEIGHT_ENVELOPE = floatArrayOf(1f, 0.96f, 0.9f, 0.82f, 0.74f)
+
+private const val BAR_MIN_ALPHA = 0.35f
+private const val PULSE_MAX_SCALE = 1.06f
+private const val PULSE_HALF_CYCLE_MILLIS = 700
+
+private val RestLevels = persistentListOf(0f, 0f, 0f, 0f, 0f)
+private val MidLevels = persistentListOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
+private val PeakLevels = persistentListOf(1f, 1f, 1f, 1f, 1f)
+private val WaveLevels = persistentListOf(0.35f, 0.9f, 0.6f, 0.2f, 0.05f)
+
+@ShowkaseComposable(name = "Voice capture indicator", group = "Feedback")
+@Composable
+fun FlashcardsVoiceCaptureIndicatorShowcase() {
+    VoiceCaptureIndicatorPreview(levels = WaveLevels)
+}
+
+@PreviewLightDark
+@Composable
+private fun FlashcardsVoiceCaptureIndicatorRestPreview() {
+    VoiceCaptureIndicatorPreview(levels = RestLevels)
+}
+
+@PreviewLightDark
+@Composable
+private fun FlashcardsVoiceCaptureIndicatorMidPreview() {
+    VoiceCaptureIndicatorPreview(levels = MidLevels)
+}
+
+@PreviewLightDark
+@Composable
+private fun FlashcardsVoiceCaptureIndicatorPeakPreview() {
+    VoiceCaptureIndicatorPreview(levels = PeakLevels)
+}
+
+@PreviewLightDark
+@Composable
+private fun FlashcardsVoiceCaptureIndicatorWavePreview() {
+    VoiceCaptureIndicatorPreview(levels = WaveLevels)
+}
+
+@Composable
+private fun VoiceCaptureIndicatorPreview(levels: ImmutableList<Float>) {
+    FlashcardsTheme {
+        Surface {
+            FlashcardsVoiceCaptureIndicator(
+                levels = levels,
+                contentDescription = stringResource(R.string.common_voice_capture_listening_cd),
+            )
+        }
+    }
+}
