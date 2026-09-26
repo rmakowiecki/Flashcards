@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -86,6 +87,12 @@ class VoiceAnswerController @Inject constructor(
      */
     private val _advanceRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val advanceRequests: SharedFlow<Unit> = _advanceRequests.asSharedFlow()
+
+    /**
+     * Raw microphone input level in `0..1`, 0 whenever the capture engine is not listening.
+     * Computed on the device from raw PCM and never logged, stored or uploaded.
+     */
+    val rawVoiceLevel: Flow<Float> = voiceCaptureEngine.inputLevel
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var captureEventsJob: Job? = null

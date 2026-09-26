@@ -24,6 +24,7 @@ import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -62,11 +63,16 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import java.time.Instant
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -945,6 +951,91 @@ class RatedStudySessionViewModelTest {
         viewModel.state.value.lastVoiceAnswerGrade shouldBe grade
     }
 
+    @Test
+    fun `voice sheet mode is Transport while the question is read`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `voice sheet mode is Transport before voice answering is enabled`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `voice sheet mode is Listening while listening or hearing speech`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeechDetected)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
+    }
+
+    @Test
+    fun `voice sheet mode stays out of Transport while grading and speaking the notice`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Legacy
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Legacy
+    }
+
+    @Test
+    fun `voice sheet mode is Transport while paused, whatever the phase`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+            isEnabled = true,
+            phase = VoiceAnswerPhase.WaitingForQuestion,
+            error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)),
+        )
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+        advanceUntilIdle()
+
+        viewModel.state.value.isVoiceAnswerPaused shouldBe true
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `voice bars levels start at rest and shape the gateway raw voice level`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.voiceBarsLevels.test {
+            awaitItem() shouldBe List(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { 0f }
+            // Lets stateIn subscribe upstream first; the fake's SharedFlow drops emissions with no subscriber.
+            runCurrent()
+
+            voiceGateway.rawVoiceLevelFlow.emit(SPOKEN_RAW_VOICE_LEVEL)
+            advanceTimeBy(FlashcardsVoiceCaptureIndicatorDefaults.LEVEL_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+
+            awaitItem() shouldBe listOf(SPOKEN_RAW_VOICE_LEVEL, 0f, 0f, 0f, 0f)
+        }
+    }
+
     /**
      * Three [MutableStateFlow] writes, each followed by [advanceUntilIdle], so the collector
      * actually observes every intermediate phase — writing SpeakingNotice twice in a row without
@@ -1509,6 +1600,7 @@ class RatedStudySessionViewModelTest {
 
     private companion object {
         const val FIXED_SEED = 42L
+        const val SPOKEN_RAW_VOICE_LEVEL = 0.9f
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value
@@ -1536,6 +1628,9 @@ private class FakeVoiceGateway : VoiceGateway {
 
     val voiceAnswerStateFlow = MutableStateFlow(VoiceAnswerState())
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
+
+    val rawVoiceLevelFlow = MutableSharedFlow<Float>()
+    override val rawVoiceLevel: Flow<Float> = rawVoiceLevelFlow
 
     var lastVoiceAnswering: Boolean? = null
     var lastNextSilenceWillPauseSession: Boolean? = null

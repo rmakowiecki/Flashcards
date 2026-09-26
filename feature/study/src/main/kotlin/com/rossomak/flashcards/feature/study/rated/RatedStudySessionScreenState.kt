@@ -74,6 +74,13 @@ data class RatedStudySessionScreenState(
 ) {
     val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)
 
+    val voiceSheetMode: RatedVoiceSheetMode
+        get() = voiceSheetModeOf(
+            isVoiceAnswerEnabled = isVoiceAnswerEnabled,
+            voiceAnswerPhase = voiceAnswerPhase,
+            isVoiceAnswerPaused = isVoiceAnswerPaused,
+        )
+
     /**
      * The current card's Rating history mapped to [FlashcardsAttemptIndicator] slots: one filled
      * slot per past Attempt in order, one [FlashcardsAttemptSlotState.Current] slot, and the rest

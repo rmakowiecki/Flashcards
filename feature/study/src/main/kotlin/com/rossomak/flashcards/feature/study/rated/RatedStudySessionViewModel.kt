@@ -22,6 +22,7 @@ import com.rossomak.flashcards.core.domain.model.startClock
 import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
+import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -49,6 +50,7 @@ import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -149,6 +151,12 @@ class RatedStudySessionViewModel @Inject constructor(
 
     private val _messages = MutableSharedFlow<RatedStudySessionMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<RatedStudySessionMessage> = _messages.asSharedFlow()
+
+    /**
+     * Live microphone bar levels for the listening indicator. Kept out of [state] so the level
+     * stream never recomposes the rest of the screen.
+     */
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = voiceGateway.rawVoiceLevel.stateInVoiceBarsLevels(viewModelScope)
 
     private var lastObservedCardIndex = -1
 

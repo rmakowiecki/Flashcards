@@ -3,6 +3,11 @@ package com.rossomak.flashcards.feature.study.rated
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,8 +60,11 @@ import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButtonRow
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
@@ -78,7 +86,12 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.Voic
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
+import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Legacy
+import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Listening
+import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Transport
 import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
 
 private val SHEET_PEEK_HEIGHT_VOICE: Dp = 176.dp
@@ -91,6 +104,7 @@ fun RatedStudySessionScreen(
     onNavigateToSummary: (StudySessionSummaryRoute) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val voiceBarsLevels by viewModel.voiceBarsLevels.collectAsStateWithLifecycle()
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
@@ -137,6 +151,7 @@ fun RatedStudySessionScreen(
     RatedStudySessionContent(
         modifier = modifier,
         state = state,
+        voiceBarsLevels = voiceBarsLevels,
         snackbarHostState = snackbarHostState,
         onShowAnswer = viewModel::onShowAnswer,
         onAttemptRating = viewModel::onAttemptRating,
@@ -152,6 +167,7 @@ fun RatedStudySessionScreen(
 fun RatedStudySessionContent(
     modifier: Modifier = Modifier,
     state: RatedStudySessionScreenState,
+    voiceBarsLevels: ImmutableList<Float>,
     snackbarHostState: SnackbarHostState,
     onShowAnswer: () -> Unit,
     onAttemptRating: (FlashcardAttemptRating) -> Unit,
@@ -202,15 +218,23 @@ fun RatedStudySessionContent(
                 )
             },
             sheetContent = {
-                RatedStudySessionSheetContent(
-                    state = state,
-                    onShowAnswer = onShowAnswer,
-                    onAttemptRating = onAttemptRating,
-                    onVoicePlayPause = onVoicePlayPause,
-                    onVoiceNext = onVoiceNext,
-                    onVoicePrevious = onVoicePrevious,
-                    onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
-                )
+                if (state.isVoiceMode) {
+                    RatedVoiceSheetContent(
+                        state = state,
+                        voiceBarsLevels = voiceBarsLevels,
+                        onShowAnswer = onShowAnswer,
+                        onVoicePlayPause = onVoicePlayPause,
+                        onVoiceNext = onVoiceNext,
+                        onVoicePrevious = onVoicePrevious,
+                        onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
+                    )
+                } else {
+                    RatedManualSheetContent(
+                        isAnswerRevealed = state.isAnswerRevealed,
+                        onShowAnswer = onShowAnswer,
+                        onAttemptRating = onAttemptRating,
+                    )
+                }
             },
         ) { innerPadding ->
             StudySessionBody(
@@ -233,92 +257,162 @@ fun RatedStudySessionContent(
 }
 
 @Composable
-private fun RatedStudySessionSheetContent(
+private fun RatedManualSheetContent(isAnswerRevealed: Boolean, onShowAnswer: () -> Unit, onAttemptRating: (FlashcardAttemptRating) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SHEET_PEEK_HEIGHT_MANUAL)
+            .padding(horizontal = MaterialTheme.spacing.normal)
+            .padding(top = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.medium),
+    ) {
+        if (!isAnswerRevealed) {
+            Text(
+                text = stringResource(R.string.study_session_show_answer_caption_message),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
+            FlashcardsFilledButton(
+                text = stringResource(R.string.study_session_show_answer_button),
+                onClick = onShowAnswer,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Default.Flip,
+            )
+        } else {
+            AttemptRatingButtons(onAttemptRating = onAttemptRating)
+        }
+    }
+}
+
+/**
+ * Groups the sheet modes that share one layout. Switching modes inside a group keeps that layout's
+ * nodes alive, so only a group change swaps the sheet's content.
+ */
+private enum class RatedVoiceSheetGroup { Transport, VoiceRound, Legacy }
+
+private val RatedVoiceSheetMode.group: RatedVoiceSheetGroup
+    get() = when (this) {
+        Transport -> RatedVoiceSheetGroup.Transport
+        Listening -> RatedVoiceSheetGroup.VoiceRound
+        Legacy -> RatedVoiceSheetGroup.Legacy
+    }
+
+@Composable
+private fun RatedVoiceSheetContent(
     state: RatedStudySessionScreenState,
+    voiceBarsLevels: ImmutableList<Float>,
     onShowAnswer: () -> Unit,
-    onAttemptRating: (FlashcardAttemptRating) -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
-    Column(
-//        verticalArrangement = if (state.isVoiceMode) Arrangement.Top else Arrangement.Center,
+    val voiceSheetMode = state.voiceSheetMode
+    AnimatedContent(
+        targetState = voiceSheetMode.group,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (state.isVoiceMode) Modifier else Modifier.height(SHEET_PEEK_HEIGHT_MANUAL))
+            .height(SHEET_PEEK_HEIGHT_VOICE)
             .padding(horizontal = MaterialTheme.spacing.normal)
             .padding(top = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.medium),
-    ) {
-        if (state.isVoiceMode) {
-            RatedVoiceAnswerHeader(state = state, onVoiceSettingsCogClick = onVoiceSettingsCogClick)
-            RatedVoiceTranscript(state = state)
-            RatedVoiceGradeFeedback(state = state)
-            RatedVoiceTransportRow(
+        transitionSpec = {
+            fadeIn(tween(FlashcardsMotion.DURATION_MEDIUM_MS)) togetherWith fadeOut(tween(FlashcardsMotion.DURATION_MEDIUM_MS))
+        },
+        contentAlignment = Alignment.Center,
+        label = "ratedVoiceSheetGroup",
+    ) { group ->
+        when (group) {
+            RatedVoiceSheetGroup.Transport -> RatedVoiceTransportSheet(
+                state = state,
+                onShowAnswer = onShowAnswer,
+                onVoicePlayPause = onVoicePlayPause,
+                onVoiceNext = onVoiceNext,
+                onVoicePrevious = onVoicePrevious,
+                onVoiceSettingsCogClick = onVoiceSettingsCogClick,
+            )
+            // Reads the live mode rather than the group: while this group fades out, the indicator
+            // folds its bars in instead of freezing on the last level.
+            RatedVoiceSheetGroup.VoiceRound -> RatedVoiceRoundSheet(
+                isListening = voiceSheetMode == Listening,
+                voiceBarsLevels = voiceBarsLevels,
+            )
+            RatedVoiceSheetGroup.Legacy -> RatedVoiceLegacySheet(
                 state = state,
                 onShowAnswer = onShowAnswer,
                 onVoicePlayPause = onVoicePlayPause,
                 onVoiceNext = onVoiceNext,
                 onVoicePrevious = onVoicePrevious,
             )
-        } else {
-            if (!state.isAnswerRevealed) {
-                Text(
-                    text = stringResource(R.string.study_session_show_answer_caption_message),
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
-                FlashcardsFilledButton(
-                    text = stringResource(R.string.study_session_show_answer_button),
-                    onClick = onShowAnswer,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Default.Flip,
-                )
-            } else {
-                AttemptRatingButtons(onAttemptRating = onAttemptRating)
-            }
         }
     }
 }
 
 @Composable
-private fun RatedVoiceAnswerHeader(
+private fun RatedVoiceTransportSheet(
     state: RatedStudySessionScreenState,
+    onShowAnswer: () -> Unit,
+    onVoicePlayPause: () -> Unit,
+    onVoiceNext: () -> Unit,
+    onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (state.isVoiceAnswerEnabled) {
-            Text(
-                text = stringResource(
-                    when (state.voiceAnswerPhase) {
-                        VoiceAnswerPhase.WaitingForQuestion -> R.string.study_session_voice_answer_waiting_label
-                        VoiceAnswerPhase.Grading -> R.string.study_session_voice_answer_grading_label
-                        VoiceAnswerPhase.SpeakingNotice -> R.string.study_session_voice_answer_feedback_label
-                        else -> R.string.study_session_voice_answer_listening_label
-                    }
-                ),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (state.voiceAnswerPhase == VoiceAnswerPhase.SpeechDetected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = onVoiceSettingsCogClick) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        RatedVoiceTransportRow(
+            state = state,
+            onShowAnswer = onShowAnswer,
+            onVoicePlayPause = onVoicePlayPause,
+            onVoiceNext = onVoiceNext,
+            onVoicePrevious = onVoicePrevious,
+            modifier = Modifier.align(Alignment.Center),
+        )
+        IconButton(
+            onClick = onVoiceSettingsCogClick,
+            modifier = Modifier.align(Alignment.TopEnd),
+        ) {
             Icon(
                 imageVector = Icons.Outlined.Settings,
                 contentDescription = stringResource(R.string.study_session_voice_settings_cd),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun RatedVoiceRoundSheet(isListening: Boolean, voiceBarsLevels: ImmutableList<Float>) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        FlashcardsVoiceCaptureIndicator(
+            levels = voiceBarsLevels,
+            contentDescription = stringResource(CoreUiR.string.common_voice_capture_listening_cd),
+            isActive = isListening,
+        )
+    }
+}
+
+@Composable
+private fun RatedVoiceLegacySheet(
+    state: RatedStudySessionScreenState,
+    onShowAnswer: () -> Unit,
+    onVoicePlayPause: () -> Unit,
+    onVoiceNext: () -> Unit,
+    onVoicePrevious: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        RatedVoiceTranscript(state = state)
+        RatedVoiceGradeFeedback(state = state)
+        RatedVoiceTransportRow(
+            state = state,
+            onShowAnswer = onShowAnswer,
+            onVoicePlayPause = onVoicePlayPause,
+            onVoiceNext = onVoiceNext,
+            onVoicePrevious = onVoicePrevious,
+            modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
+        )
     }
 }
 
@@ -368,6 +462,7 @@ private fun RatedVoiceTransportRow(
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // While voice-answering is actively listening/grading/speaking feedback, manual skip
     // controls must stay disabled: skipping to the answer here would start TtsPlayer reading
@@ -383,9 +478,7 @@ private fun RatedVoiceTransportRow(
     // noted and GRADING/SPEAKING_NOTICE takes over.
     val isVoiceAnswerListening = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = MaterialTheme.spacing.normal),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -445,20 +538,19 @@ private fun AttemptRatingButtons(onAttemptRating: (FlashcardAttemptRating) -> Un
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Preview
+private val PreviewVoiceBarsLevels: ImmutableList<Float> = persistentListOf(0.9f, 0.7f, 0.5f, 0.3f, 0.15f)
+
 @Composable
-private fun RatedStudySessionVoiceActivePreview() {
+private fun RatedStudySessionVoicePreview(state: RatedStudySessionScreenState, voiceBarsLevels: ImmutableList<Float> = FlashcardsVoiceCaptureIndicatorDefaults.restLevels) {
     RatedStudySessionContent(
-        state = RatedStudySessionScreenState(
+        state = state.copy(
             categoryName = "Android",
             subcategoryNameById = mapOf("compose" to "Compose"),
-            flashcards = emptyList(),
             isVoiceMode = true,
             isVoiceActive = true,
-            isVoicePlaying = true,
-            speechRate = 1.25f,
+            isVoiceAnswerEnabled = true,
         ),
+        voiceBarsLevels = voiceBarsLevels,
         snackbarHostState = remember { SnackbarHostState() },
         onShowAnswer = {},
         onAttemptRating = {},
@@ -466,6 +558,41 @@ private fun RatedStudySessionVoiceActivePreview() {
         onVoiceNext = {},
         onVoicePrevious = {},
         onDialogEvent = {},
+    )
+}
+
+@Preview
+@Composable
+private fun RatedStudySessionVoiceTransportPreview() {
+    RatedStudySessionVoicePreview(
+        state = RatedStudySessionScreenState(
+            isVoicePlaying = true,
+            voiceAnswerPhase = VoiceAnswerPhase.WaitingForQuestion,
+        ),
+    )
+}
+
+@Preview
+@Composable
+private fun RatedStudySessionVoiceTransportPausedPreview() {
+    RatedStudySessionVoicePreview(
+        state = RatedStudySessionScreenState(
+            isVoicePlaying = false,
+            voiceAnswerPhase = VoiceAnswerPhase.Idle,
+            isVoiceAnswerPaused = true,
+        ),
+    )
+}
+
+@Preview
+@Composable
+private fun RatedStudySessionVoiceListeningPreview() {
+    RatedStudySessionVoicePreview(
+        state = RatedStudySessionScreenState(
+            isVoicePlaying = true,
+            voiceAnswerPhase = VoiceAnswerPhase.SpeechDetected,
+        ),
+        voiceBarsLevels = PreviewVoiceBarsLevels,
     )
 }
 
@@ -495,6 +622,7 @@ private fun RatedStudySessionManualPreview() {
             ),
             isAnswerRevealed = true,
         ),
+        voiceBarsLevels = FlashcardsVoiceCaptureIndicatorDefaults.restLevels,
         snackbarHostState = remember { SnackbarHostState() },
         onShowAnswer = {},
         onAttemptRating = {},
