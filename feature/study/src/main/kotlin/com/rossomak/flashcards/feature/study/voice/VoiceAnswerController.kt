@@ -20,6 +20,8 @@ import com.rossomak.flashcards.core.voice.CaptureRouteType
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.NoConnection
+import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.ServiceError
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import javax.inject.Inject
@@ -65,6 +67,9 @@ data class VoiceAnswerState(
     val lastGradedCardId: String? = null,
     val captureRoute: CaptureRouteType = CaptureRouteType.None,
     val error: VoiceAnswerFailureReason? = null,
+    // A short notice (silence skip or pause, grading or capture failure) is being spoken. Survives
+    // stop(): a pause can stop voice answering while its own notice is still playing.
+    val isShortNoticeSpeaking: Boolean = false,
 )
 
 /**
@@ -112,6 +117,7 @@ class VoiceAnswerController @Inject constructor(
     private var sessionRouteJob: Job? = null
     private var listenStartJob: Job? = null
     private var listenTimeoutJob: Job? = null
+    private var shortNoticeTimeoutJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     private var activeCard: VoiceFlashcard? = null
@@ -172,7 +178,7 @@ class VoiceAnswerController @Inject constructor(
         releaseWakeLock()
         activeCard = null
         nextSilenceWillPauseSession = false
-        _state.value = VoiceAnswerState()
+        _state.value = VoiceAnswerState(isShortNoticeSpeaking = _state.value.isShortNoticeSpeaking)
     }
 
     /** Full teardown when the owning service dies. */
@@ -180,6 +186,7 @@ class VoiceAnswerController @Inject constructor(
         stop()
         noticeTts?.shutdown()
         noticeTts = null
+        onShortNoticeFinished()
     }
 
     /** Called once the shared TTS engine finishes reading the current card's question — opens the listening window. */
@@ -222,13 +229,14 @@ class VoiceAnswerController @Inject constructor(
 
     private suspend fun onSilenceTimeout() {
         voiceCaptureEngine.stopListening()
-        _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice) }
+        _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true) }
         val messageRes = if (nextSilenceWillPauseSession) {
             R.string.study_session_voice_answer_skip_pause_spoken_message
         } else {
             R.string.study_session_voice_answer_skip_spoken_message
         }
         speakNotice(context.getString(messageRes))
+        startShortNoticeTimeout()
     }
 
     private suspend fun handleCaptureEvent(event: VoiceCaptureEvent) {
@@ -251,11 +259,13 @@ class VoiceAnswerController @Inject constructor(
                     it.copy(
                         phase = VoiceAnswerPhase.WaitingForQuestion,
                         error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
+                        isShortNoticeSpeaking = true,
                     )
                 }
                 // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
                 // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
                 speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
+                startShortNoticeTimeout()
             }
         }
     }
@@ -308,15 +318,23 @@ class VoiceAnswerController @Inject constructor(
             }
             .catch { error ->
                 loge(error) { "voice answer grading/upload failed" }
+                val failureReason = error.toGradingFailureReason()
                 _state.update {
                     it.copy(
                         phase = VoiceAnswerPhase.SpeakingNotice,
-                        error = VoiceAnswerFailureReason.GradingFailed(error.message),
+                        error = failureReason,
+                        isShortNoticeSpeaking = true,
                     )
                 }
                 // No screen to look at in this UX — failure must be audible (design doc §Upload
-                // failure handling; silent-drop was explicitly rejected).
-                speakNotice(context.getString(R.string.study_session_voice_answer_failure_spoken_message))
+                // failure handling; silent-drop was explicitly rejected), and it names the cause,
+                // since the snackbar saying the same may never be seen.
+                val messageRes = when (failureReason) {
+                    NoConnection -> R.string.study_session_voice_answer_offline_spoken_message
+                    ServiceError -> R.string.study_session_voice_answer_service_error_spoken_message
+                }
+                speakNotice(context.getString(messageRes))
+                startShortNoticeTimeout()
             }
             .collect()
     }
@@ -345,6 +363,7 @@ class VoiceAnswerController @Inject constructor(
         override fun onStart(utteranceId: String?) = Unit
 
         override fun onDone(utteranceId: String?) {
+            onShortNoticeFinished()
             if (utteranceId != NOTICE_UTTERANCE_ID) return
             scope.launch { onNoticeFinishedSpeaking() }
         }
@@ -353,6 +372,7 @@ class VoiceAnswerController @Inject constructor(
         override fun onError(utteranceId: String?) = Unit
 
         override fun onError(utteranceId: String?, errorCode: Int) {
+            onShortNoticeFinished()
             if (utteranceId != NOTICE_UTTERANCE_ID) return
             scope.launch { onNoticeFinishedSpeaking() }
         }
@@ -364,6 +384,25 @@ class VoiceAnswerController @Inject constructor(
         if (!_state.value.isEnabled) return
         _state.update { it.copy(phase = VoiceAnswerPhase.WaitingForQuestion) }
         _advanceRequests.emit(Unit)
+    }
+
+    /**
+     * Clears [VoiceAnswerState.isShortNoticeSpeaking] on its own after [SHORT_NOTICE_TIMEOUT] in case
+     * the notice engine never reports the utterance finished. Not cancelled by [stop], since the
+     * notice outlives the pause that stops voice answering.
+     */
+    private fun startShortNoticeTimeout() {
+        shortNoticeTimeoutJob?.cancel()
+        shortNoticeTimeoutJob = scope.launch {
+            delay(SHORT_NOTICE_TIMEOUT)
+            _state.update { it.copy(isShortNoticeSpeaking = false) }
+        }
+    }
+
+    private fun onShortNoticeFinished() {
+        shortNoticeTimeoutJob?.cancel()
+        shortNoticeTimeoutJob = null
+        _state.update { it.copy(isShortNoticeSpeaking = false) }
     }
 
     private fun speakNotice(text: String) {
@@ -410,6 +449,7 @@ class VoiceAnswerController @Inject constructor(
         const val CAPTURE_FAILURE_NOTICE_UTTERANCE_ID = "voice_answer_capture_failure_notice"
         const val SILENCE_TIMEOUT_MS = 8_000L
         const val ADVANCE_DELAY_MS = 1_000L
+        val SHORT_NOTICE_TIMEOUT = 5.seconds
     }
 }
 
