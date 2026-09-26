@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.ui.composables.voice
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +34,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -52,21 +55,36 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
 /**
- * Microphone disc with mirrored level bars on each side.
+ * Icon disc with mirrored level bars on each side. The disc shows a microphone by default; pass a
+ * speaker [icon] while the bars follow audio being played back rather than captured.
  *
  * [levels] is one snapshot of [FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT] values in `0..1`,
  * index 0 innermost. Each new snapshot is blended in linearly over [levelIntervalMillis], which
  * should match the producer's emission interval. The disc's size pulses independently of the level.
+ *
+ * While [isActive] is false only the disc shows and [levels] is ignored; turning it true fans the
+ * bars out from the disc, and turning it false folds them back in. The indicator keeps its full
+ * width either way, so the disc never moves. A changed [icon] crossfades in.
  */
 @Composable
 fun FlashcardsVoiceCaptureIndicator(
     levels: ImmutableList<Float>,
     contentDescription: String,
     modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Default.Mic,
+    isActive: Boolean = true,
     levelIntervalMillis: Int = FlashcardsVoiceCaptureIndicatorDefaults.LEVEL_INTERVAL_MILLIS,
 ) {
     val levelBars = remember { LevelBars(levels) }
     LaunchedEffect(levels) { levelBars.animateTo(levels = levels, durationMillis = levelIntervalMillis) }
+    // Read only while drawing, like the bar levels, so the fan animation redraws without recomposing.
+    val fanOut = remember { Animatable(if (isActive) 1f else 0f) }
+    LaunchedEffect(isActive) {
+        fanOut.animateTo(
+            targetValue = if (isActive) 1f else 0f,
+            animationSpec = tween(durationMillis = FlashcardsMotion.DURATION_LONG_MS, easing = FlashcardsMotion.StandardEasing),
+        )
+    }
 
     val barColor = MaterialTheme.colorScheme.primary
     val barsModifier = Modifier.size(width = BarsAreaWidth, height = BarMaxHeight)
@@ -81,13 +99,13 @@ fun FlashcardsVoiceCaptureIndicator(
     ) {
         Spacer(
             modifier = barsModifier.drawBehind {
-                drawLevelBars(levelBars = levelBars, color = barColor, growsTowardStart = true)
+                drawLevelBars(levelBars = levelBars, fanOut = fanOut.value, color = barColor, growsTowardStart = true)
             },
         )
-        PulsingMicrophoneDisc()
+        PulsingIconDisc(icon = icon)
         Spacer(
             modifier = barsModifier.drawBehind {
-                drawLevelBars(levelBars = levelBars, color = barColor, growsTowardStart = false)
+                drawLevelBars(levelBars = levelBars, fanOut = fanOut.value, color = barColor, growsTowardStart = false)
             },
         )
     }
@@ -140,7 +158,7 @@ private class LevelBars(initialLevels: ImmutableList<Float>) {
 }
 
 @Composable
-private fun PulsingMicrophoneDisc() {
+private fun PulsingIconDisc(icon: ImageVector) {
     val pulse = rememberInfiniteTransition(label = "voiceCapturePulse").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -165,33 +183,47 @@ private fun PulsingMicrophoneDisc() {
                 }
                 .background(color = FlashcardsVoiceCaptureIndicatorDefaults.discContainerColor, shape = CircleShape),
         )
-        Icon(
-            imageVector = Icons.Default.Mic,
-            // Decorative: the root node carries the announcement.
-            contentDescription = null,
-            tint = FlashcardsVoiceCaptureIndicatorDefaults.discContentColor,
-        )
+        Crossfade(targetState = icon, animationSpec = tween(FlashcardsMotion.DURATION_MEDIUM_MS), label = "voiceCaptureIcon") { shownIcon ->
+            Icon(
+                imageVector = shownIcon,
+                // Decorative: the root node carries the announcement.
+                contentDescription = null,
+                tint = FlashcardsVoiceCaptureIndicatorDefaults.discContentColor,
+            )
+        }
     }
 }
 
-/** Draws one side's bars; index 0 sits next to the disc. */
-private fun DrawScope.drawLevelBars(levelBars: LevelBars, color: Color, growsTowardStart: Boolean) {
+/**
+ * Draws one side's bars; index 0 sits next to the disc. [fanOut] `0..1` slides each bar out from
+ * index 0's slot to its own and fades it in, inner bars leading; at 0 nothing is drawn.
+ */
+private fun DrawScope.drawLevelBars(levelBars: LevelBars, fanOut: Float, color: Color, growsTowardStart: Boolean) {
+    if (fanOut <= 0f) return
     val barWidth = BarWidth.toPx()
     val barStep = barWidth + BarGap.toPx()
     val restHeight = BarRestHeight.toPx()
     val maxHeight = size.height
     repeat(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { index ->
+        val barFanOut = barFanOut(fanOut = fanOut, index = index)
         val level = levelBars.levelAt(index)
         val barHeight = lerp(restHeight, maxHeight * BAR_HEIGHT_ENVELOPE[index], level)
-        val barLeft = if (growsTowardStart) size.width - barWidth - index * barStep else index * barStep
+        val offsetFromDisc = index * barStep * barFanOut
+        val barLeft = if (growsTowardStart) size.width - barWidth - offsetFromDisc else offsetFromDisc
         drawRoundRect(
             color = color,
             topLeft = Offset(x = barLeft, y = (maxHeight - barHeight) / 2f),
             size = Size(width = barWidth, height = barHeight),
             cornerRadius = CornerRadius(barWidth / 2f),
-            alpha = lerp(BAR_MIN_ALPHA, 1f, level),
+            alpha = lerp(BAR_MIN_ALPHA, 1f, level) * barFanOut,
         )
     }
+}
+
+/** One bar's share of the overall fan: each bar starts [FAN_STAGGER] later than the one inside it. */
+private fun barFanOut(fanOut: Float, index: Int): Float {
+    val barWindow = 1f - FAN_STAGGER * (FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT - 1)
+    return ((fanOut - index * FAN_STAGGER) / barWindow).coerceIn(0f, 1f)
 }
 
 private fun ImmutableList<Float>.levelAt(index: Int): Float = getOrElse(index) { 0f }.coerceIn(0f, 1f)
@@ -209,6 +241,7 @@ private val BAR_HEIGHT_ENVELOPE = floatArrayOf(1f, 0.96f, 0.9f, 0.82f, 0.74f)
 private const val BAR_MIN_ALPHA = 0.35f
 private const val PULSE_MAX_SCALE = 1.06f
 private const val PULSE_HALF_CYCLE_MILLIS = 700
+private const val FAN_STAGGER = 0.1f
 
 private val RestLevels = persistentListOf(0f, 0f, 0f, 0f, 0f)
 private val MidLevels = persistentListOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
@@ -245,13 +278,29 @@ private fun FlashcardsVoiceCaptureIndicatorWavePreview() {
     VoiceCaptureIndicatorPreview(levels = WaveLevels)
 }
 
+@PreviewLightDark
 @Composable
-private fun VoiceCaptureIndicatorPreview(levels: ImmutableList<Float>) {
+private fun FlashcardsVoiceCaptureIndicatorPlaybackPreview() {
+    VoiceCaptureIndicatorPreview(levels = WaveLevels, isPlayback = true)
+}
+
+@PreviewLightDark
+@Composable
+private fun FlashcardsVoiceCaptureIndicatorInactivePreview() {
+    VoiceCaptureIndicatorPreview(levels = RestLevels, isActive = false)
+}
+
+@Composable
+private fun VoiceCaptureIndicatorPreview(levels: ImmutableList<Float>, isPlayback: Boolean = false, isActive: Boolean = true) {
     FlashcardsTheme {
         Surface {
             FlashcardsVoiceCaptureIndicator(
                 levels = levels,
-                contentDescription = stringResource(R.string.common_voice_capture_listening_cd),
+                contentDescription = stringResource(
+                    if (isPlayback) R.string.common_voice_capture_playing_cd else R.string.common_voice_capture_listening_cd,
+                ),
+                icon = if (isPlayback) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Mic,
+                isActive = isActive,
             )
         }
     }

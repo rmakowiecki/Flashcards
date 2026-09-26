@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.domain.model.OnboardingSubcategory
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason
+import com.rossomak.flashcards.core.domain.model.VoiceDemoRecordingResult
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeOnboardingSubcategoriesRepository
@@ -16,9 +17,11 @@ import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreference
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceDemoGateway
+import com.rossomak.flashcards.core.domain.usecase.FinishVoiceDemoRecordingUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoLevelsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -62,7 +65,9 @@ class OnboardingViewModelTest {
         setFavoriteSubcategories = SetFavoriteSubcategoriesUseCase(userFavoritesRepository),
         signInAnonymously = SignInAnonymouslyUseCase(authRepository),
         observeVoiceDemoState = ObserveVoiceDemoStateUseCase(voiceDemoGateway),
+        observeVoiceDemoLevels = ObserveVoiceDemoLevelsUseCase(voiceDemoGateway),
         startVoiceDemo = StartVoiceDemoUseCase(voiceDemoGateway),
+        finishVoiceDemoRecording = FinishVoiceDemoRecordingUseCase(voiceDemoGateway),
         playVoiceDemo = PlayVoiceDemoUseCase(voiceDemoGateway),
         stopVoiceDemo = StopVoiceDemoUseCase(voiceDemoGateway),
         observePermissionStatus = ObservePermissionStatusUseCase(permissionGateway),
@@ -417,6 +422,77 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Ready
+    }
+
+    @Test
+    fun `voice demo levels pass through as their own flow, starting at rest`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val levels = listOf(0.4f, 0.2f, 0f, 0f, 0f)
+            val viewModel = createViewModel()
+
+            viewModel.voiceDemoLevels.test {
+                awaitItem() shouldBe listOf(0f, 0f, 0f, 0f, 0f)
+                advanceUntilIdle()
+
+                voiceDemoGateway.levels.emit(levels)
+
+                awaitItem() shouldBe levels
+            }
+        }
+
+    @Test
+    fun `voice demo processing state is mirrored into screen state`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceDemoGateway.state.value = VoiceDemoState.Processing
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Processing
+    }
+
+    @Test
+    fun `stop recording finishes the recording through the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceDemoGateway.state.value = VoiceDemoState.SpeechDetected
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onVoiceDemoFinish()
+        advanceUntilIdle()
+
+        voiceDemoGateway.finishRecordingCount shouldBe 1
+        viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Ready
+    }
+
+    @Test
+    fun `stop recording with nothing captured emits a nothing captured message`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceDemoGateway.finishRecordingOutcome = VoiceDemoRecordingResult.NothingCaptured
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            viewModel.onVoiceDemoFinish()
+            advanceUntilIdle()
+
+            awaitItem() shouldBe OnboardingMessage.NothingCaptured
+        }
+        viewModel.state.value.voiceDemoState shouldBe VoiceDemoState.Idle
+    }
+
+    @Test
+    fun `stop recording that captured or was cancelled emits no message`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            voiceDemoGateway.finishRecordingOutcome = VoiceDemoRecordingResult.Captured
+            viewModel.onVoiceDemoFinish()
+            voiceDemoGateway.finishRecordingOutcome = VoiceDemoRecordingResult.Cancelled
+            viewModel.onVoiceDemoFinish()
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
     }
 
     @Test

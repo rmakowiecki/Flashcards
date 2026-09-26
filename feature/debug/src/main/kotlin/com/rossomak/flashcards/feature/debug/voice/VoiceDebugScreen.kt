@@ -8,7 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,10 +18,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,15 +42,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.feature.debug.R
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun VoiceDebugScreen(
@@ -87,6 +95,7 @@ fun VoiceDebugScreen(
     VoiceDebugContent(
         modifier = modifier,
         state = state,
+        levels = viewModel.levels,
         onNavigateBack = onNavigateBack,
         onVadToggle = { withMicPermission(viewModel::onVadToggle) },
         onPlayCapturedUtterance = viewModel::onPlayCapturedUtterance,
@@ -104,6 +113,7 @@ fun VoiceDebugScreen(
 fun VoiceDebugContent(
     modifier: Modifier = Modifier,
     state: VoiceDebugScreenState,
+    levels: StateFlow<ImmutableList<Float>>,
     onNavigateBack: () -> Unit,
     onVadToggle: () -> Unit,
     onPlayCapturedUtterance: () -> Unit,
@@ -144,6 +154,11 @@ fun VoiceDebugContent(
             )
 
             DebugBlock(title = stringResource(R.string.voice_debug_vad_title)) {
+                LevelIndicator(
+                    levels = levels,
+                    isPlayback = state.isPlayingLastAnswer,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = onVadToggle) {
                         Text(
@@ -157,22 +172,7 @@ fun VoiceDebugContent(
                         )
                     }
                     Spacer(modifier = Modifier.size(16.dp))
-                    Surface(
-                        modifier = Modifier.size(16.dp),
-                        shape = CircleShape,
-                        color = if (state.isSpeechDetected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outlineVariant,
-                    ) {}
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(
-                        text = stringResource(
-                            if (state.isSpeechDetected) {
-                                R.string.voice_debug_vad_speech_label
-                            } else {
-                                R.string.voice_debug_vad_silence_label
-                            }
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
+                    SpeechStatusLabel(isSpeechDetected = state.isSpeechDetected)
                 }
                 Text(
                     text = stringResource(R.string.voice_debug_vad_probability_label, state.vadSpeechProbability),
@@ -302,7 +302,7 @@ private fun AudioRouteBanner(micLabel: String, playbackLabel: String) {
 @Composable
 private fun DebugBlock(
     title: String,
-    content: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -313,6 +313,47 @@ private fun DebugBlock(
             HorizontalDivider()
             content()
         }
+    }
+}
+
+/**
+ * Collects the level here so each new level recomposes only the indicator. A speaker replaces the
+ * microphone while the last answer plays back.
+ */
+@Composable
+private fun LevelIndicator(levels: StateFlow<ImmutableList<Float>>, isPlayback: Boolean, modifier: Modifier = Modifier) {
+    val currentLevels by levels.collectAsStateWithLifecycle()
+    FlashcardsVoiceCaptureIndicator(
+        levels = currentLevels,
+        contentDescription = stringResource(
+            if (isPlayback) CoreUiR.string.common_voice_capture_playing_cd else CoreUiR.string.common_voice_capture_listening_cd,
+        ),
+        modifier = modifier,
+        icon = if (isPlayback) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Mic,
+    )
+}
+
+/**
+ * Silence / speech label reserving the width of the longer "speech detected" text, so swapping
+ * between the two never shifts the row.
+ */
+@Composable
+private fun SpeechStatusLabel(isSpeechDetected: Boolean) {
+    val speechText = stringResource(R.string.voice_debug_vad_speech_label)
+    Box {
+        Text(
+            text = speechText,
+            modifier = Modifier
+                .alpha(0f)
+                .clearAndSetSemantics {},
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
+        Text(
+            text = if (isSpeechDetected) speechText else stringResource(R.string.voice_debug_vad_silence_label),
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
     }
 }
 

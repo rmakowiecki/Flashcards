@@ -15,6 +15,7 @@
     <string name="common_voice_capture_permission_missing_message">Microphone permission is missing</string>
     <string name="common_voice_capture_loop_error_message">Something interrupted the recording</string>
     <string name="common_voice_capture_listening_cd">Listening</string>
+    <string name="common_voice_capture_playing_cd">Playing back</string>
     <string name="common_mic_permission_still_denied_message">Microphone is still off. Allow it in system settings.</string>
     <string name="common_difficulty_range_cd">Difficulty %1$d to %2$d out of %3$d</string>
     <string name="common_navigate_back_cd">Back</string>
