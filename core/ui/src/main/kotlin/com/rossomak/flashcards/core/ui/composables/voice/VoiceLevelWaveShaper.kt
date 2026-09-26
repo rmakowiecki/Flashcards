@@ -8,10 +8,12 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -47,7 +49,9 @@ fun Flow<Float>.stateInVoiceBarsLevels(scope: CoroutineScope): StateFlow<Immutab
  *
  * The interval is the wave's propagation speed; the indicator animates between snapshots over the
  * same interval. When the level drops to 0 the wave decays to all zeros over [barCount] intervals
- * and then emits nothing more until the level rises again.
+ * and then emits nothing more until the level rises again. While it rests there, the interval timer
+ * is suspended too, so a silent input costs no periodic wakeups; the first tick after the level
+ * rises comes one [interval] later.
  */
 internal class VoiceLevelWaveShaper(
     private val barCount: Int = FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT,
@@ -59,33 +63,38 @@ internal class VoiceLevelWaveShaper(
     }
 
     /** Cold: nothing is collected or emitted without a collector. */
-    fun shape(level: Flow<Float>): Flow<List<Float>> {
+    fun shape(level: Flow<Float>): Flow<List<Float>> = flow {
+        // Starts awake so the first tick still emits the all-zero rest wave for a silent input.
+        // Read by the tick loop, written only by the collector below; a tick already past the wait
+        // when the wave comes to rest re-emits an unchanged wave, which distinctUntilChanged drops.
+        val isAtRest = MutableStateFlow(false)
         val ticks = flow {
             while (true) {
+                isAtRest.first { atRest -> !atRest }
                 delay(interval)
                 emit(WaveInput.Tick)
             }
         }
-        return flow {
-            val history = MutableList(barCount) { 0f }
-            var currentLevel = 0f
-            var windowMax = 0f
-            val wave = merge(level.map(WaveInput::Level), ticks).transform { input ->
-                when (input) {
-                    is WaveInput.Level -> {
-                        currentLevel = input.value.coerceIn(0f, 1f)
-                        windowMax = maxOf(windowMax, currentLevel)
-                    }
-                    WaveInput.Tick -> {
-                        history.removeAt(history.lastIndex)
-                        history.add(0, windowMax)
-                        windowMax = currentLevel
-                        emit(history.toList())
-                    }
+        val history = MutableList(barCount) { 0f }
+        var currentLevel = 0f
+        var windowMax = 0f
+        val wave = merge(level.map(WaveInput::Level), ticks).transform { input ->
+            when (input) {
+                is WaveInput.Level -> {
+                    currentLevel = input.value.coerceIn(0f, 1f)
+                    windowMax = maxOf(windowMax, currentLevel)
+                    if (currentLevel > 0f) isAtRest.value = false
+                }
+                WaveInput.Tick -> {
+                    history.removeAt(history.lastIndex)
+                    history.add(0, windowMax)
+                    windowMax = currentLevel
+                    emit(history.toList())
+                    isAtRest.value = currentLevel == 0f && history.all { bar -> bar == 0f }
                 }
             }
-            emitAll(wave.distinctUntilChanged())
         }
+        emitAll(wave.distinctUntilChanged())
     }
 
     private sealed interface WaveInput {

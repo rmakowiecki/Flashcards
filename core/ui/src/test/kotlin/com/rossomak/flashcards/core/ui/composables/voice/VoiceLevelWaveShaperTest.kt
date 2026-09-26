@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.ui.composables.voice
 
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -12,6 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -101,6 +104,58 @@ class VoiceLevelWaveShaperTest {
         advanceBy(interval * 10)
 
         emissions shouldBe listOf(listOf(0f, 0f, 0f, 0f, 0f))
+    }
+
+    @Test
+    fun `stops ticking once a silent wave is at rest`() = runTest {
+        // Collected in the test's own scope: a timer still ticking would keep advanceUntilIdle from ever returning.
+        val collector = launch { VoiceLevelWaveShaper().shape(level).toList(mutableListOf()) }
+
+        advanceUntilIdle()
+
+        currentTime shouldBeLessThanOrEqual (interval * 2).inWholeMilliseconds
+        collector.cancel()
+    }
+
+    @Test
+    fun `stops ticking once a decayed wave is at rest`() = runTest {
+        val collector = launch { VoiceLevelWaveShaper().shape(level).toList(mutableListOf()) }
+        level.value = 0.8f
+        advanceBy(interval)
+        level.value = 0f
+
+        advanceUntilIdle()
+
+        // Seven ticks until the held peak has left every bar (see the decay test above), plus at most
+        // one tick already past the wait when the wave came to rest.
+        currentTime shouldBeLessThanOrEqual (interval * 8).inWholeMilliseconds
+        collector.cancel()
+    }
+
+    @Test
+    fun `a level rising after rest resumes the wave one interval later`() = runTest {
+        val emissions = collect(VoiceLevelWaveShaper().shape(level))
+        advanceBy(interval * 10)
+
+        level.value = 0.7f
+        runCurrent()
+        emissions.size shouldBe 1
+        advanceBy(interval)
+
+        emissions shouldBe listOf(listOf(0f, 0f, 0f, 0f, 0f), listOf(0.7f, 0f, 0f, 0f, 0f))
+    }
+
+    @Test
+    fun `a short burst between ticks while at rest still reaches the wave`() = runTest {
+        val emissions = collect(VoiceLevelWaveShaper().shape(level))
+        advanceBy(interval * 10)
+
+        level.value = 0.6f
+        runCurrent()
+        level.value = 0f
+        advanceBy(interval)
+
+        emissions.last() shouldBe listOf(0.6f, 0f, 0f, 0f, 0f)
     }
 
     @Test
