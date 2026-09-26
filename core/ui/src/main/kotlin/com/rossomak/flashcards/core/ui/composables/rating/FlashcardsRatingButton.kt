@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.ui.composables.rating
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,7 +126,9 @@ private val FlashcardAttemptRating.icon: ImageVector
         FlashcardAttemptRating.Correct -> Icons.Default.Check
     }
 
-private val FlashcardAttemptRating.labelRes: Int
+/** The Rating's display name, shared by the rating buttons and any text that names a Rating. */
+@get:StringRes
+val FlashcardAttemptRating.labelRes: Int
     get() = when (this) {
         FlashcardAttemptRating.Failed -> R.string.common_rating_failed_label
         FlashcardAttemptRating.PartiallyCorrect -> R.string.common_rating_partially_correct_label
