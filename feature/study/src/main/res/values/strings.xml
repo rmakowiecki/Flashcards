@@ -9,7 +9,7 @@
     <string name="study_session_voice_answer_capture_unavailable_spoken_message">Couldn\'t hear you, pausing the session.</string>
     <string name="study_session_show_answer_cd">Show answer</string>
     <string name="study_session_next_flashcard_cd">Next flashcard</string>
-    <string name="study_session_voice_answer_grade_spoken_message">You scored %1$d percent. %2$s</string>
+    <string name="study_session_voice_answer_grade_spoken_message">%1$s. %2$s</string>
     <string name="study_session_voice_answer_failure_spoken_message">Couldn\'t grade that answer, moving on.</string>
     <string name="study_session_voice_answer_skip_spoken_message">No answer heard, moving on.</string>
     <string name="study_session_voice_answer_skip_pause_spoken_message">No answer heard 3 times in a row, pausing the session.</string>
