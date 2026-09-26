@@ -1,6 +1,6 @@
 # Premium Voice Answer Capture & Grading Pipeline
 
-Design overview for a premium feature: while studying in Rated mode, the app listens for the user's spoken answer, obfuscates their voice on-device before it ever leaves the phone, transcribes it, sanitizes the transcript, and has an LLM grade completeness/quality. This works equally well **screen-on** (the user watching the session, reading their sanitized transcript and grade as they arrive) and **screen-off/pocket** (hands-free, audio-only feedback via TTS) — see ADR-0028, which corrects this document's original screen-off-only framing. Earlier revisions of this document treated the background/pocket case as the single driving constraint; that was wrong — both are first-class.
+Design overview for a premium feature: while studying in Rated mode, the app listens for the user's spoken answer, obfuscates their voice on-device before it ever leaves the phone, transcribes it, sanitizes the transcript, and has an LLM grade completeness/quality. This works equally well **screen-on** (the user watching the session, reading their recognized answer and then the grade in the bottom sheet) and **screen-off/pocket** (hands-free, audio-only feedback via TTS) — see ADR-0028. Earlier revisions of this document treated the background/pocket case as the single driving constraint; that was wrong — both are first-class.
 
 This document is an **intermediary design overview**, produced by a structured decision-tree interview. It captures the architecture and the rationale behind each choice so it can later be distilled into a concrete implementation plan. It intentionally does not yet contain task breakdowns, file-level plans, or Gradle module scaffolding. **See ADR-0024 (proxy shape), ADR-0027 (BT/screen-off mechanics), ADR-0028 (not background-only; streamed transcript-then-grade over one Firebase Callable connection), and ADR-0029 (voice grading collapses to two `onCall` callables; the entire REST/Retrofit stack deleted; one grade function serves prod + debug via payload-inferred mode) for decisions made after this document was first written — those ADRs are authoritative where they conflict with prose below that hasn't been fully rewritten yet.**
 
@@ -20,7 +20,7 @@ This document is an **intermediary design overview**, produced by a structured d
 Two equally valid usage modes shape this design (ADR-0028):
 
 - **Screen-off/pocket**: the phone is in the user's pocket, they talk through earphones, there is no screen to tap or button to hold. This constraint is why VAD replaces a push-to-talk trigger, a foreground service + wake lock is mandatory (Android kills/throttles background mic access otherwise), errors must be communicated by voice (TTS) as a fallback, and Bluetooth earphone mic routing (SCO/LE Audio) is a first-class concern.
-- **Screen-on**: the user is watching the session, wants to see their sanitized transcript and grade appear promptly as they arrive (not just hear them), and expects manual controls (skip/prev/next/pause) to behave sensibly around the listening/grading window rather than race it.
+- **Screen-on**: the user is watching the session, wants to see their recognized answer promptly and then the grade (not just hear the grade), and expects manual controls (skip/prev/next/pause) to behave sensibly around the listening/grading window rather than race it.
 
 Nothing in the capture/VAD/obfuscation/routing mechanics below differs between the two modes — the mic pipeline runs the same way regardless of whether the screen is on. What differs is purely the UI layer: whether transcript/grade text renders on screen, and whether TTS is the only feedback channel or a supplement to visible text.
 
@@ -65,8 +65,9 @@ automatically by the Firebase SDK, no manual interceptor needed; ADR-0029)
 8. Discard the audio (never written to disk/Cloud Storage — fully ephemeral)
         │
         ▼
-Client displays sanitized_transcript the moment step 5 arrives, then grade/feedback
-once step 7 arrives — two on-screen (and, screen-off, two spoken) updates, one connection
+Client shows sanitized_transcript in the bottom sheet when step 5 arrives, then the Rating and
+feedback once step 7 arrives, at least 1 s later (ADR-0053) — two on-screen updates, one
+spoken grade notice, one connection
         │
         ▼
 Client displays sanitized_transcript and grade/feedback transiently, on screen, during the session
@@ -89,7 +90,7 @@ Rationale: capture/VAD/obfuscation logic has no inherent dependency on the study
 
 Session-scoped only: the mic/VAD pipeline is active only while a study session's foreground service is alive — the same lifecycle `TtsPlayer`'s `MediaSessionService` already uses for voice playback. It does **not** persist after the app is swiped away or the session ends. A true always-on/system-wide listener was considered and rejected: it multiplies battery cost, privacy exposure, and Play Store policy burden for no stated benefit — the actual need is "hands-free during an active study session," not "always listening."
 
-Rated full-voice sessions support **screen-off** (a hands-free walk, answering aloud without looking at the device) as a first-class case, alongside **screen-on** (the user watching, reading transcript/grade as they arrive — ADR-0028); neither is "the" target use case to the exclusion of the other. Fast mode already proves the screen-off TTS-playback lifecycle; Rated full-voice reuses that same playback service and adds the listen+grade turn (mic capture is net-new and Rated-only — Fast mode is consume-only, no answering). Capture and playback share **one dual-typed foreground service** (`mediaPlayback|microphone`), so the existing `MediaSessionService` gains the `microphone` FGS type + `FOREGROUND_SERVICE_MICROPHONE` permission (required on Android 14+; target SDK 36) — one lifecycle, one notification, one wake lock. `MediaSession`/media-button (bud-tap) controls drive pause/resume/skip/repeat with the screen off; the turn loop auto-advances after grading-feedback TTS finishes + ~1s.
+Rated full-voice sessions support **screen-off** (a hands-free walk, answering aloud without looking at the device) as a first-class case, alongside **screen-on** (the user watching, reading their recognized answer and then the grade — ADR-0028); neither is "the" target use case to the exclusion of the other. Fast mode already proves the screen-off TTS-playback lifecycle; Rated full-voice reuses that same playback service and adds the listen+grade turn (mic capture is net-new and Rated-only — Fast mode is consume-only, no answering). Capture and playback share **one dual-typed foreground service** (`mediaPlayback|microphone`), so the existing `MediaSessionService` gains the `microphone` FGS type + `FOREGROUND_SERVICE_MICROPHONE` permission (required on Android 14+; target SDK 36) — one lifecycle, one notification, one wake lock. `MediaSession`/media-button (bud-tap) controls drive pause/resume/skip/repeat with the screen off; the turn loop auto-advances after grading-feedback TTS finishes + ~1s.
 
 ### Capture trigger: VAD, not push-to-talk
 
@@ -131,7 +132,7 @@ A `PARTIAL_WAKE_LOCK`, scoped to the foreground service's listening lifecycle (a
 
 ### Upload failure handling
 
-Retry with exponential backoff (in-process retry or WorkManager). If it ultimately fails, the existing `TtsPlayer` voice channel speaks a short audio notice ("couldn't grade that answer, moving on") rather than showing a toast/dialog — there's no screen to look at in this UX, so any failure signal has to be audible. Silent-drop was considered and rejected: the user would have no idea their answer wasn't graded, undermining trust in the feature.
+Retry with exponential backoff (in-process retry or WorkManager). If it ultimately fails, the failure is classified as no connection or a service problem ([ADR-0053](../adr/0053-voice-answer-sheet-states-and-live-input-level.md)). `VoiceAnswerController`'s dedicated notice TTS speaks a short notice naming the cause ("Couldn't reach grading. Check your connection. Moving on." / "Grading had a problem, moving on."), and a matching snackbar shows for a user watching the screen. The spoken notice is the one that matters: in pocket use there's no screen to look at, so any failure signal has to be audible. The card then moves on, with no Attempt consumed. Silent-drop was considered and rejected: the user would have no idea their answer wasn't graded, undermining trust in the feature.
 
 ## Debug dev screen: manual per-stage testing
 

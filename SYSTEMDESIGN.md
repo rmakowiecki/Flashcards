@@ -164,7 +164,7 @@ Fast and Rated are **two separate screens, ViewModels and routes** — Study Mod
 
 - **Correct** (any Attempt): Flashcard exits queue → Terminal State Mastered
 - **Partial** or **Failed**: Flashcard re-inserted with Attempt count incremented, at `currentIndex + random(gap)` — gap **2–4** for Failed, **5–9** for Partial, so weaker recall returns sooner. Clamped to the queue end; appended if fewer cards remain than the drawn gap. The draw uses an injected `kotlin.random.Random` defaulting to `Random.Default`, not a session seed — a predictable re-ask rhythm is something a user could learn to anticipate. See [ADR-0046](docs/adr/0046-failed-and-partial-re-insertion-placement.md)
-- Each Flashcard has a maximum of N Attempts (user-configurable in Settings, default 3, max 5). A Voice Answering silence timeout consumes no Attempt
+- Each Flashcard has a maximum of N Attempts (user-configurable in Settings, default 3, max 5). A Voice Answering silence timeout or grading failure consumes no Attempt
 - The Flashcard's **Terminal State is the best Rating it ever achieved**: Correct → Mastered, else Partial → Partial, else Failed. Reaching the Attempts limit resolves the accumulated Ratings; it does not force Failed
 - **"Partial ends the card"** setting (default off): when on, a Partial Rating resolves the Flashcard to Terminal Partial immediately instead of re-inserting it
 
