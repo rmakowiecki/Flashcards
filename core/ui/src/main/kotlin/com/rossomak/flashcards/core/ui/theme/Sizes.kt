@@ -4,10 +4,7 @@
 
 package com.rossomak.flashcards.core.ui.theme
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
