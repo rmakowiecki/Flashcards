@@ -46,8 +46,8 @@ data class RatedStudySessionScreenState(
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
     val voiceAnswerSanitizedTranscript: String? = null,
     // Continuous display state, not a one-shot event: mirrors the current round's grade for as
-    // long as VoiceAnswerPhase.SpeakingNotice is reading it aloud, rendered as bottom-sheet plain
-    // text (RatedVoiceGradeFeedback) rather than a snackbar. One-shot voice-answering failures go
+    // long as VoiceAnswerPhase.SpeakingNotice is reading it aloud, rendered in the bottom sheet
+    // (RatedVoiceSheetMode.Graded) rather than as a snackbar. One-shot voice-answering failures go
     // through RatedStudySessionMessage instead — see RatedStudySessionViewModel.messages.
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
     val activeDialog: StudySessionDialog? = null,
@@ -79,6 +79,8 @@ data class RatedStudySessionScreenState(
             isVoiceAnswerEnabled = isVoiceAnswerEnabled,
             voiceAnswerPhase = voiceAnswerPhase,
             isVoiceAnswerPaused = isVoiceAnswerPaused,
+            sanitizedTranscript = voiceAnswerSanitizedTranscript,
+            lastGrade = lastVoiceAnswerGrade,
         )
 
     /**

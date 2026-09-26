@@ -985,18 +985,74 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `voice sheet mode stays out of Transport while grading and speaking the notice`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `voice sheet mode is Pending while grading without a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
         loadThreeCards()
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
         advanceUntilIdle()
-        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Legacy
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = " ")
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+    }
+
+    @Test
+    fun `voice sheet mode is GradingWithTranscript while grading with a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = SPOKEN_TRANSCRIPT)
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.GradingWithTranscript(SPOKEN_TRANSCRIPT)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Failed just below the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 39) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Failed, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Partial at the bottom of the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 40) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Partial at the top of the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 79) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Correct at the bottom of the Correct band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 80) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Correct, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode stays Legacy while speaking a notice without a grade`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
 
         voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
         advanceUntilIdle()
+
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Legacy
+    }
+
+    private fun TestScope.voiceSheetModeWhileSpeakingGrade(gradePercent: Int): RatedVoiceSheetMode {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val grade = VoiceAnswerGrade(sanitizedTranscript = SPOKEN_TRANSCRIPT, gradePercent = gradePercent, feedback = GRADE_RATIONALE)
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, lastGrade = grade)
+        advanceUntilIdle()
+
+        return viewModel.state.value.voiceSheetMode
     }
 
     @Test
@@ -1601,6 +1657,8 @@ class RatedStudySessionViewModelTest {
     private companion object {
         const val FIXED_SEED = 42L
         const val SPOKEN_RAW_VOICE_LEVEL = 0.9f
+        const val SPOKEN_TRANSCRIPT = "remember keeps state across recompositions"
+        const val GRADE_RATIONALE = "You named the key difference."
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value
