@@ -12,7 +12,9 @@ import androidx.core.content.ContextCompat
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndGradeSpokenAnswerUseCase
+import com.rossomak.flashcards.core.ui.composables.rating.labelRes
 import com.rossomak.flashcards.core.voice.AudioRouteManager
 import com.rossomak.flashcards.core.voice.CaptureRouteType
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
@@ -21,7 +23,11 @@ import com.rossomak.flashcards.feature.study.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import javax.inject.Inject
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,22 +42,28 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class VoiceAnswerPhase { Idle, WaitingForQuestion, Listening, SpeechDetected, Grading, SpeakingNotice }
+enum class VoiceAnswerPhase {
+    Idle,
+    WaitingForQuestion,
+    Listening,
+    SpeechDetected,
+    Grading,
+    SpeakingNotice
+}
 
 data class VoiceAnswerState(
     val isEnabled: Boolean = false,
     val phase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
-    /** Sanitized transcript, set as soon as it streams in — ahead of [lastGrade] (ADR-0028). */
-    val sanitizedTranscript: String? = null,
+    val sanitizedTranscript: String? = null, // sanitized transcript, set as soon as it streams in — ahead of [lastGrade] (ADR-0028)
     val lastGrade: VoiceAnswerGrade? = null,
     val lastGradedCardId: String? = null,
     val captureRoute: CaptureRouteType = CaptureRouteType.None,
-    // Compile-safe migration only: still just a null-check trigger for one fixed snackbar
-    // message, not resolved per-reason yet.
     val error: VoiceAnswerFailureReason? = null,
 )
 
@@ -267,6 +279,9 @@ class VoiceAnswerController @Inject constructor(
                 obfuscatedAnswerWav = obfuscatedWav,
             )
         )
+            // Held before onEach so the grade state, its spoken notice and the failure path all start
+            // together, once the transcript has had its minimum time on screen.
+            .holdGradedUntilTranscriptShown()
             .onEach { event ->
                 when (event) {
                     is VoiceAnswerGradingEvent.TranscriptReady ->
@@ -280,10 +295,11 @@ class VoiceAnswerController @Inject constructor(
                                 error = null,
                             )
                         }
+                        // The percentage only drives the Rating band; the user hears the Rating's name and the rationale, never the number.
                         speakNotice(
                             context.getString(
                                 R.string.study_session_voice_answer_grade_spoken_message,
-                                event.grade.gradePercent,
+                                context.getString(event.grade.toFlashcardAttemptRating().labelRes),
                                 event.grade.feedback,
                             )
                         )
@@ -395,4 +411,42 @@ class VoiceAnswerController @Inject constructor(
         const val SILENCE_TIMEOUT_MS = 8_000L
         const val ADVANCE_DELAY_MS = 1_000L
     }
+}
+
+/** Shortest time the user's recognized answer stays on screen before the grade or a failure replaces it. */
+internal val MIN_TRANSCRIPT_DISPLAY: Duration = 1.seconds
+
+/**
+ * Holds back [VoiceAnswerGradingEvent.Graded] — or an upstream failure — until
+ * [VoiceAnswerGradingEvent.TranscriptReady] has been shown for at least [minDisplay], so the user can
+ * confirm their speech was recognized before the grade replaces it. There is no way back to the
+ * transcript afterwards. Held here rather than in the UI so the spoken grade (or failure notice) and
+ * the visual one still start together.
+ *
+ * Without a preceding transcript, the grade and failures pass through immediately. Only upstream
+ * failures are held; exceptions thrown downstream propagate untouched.
+ */
+internal fun Flow<VoiceAnswerGradingEvent>.holdGradedUntilTranscriptShown(
+    minDisplay: Duration = MIN_TRANSCRIPT_DISPLAY,
+    timeSource: TimeSource = TimeSource.Monotonic,
+): Flow<VoiceAnswerGradingEvent> = flow {
+    var transcriptShownAt: TimeMark? = null
+
+    suspend fun holdTranscript() {
+        transcriptShownAt?.let { shownAt -> delay(minDisplay - shownAt.elapsedNow()) }
+    }
+
+    emitAll(
+        this@holdGradedUntilTranscriptShown
+            .catch { error ->
+                holdTranscript()
+                throw error
+            }
+            .onEach { event ->
+                when (event) {
+                    is VoiceAnswerGradingEvent.TranscriptReady -> transcriptShownAt = timeSource.markNow()
+                    is VoiceAnswerGradingEvent.Graded -> holdTranscript()
+                }
+            }
+    )
 }
