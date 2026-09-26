@@ -24,10 +24,10 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDestination
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDialog
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsScreenState
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsViewModel
@@ -172,6 +172,20 @@ class SubcategoryDetailsViewModelTest {
         val content = startedViewModel().state.value.content
 
         (content is SubcategoryDetailsContentState.Error) shouldBe true
+    }
+
+    @Test
+    fun `retrying after a failed load shows the pool`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.flashcardsToReturn = Result.failure(IllegalStateException("offline"))
+        val viewModel = startedViewModel()
+        flashcardRepository.flashcardsToReturn = Result.success(pool)
+
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            cards(this) shouldBe listOf("1", "2", "3")
+        }
     }
 
     // --- sorting ---
@@ -342,7 +356,7 @@ class SubcategoryDetailsViewModelTest {
                 viewModel.onFavoriteToggle()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe SubcategoryDetailsMessage.AddedToFavorites
+                awaitItem() shouldBe DetailsMessage.AddedToFavorites
                 viewModel.state.value.isFavorite shouldBe true
                 preferencesRepository.preferences.value shouldBe StudySessionPreferences()
             }
@@ -369,7 +383,7 @@ class SubcategoryDetailsViewModelTest {
                 viewModel.onFavoriteToggle()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe SubcategoryDetailsMessage.RemovedFromFavorites
+                awaitItem() shouldBe DetailsMessage.RemovedFromFavorites
                 viewModel.state.value.isFavorite shouldBe false
             }
         }
@@ -382,7 +396,7 @@ class SubcategoryDetailsViewModelTest {
         flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(categoryModel()))
         val viewModel = startedViewModel()
 
-        viewModel.onAddShortcutClick()
+        viewModel.onAddShortcut()
         advanceUntilIdle()
 
         appShortcutsRepository.pinnedTargets.single().id shouldBe "subcategory:${route.subcategoryId}"
@@ -395,10 +409,10 @@ class SubcategoryDetailsViewModelTest {
             val viewModel = startedViewModel()
 
             viewModel.messages.test {
-                viewModel.onAddShortcutClick()
+                viewModel.onAddShortcut()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe SubcategoryDetailsMessage.ShortcutPinFailed
+                awaitItem() shouldBe DetailsMessage.ShortcutPinFailed
             }
         }
 
@@ -411,10 +425,10 @@ class SubcategoryDetailsViewModelTest {
             val viewModel = startedViewModel()
 
             viewModel.messages.test {
-                viewModel.onAddShortcutClick()
+                viewModel.onAddShortcut()
                 advanceUntilIdle()
 
-                awaitItem() shouldBe SubcategoryDetailsMessage.ShortcutPinUnsupported
+                awaitItem() shouldBe DetailsMessage.ShortcutPinUnsupported
             }
         }
 

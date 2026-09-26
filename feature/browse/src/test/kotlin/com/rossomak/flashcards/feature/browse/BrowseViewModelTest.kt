@@ -75,9 +75,9 @@ class BrowseViewModelTest {
         BrowseViewModel(getCategories, searchCategories, observeProgressSummary, observeUserFavorites)
 
     @Test
-    fun `onCategorySelected emits CategoryDetails with id and name`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `onCategorySelect emits CategoryDetails with id and name`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
-        viewModel.onCategorySelected(categoryId, categoryName)
+        viewModel.onCategorySelect(categoryId, categoryName)
 
         viewModel.events.test {
             awaitItem() shouldBe BrowseNavigationDestination.CategoryDetails(categoryId, categoryName)

@@ -14,11 +14,20 @@ class InferredCopiedProperty(source: List<String>) {
     val ids = source.toMutableList()
 }
 
+class ChainedApplyCopyProperty(source: List<String>) {
+    val ids = source.toMutableList().apply { sort() }
+}
+
+class ChainedAlsoCopyProperty(source: List<String>) {
+    val ids = source.toMutableSet().also { it.remove("") }
+}
+
 class MutableConstructorParameter(val ids: MutableSet<String>)
 
 class ReadOnlyProperties(val names: List<String>) {
     val ids = listOf("a")
     val lookup: Map<String, Int> = emptyMap()
+    val sorted = names.toMutableList().apply { sort() }.toList()
 }
 
 class PrivateMutableCache {

@@ -22,8 +22,11 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinFailed
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinUnsupported
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -65,9 +68,9 @@ class SubcategoryDetailsViewModel @Inject constructor(
     private val eventChannel = Channel<SubcategoryDetailsDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
-    private val _messages = MutableSharedFlow<SubcategoryDetailsMessage>(extraBufferCapacity = 1)
+    private val _messages = MutableSharedFlow<DetailsMessage>(extraBufferCapacity = 1)
 
-    val messages: SharedFlow<SubcategoryDetailsMessage> = _messages.asSharedFlow()
+    val messages: SharedFlow<DetailsMessage> = _messages.asSharedFlow()
 
     /**
      * The Subcategory's whole pool, or null until one has loaded. Nullable rather than empty: an
@@ -118,10 +121,9 @@ class SubcategoryDetailsViewModel @Inject constructor(
      */
     fun onResetFilters() {
         _state.update {
-            it.copy(
-                filters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = SubcategoryDetailsScreenState.DIFFICULTY_BOUNDS)
-                    .selectAllTags(it.availableTags),
-            )
+            val filters = FlashcardFilters(selectedTags = emptySet(), difficultyRange = SubcategoryDetailsScreenState.DIFFICULTY_BOUNDS)
+                .selectAllTags(it.availableTags)
+            it.copy(filters = filters, hasActiveFilters = hasActiveFilters(filters, it.availableTags))
         }
         renderContent()
     }
@@ -149,12 +151,12 @@ class SubcategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    fun onAddShortcutClick() {
+    fun onAddShortcut() {
         viewModelScope.launch {
             when (pinSubcategoryShortcut(route.subcategoryId)) {
                 PinShortcutResult.Pinned -> Unit
-                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinFailed)
-                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(SubcategoryDetailsMessage.ShortcutPinUnsupported)
+                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(ShortcutPinFailed)
+                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(ShortcutPinUnsupported)
             }
         }
     }
@@ -199,12 +201,22 @@ class SubcategoryDetailsViewModel @Inject constructor(
                 }
                 _state.update { it.copy(sortOrder = dialog.draftState, activeDialog = null) }
             }
-            is SubcategoryDetailsDialog.Filters -> _state.update { it.copy(filters = dialog.draftState, activeDialog = null) }
+            is SubcategoryDetailsDialog.Filters -> _state.update {
+                it.copy(
+                    filters = dialog.draftState,
+                    hasActiveFilters = hasActiveFilters(dialog.draftState, it.availableTags),
+                    activeDialog = null,
+                )
+            }
         }
         renderContent()
     }
 
-    internal fun loadFlashcards() {
+    fun onRetry() {
+        loadFlashcards()
+    }
+
+    private fun loadFlashcards() {
         viewModelScope.launch {
             pool = null
             _state.update { it.copy(content = SubcategoryDetailsContentState.Loading) }
@@ -250,6 +262,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
                 )
             )
             _state.update {
+                val filters = if (seedFilters) it.filters.selectAllTags(filtered.poolTags) else it.filters
                 it.copy(
                     content = if (filtered.cards.isEmpty()) {
                         SubcategoryDetailsContentState.NoMatches
@@ -258,11 +271,8 @@ class SubcategoryDetailsViewModel @Inject constructor(
                     },
                     availableTags = filtered.poolTags,
                     totalCount = filtered.totalCount,
-                    filters = if (seedFilters) {
-                        it.filters.selectAllTags(filtered.poolTags)
-                    } else {
-                        it.filters
-                    },
+                    filters = filters,
+                    hasActiveFilters = hasActiveFilters(filters, filtered.poolTags),
                 )
             }
         }

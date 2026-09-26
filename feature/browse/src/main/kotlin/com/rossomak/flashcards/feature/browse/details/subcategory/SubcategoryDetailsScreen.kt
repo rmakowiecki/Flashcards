@@ -28,10 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -39,9 +37,11 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -59,8 +59,9 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
+import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
-import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsExpandableListRow
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupContainer
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItems
 import com.rossomak.flashcards.core.ui.composables.withInlineCode
@@ -68,16 +69,12 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.DetailsMessagesEffect
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Error
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.FlashcardsList
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Loading
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.NoMatches
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.RemovedFromFavorites
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinFailed
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsMessage.ShortcutPinUnsupported
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.launch
 
 @Composable
 fun SubcategoryDetailsScreen(
@@ -99,67 +96,33 @@ fun SubcategoryDetailsScreen(
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is SubcategoryDetailsDestination.PreviewStudySession ->
-                onNavigateToPreviewStudySession(
-                    destination.categoryId,
-                    destination.categoryName,
-                    destination.subcategoryId,
-                    destination.subcategoryName,
-                    destination.filterTagIds,
-                    destination.difficultyRange,
-                    destination.sortOrder,
-                )
+            is SubcategoryDetailsDestination.PreviewStudySession -> onNavigateToPreviewStudySession(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryId,
+                destination.subcategoryName,
+                destination.filterTagIds,
+                destination.difficultyRange,
+                destination.sortOrder,
+            )
         }
     }
-
-    val addedToFavoritesText = stringResource(R.string.favorites_added_message)
-    val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
-    val undoLabelText = stringResource(R.string.favorites_undo_button)
-    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
-    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
-
-    // showSnackbar suspends until the snackbar is dismissed, and observeAsEvents hands over a plain
-    // lambda, so the wait is launched rather than blocking the collector.
-    val snackbarScope = rememberCoroutineScope()
-    observeAsEvents(viewModel.messages) { message ->
-        when (message) {
-            AddedToFavorites, RemovedFromFavorites -> {
-                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
-                snackbarScope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = text,
-                        actionLabel = undoLabelText,
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
-                    }
-                }
-            }
-            ShortcutPinUnsupported -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
-                }
-            }
-            ShortcutPinFailed -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
-                }
-            }
-        }
-    }
-
+    DetailsMessagesEffect(
+        messages = viewModel.messages,
+        snackbarHostState = snackbarHostState,
+        onFavoriteUndo = viewModel::onFavoriteUndo,
+    )
     SubcategoryDetailsContent(
         modifier = modifier,
         state = state,
+        snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
         onStartSession = viewModel::onStartSession,
         onResetFilters = viewModel::onResetFilters,
         onFavoriteToggle = viewModel::onFavoriteToggle,
-        onAddShortcut = viewModel::onAddShortcutClick,
-        onRetry = viewModel::loadFlashcards,
+        onAddShortcut = viewModel::onAddShortcut,
+        onRetry = viewModel::onRetry,
         onDialogEvent = viewModel::onDialogEvent,
-        snackbarHostState = snackbarHostState,
     )
 }
 
@@ -169,6 +132,7 @@ fun SubcategoryDetailsScreen(
 fun SubcategoryDetailsContent(
     modifier: Modifier = Modifier,
     state: SubcategoryDetailsScreenState,
+    snackbarHostState: SnackbarHostState,
     onNavigateBack: () -> Unit,
     onStartSession: () -> Unit,
     onResetFilters: () -> Unit,
@@ -176,7 +140,6 @@ fun SubcategoryDetailsContent(
     onAddShortcut: () -> Unit,
     onRetry: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
-    snackbarHostState: SnackbarHostState,
 ) {
     // Hoisted out of FlashcardList so it survives the Cards -> NoMatches -> Cards round trip, which
     // would otherwise drop the state and hide the reset below.
@@ -194,9 +157,16 @@ fun SubcategoryDetailsContent(
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        // The bars take only the fields they render, so a dialog draft tick (the dialog lives in
+        // screen state, ADR-0036) leaves them skipped.
         topBar = {
             SubcategoryDetailsTopBar(
-                state = state,
+                subcategoryName = state.subcategoryName,
+                categoryName = state.categoryName,
+                isFavorite = state.isFavorite,
+                visibleCardCount = (state.content as? FlashcardsList)?.flashcards?.size,
+                totalCount = state.totalCount,
+                hasActiveFilters = state.hasActiveFilters,
                 scrollBehavior = scrollBehavior,
                 onNavigateBack = onNavigateBack,
                 onFavoriteToggle = onFavoriteToggle,
@@ -205,7 +175,13 @@ fun SubcategoryDetailsContent(
         },
         bottomBar = {
             SubcategoryDetailsBottomBar(
-                state = state,
+                hasActiveFilters = state.hasActiveFilters,
+                sessionCardCount = state.sessionCardCount,
+                canStartSession = state.content is FlashcardsList,
+                areControlsEnabled = state.content is FlashcardsList || state.content is NoMatches,
+                filters = state.filters,
+                availableTags = state.availableTags,
+                sortOrder = state.sortOrder,
                 onStartSession = onStartSession,
                 onDialogEvent = onDialogEvent,
             )
@@ -224,6 +200,7 @@ fun SubcategoryDetailsContent(
                     flashcards = content.flashcards,
                     listState = listState,
                 )
+
                 is Error -> FlashcardsEmptyState(
                     icon = Icons.Filled.ErrorOutline,
                     title = stringResource(CoreUiR.string.common_load_error_title),
@@ -257,11 +234,18 @@ fun SubcategoryDetailsContent(
     SubcategoryDetailsDialogHost(activeDialog = state.activeDialog, onDialogEvent = onDialogEvent)
 }
 
+/** [visibleCardCount] is `null` unless cards are listed, which hides the overline. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongParameterList") // one field per rendered value; the whole state would recompose on every dialog draft tick.
 @Composable
 private fun SubcategoryDetailsTopBar(
     modifier: Modifier = Modifier,
-    state: SubcategoryDetailsScreenState,
+    subcategoryName: String,
+    categoryName: String,
+    isFavorite: Boolean,
+    visibleCardCount: Int?,
+    totalCount: Int,
+    hasActiveFilters: Boolean,
     scrollBehavior: TopAppBarScrollBehavior,
     onNavigateBack: () -> Unit,
     onFavoriteToggle: () -> Unit,
@@ -269,33 +253,32 @@ private fun SubcategoryDetailsTopBar(
 ) {
     Column(modifier = modifier) {
         FlashcardsTopAppBar(
-            title = state.subcategoryName,
-            subtitle = stringResource(R.string.subcategory_details_subtitle_label, state.categoryName),
+            title = subcategoryName,
+            subtitle = stringResource(R.string.subcategory_details_subtitle_label, categoryName),
             onNavigateBack = onNavigateBack,
             scrollBehavior = scrollBehavior,
             actions = {
                 SubcategoryDetailsActions(
-                    isFavorite = state.isFavorite,
+                    isFavorite = isFavorite,
                     onFavoriteToggle = onFavoriteToggle,
                     onAddShortcut = onAddShortcut,
                 )
             },
         )
-        val flashcards = state.content as? FlashcardsList
-        if (flashcards != null) {
+        if (visibleCardCount != null) {
             FlashcardsOverlineLabel(
-                text = if (state.hasActiveFilters) {
+                text = if (hasActiveFilters) {
                     pluralStringResource(
                         R.plurals.subcategory_details_filtered_card_count_label,
-                        state.totalCount,
-                        flashcards.flashcards.size,
-                        state.totalCount,
+                        totalCount,
+                        visibleCardCount,
+                        totalCount,
                     )
                 } else {
                     pluralStringResource(
                         R.plurals.browse_card_count_label,
-                        state.totalCount,
-                        state.totalCount,
+                        totalCount,
+                        totalCount,
                     )
                 },
             )
@@ -303,10 +286,17 @@ private fun SubcategoryDetailsTopBar(
     }
 }
 
+@Suppress("LongParameterList") // one field per rendered value; the whole state would recompose on every dialog draft tick.
 @Composable
 private fun SubcategoryDetailsBottomBar(
     modifier: Modifier = Modifier,
-    state: SubcategoryDetailsScreenState,
+    hasActiveFilters: Boolean,
+    sessionCardCount: Int,
+    canStartSession: Boolean,
+    areControlsEnabled: Boolean,
+    filters: FlashcardFilters,
+    availableTags: List<String>,
+    sortOrder: FlashcardSortOrder,
     onStartSession: () -> Unit,
     onDialogEvent: (SubcategoryDetailsDialogEvent) -> Unit,
 ) {
@@ -314,31 +304,27 @@ private fun SubcategoryDetailsBottomBar(
         modifier = modifier,
         actions = {
             SubcategoryDetailsToolbarActions(
-                hasActiveFilters = state.hasActiveFilters,
-                enabled = state.content is FlashcardsList ||
-                    state.content is NoMatches,
-                onFilterClick = {
-                    onDialogEvent(
-                        Open(SubcategoryDetailsDialog.Filters(state.filters, state.availableTags))
-                    )
-                },
-            ) { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(state.sortOrder))) }
+                hasActiveFilters = hasActiveFilters,
+                enabled = areControlsEnabled,
+                onFilterClick = { onDialogEvent(Open(SubcategoryDetailsDialog.Filters(filters, availableTags))) },
+                onSortClick = { onDialogEvent(Open(SubcategoryDetailsDialog.CardsSortingOrder(sortOrder))) },
+            )
         },
         trailing = {
             FlashcardsFilledButton(
                 // The count appears only once filters are on: unfiltered, it would just restate the
                 // overline directly above it.
-                text = if (state.hasActiveFilters) {
+                text = if (hasActiveFilters) {
                     stringResource(
                         R.string.subcategory_details_start_session_with_count_button,
-                        state.sessionCardCount,
+                        sessionCardCount,
                     )
                 } else {
                     stringResource(CoreUiR.string.common_start_session_button)
                 },
                 onClick = onStartSession,
                 size = FlashcardsComponentSize.Small,
-                enabled = state.content is FlashcardsList,
+                enabled = canStartSession,
                 icon = Icons.Filled.PlayArrow,
             )
         },
@@ -425,9 +411,15 @@ private fun FlashcardList(
     flashcards: List<Flashcard>,
     listState: LazyListState,
 ) {
-    val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
+    // Saveable, so expanded cards stay expanded across a trip to Preview and back, rotation and
+    // process death. Still UI state: the ViewModel never reads it.
+    var expandedFlashcardIds by rememberSaveable(stateSaver = ExpandedFlashcardIdsSaver) { mutableStateOf(emptySet<String>()) }
     val expandedStateDescription = stringResource(R.string.subcategory_details_card_expanded_cd)
     val collapsedStateDescription = stringResource(R.string.subcategory_details_card_collapsed_cd)
+
+    val onFlashcardExpandedChange = { flashcardId: String, expanded: Boolean ->
+        expandedFlashcardIds = if (expanded) expandedFlashcardIds + flashcardId else expandedFlashcardIds - flashcardId
+    }
 
     LazyColumn(
         state = listState,
@@ -438,24 +430,54 @@ private fun FlashcardList(
             .flashcardsListScrollFade(listState),
     ) {
         flashcardsListGroupItems(
-            items = flashcards.map { flashcard ->
-                FlashcardsListGroupItem.ExpandableRow(
-                    key = flashcard.id,
-                    difficulty = flashcard.difficulty,
-                    title = flashcard.question,
-                    expanded = expandedStates[flashcard.id] ?: false,
-                    onExpandedChange = { expanded -> expandedStates[flashcard.id] = expanded },
-                    expandedStateDescription = expandedStateDescription,
-                    collapsedStateDescription = collapsedStateDescription,
-                    tags = flashcard.tags.toImmutableList(),
-                    expandedContent = {
-                        Text(
-                            text = flashcard.answer.withInlineCode(),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    },
-                )
-            },
-        )
+            items = flashcards,
+            key = { flashcard -> flashcard.id },
+        ) { flashcard, rowModifier ->
+            FlashcardRow(
+                modifier = rowModifier,
+                flashcard = flashcard,
+                expanded = flashcard.id in expandedFlashcardIds,
+                expandedStateDescription = expandedStateDescription,
+                collapsedStateDescription = collapsedStateDescription,
+                onExpandedChange = onFlashcardExpandedChange,
+            )
+        }
     }
 }
+
+/**
+ * One card, built inside its own lazy item scope with only per-row values, so expanding one card
+ * recomposes that card alone.
+ */
+@Composable
+private fun FlashcardRow(
+    modifier: Modifier,
+    flashcard: Flashcard,
+    expanded: Boolean,
+    expandedStateDescription: String,
+    collapsedStateDescription: String,
+    onExpandedChange: (flashcardId: String, expanded: Boolean) -> Unit,
+) {
+    FlashcardsExpandableListRow(
+        modifier = modifier,
+        difficulty = flashcard.difficulty,
+        title = flashcard.question,
+        expanded = expanded,
+        onExpandedChange = { isExpanded -> onExpandedChange(flashcard.id, isExpanded) },
+        expandedStateDescription = expandedStateDescription,
+        collapsedStateDescription = collapsedStateDescription,
+        tags = flashcard.tags.toImmutableList(),
+        expandedContent = {
+            Text(
+                text = flashcard.answer.withInlineCode(),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+    )
+}
+
+/** A Bundle can't hold a `Set`, so the expanded ids round-trip through a list. */
+private val ExpandedFlashcardIdsSaver = listSaver<Set<String>, String>(
+    save = { expandedIds -> expandedIds.toList() },
+    restore = { savedIds -> savedIds.toSet() },
+)

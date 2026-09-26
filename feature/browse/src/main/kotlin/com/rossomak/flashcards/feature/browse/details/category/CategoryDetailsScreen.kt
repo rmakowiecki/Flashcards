@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.browse.details.category
 
-import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,21 +30,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -68,23 +64,23 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconBu
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
-import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsSelectableListRow
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupContainer
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItems
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
+import com.rossomak.flashcards.feature.browse.details.DetailsMessagesEffect
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.Error
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.Loading
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsContentState.SubcategoriesList
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.PreviewStudySession
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinFailed
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.ShortcutPinUnsupported
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryDetails
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryPreviewStudySession
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Resolved
 import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Unresolved
-import kotlinx.coroutines.launch
+import com.rossomak.flashcards.feature.browse.rememberProgressFor
 
 @Composable
 fun CategoryDetailsScreen(
@@ -104,69 +100,43 @@ fun CategoryDetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Only the two session CTAs go through the ViewModel's event channel — they're the only navigations that aggregate state across rows.
-    // The row's own tap and its play button stay inline lambdas below: each already holds the Subcategory it needs.
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is PreviewStudySession ->
-                onNavigateToPreviewStudySessionForCategory(
-                    destination.categoryId,
-                    destination.categoryName,
-                    destination.subcategoryIds,
-                    destination.subcategoryNames,
-                    destination.isQuickSession,
-                )
+            is SubcategoryDetails -> onNavigateToSubcategoryDetails(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryId,
+                destination.subcategoryName,
+            )
+
+            is SubcategoryPreviewStudySession -> onNavigateToPreviewStudySession(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryId,
+                destination.subcategoryName,
+            )
+
+            is PreviewStudySession -> onNavigateToPreviewStudySessionForCategory(
+                destination.categoryId,
+                destination.categoryName,
+                destination.subcategoryIds,
+                destination.subcategoryNames,
+                destination.isQuickSession,
+            )
         }
     }
-
-    val addedToFavoritesText = stringResource(R.string.favorites_added_message)
-    val removedFromFavoritesText = stringResource(R.string.favorites_removed_message)
-    val undoLabelText = stringResource(R.string.favorites_undo_button)
-    val shortcutPinUnsupportedText = stringResource(R.string.shortcut_pin_unsupported_message)
-    val shortcutPinFailedText = stringResource(R.string.shortcut_pin_failed_message)
-
-    val snackbarScope = rememberCoroutineScope()
-    observeAsEvents(viewModel.messages) { message ->
-        when (message) {
-            AddedToFavorites, RemovedFromFavorites -> {
-                val text = if (message == AddedToFavorites) addedToFavoritesText else removedFromFavoritesText
-                snackbarScope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = text,
-                        actionLabel = undoLabelText,
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        viewModel.onFavoriteUndo(restoreTo = message != AddedToFavorites)
-                    }
-                }
-            }
-            ShortcutPinUnsupported -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinUnsupportedText, duration = SnackbarDuration.Short)
-                }
-            }
-            ShortcutPinFailed -> {
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(message = shortcutPinFailedText, duration = SnackbarDuration.Short)
-                }
-            }
-        }
-    }
-
+    DetailsMessagesEffect(
+        messages = viewModel.messages,
+        snackbarHostState = snackbarHostState,
+        onFavoriteUndo = viewModel::onFavoriteUndo,
+    )
     CategoryDetailsContent(
         modifier = modifier,
         state = state,
+        snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
-        onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-        onNavigateToPreviewStudySession = { subcategory ->
-            onNavigateToPreviewStudySession(
-                subcategory.categoryId,
-                subcategory.categoryName,
-                subcategory.id,
-                subcategory.name,
-            )
-        },
+        onSubcategorySelect = viewModel::onSubcategorySelect,
+        onSubcategorySessionStart = viewModel::onSubcategorySessionStart,
         onSelectionModeToggle = viewModel::onSelectionModeToggle,
         onSubcategoryLongPress = viewModel::onSubcategoryLongPress,
         onSubcategorySelectionChange = viewModel::onSubcategorySelectionChange,
@@ -174,9 +144,8 @@ fun CategoryDetailsScreen(
         onQuickSessionStart = viewModel::onQuickSessionStart,
         onCustomSessionStart = viewModel::onCustomSessionStart,
         onFavoriteToggle = viewModel::onFavoriteToggle,
-        onAddShortcut = viewModel::onAddShortcutClick,
-        onRetry = viewModel::loadSubcategories,
-        snackbarHostState = snackbarHostState,
+        onAddShortcut = viewModel::onAddShortcut,
+        onRetry = viewModel::onRetry,
     )
 }
 
@@ -186,9 +155,10 @@ fun CategoryDetailsScreen(
 fun CategoryDetailsContent(
     modifier: Modifier = Modifier,
     state: CategoryDetailsScreenState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateBack: () -> Unit,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (Subcategory) -> Unit,
+    onSubcategorySelect: (Subcategory) -> Unit,
+    onSubcategorySessionStart: (Subcategory) -> Unit,
     onSelectionModeToggle: () -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
@@ -198,43 +168,44 @@ fun CategoryDetailsContent(
     onFavoriteToggle: () -> Unit,
     onAddShortcut: () -> Unit,
     onRetry: () -> Unit,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     // Hoisted here, and never reset: the row set is identical in both modes and only the chrome changes, unlike Subcategory Details where filtering changes which items exist.
     // Resetting on list mode switch would throw a user who long-pressed halfway down the list back to the top.
     val listState = rememberLazyListState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
+    val progressFor = rememberProgressFor(state.progressSummary, state.isProgressResolved)
+    val subcategoryCount = (state.content as? SubcategoriesList)?.subcategories?.size
+
     // System back leaves Selection Mode (if active) rather than the screen, same as the top app bar's back arrow below
     BackHandler(enabled = state.isSelectionMode, onBack = onSelectionModeToggle)
 
+    // The bars take only the fields they render, so a progress or favorites emission, or a tick that
+    // changes nothing they show, leaves them skipped.
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            Column {
-                FlashcardsTopAppBar(
-                    title = state.categoryName,
-                    subtitle = categoryDetailsSubtitle(state),
-                    onNavigateBack = if (state.isSelectionMode) onSelectionModeToggle else onNavigateBack,
-                    scrollBehavior = scrollBehavior,
-                    actions = {
-                        CategoryDetailsActions(
-                            isFavorite = state.isFavorite,
-                            onFavoriteToggle = onFavoriteToggle,
-                            onAddShortcut = onAddShortcut,
-                        )
-                    },
-                )
-                val subcategories = state.content as? SubcategoriesList
-                if (subcategories != null) {
-                    FlashcardsOverlineLabel(text = categoryDetailsOverline(state, subcategories.subcategories.size))
-                }
-            }
+            CategoryDetailsTopBar(
+                categoryName = state.categoryName,
+                isSelectionMode = state.isSelectionMode,
+                selectedCount = state.selectedCount,
+                selectedCardCount = state.selectedCardCount,
+                subcategoryCount = subcategoryCount,
+                isFavorite = state.isFavorite,
+                scrollBehavior = scrollBehavior,
+                onNavigateBack = onNavigateBack,
+                onSelectionModeToggle = onSelectionModeToggle,
+                onFavoriteToggle = onFavoriteToggle,
+                onAddShortcut = onAddShortcut,
+            )
         },
         bottomBar = {
             CategoryDetailsBottomBar(
-                state = state,
+                isSelectionMode = state.isSelectionMode,
+                selectedCount = state.selectedCount,
+                isAllSelected = state.isAllSelected,
+                hasSubcategories = subcategoryCount != null,
                 onSelectionModeToggle = onSelectionModeToggle,
                 onSelectAllToggle = onSelectAllToggle,
                 onQuickSessionStart = onQuickSessionStart,
@@ -257,12 +228,13 @@ fun CategoryDetailsContent(
                     isSelectionMode = state.isSelectionMode,
                     selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
                     favorites = state.favorites,
-                    progressFor = state::progressFor,
-                    onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-                    onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
+                    progressFor = progressFor,
+                    onSubcategorySelect = onSubcategorySelect,
+                    onSubcategorySessionStart = onSubcategorySessionStart,
                     onSubcategoryLongPress = onSubcategoryLongPress,
                     onSubcategorySelectionChange = onSubcategorySelectionChange,
                 )
+
                 is Error -> FlashcardsEmptyState(
                     icon = Icons.Filled.ErrorOutline,
                     title = stringResource(CoreUiR.string.common_load_error_title),
@@ -281,33 +253,68 @@ fun CategoryDetailsContent(
 }
 
 /**
- * "Category" by default; in Selection Mode, the selection's total card count — so the size of a
- * Custom session is legible before starting it — falling back to a bare label rather than
- * rendering "· 0 cards" while nothing is selected yet.
+ * The subtitle reads "Category" by default; in Selection Mode, the selection's total card count — so
+ * the size of a Custom session is legible before starting it — falling back to a bare label rather
+ * than rendering "· 0 cards" while nothing is selected yet. The back arrow leaves Selection Mode (if
+ * active) rather than the screen. [subcategoryCount] is `null` until the list loads, which hides the
+ * overline.
  */
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
-private fun categoryDetailsSubtitle(state: CategoryDetailsScreenState): String =
-    if (state.isSelectionMode) {
-        if (state.selectedCount > 0) {
-            pluralStringResource(
-                R.plurals.category_details_selection_subtitle_with_count_label,
-                state.selectedCardCount,
-                state.selectedCardCount,
-            )
-        } else {
-            stringResource(R.string.category_details_selection_subtitle_label)
-        }
-    } else {
-        stringResource(R.string.category_details_subtitle_label)
+private fun CategoryDetailsTopBar(
+    categoryName: String,
+    isSelectionMode: Boolean,
+    selectedCount: Int,
+    selectedCardCount: Int,
+    subcategoryCount: Int?,
+    isFavorite: Boolean,
+    scrollBehavior: TopAppBarScrollBehavior,
+    onNavigateBack: () -> Unit,
+    onSelectionModeToggle: () -> Unit,
+    onFavoriteToggle: () -> Unit,
+    onAddShortcut: () -> Unit,
+) {
+    val subtitle = when {
+        !isSelectionMode -> stringResource(R.string.category_details_subtitle_label)
+        selectedCount > 0 -> pluralStringResource(
+            R.plurals.category_details_selection_subtitle_with_count_label,
+            selectedCardCount,
+            selectedCardCount,
+        )
+        else -> stringResource(R.string.category_details_selection_subtitle_label)
     }
+    Column {
+        FlashcardsTopAppBar(
+            title = categoryName,
+            subtitle = subtitle,
+            onNavigateBack = if (isSelectionMode) onSelectionModeToggle else onNavigateBack,
+            scrollBehavior = scrollBehavior,
+            actions = {
+                CategoryDetailsActions(
+                    isFavorite = isFavorite,
+                    onFavoriteToggle = onFavoriteToggle,
+                    onAddShortcut = onAddShortcut,
+                )
+            },
+        )
+        if (subcategoryCount != null) {
+            CategoryDetailsOverline(
+                isSelectionMode = isSelectionMode,
+                selectedCount = selectedCount,
+                subcategoryCount = subcategoryCount,
+            )
+        }
+    }
+}
 
 @Composable
-private fun categoryDetailsOverline(state: CategoryDetailsScreenState, subcategoryCount: Int): String =
-    if (state.isSelectionMode) {
+private fun CategoryDetailsOverline(isSelectionMode: Boolean, selectedCount: Int, subcategoryCount: Int) {
+    val text = if (isSelectionMode) {
         pluralStringResource(
             R.plurals.category_details_selection_overline_label,
             subcategoryCount,
-            state.selectedCount,
+            selectedCount,
             subcategoryCount,
         )
     } else {
@@ -317,6 +324,8 @@ private fun categoryDetailsOverline(state: CategoryDetailsScreenState, subcatego
             subcategoryCount,
         )
     }
+    FlashcardsOverlineLabel(text = text)
+}
 
 /**
  * Default list mode carries one control — the Selection Mode toggle — beside the **Quick session** CTA.
@@ -325,22 +334,25 @@ private fun categoryDetailsOverline(state: CategoryDetailsScreenState, subcatego
  * [FlashcardsBottomToolbar]'s own contract) — availability is expressed through `enabled` instead,
  * so Selection Mode is simply unreachable while loading or errored.
  */
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
 private fun CategoryDetailsBottomBar(
     modifier: Modifier = Modifier,
-    state: CategoryDetailsScreenState,
+    isSelectionMode: Boolean,
+    selectedCount: Int,
+    isAllSelected: Boolean,
+    hasSubcategories: Boolean,
     onSelectionModeToggle: () -> Unit,
     onSelectAllToggle: () -> Unit,
     onQuickSessionStart: () -> Unit,
     onCustomSessionStart: () -> Unit,
 ) {
-    val hasSubcategories = state.content is SubcategoriesList
     FlashcardsBottomToolbar(
         modifier = modifier,
         actions = {
-            if (state.isSelectionMode) {
+            if (isSelectionMode) {
                 SelectionModeToolbarActions(
-                    isAllSelected = state.isAllSelected,
+                    isAllSelected = isAllSelected,
                     onSelectionModeToggle = onSelectionModeToggle,
                     onSelectAllToggle = onSelectAllToggle,
                 )
@@ -354,12 +366,12 @@ private fun CategoryDetailsBottomBar(
             }
         },
         trailing = {
-            if (state.isSelectionMode) {
+            if (isSelectionMode) {
                 FlashcardsFilledButton(
-                    text = stringResource(R.string.category_details_custom_session_button, state.selectedCount),
+                    text = stringResource(R.string.category_details_custom_session_button, selectedCount),
                     onClick = onCustomSessionStart,
                     size = FlashcardsComponentSize.Small,
-                    enabled = state.selectedCount > 0,
+                    enabled = selectedCount > 0,
                     icon = Icons.Filled.PlayArrow,
                 )
             } else {
@@ -450,13 +462,11 @@ private fun SubcategoryList(
     selectedSubcategoryIds: Set<String>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgress,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (Subcategory) -> Unit,
+    onSubcategorySelect: (Subcategory) -> Unit,
+    onSubcategorySessionStart: (Subcategory) -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
 ) {
-    val resources = LocalResources.current
-    val rowSubtitleSeparator = resources.getString(CoreUiR.string.common_middle_dot_separator)
     LazyColumn(
         state = listState,
         modifier = modifier
@@ -466,29 +476,22 @@ private fun SubcategoryList(
             .flashcardsListScrollFade(listState)
     ) {
         flashcardsListGroupItems(
-            items = subcategories.map { subcategory ->
-                val progress = progressFor(subcategory.id)
-                subcategory.toListGroupItem(
-                    isSelectionMode = isSelectionMode,
-                    isSelected = subcategory.id in selectedSubcategoryIds,
-                    isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
-                    progress = progress,
-                    playContentDescription = resources.getString(R.string.category_details_topic_play_cd, subcategory.name),
-                    ringContentDescription = progress.ringContentDescription(resources, subcategory.cardCount),
-                    cardCountLabel = resources.getQuantityString(
-                        R.plurals.browse_card_count_label,
-                        subcategory.cardCount,
-                        subcategory.cardCount,
-                    ),
-                    studiedText = progress.studiedLabel(resources),
-                    rowSubtitleSeparator = rowSubtitleSeparator,
-                    onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-                    onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
-                    onLongPress = onSubcategoryLongPress,
-                    onSelectedChange = onSubcategorySelectionChange,
-                )
-            }
-        )
+            items = subcategories,
+            key = { subcategory -> subcategory.id },
+        ) { subcategory, rowModifier ->
+            SubcategoryRow(
+                modifier = rowModifier,
+                subcategory = subcategory,
+                isSelectionMode = isSelectionMode,
+                isSelected = subcategory.id in selectedSubcategoryIds,
+                isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
+                progress = progressFor(subcategory.id),
+                onSelect = onSubcategorySelect,
+                onSessionStart = onSubcategorySessionStart,
+                onLongPress = onSubcategoryLongPress,
+                onSelectedChange = onSubcategorySelectionChange,
+            )
+        }
     }
 }
 
@@ -499,20 +502,22 @@ private const val PROGRESS_PERCENT_SCALE = 100
  * once resolved to zero — either way there's nothing studied to report yet, so
  * [CategoryDetailsRowSubtitle] drops the segment rather than showing "— studied" or "0 studied".
  */
-private fun SubcategoryProgress.studiedLabel(resources: Resources): String? =
+@Composable
+private fun SubcategoryProgress.studiedLabel(): String? =
     when (this) {
         Unresolved -> null
-        is Resolved -> if (studiedCount > 0) resources.getString(R.string.category_details_topic_studied_label, studiedCount) else null
+        is Resolved -> if (studiedCount > 0) stringResource(R.string.category_details_topic_studied_label, studiedCount) else null
     }
 
 /**
  * Names Studied, never a number in the unknown state. [cardCount] is the ring's denominator — kept
  * separate from [SubcategoryProgress] itself, which only ever holds the summary's raw counts.
  */
-private fun SubcategoryProgress.ringContentDescription(resources: Resources, cardCount: Int): String =
+@Composable
+private fun SubcategoryProgress.ringContentDescription(cardCount: Int): String =
     when (this) {
-        Unresolved -> resources.getString(R.string.category_details_topic_progress_unavailable_cd)
-        is Resolved -> resources.getString(
+        Unresolved -> stringResource(R.string.category_details_topic_progress_unavailable_cd)
+        is Resolved -> stringResource(
             R.string.category_details_topic_progress_cd,
             (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).toInt(),
         )
@@ -534,26 +539,28 @@ private fun Resolved.studiedFraction(cardCount: Int): Float =
  *   checkbox, still leading with the same ring, so its identity doesn't jump as the mode changes.
  *
  * The ring and the subtitle both derive from [progress] and this subcategory's own
- * [cardCount] — see [CategoryDetailsScreenState.progressFor].
+ * [Subcategory.cardCount] — see [CategoryDetailsScreenState.progressFor]. Built inside its own lazy
+ * item scope with only per-row values, so ticking one row's checkbox recomposes that row alone.
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
-private fun Subcategory.toListGroupItem(
+@Composable
+private fun SubcategoryRow(
+    modifier: Modifier,
+    subcategory: Subcategory,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     isFavorited: Boolean,
     progress: SubcategoryProgress,
-    playContentDescription: String,
-    ringContentDescription: String,
-    cardCountLabel: String,
-    studiedText: String?,
-    rowSubtitleSeparator: String,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (Subcategory) -> Unit,
+    onSelect: (Subcategory) -> Unit,
+    onSessionStart: (Subcategory) -> Unit,
     onLongPress: (String) -> Unit,
     onSelectedChange: (String, Boolean) -> Unit,
-): FlashcardsListGroupItem {
-    val subcategory = this
+) {
     val ringFraction = (progress as? Resolved)?.studiedFraction(subcategory.cardCount)
+    val ringContentDescription = progress.ringContentDescription(subcategory.cardCount)
+    val cardCountLabel = pluralStringResource(R.plurals.browse_card_count_label, subcategory.cardCount, subcategory.cardCount)
+    val studiedText = progress.studiedLabel()
+    val rowSubtitleSeparator = stringResource(CoreUiR.string.common_middle_dot_separator)
     val ring: @Composable () -> Unit = {
         FlashcardsProgressRing(
             progress = ringFraction,
@@ -563,9 +570,9 @@ private fun Subcategory.toListGroupItem(
     val subtitle: @Composable () -> Unit = {
         CategoryDetailsRowSubtitle(cardCountLabel = cardCountLabel, studiedText = studiedText, separator = rowSubtitleSeparator)
     }
-    return if (isSelectionMode) {
-        FlashcardsListGroupItem.Selectable(
-            key = subcategory.id,
+    if (isSelectionMode) {
+        FlashcardsSelectableListRow(
+            modifier = modifier,
             title = subcategory.name,
             subtitleContent = subtitle,
             selected = isSelected,
@@ -574,13 +581,11 @@ private fun Subcategory.toListGroupItem(
             leading = ring,
         )
     } else {
-        FlashcardsListGroupItem.Row(
-            key = subcategory.id,
+        FlashcardsListRow(
+            modifier = modifier,
             title = subcategory.name,
             secondaryContent = subtitle,
-            onClick = {
-                onNavigateToSubcategoryDetails(subcategory.categoryId, subcategory.categoryName, subcategory.id, subcategory.name)
-            },
+            onClick = { onSelect(subcategory) },
             onLongClick = { onLongPress(subcategory.id) },
             isFavorited = isFavorited,
             leading = ring,
@@ -591,8 +596,8 @@ private fun Subcategory.toListGroupItem(
                 ) {
                     FlashcardsTonalIconButton(
                         icon = Icons.Default.PlayArrow,
-                        contentDescription = playContentDescription,
-                        onClick = { onNavigateToPreviewStudySession(subcategory) },
+                        contentDescription = stringResource(R.string.category_details_topic_play_cd, subcategory.name),
+                        onClick = { onSessionStart(subcategory) },
                         size = FlashcardsComponentSize.Small,
                     )
                     FlashcardsChevron()

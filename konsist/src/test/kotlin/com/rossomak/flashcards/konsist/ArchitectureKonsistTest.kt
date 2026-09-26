@@ -93,8 +93,7 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `no file uses Timber directly outside AppLog`() {
-        // AGENTS.md mandates AppLog (logv/logd/logi/logw/loge) over raw Timber calls, so the
-        // wrapper's caller-attribution fix (inline fns) stays the only place touching Timber.
+        // the project mandates AppLog (logv/logd/logi/logw/loge) over raw Timber calls
         projectScope
             .files
             .filter { !it.path.endsWith("/AppLog.kt") && !it.path.endsWith("/FlashcardsApplication.kt") }
@@ -102,9 +101,6 @@ class ArchitectureKonsistTest {
                 file.imports.none { import -> import.name.startsWith("timber.log") }
             }
     }
-
-    // --- Second pass (grilled 2026-09-18): opt out per-class/function with
-    // @ArchConventionExempt("reason") from core:domain.annotation. ---
 
     private fun typeArgumentNames(typeArguments: List<KoTypeArgumentDeclaration>?): List<String> =
         typeArguments.orEmpty().flatMap { listOf(it.name) + typeArgumentNames(it.typeArguments) }
@@ -124,10 +120,13 @@ class ArchitectureKonsistTest {
 
     private val mutableCollectionFactory = "mutable(List|Set|Map)Of|arrayListOf|hashMapOf|hashSetOf|linkedMapOf|linkedSetOf"
 
-    /** An initializer that builds a mutable collection, for a property whose type is inferred. */
+    /**
+     * An initializer that builds a mutable collection, for a property whose type is inferred. A
+     * trailing `also`/`apply` block returns its receiver, so a copy ending in one stays mutable.
+     */
     private val mutableCollectionInitializer = Regex(
         """^\s*(object\s*:\s*)?($mutableCollectionFactory|${mutableCollectionType.pattern})\b""" +
-            """|\.toMutable(List|Set|Map)\(\s*\)\s*$""",
+            """|\.toMutable(List|Set|Map)\(\s*\)(\s*\.(also|apply)\s*\{[\s\S]*})?\s*$""",
     )
 
     /**
@@ -241,7 +240,14 @@ class ArchitectureKonsistTest {
             .map { it.name }
             .toSet()
 
-        flaggedClasses shouldBe setOf("DeclaredMutableProperty", "InferredMutableProperty", "InferredCopiedProperty", "MutableConstructorParameter")
+        flaggedClasses shouldBe setOf(
+            "DeclaredMutableProperty",
+            "InferredMutableProperty",
+            "InferredCopiedProperty",
+            "ChainedApplyCopyProperty",
+            "ChainedAlsoCopyProperty",
+            "MutableConstructorParameter",
+        )
     }
 
     private fun domainModelClasses() =

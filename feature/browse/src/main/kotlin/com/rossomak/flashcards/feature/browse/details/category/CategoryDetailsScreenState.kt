@@ -14,7 +14,6 @@ import com.rossomak.flashcards.core.domain.model.UserFavorites
  * a nullable error id plus a list, so "loading and failed at once" is unrepresentable and the
  * screen's `when` cannot silently depend on branch order — see
  * [com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState], which this mirrors.
- * @param isFavorite live from [UserFavoritesRepository.observeFavorites][com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository.observeFavorites], written via [CategoryDetailsViewModel.onFavoriteToggle].
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), `null` until
  * [isProgressResolved] — and possibly still `null` after, for a User who has never finished a
  * session. Never read directly by the screen; go through [progressFor].
@@ -27,7 +26,6 @@ data class CategoryDetailsScreenState(
     val categoryName: String = "",
     val content: CategoryDetailsContentState = CategoryDetailsContentState.Loading,
     val selectedSubcategoryIds: Set<String>? = null,
-    val isFavorite: Boolean = false,
     val progressSummary: ProgressSummary? = null,
     val isProgressResolved: Boolean = false,
     val favorites: UserFavorites = UserFavorites.EMPTY,
@@ -35,6 +33,13 @@ data class CategoryDetailsScreenState(
 
     val isSelectionMode: Boolean
         get() = selectedSubcategoryIds != null
+
+    /**
+     * Derived from [favorites] rather than held separately, so the bookmark and the row badges
+     * share one live listener. Written via [CategoryDetailsViewModel.onFavoriteToggle].
+     */
+    val isFavorite: Boolean
+        get() = favorites.categoryIds.containsKey(categoryId)
 
     val selectedCount: Int
         get() = selectedSubcategoryIds?.size ?: 0

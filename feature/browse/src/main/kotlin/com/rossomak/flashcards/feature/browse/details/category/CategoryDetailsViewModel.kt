@@ -6,15 +6,17 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveCategoryFavoriteStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.PinCategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetCategoryFavoriteUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.browse.R
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.AddedToFavorites
-import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.AddedToFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.RemovedFromFavorites
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinFailed
+import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinUnsupported
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -33,7 +35,6 @@ class CategoryDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getSubcategories: GetSubcategoriesUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
-    private val observeCategoryFavoriteState: ObserveCategoryFavoriteStateUseCase,
     private val setCategoryFavorite: SetCategoryFavoriteUseCase,
     private val pinCategoryShortcut: PinCategoryShortcutUseCase,
     private val observeUserFavorites: ObserveUserFavoritesUseCase,
@@ -47,14 +48,13 @@ class CategoryDetailsViewModel @Inject constructor(
     private val eventChannel = Channel<CategoryDetailsDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
-    private val _messages = MutableSharedFlow<CategoryDetailsMessage>(extraBufferCapacity = 1)
+    private val _messages = MutableSharedFlow<DetailsMessage>(extraBufferCapacity = 1)
 
-    val messages: SharedFlow<CategoryDetailsMessage> = _messages.asSharedFlow()
+    val messages: SharedFlow<DetailsMessage> = _messages.asSharedFlow()
 
     init {
         loadSubcategories()
         collectProgressSummary()
-        observeFavoriteState()
         observeFavorites()
     }
 
@@ -101,6 +101,34 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
+    /** The row itself browses: it opens Subcategory Details and starts nothing (ADR-0041). */
+    fun onSubcategorySelect(subcategory: Subcategory) {
+        viewModelScope.launch {
+            eventChannel.send(
+                CategoryDetailsDestination.SubcategoryDetails(
+                    categoryId = subcategory.categoryId,
+                    categoryName = subcategory.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            )
+        }
+    }
+
+    /** The row's play button studies: a single-subcategory session for just this row (ADR-0041). */
+    fun onSubcategorySessionStart(subcategory: Subcategory) {
+        viewModelScope.launch {
+            eventChannel.send(
+                CategoryDetailsDestination.SubcategoryPreviewStudySession(
+                    categoryId = subcategory.categoryId,
+                    categoryName = subcategory.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            )
+        }
+    }
+
     /** Every Subcategory in the Category, sampled by the Preview screen — not honoured literally. */
     fun onQuickSessionStart() {
         val subcategories = (_state.value.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return
@@ -136,9 +164,12 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * No optimistic flip: [CategoryDetailsScreenState.isFavorite] derives from the favorites
+     * listener, and Firestore's latency compensation delivers the local write to it immediately.
+     */
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
-        _state.update { it.copy(isFavorite = isFavorite) }
         viewModelScope.launch {
             val result = setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
             if (result.isSuccess) {
@@ -153,33 +184,25 @@ class CategoryDetailsViewModel @Inject constructor(
      * would invert a later, unrelated toggle. Emits no message of its own.
      */
     fun onFavoriteUndo(restoreTo: Boolean) {
-        _state.update { it.copy(isFavorite = restoreTo) }
         viewModelScope.launch {
             setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, restoreTo))
         }
     }
 
-    fun onAddShortcutClick() {
+    fun onAddShortcut() {
         viewModelScope.launch {
             when (pinCategoryShortcut(route.categoryId)) {
                 PinShortcutResult.Pinned -> Unit
-                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(CategoryDetailsMessage.ShortcutPinFailed)
-                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(CategoryDetailsMessage.ShortcutPinUnsupported)
-            }
-        }
-    }
-
-    private fun observeFavoriteState() {
-        viewModelScope.launch {
-            observeCategoryFavoriteState(route.categoryId).collect { isFavorite ->
-                _state.update { it.copy(isFavorite = isFavorite) }
+                PinShortcutResult.EntityResolutionError -> _messages.tryEmit(ShortcutPinFailed)
+                PinShortcutResult.UnsupportedLauncher -> _messages.tryEmit(ShortcutPinUnsupported)
             }
         }
     }
 
     /**
-     * Badges each subcategory row reactively — the list itself never waits on this to render, same
-     * rule as [collectProgressSummary]. [ObserveUserFavoritesUseCase] is a live Firestore listener
+     * The screen's one favorites listener: it drives both the top app bar's bookmark
+     * ([CategoryDetailsScreenState.isFavorite]) and each subcategory row's badge. The list itself
+     * never waits on this to render, same rule as [collectProgressSummary]. [ObserveUserFavoritesUseCase] is a live Firestore listener
      * too, re-attaching on its own after a network drop, so a screen left open through a
      * connectivity blip still gets its bookmark badges filled in without any retry wiring here.
      */
@@ -191,7 +214,11 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    internal fun loadSubcategories() {
+    fun onRetry() {
+        loadSubcategories()
+    }
+
+    private fun loadSubcategories() {
         viewModelScope.launch {
             _state.update { it.copy(content = CategoryDetailsContentState.Loading) }
             getSubcategories(route.categoryId)
