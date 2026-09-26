@@ -77,6 +77,11 @@
     <string name="voice_privacy_permission_denied_message">Microphone access is off, so this preview can\'t record. Turn it on in Settings to try it.</string>
     <string name="voice_privacy_open_settings_button">Open settings</string>
     <string name="voice_privacy_listening_cd">Listening for your answer</string>
+    <string name="voice_privacy_playing_cd">Playing back your transformed voice</string>
+    <string name="voice_privacy_mic_cd">Microphone</string>
+    <string name="voice_privacy_stop_button">Stop recording</string>
+    <string name="voice_privacy_processing_hint">Processing…</string>
+    <string name="voice_privacy_nothing_captured_message">Didn\'t catch anything. Try again and speak a little longer.</string>
 
     <!-- 7 · Favorite topics -->
     <string name="favorites_eyebrow_label">Convenient bookmarks</string>

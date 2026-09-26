@@ -13,10 +13,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,6 +40,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Failed
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Idle
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Listening
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Playing
+import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Processing
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Ready
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.SpeechDetected
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
@@ -64,6 +68,8 @@ import kotlinx.coroutines.flow.StateFlow
  * everyone, and only the AI grading of the spoken answer is gated — hence a premium line scoped to
  * grading rather than a badge over the whole screen.
  *
+ * While recording, [onStopRecording] ends the take early and keeps what was said.
+ *
  * The ViewModel requests the microphone through the shared permission layer whenever [onTestVoice]
  * fires; [permissionDenied] (a permanent refusal) is the only signal this composable gets about it,
  * and its row keeps a Retry next to Open settings so a false "permanently denied" can still heal.
@@ -71,9 +77,10 @@ import kotlinx.coroutines.flow.StateFlow
 @Composable
 internal fun VoicePrivacyStep(
     voiceDemoState: VoiceDemoState,
-    inputLevels: StateFlow<ImmutableList<Float>>,
+    levels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
+    onStopRecording: () -> Unit,
     onPlay: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -89,9 +96,10 @@ internal fun VoicePrivacyStep(
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.medium))
         VoiceTestCard(
             voiceDemoState = voiceDemoState,
-            inputLevels = inputLevels,
+            levels = levels,
             permissionDenied = permissionDenied,
             onTestVoice = onTestVoice,
+            onStopRecording = onStopRecording,
             onPlay = onPlay,
             onOpenSettings = onOpenSettings,
         )
@@ -129,20 +137,26 @@ private fun PremiumNote(modifier: Modifier = Modifier) {
 @Composable
 private fun VoiceTestCard(
     voiceDemoState: VoiceDemoState,
-    inputLevels: StateFlow<ImmutableList<Float>>,
+    levels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
+    onStopRecording: () -> Unit,
     onPlay: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The Surface itself is pinned to an exact height (MicBadge + spacing + fixed body slot +
+    // The Surface itself is pinned to an exact height (indicator + spacing + fixed body slot +
     // padding), not just the body slot inside it — belt-and-suspenders so the card's outer bounds
     // can never move, regardless of what the body's own height/scroll measurement does internally.
-    val cardHeight = MaterialTheme.sizes.ratingButton +
-        MaterialTheme.spacing.small +
+    // The deeper top padding sets the badge lower in the card; the body sits close under it.
+    val cardTopPadding = MaterialTheme.spacing.large
+    val cardBottomPadding = MaterialTheme.spacing.normal
+    val badgeToBodySpacing = MaterialTheme.spacing.xsmall
+    val cardHeight = cardTopPadding +
+        MaterialTheme.sizes.ratingButton +
+        badgeToBodySpacing +
         VOICE_TEST_CARD_BODY_HEIGHT +
-        MaterialTheme.spacing.normal * 2
+        cardBottomPadding
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -151,11 +165,16 @@ private fun VoiceTestCard(
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier.padding(MaterialTheme.spacing.normal),
+            modifier = Modifier.padding(
+                start = MaterialTheme.spacing.normal,
+                top = cardTopPadding,
+                end = MaterialTheme.spacing.normal,
+                bottom = cardBottomPadding,
+            ),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+            verticalArrangement = Arrangement.spacedBy(badgeToBodySpacing),
         ) {
-            MicBadge(voiceDemoState = voiceDemoState, inputLevels = inputLevels)
+            VoiceTestIndicator(voiceDemoState = voiceDemoState, levels = levels, permissionDenied = permissionDenied)
             // Fixed height, sized to the tallest of the states below (permission-denied's two-line
             // message + button row), so the card never visibly resizes as the voice demo state changes.
             // verticalScroll is a safety net only, for oversized a11y font scale overflowing it.
@@ -170,6 +189,7 @@ private fun VoiceTestCard(
                     voiceDemoState = voiceDemoState,
                     permissionDenied = permissionDenied,
                     onTestVoice = onTestVoice,
+                    onStopRecording = onStopRecording,
                     onPlay = onPlay,
                     onOpenSettings = onOpenSettings,
                 )
@@ -180,32 +200,36 @@ private fun VoiceTestCard(
 
 private val VOICE_TEST_CARD_BODY_HEIGHT = 120.dp
 
-/** While listening, the live input level indicator takes the badge's place; its disc is the same size. */
+/**
+ * Disc alone before a take and after a failure; bars from the first recording through playback, so
+ * nothing swaps out between recording, processing and playing back. The disc shows a microphone,
+ * or a speaker while the recording plays back.
+ */
 @Composable
-private fun MicBadge(
+private fun VoiceTestIndicator(
     voiceDemoState: VoiceDemoState,
-    inputLevels: StateFlow<ImmutableList<Float>>,
+    levels: StateFlow<ImmutableList<Float>>,
+    permissionDenied: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    if (voiceDemoState is Listening || voiceDemoState is SpeechDetected) {
-        val levels by inputLevels.collectAsStateWithLifecycle()
-        FlashcardsVoiceCaptureIndicator(
-            levels = levels,
-            contentDescription = stringResource(R.string.voice_privacy_listening_cd),
-            modifier = modifier,
-        )
-    } else {
-        Surface(
-            modifier = modifier.size(MaterialTheme.sizes.ratingButton),
-            shape = RoundedCornerShape(MaterialTheme.cornerRadius.full),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Default.Mic, contentDescription = null)
-            }
+    val currentLevels by levels.collectAsStateWithLifecycle()
+    val isActive = !permissionDenied &&
+        when (voiceDemoState) {
+            Listening, SpeechDetected, Processing, Ready, Playing -> true
+            Idle, is Failed -> false
         }
+    val contentDescriptionRes = when (voiceDemoState) {
+        Listening, SpeechDetected -> R.string.voice_privacy_listening_cd
+        Playing -> R.string.voice_privacy_playing_cd
+        Idle, Processing, Ready, is Failed -> R.string.voice_privacy_mic_cd
     }
+    FlashcardsVoiceCaptureIndicator(
+        levels = currentLevels,
+        contentDescription = stringResource(contentDescriptionRes),
+        modifier = modifier,
+        icon = if (voiceDemoState is Playing) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Mic,
+        isActive = isActive,
+    )
 }
 
 @Composable
@@ -213,6 +237,7 @@ private fun VoiceTestCardBody(
     voiceDemoState: VoiceDemoState,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
+    onStopRecording: () -> Unit,
     onPlay: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -249,41 +274,31 @@ private fun VoiceTestCardBody(
                 buttonText = stringResource(R.string.voice_privacy_test_button),
                 onClick = onTestVoice,
             )
-            is Listening -> VoiceTestStatus(
-                text = stringResource(R.string.voice_privacy_listening_hint),
+            is Listening, is SpeechDetected -> VoiceTestHint(
+                text = stringResource(
+                    if (voiceDemoState is SpeechDetected) {
+                        R.string.voice_privacy_speech_detected_hint
+                    } else {
+                        R.string.voice_privacy_listening_hint
+                    },
+                ),
+                buttonText = stringResource(R.string.voice_privacy_stop_button),
+                onClick = onStopRecording,
+                icon = Icons.Default.Stop,
             )
-            is SpeechDetected -> VoiceTestStatus(
-                text = stringResource(R.string.voice_privacy_speech_detected_hint),
+            Processing, Ready, Playing -> VoiceTestPlayback(
+                statusText = stringResource(
+                    when (voiceDemoState) {
+                        Processing -> R.string.voice_privacy_processing_hint
+                        Playing -> R.string.voice_privacy_playing_hint
+                        else -> R.string.voice_privacy_ready_hint
+                    },
+                ),
+                canPlay = voiceDemoState is Ready,
+                canRetry = voiceDemoState !is Processing,
+                onPlay = onPlay,
+                onRetry = onTestVoice,
             )
-            Ready, Playing -> Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
-            ) {
-                VoiceTestStatus(
-                    text = stringResource(
-                        if (voiceDemoState is Playing) {
-                            R.string.voice_privacy_playing_hint
-                        } else {
-                            R.string.voice_privacy_ready_hint
-                        },
-                    ),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
-                ) {
-                    FlashcardsFilledButton(
-                        text = stringResource(R.string.voice_privacy_play_button),
-                        onClick = onPlay,
-                        icon = Icons.Default.PlayArrow,
-                        enabled = voiceDemoState !is Playing,
-                    )
-                    FlashcardsTextButton(
-                        text = stringResource(R.string.voice_privacy_retry_button),
-                        onClick = onTestVoice,
-                        icon = Icons.Default.Replay,
-                    )
-                }
-            }
             is Failed -> VoiceTestHint(
                 text = stringResource(R.string.voice_privacy_capture_failed_message),
                 buttonText = stringResource(R.string.voice_privacy_retry_button),
@@ -299,6 +314,7 @@ private fun VoiceTestHint(
     buttonText: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Default.Mic,
 ) {
     Column(
         modifier = modifier,
@@ -315,8 +331,41 @@ private fun VoiceTestHint(
         FlashcardsFilledButton(
             text = buttonText,
             onClick = onClick,
-            icon = Icons.Default.Mic,
+            icon = icon,
         )
+    }
+}
+
+/** Status line over the Play + Retry pair; Processing shows the same pair disabled so nothing shifts once it is ready. */
+@Composable
+private fun VoiceTestPlayback(
+    statusText: String,
+    canPlay: Boolean,
+    canRetry: Boolean,
+    onPlay: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+    ) {
+        VoiceTestStatus(text = statusText)
+        Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)) {
+            FlashcardsFilledButton(
+                text = stringResource(R.string.voice_privacy_play_button),
+                onClick = onPlay,
+                icon = Icons.Default.PlayArrow,
+                enabled = canPlay,
+            )
+            FlashcardsTextButton(
+                text = stringResource(R.string.voice_privacy_retry_button),
+                onClick = onRetry,
+                icon = Icons.Default.Replay,
+                enabled = canRetry,
+            )
+        }
     }
 }
 
@@ -337,16 +386,17 @@ private fun VoicePrivacyStepPermissionDeniedPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = Idle,
-            inputLevels = remember { MutableStateFlow(persistentListOf()) },
+            levels = remember { MutableStateFlow(persistentListOf()) },
             permissionDenied = true,
             onTestVoice = {},
+            onStopRecording = {},
             onPlay = {},
             onOpenSettings = {},
         )
     }
 }
 
-private val PreviewInputLevels = persistentListOf(0.35f, 0.9f, 0.6f, 0.2f, 0.05f)
+private val PreviewLevels = persistentListOf(0.35f, 0.9f, 0.6f, 0.2f, 0.05f)
 
 @Preview(showBackground = true, widthDp = 360)
 @Composable
@@ -354,9 +404,42 @@ private fun VoicePrivacyStepListeningPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = SpeechDetected,
-            inputLevels = remember { MutableStateFlow(PreviewInputLevels) },
+            levels = remember { MutableStateFlow(PreviewLevels) },
             permissionDenied = false,
             onTestVoice = {},
+            onStopRecording = {},
+            onPlay = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+private fun VoicePrivacyStepProcessingPreview() {
+    FlashcardsTheme {
+        VoicePrivacyStep(
+            voiceDemoState = Processing,
+            levels = remember { MutableStateFlow(persistentListOf()) },
+            permissionDenied = false,
+            onTestVoice = {},
+            onStopRecording = {},
+            onPlay = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+private fun VoicePrivacyStepPlayingPreview() {
+    FlashcardsTheme {
+        VoicePrivacyStep(
+            voiceDemoState = Playing,
+            levels = remember { MutableStateFlow(PreviewLevels) },
+            permissionDenied = false,
+            onTestVoice = {},
+            onStopRecording = {},
             onPlay = {},
             onOpenSettings = {},
         )

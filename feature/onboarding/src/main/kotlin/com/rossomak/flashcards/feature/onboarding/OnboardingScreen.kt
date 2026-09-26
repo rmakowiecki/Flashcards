@@ -65,6 +65,7 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.MicPermissionStillDenied
+import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.NothingCaptured
 import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.VoiceDemoFailed
 import com.rossomak.flashcards.feature.onboarding.step.AllSetStep
 import com.rossomak.flashcards.feature.onboarding.step.DailyGoalStep
@@ -103,6 +104,7 @@ private data class OnboardingActions(
     val onFavoritesStepEntered: () -> Unit,
     val onFavoriteSubcategoriesRetry: () -> Unit,
     val onVoiceDemoStart: () -> Unit,
+    val onVoiceDemoFinish: () -> Unit,
     val onVoiceDemoPlay: () -> Unit,
     val onVoiceDemoStop: () -> Unit,
     val onFinish: () -> Unit,
@@ -129,7 +131,7 @@ fun OnboardingScreen(
     OnboardingContent(
         modifier = modifier,
         state = state,
-        voiceDemoInputLevels = viewModel.voiceDemoInputLevels,
+        voiceDemoLevels = viewModel.voiceDemoLevels,
         messages = viewModel.messages,
         actions = OnboardingActions(
             onStudyModeSelect = viewModel::onStudyModeSelect,
@@ -139,6 +141,7 @@ fun OnboardingScreen(
             onFavoritesStepEntered = viewModel::onFavoritesStepEntered,
             onFavoriteSubcategoriesRetry = viewModel::onFavoriteSubcategoriesRetry,
             onVoiceDemoStart = viewModel::onVoiceDemoStart,
+            onVoiceDemoFinish = viewModel::onVoiceDemoFinish,
             onVoiceDemoPlay = viewModel::onVoiceDemoPlay,
             onVoiceDemoStop = viewModel::onVoiceDemoStop,
             onFinish = viewModel::onFinish,
@@ -158,7 +161,7 @@ fun OnboardingScreen(
 private fun OnboardingContent(
     modifier: Modifier = Modifier,
     state: OnboardingScreenState,
-    voiceDemoInputLevels: StateFlow<ImmutableList<Float>>,
+    voiceDemoLevels: StateFlow<ImmutableList<Float>>,
     actions: OnboardingActions,
     messages: SharedFlow<OnboardingMessage>,
 ) {
@@ -229,7 +232,7 @@ private fun OnboardingContent(
                 OnboardingStepPage(
                     step = OnboardingStep.atPage(page),
                     state = state,
-                    voiceDemoInputLevels = voiceDemoInputLevels,
+                    voiceDemoLevels = voiceDemoLevels,
                     copyRevealProgress = copyReveal.value,
                     actions = actions,
                     messages = messages,
@@ -331,7 +334,7 @@ private fun OnboardingCta(
 private fun OnboardingStepPage(
     step: OnboardingStep,
     state: OnboardingScreenState,
-    voiceDemoInputLevels: StateFlow<ImmutableList<Float>>,
+    voiceDemoLevels: StateFlow<ImmutableList<Float>>,
     copyRevealProgress: Float,
     actions: OnboardingActions,
     messages: SharedFlow<OnboardingMessage>,
@@ -356,10 +359,11 @@ private fun OnboardingStepPage(
         )
         OnboardingStep.VoicePrivacy -> VoicePrivacyStepRoute(
             voiceDemoState = state.voiceDemoState,
-            voiceDemoInputLevels = voiceDemoInputLevels,
+            voiceDemoLevels = voiceDemoLevels,
             micPermissionStatus = state.micPermissionStatus,
             messages = messages,
             onTestVoice = actions.onVoiceDemoStart,
+            onStopRecording = actions.onVoiceDemoFinish,
             onPlay = actions.onVoiceDemoPlay,
             modifier = modifier,
         )
@@ -390,10 +394,11 @@ private fun OnboardingStepPage(
 @Composable
 private fun VoicePrivacyStepRoute(
     voiceDemoState: VoiceDemoState,
-    voiceDemoInputLevels: StateFlow<ImmutableList<Float>>,
+    voiceDemoLevels: StateFlow<ImmutableList<Float>>,
     micPermissionStatus: PermissionStatus,
     messages: SharedFlow<OnboardingMessage>,
     onTestVoice: () -> Unit,
+    onStopRecording: () -> Unit,
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -401,11 +406,13 @@ private fun VoicePrivacyStepRoute(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val micPermissionStillDeniedText = stringResource(CoreUiR.string.common_mic_permission_still_denied_message)
+    val nothingCapturedText = stringResource(R.string.voice_privacy_nothing_captured_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(messages) { message ->
         val text = when (message) {
             is VoiceDemoFailed -> resolveVoiceDemoFailureMessage(context = context, reason = message.reason)
             MicPermissionStillDenied -> micPermissionStillDeniedText
+            NothingCaptured -> nothingCapturedText
         }
         snackbarScope.launch { snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short) }
     }
@@ -417,9 +424,10 @@ private fun VoicePrivacyStepRoute(
     ) { innerPadding ->
         VoicePrivacyStep(
             voiceDemoState = voiceDemoState,
-            inputLevels = voiceDemoInputLevels,
+            levels = voiceDemoLevels,
             permissionDenied = micPermissionStatus == PermissionStatus.PermanentlyDenied,
             onTestVoice = onTestVoice,
+            onStopRecording = onStopRecording,
             onPlay = onPlay,
             onOpenSettings = {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -449,7 +457,7 @@ private fun OnboardingContentPreview() {
     FlashcardsTheme {
         OnboardingContent(
             state = remember { OnboardingScreenState(userName = "Radek") },
-            voiceDemoInputLevels = remember { MutableStateFlow(persistentListOf()) },
+            voiceDemoLevels = remember { MutableStateFlow(persistentListOf()) },
             messages = remember { MutableSharedFlow() },
             actions = OnboardingActions(
                 onStudyModeSelect = {},
@@ -459,6 +467,7 @@ private fun OnboardingContentPreview() {
                 onFavoritesStepEntered = {},
                 onFavoriteSubcategoriesRetry = {},
                 onVoiceDemoStart = {},
+                onVoiceDemoFinish = {},
                 onVoiceDemoPlay = {},
                 onVoiceDemoStop = {},
                 onFinish = {},

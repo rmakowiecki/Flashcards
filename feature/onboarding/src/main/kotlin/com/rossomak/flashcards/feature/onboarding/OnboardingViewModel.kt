@@ -6,11 +6,15 @@ import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.VoiceDemoRecordingResult.Cancelled
+import com.rossomak.flashcards.core.domain.model.VoiceDemoRecordingResult.Captured
+import com.rossomak.flashcards.core.domain.model.VoiceDemoRecordingResult.NothingCaptured
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
+import com.rossomak.flashcards.core.domain.usecase.FinishVoiceDemoRecordingUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetOnboardingSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoInputLevelsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoLevelsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceDemoStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.PlayVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -57,8 +61,9 @@ class OnboardingViewModel @Inject constructor(
     private val setFavoriteSubcategories: SetFavoriteSubcategoriesUseCase,
     private val signInAnonymously: SignInAnonymouslyUseCase,
     private val observeVoiceDemoState: ObserveVoiceDemoStateUseCase,
-    private val observeVoiceDemoInputLevels: ObserveVoiceDemoInputLevelsUseCase,
+    private val observeVoiceDemoLevels: ObserveVoiceDemoLevelsUseCase,
     private val startVoiceDemo: StartVoiceDemoUseCase,
+    private val finishVoiceDemoRecording: FinishVoiceDemoRecordingUseCase,
     private val playVoiceDemo: PlayVoiceDemoUseCase,
     private val stopVoiceDemo: StopVoiceDemoUseCase,
     private val observePermissionStatus: ObservePermissionStatusUseCase,
@@ -74,14 +79,17 @@ class OnboardingViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<OnboardingMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<OnboardingMessage> = _messages.asSharedFlow()
 
-    /** Voice test microphone levels. Kept out of [state] so each update recomposes only the indicator. */
-    val voiceDemoInputLevels: StateFlow<ImmutableList<Float>> =
-        flow { emitAll(observeVoiceDemoInputLevels()) }
+    /**
+     * Voice test audio levels: the microphone while listening, the played-back recording while
+     * playing. Kept out of [state] so each update recomposes only the indicator.
+     */
+    val voiceDemoLevels: StateFlow<ImmutableList<Float>> =
+        flow { emitAll(observeVoiceDemoLevels()) }
             .map { levels -> levels.toImmutableList() }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = INPUT_LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
-                initialValue = RestInputLevels,
+                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
+                initialValue = RestLevels,
             )
 
     private var permissionStatusJob: Job? = null
@@ -152,6 +160,16 @@ class OnboardingViewModel @Inject constructor(
                 }
             } finally {
                 micRequestInFlight = false
+            }
+        }
+    }
+
+    /** "Stop recording": ends listening early and keeps what was said. Nothing kept gets a snackbar. */
+    fun onVoiceDemoFinish() {
+        viewModelScope.launch {
+            when (finishVoiceDemoRecording()) {
+                NothingCaptured -> _messages.tryEmit(OnboardingMessage.NothingCaptured)
+                Captured, Cancelled -> Unit
             }
         }
     }
@@ -303,8 +321,8 @@ class OnboardingViewModel @Inject constructor(
     private companion object {
         const val SIGN_IN_ANONYMOUSLY_TIMEOUT_MS = 8000L
         const val SET_FAVORITES_TIMEOUT_MS = 8000L
-        val INPUT_LEVELS_STOP_TIMEOUT = 5.seconds
-        val RestInputLevels: ImmutableList<Float> =
+        val LEVELS_STOP_TIMEOUT = 5.seconds
+        val RestLevels: ImmutableList<Float> =
             List(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { 0f }.toImmutableList()
     }
 }
