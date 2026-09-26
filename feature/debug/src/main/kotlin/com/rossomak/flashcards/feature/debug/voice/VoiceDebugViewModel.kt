@@ -12,16 +12,24 @@ import com.rossomak.flashcards.core.voice.PcmPlayer
 import com.rossomak.flashcards.core.voice.SileroVoiceActivityDetector
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
+import com.rossomak.flashcards.core.voice.VoiceLevelWaveShaper
 import com.rossomak.flashcards.core.voice.VoiceObfuscator
 import com.rossomak.flashcards.core.voice.WavEncoder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -44,6 +52,16 @@ class VoiceDebugViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(VoiceDebugScreenState())
     val state: StateFlow<VoiceDebugScreenState> = _state.asStateFlow()
+
+    /** Live microphone level for the VAD block's indicator, kept out of [state]. */
+    val inputLevels: StateFlow<ImmutableList<Float>> = VoiceLevelWaveShaper()
+        .shape(level = voiceCaptureEngine.inputLevel, isListening = voiceCaptureEngine.isListening)
+        .map { levels -> levels.toImmutableList() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = INPUT_LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
+            initialValue = persistentListOf(),
+        )
 
     private var rawClip: ShortArray = ShortArray(0)
     private var obfuscatedClip: ShortArray = ShortArray(0)
@@ -254,5 +272,6 @@ class VoiceDebugViewModel @Inject constructor(
         const val RAW_CLIP_DURATION_MS = 3_000L
         const val MAX_LOG_LINES = 12
         const val IDLE_ROUTE_LABEL = "Idle"
+        val INPUT_LEVELS_STOP_TIMEOUT = 5.seconds
     }
 }

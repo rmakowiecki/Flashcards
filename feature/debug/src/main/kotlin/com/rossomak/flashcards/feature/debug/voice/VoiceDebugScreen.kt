@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -47,7 +45,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.feature.debug.R
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun VoiceDebugScreen(
@@ -87,6 +89,7 @@ fun VoiceDebugScreen(
     VoiceDebugContent(
         modifier = modifier,
         state = state,
+        inputLevels = viewModel.inputLevels,
         onNavigateBack = onNavigateBack,
         onVadToggle = { withMicPermission(viewModel::onVadToggle) },
         onPlayCapturedUtterance = viewModel::onPlayCapturedUtterance,
@@ -104,6 +107,7 @@ fun VoiceDebugScreen(
 fun VoiceDebugContent(
     modifier: Modifier = Modifier,
     state: VoiceDebugScreenState,
+    inputLevels: StateFlow<ImmutableList<Float>>,
     onNavigateBack: () -> Unit,
     onVadToggle: () -> Unit,
     onPlayCapturedUtterance: () -> Unit,
@@ -157,11 +161,7 @@ fun VoiceDebugContent(
                         )
                     }
                     Spacer(modifier = Modifier.size(16.dp))
-                    Surface(
-                        modifier = Modifier.size(16.dp),
-                        shape = CircleShape,
-                        color = if (state.isSpeechDetected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outlineVariant,
-                    ) {}
+                    InputLevelIndicator(inputLevels = inputLevels)
                     Spacer(modifier = Modifier.size(8.dp))
                     Text(
                         text = stringResource(
@@ -314,6 +314,16 @@ private fun DebugBlock(
             content()
         }
     }
+}
+
+/** Collects the level here so each new level recomposes only the indicator. */
+@Composable
+private fun InputLevelIndicator(inputLevels: StateFlow<ImmutableList<Float>>) {
+    val levels by inputLevels.collectAsStateWithLifecycle()
+    FlashcardsVoiceCaptureIndicator(
+        levels = levels,
+        contentDescription = stringResource(CoreUiR.string.common_voice_capture_listening_cd),
+    )
 }
 
 @Composable
