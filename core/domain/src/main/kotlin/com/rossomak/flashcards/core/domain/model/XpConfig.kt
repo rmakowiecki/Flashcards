@@ -9,16 +9,18 @@ import kotlin.math.pow
  * eventually consumes this reads every value from here instead
  * ([ADR-0047](../../../../../../../docs/adr/0047-xp-values-behind-a-config-repository.md)).
  *
- * Served by [com.rossomak.flashcards.core.domain.repository.XpConfigRepository]. The default
- * constructor values *are* the documented defaults — the local repository implementation returns a
- * plain `XpConfig()`, and this ticket ships no other source. A future remote source would need a
- * cache and a defaulting story, since scoring must work offline; these defaults are that fallback
- * too, via [com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase].
+ * **The values normally come from the server.** A server-owned configuration document is the
+ * source of truth: the `submitStudySession` Cloud Function scores every session with it, and
+ * [com.rossomak.flashcards.core.domain.repository.XpConfigRepository] serves the last copy the client
+ * fetched. The default constructor values are a fallback only, used until a first fetch succeeds.
+ * They stay identical to the shared default configuration file in `testdata/xp-scoring/` at the repo
+ * root, and to the Cloud Functions' own bundled default; a test on each side enforces that.
  *
- * **A session is scored against the [XpConfig] captured when it started.** It is fetched alongside
+ * **A session's local preview uses the [XpConfig] captured when it started.** It is fetched alongside
  * the session's cards, carried in the session state, and carried forward on [SessionResult.xpConfig]
- * — the Summary screen computes from that snapshot, never from a fresh read, so a value changing
- * mid-session cannot rewrite the arithmetic for a session already in progress.
+ * — the Summary screen's preview computes from that snapshot, never from a fresh read, so a value
+ * changing mid-session cannot rewrite the preview's arithmetic. The server always scores with its
+ * current document, not with this snapshot.
  *
  * @param newCardStudied per card seeing a card for the first time ever. Both Study Modes.
  * @param cardMastered per card ending Mastered. Rated only — Fast has no mastery concept.

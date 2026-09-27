@@ -115,9 +115,9 @@ sealed interface SessionResult {
     /**
      * The XP configuration snapshot captured when this session started
      * ([ADR-0047](../../../../../../../docs/adr/0047-xp-values-behind-a-config-repository.md)):
-     * fetched alongside [cardResults]' cards, never re-read here. Defaults to [XpConfig]'s own
-     * defaults so every existing call site outside the new scoring path (persistence, Firestore mapping) is
-     * unaffected — this ticket adds the field and the snapshot rule, nothing computes against it yet.
+     * fetched alongside [cardResults]' cards, never re-read here. It drives only this session's local
+     * XP preview: the server scores the submitted session with its own current configuration and never
+     * reads this snapshot. Defaults to [XpConfig]'s own defaults for call sites that never preview XP.
      */
     val xpConfig: XpConfig
 
