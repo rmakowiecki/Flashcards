@@ -487,6 +487,7 @@ class OnboardingViewModelTest {
         viewModel.messages.test {
             voiceDemoGateway.finishRecordingOutcome = VoiceDemoRecordingResult.Captured
             viewModel.onVoiceDemoFinish()
+            advanceUntilIdle()
             voiceDemoGateway.finishRecordingOutcome = VoiceDemoRecordingResult.Cancelled
             viewModel.onVoiceDemoFinish()
             advanceUntilIdle()
