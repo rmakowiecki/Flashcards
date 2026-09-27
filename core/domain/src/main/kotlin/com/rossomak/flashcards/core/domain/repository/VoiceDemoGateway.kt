@@ -16,11 +16,11 @@ interface VoiceDemoGateway {
     val state: StateFlow<VoiceDemoState>
 
     /**
-     * Audio level as bar levels in `0..1`, index 0 newest, one list per shaping interval: the
-     * microphone input while listening, the played-back audio while [VoiceDemoState.Playing], and an
-     * all-zero list otherwise. Cold: computed only while collected, on the device only.
+     * Raw audio level in `0..1`: the microphone input while listening, the played-back audio while
+     * [VoiceDemoState.Playing], and 0 otherwise. Cold: computed only while collected, on the device
+     * only, and never logged, stored or uploaded.
      */
-    val levels: Flow<List<Float>>
+    val rawVoiceLevel: Flow<Float>
 
     /** Starts a fresh listening attempt. Re-randomizes the obfuscation shift for this attempt. */
     fun start()

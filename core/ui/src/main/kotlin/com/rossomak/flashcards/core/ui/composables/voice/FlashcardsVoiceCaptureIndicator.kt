@@ -53,6 +53,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 
 /**
  * Icon disc with mirrored level bars on each side. The disc shows a microphone by default; pass a
@@ -117,6 +118,9 @@ object FlashcardsVoiceCaptureIndicatorDefaults {
 
     /** Expected interval between two `levels` snapshots. */
     const val LEVEL_INTERVAL_MILLIS: Int = 70
+
+    /** A `levels` snapshot with every bar at rest height. */
+    val restLevels: ImmutableList<Float> = List(BAR_COUNT) { 0f }.toImmutableList()
 
     /** Disc diameter, equal to a Rating circle so either can replace the other in place. */
     val discSize: Dp = AppSizes.ratingButton

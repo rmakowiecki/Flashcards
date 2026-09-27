@@ -49,6 +49,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButto
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
@@ -78,7 +79,7 @@ import kotlinx.coroutines.flow.StateFlow
 @Composable
 internal fun VoicePrivacyStep(
     voiceDemoState: VoiceDemoState,
-    levels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
     onStopRecording: () -> Unit,
@@ -97,7 +98,7 @@ internal fun VoicePrivacyStep(
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.medium))
         VoiceTestCard(
             voiceDemoState = voiceDemoState,
-            levels = levels,
+            voiceBarsLevels = voiceBarsLevels,
             permissionDenied = permissionDenied,
             onTestVoice = onTestVoice,
             onStopRecording = onStopRecording,
@@ -138,7 +139,7 @@ private fun PremiumNote(modifier: Modifier = Modifier) {
 @Composable
 private fun VoiceTestCard(
     voiceDemoState: VoiceDemoState,
-    levels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     onTestVoice: () -> Unit,
     onStopRecording: () -> Unit,
@@ -175,7 +176,7 @@ private fun VoiceTestCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(badgeToBodySpacing),
         ) {
-            VoiceTestIndicator(voiceDemoState = voiceDemoState, levels = levels, permissionDenied = permissionDenied)
+            VoiceTestIndicator(voiceDemoState = voiceDemoState, voiceBarsLevels = voiceBarsLevels, permissionDenied = permissionDenied)
             // Fixed height, sized to the tallest of the states below (permission-denied's two-line
             // message + button row), so the card never visibly resizes as the voice demo state changes.
             // verticalScroll is a safety net only, for oversized a11y font scale overflowing it.
@@ -209,11 +210,11 @@ private val VOICE_TEST_CARD_BODY_HEIGHT = 120.dp
 @Composable
 private fun VoiceTestIndicator(
     voiceDemoState: VoiceDemoState,
-    levels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     permissionDenied: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val currentLevels by levels.collectAsStateWithLifecycle()
+    val currentVoiceBarsLevels by voiceBarsLevels.collectAsStateWithLifecycle()
     val isActive = !permissionDenied &&
         when (voiceDemoState) {
             Listening, SpeechDetected, Processing, Ready, Playing -> true
@@ -225,7 +226,7 @@ private fun VoiceTestIndicator(
         Idle, Processing, Ready, is Failed -> CoreUiR.string.common_voice_capture_mic_cd
     }
     FlashcardsVoiceCaptureIndicator(
-        levels = currentLevels,
+        levels = currentVoiceBarsLevels,
         contentDescription = stringResource(contentDescriptionRes),
         modifier = modifier,
         icon = if (voiceDemoState is Playing) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Mic,
@@ -387,7 +388,7 @@ private fun VoicePrivacyStepPermissionDeniedPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = Idle,
-            levels = remember { MutableStateFlow(persistentListOf()) },
+            voiceBarsLevels = remember { MutableStateFlow(FlashcardsVoiceCaptureIndicatorDefaults.restLevels) },
             permissionDenied = true,
             onTestVoice = {},
             onStopRecording = {},
@@ -397,7 +398,7 @@ private fun VoicePrivacyStepPermissionDeniedPreview() {
     }
 }
 
-private val PreviewLevels = persistentListOf(0.35f, 0.9f, 0.6f, 0.2f, 0.05f)
+private val PreviewVoiceBarsLevels = persistentListOf(0.35f, 0.9f, 0.6f, 0.2f, 0.05f)
 
 @Preview(showBackground = true, widthDp = 360)
 @Composable
@@ -405,7 +406,7 @@ private fun VoicePrivacyStepListeningPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = SpeechDetected,
-            levels = remember { MutableStateFlow(PreviewLevels) },
+            voiceBarsLevels = remember { MutableStateFlow(PreviewVoiceBarsLevels) },
             permissionDenied = false,
             onTestVoice = {},
             onStopRecording = {},
@@ -421,7 +422,7 @@ private fun VoicePrivacyStepProcessingPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = Processing,
-            levels = remember { MutableStateFlow(persistentListOf()) },
+            voiceBarsLevels = remember { MutableStateFlow(FlashcardsVoiceCaptureIndicatorDefaults.restLevels) },
             permissionDenied = false,
             onTestVoice = {},
             onStopRecording = {},
@@ -437,7 +438,7 @@ private fun VoicePrivacyStepPlayingPreview() {
     FlashcardsTheme {
         VoicePrivacyStep(
             voiceDemoState = Playing,
-            levels = remember { MutableStateFlow(PreviewLevels) },
+            voiceBarsLevels = remember { MutableStateFlow(PreviewVoiceBarsLevels) },
             permissionDenied = false,
             onTestVoice = {},
             onStopRecording = {},

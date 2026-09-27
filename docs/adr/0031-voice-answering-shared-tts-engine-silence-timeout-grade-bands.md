@@ -10,7 +10,7 @@ Two tunable constants:
 - **8 seconds** of continuous silence after the question finishes → declare no-answer, speak an audible skip notice, advance without a grade for that card.
 - **1000ms** fixed delay after the grade-feedback notice finishes speaking → advance to the next card.
 
-Grade-percent bands, used both for feedback tone and the Failed/Partial/Correct mapping: **Failed < 40, Partial 40-79, Correct ≥ 80**. On Failed/Partial, spoken feedback must state what was missed and include the full acceptable answer (the only place the user hears the real answer in this mode). On Correct, feedback is a short affirmation only.
+Grade-percent bands, used both for feedback tone and the Failed/Partial/Correct mapping: **Failed < 40, Partial 40-79, Correct ≥ 80**. On Failed/Partial, spoken feedback must state what was missed and include the full acceptable answer (the only place the user hears the real answer in this mode). On Correct, feedback is a short affirmation only. The spoken notice is the Rating name followed by that feedback; the percentage itself drives only the band and is never spoken or shown ([ADR-0053](0053-voice-answer-sheet-states-and-live-input-level.md)).
 
 ## Context
 

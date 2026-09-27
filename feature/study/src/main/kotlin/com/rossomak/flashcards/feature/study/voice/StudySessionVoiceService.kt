@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -52,6 +53,8 @@ class StudySessionVoiceService : MediaSessionService() {
         val state: StateFlow<VoicePlaybackState> get() = player.voiceState
 
         val voiceAnswerState: StateFlow<VoiceAnswerState> get() = voiceAnswerController.state
+
+        val rawVoiceLevel: Flow<Float> get() = voiceAnswerController.rawVoiceLevel
 
         fun loadSession(cards: List<VoiceFlashcard>, startIndex: Int, subcategoryName: String) {
             sessionCards = cards

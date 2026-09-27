@@ -48,8 +48,10 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -939,6 +941,8 @@ private class FakeVoiceGateway : VoiceGateway {
 
     val voiceAnswerStateFlow = MutableStateFlow(VoiceAnswerState())
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
+
+    override val rawVoiceLevel: Flow<Float> = emptyFlow()
 
     var lastVoiceAnswering: Boolean? = null
     var lastNextSilenceWillPauseSession: Boolean? = null

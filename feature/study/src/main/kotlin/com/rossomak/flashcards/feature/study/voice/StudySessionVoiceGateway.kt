@@ -14,11 +14,15 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 @UnstableApi
@@ -33,7 +37,12 @@ class StudySessionVoiceGateway @Inject constructor(
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = _voiceAnswerState.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private var voiceBinder: StudySessionVoiceService.LocalBinder? = null
+    private val voiceBinder = MutableStateFlow<StudySessionVoiceService.LocalBinder?>(null)
+
+    // Declared after voiceBinder, which it reads at construction.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val rawVoiceLevel: Flow<Float> = voiceBinder.flatMapLatest { binder -> binder?.rawVoiceLevel ?: flowOf(0f) }
+
     private var voiceStateJob: Job? = null
     private var voiceAnswerStateJob: Job? = null
     private var isBound = false
@@ -60,7 +69,7 @@ class StudySessionVoiceGateway @Inject constructor(
                 return
             }
             val binder = service as? StudySessionVoiceService.LocalBinder ?: return
-            voiceBinder = binder
+            voiceBinder.value = binder
             binder.loadSession(pendingCards, pendingStartIndex, pendingSubcategoryName)
             // setSpeechRate/setVoice can land before the async bind completes (voiceBinder was
             // still null), so replay whatever was requested in the meantime.
@@ -73,7 +82,7 @@ class StudySessionVoiceGateway @Inject constructor(
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            voiceBinder = null
+            voiceBinder.value = null
         }
     }
 
@@ -97,11 +106,11 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun updateQueue(cards: List<Flashcard>) {
         val voiceCards = cards.toVoiceFlashcards()
         pendingCards = voiceCards
-        voiceBinder?.updateQueue(voiceCards)
+        voiceBinder.value?.updateQueue(voiceCards)
     }
 
     override fun stop() {
-        voiceBinder?.stopPlayback()
+        voiceBinder.value?.stopPlayback()
         unbind()
         _state.value = VoicePlaybackState()
         _voiceAnswerState.value = VoiceAnswerState()
@@ -110,43 +119,43 @@ class StudySessionVoiceGateway @Inject constructor(
     }
 
     override fun togglePlayPause() {
-        voiceBinder?.togglePlayPause()
+        voiceBinder.value?.togglePlayPause()
     }
 
     override fun rewindToNext() {
-        voiceBinder?.moveToNextCard()
+        voiceBinder.value?.moveToNextCard()
     }
 
     override fun rewindToPrevious() {
-        voiceBinder?.moveToPreviousCard()
+        voiceBinder.value?.moveToPreviousCard()
     }
 
     override fun restartCurrentCard() {
-        voiceBinder?.restartCurrentCardPlayback()
+        voiceBinder.value?.restartCurrentCardPlayback()
     }
 
     override fun showAnswer() {
-        voiceBinder?.skipToCardAnswerPlayback()
+        voiceBinder.value?.skipToCardAnswerPlayback()
     }
 
     override fun setSpeechRate(rate: Float) {
         pendingSpeechRate = rate
-        voiceBinder?.setPlaybackSpeechRate(rate)
+        voiceBinder.value?.setPlaybackSpeechRate(rate)
     }
 
     override fun setVoice(voiceId: String?) {
         pendingVoiceId = voiceId
-        voiceBinder?.setVoice(voiceId)
+        voiceBinder.value?.setVoice(voiceId)
     }
 
     override fun setVoiceAnswering(enabled: Boolean) {
         pendingVoiceAnswering = enabled
-        voiceBinder?.setVoiceAnswering(enabled)
+        voiceBinder.value?.setVoiceAnswering(enabled)
     }
 
     override fun setNextSilenceWillPauseSession(willPause: Boolean) {
         pendingNextSilenceWillPauseSession = willPause
-        voiceBinder?.setNextSilenceWillPauseSession(willPause)
+        voiceBinder.value?.setNextSilenceWillPauseSession(willPause)
     }
 
     private fun collectVoiceState(binder: StudySessionVoiceService.LocalBinder) {
@@ -192,7 +201,7 @@ class StudySessionVoiceGateway @Inject constructor(
             runCatching { context.unbindService(serviceConnection) }
             isBound = false
         }
-        voiceBinder = null
+        voiceBinder.value = null
     }
 
     private fun List<Flashcard>.toVoiceFlashcards(): List<VoiceFlashcard> = map { card ->

@@ -24,6 +24,7 @@ import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
+import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -37,7 +38,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSessi
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
-import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingServiceError
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
@@ -62,11 +64,16 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import java.time.Instant
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -945,6 +952,256 @@ class RatedStudySessionViewModelTest {
         viewModel.state.value.lastVoiceAnswerGrade shouldBe grade
     }
 
+    @Test
+    fun `voice sheet mode is Transport while the question is read`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `voice sheet mode is Transport before voice answering is enabled`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `voice sheet mode is Listening while listening or hearing speech`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeechDetected)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
+    }
+
+    @Test
+    fun `voice sheet mode is Pending while grading without a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = " ")
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+    }
+
+    @Test
+    fun `voice sheet mode is GradingWithTranscript while grading with a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = SPOKEN_TRANSCRIPT)
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.GradingWithTranscript(SPOKEN_TRANSCRIPT)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Failed just below the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 39) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Failed, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Partial at the bottom of the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 40) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Partial at the top of the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 79) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Graded as Correct at the bottom of the Correct band`() = runTest(mainDispatcherRule.testDispatcher) {
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 80) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Correct, GRADE_RATIONALE)
+    }
+
+    @Test
+    fun `voice sheet mode is Pending while speaking a notice without a grade`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+    }
+
+    @Test
+    fun `a silence skip shows Pending during its notice with the skip message, then Transport`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+            advanceUntilIdle()
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe VoiceAnswerSilenceSkip
+            viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+        }
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+        viewModel.state.value.isVoiceAnswerPaused shouldBe false
+    }
+
+    @Test
+    fun `a pausing silence shows Pending until its notice finishes, then the paused Transport`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        repeat(2) { emitSilenceTimeout() }
+
+        viewModel.messages.test {
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+            advanceUntilIdle()
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe VoiceAnswerSilencePause
+        }
+        // The pause stops voice answering, which resets its state while the notice keeps playing.
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
+        advanceUntilIdle()
+        viewModel.state.value.isVoiceAnswerPaused shouldBe true
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `a capture failure shows Pending until its notice finishes, then the paused Transport`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                isEnabled = true,
+                phase = VoiceAnswerPhase.WaitingForQuestion,
+                error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable),
+                isShortNoticeSpeaking = true,
+            )
+            advanceUntilIdle()
+
+            awaitItem() shouldBe VoiceAnswerCaptureUnavailable
+        }
+        viewModel.state.value.isVoiceAnswerPaused shouldBe true
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
+        advanceUntilIdle()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
+        advanceUntilIdle()
+
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `a grading failure without a connection shows Pending with the offline message`() = runTest(mainDispatcherRule.testDispatcher) {
+        messageAndSheetModeForGradingFailure(VoiceAnswerFailureReason.GradingFailed.NoConnection) shouldBe (VoiceAnswerGradingOffline to RatedVoiceSheetMode.Pending)
+    }
+
+    @Test
+    fun `a grading service failure shows Pending with the service error message`() = runTest(mainDispatcherRule.testDispatcher) {
+        messageAndSheetModeForGradingFailure(VoiceAnswerFailureReason.GradingFailed.ServiceError) shouldBe (VoiceAnswerGradingServiceError to RatedVoiceSheetMode.Pending)
+    }
+
+    private suspend fun TestScope.messageAndSheetModeForGradingFailure(failure: VoiceAnswerFailureReason.GradingFailed): Pair<RatedStudySessionMessage, RatedVoiceSheetMode> {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        lateinit var message: RatedStudySessionMessage
+        viewModel.messages.test {
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = SPOKEN_TRANSCRIPT)
+            advanceUntilIdle()
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                isEnabled = true,
+                phase = VoiceAnswerPhase.SpeakingNotice,
+                sanitizedTranscript = SPOKEN_TRANSCRIPT,
+                error = failure,
+                isShortNoticeSpeaking = true,
+            )
+            advanceUntilIdle()
+            message = awaitItem()
+        }
+        return message to viewModel.state.value.voiceSheetMode
+    }
+
+    private fun TestScope.voiceSheetModeWhileSpeakingGrade(gradePercent: Int): RatedVoiceSheetMode {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val grade = VoiceAnswerGrade(sanitizedTranscript = SPOKEN_TRANSCRIPT, gradePercent = gradePercent, feedback = GRADE_RATIONALE)
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, lastGrade = grade)
+        advanceUntilIdle()
+
+        return viewModel.state.value.voiceSheetMode
+    }
+
+    @Test
+    fun `voice sheet mode is Transport while paused, whatever the phase`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+            isEnabled = true,
+            phase = VoiceAnswerPhase.WaitingForQuestion,
+            error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)),
+        )
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+        advanceUntilIdle()
+
+        viewModel.state.value.isVoiceAnswerPaused shouldBe true
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `voice bars levels start at rest and shape the gateway raw voice level`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.voiceBarsLevels.test {
+            awaitItem() shouldBe List(FlashcardsVoiceCaptureIndicatorDefaults.BAR_COUNT) { 0f }
+            // Lets stateIn subscribe upstream first; the fake's SharedFlow drops emissions with no subscriber.
+            runCurrent()
+
+            voiceGateway.rawVoiceLevelFlow.emit(SPOKEN_RAW_VOICE_LEVEL)
+            advanceTimeBy(FlashcardsVoiceCaptureIndicatorDefaults.LEVEL_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+
+            awaitItem() shouldBe listOf(SPOKEN_RAW_VOICE_LEVEL, 0f, 0f, 0f, 0f)
+        }
+    }
+
     /**
      * Three [MutableStateFlow] writes, each followed by [advanceUntilIdle], so the collector
      * actually observes every intermediate phase — writing SpeakingNotice twice in a row without
@@ -1175,10 +1432,10 @@ class RatedStudySessionViewModelTest {
                     voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
                         isEnabled = true,
                         phase = VoiceAnswerPhase.SpeakingNotice,
-                        error = VoiceAnswerFailureReason.GradingFailed("boom"),
+                        error = VoiceAnswerFailureReason.GradingFailed.ServiceError,
                     )
                     advanceUntilIdle()
-                    awaitItem() shouldBe VoiceAnswerGradingFailed
+                    awaitItem() shouldBe VoiceAnswerGradingServiceError
                     voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
                     advanceUntilIdle()
                 }
@@ -1276,7 +1533,7 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `isAnswerRevealed stays false while a grading-failure notice is speaking`() =
+    fun `isAnswerRevealed stays true while a grading-failure notice is speaking`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
@@ -1289,13 +1546,13 @@ class RatedStudySessionViewModelTest {
             voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
                 isEnabled = true,
                 phase = VoiceAnswerPhase.SpeakingNotice,
-                error = VoiceAnswerFailureReason.GradingFailed("boom"),
+                error = VoiceAnswerFailureReason.GradingFailed.ServiceError,
             )
             advanceUntilIdle()
             voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
             advanceUntilIdle()
 
-            viewModel.state.value.isAnswerRevealed shouldBe false
+            viewModel.state.value.isAnswerRevealed shouldBe true
         }
 
     @Test
@@ -1509,6 +1766,9 @@ class RatedStudySessionViewModelTest {
 
     private companion object {
         const val FIXED_SEED = 42L
+        const val SPOKEN_RAW_VOICE_LEVEL = 0.9f
+        const val SPOKEN_TRANSCRIPT = "remember keeps state across recompositions"
+        const val GRADE_RATIONALE = "You named the key difference."
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value
@@ -1536,6 +1796,9 @@ private class FakeVoiceGateway : VoiceGateway {
 
     val voiceAnswerStateFlow = MutableStateFlow(VoiceAnswerState())
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
+
+    val rawVoiceLevelFlow = MutableSharedFlow<Float>()
+    override val rawVoiceLevel: Flow<Float> = rawVoiceLevelFlow
 
     var lastVoiceAnswering: Boolean? = null
     var lastNextSilenceWillPauseSession: Boolean? = null

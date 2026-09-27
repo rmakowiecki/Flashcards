@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeVoiceDemoGateway : VoiceDemoGateway {
     override val state = MutableStateFlow<VoiceDemoState>(VoiceDemoState.Idle)
-    override val levels = MutableSharedFlow<List<Float>>()
+    override val rawVoiceLevel = MutableSharedFlow<Float>()
 
     /** What [finishRecording] returns; the matching end state is applied alongside it. */
     var finishRecordingOutcome: VoiceDemoRecordingResult = Captured
