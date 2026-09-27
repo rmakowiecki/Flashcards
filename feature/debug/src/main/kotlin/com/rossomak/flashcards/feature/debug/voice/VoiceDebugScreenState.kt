@@ -7,6 +7,7 @@ data class VoiceDebugScreenState(
     val isSpeechDetected: Boolean = false,
     val vadSpeechProbability: Float = 0f,
     val hasCapturedUtterance: Boolean = false,
+    val isPlayingLastAnswer: Boolean = false,
     val capturedUtteranceDurationMs: Long = 0L,
     val vadEventLog: List<String> = emptyList(),
     val isRecordingClip: Boolean = false,

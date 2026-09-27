@@ -10,4 +10,7 @@ sealed interface OnboardingMessage {
 
     /** "Test your voice" asked for the microphone again and the system still refused without prompting. */
     data object MicPermissionStillDenied : OnboardingMessage
+
+    /** The user stopped the voice test before saying anything long enough to keep. */
+    data object NothingCaptured : OnboardingMessage
 }
