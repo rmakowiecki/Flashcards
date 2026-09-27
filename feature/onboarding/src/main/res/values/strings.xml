@@ -78,7 +78,6 @@
     <string name="voice_privacy_open_settings_button">Open settings</string>
     <string name="voice_privacy_listening_cd">Listening for your answer</string>
     <string name="voice_privacy_playing_cd">Playing back your transformed voice</string>
-    <string name="voice_privacy_mic_cd">Microphone</string>
     <string name="voice_privacy_stop_button">Stop recording</string>
     <string name="voice_privacy_processing_hint">Processing…</string>
     <string name="voice_privacy_nothing_captured_message">Didn\'t catch anything. Try again and speak a little longer.</string>
