@@ -6,9 +6,11 @@ import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -27,9 +29,10 @@ class DefaultSessionSubmissionRepositoryTest {
 
     private val localDataSource = FakePendingSessionSubmissionLocalDataSource()
     private val drainScheduler: SessionSubmissionDrainScheduler = mockk(relaxed = true)
+    private val authRepository = FakeAuthRepository().apply { userToReturn = SIGNED_IN_USER }
 
     private fun createRepository(): DefaultSessionSubmissionRepository =
-        DefaultSessionSubmissionRepository(localDataSource, drainScheduler)
+        DefaultSessionSubmissionRepository(localDataSource, drainScheduler, authRepository)
 
     @Before
     fun setUp() {
@@ -69,13 +72,13 @@ class DefaultSessionSubmissionRepositoryTest {
     )
 
     @Test
-    fun `submitSession appends the mapped session to the local queue and schedules a drain`() = runTest {
+    fun `submitSession appends the mapped session stamped with the signed-in uid and schedules a drain`() = runTest {
         val session = sessionResult()
 
         val result = createRepository().submitSession(session)
 
         result.isSuccess shouldBe true
-        localDataSource.listAll() shouldBe listOf(session.toDto())
+        localDataSource.listAll() shouldBe listOf(session.toDto(SIGNED_IN_USER.uid))
         verify(exactly = 1) { drainScheduler.scheduleDrain() }
     }
 
@@ -89,9 +92,20 @@ class DefaultSessionSubmissionRepositoryTest {
     }
 
     @Test
+    fun `with nobody signed in submitSession returns a failure Result without queuing or scheduling`() = runTest {
+        authRepository.userToReturn = null
+
+        val result = createRepository().submitSession(sessionResult())
+
+        result.isFailure shouldBe true
+        localDataSource.listAll() shouldBe emptyList()
+        verify(exactly = 0) { drainScheduler.scheduleDrain() }
+    }
+
+    @Test
     fun `a local append failure is caught, logged and returned as a failure Result, never thrown`() = runTest {
         val failingLocalDataSource = ThrowingPendingSessionSubmissionLocalDataSource()
-        val repository = DefaultSessionSubmissionRepository(failingLocalDataSource, drainScheduler)
+        val repository = DefaultSessionSubmissionRepository(failingLocalDataSource, drainScheduler, authRepository)
 
         val result = repository.submitSession(sessionResult())
 
@@ -103,10 +117,14 @@ class DefaultSessionSubmissionRepositoryTest {
     @Test
     fun `a cancellation during local append is rethrown, never caught as a failure Result`() = runTest {
         val cancellingLocalDataSource = CancellingPendingSessionSubmissionLocalDataSource()
-        val repository = DefaultSessionSubmissionRepository(cancellingLocalDataSource, drainScheduler)
+        val repository = DefaultSessionSubmissionRepository(cancellingLocalDataSource, drainScheduler, authRepository)
 
         shouldThrow<CancellationException> { repository.submitSession(sessionResult()) }
         verify(exactly = 0) { drainScheduler.scheduleDrain() }
+    }
+
+    private companion object {
+        val SIGNED_IN_USER = AuthUser(uid = "uid-1", email = "user@example.com", displayName = "User", photoUrl = null)
     }
 }
 
