@@ -315,6 +315,7 @@ class FastStudySessionViewModel @Inject constructor(
                 cards = flashcards,
                 startIndex = currentCardIndex,
                 subcategoryName = sessionTitle,
+                isVoiceAnsweringSession = false,
             )
         }
         voiceGateway.setSpeechRate(sessionVoiceSettings.speechRate)

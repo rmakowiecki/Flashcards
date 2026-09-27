@@ -911,6 +911,7 @@ class RatedStudySessionViewModelTest {
 
             voiceGateway.startCalls shouldBe 1
             voiceGateway.lastStartCards?.map { it.id } shouldBe route.cardIds
+            voiceGateway.lastStartIsVoiceAnsweringSession shouldBe true
             voiceGateway.lastVoiceAnswering shouldBe true
         }
 
@@ -1807,6 +1808,7 @@ private class FakeVoiceGateway : VoiceGateway {
     var lastStartCards: List<Flashcard>? = null
     var lastStartIndex: Int? = null
     var lastStartSubcategoryName: String? = null
+    var lastStartIsVoiceAnsweringSession: Boolean? = null
     var updateQueueCalls = 0
     var lastUpdateQueueCards: List<Flashcard>? = null
     var togglePlayPauseCalls = 0
@@ -1818,11 +1820,12 @@ private class FakeVoiceGateway : VoiceGateway {
     var lastSpeechRate: Float? = null
     var lastVoiceId: String? = null
 
-    override fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String) {
+    override fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String, isVoiceAnsweringSession: Boolean) {
         startCalls++
         lastStartCards = cards
         lastStartIndex = startIndex
         lastStartSubcategoryName = subcategoryName
+        lastStartIsVoiceAnsweringSession = isVoiceAnsweringSession
     }
 
     override fun updateQueue(cards: List<Flashcard>) {

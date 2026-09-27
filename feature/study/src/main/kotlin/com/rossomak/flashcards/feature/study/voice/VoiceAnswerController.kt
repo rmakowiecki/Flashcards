@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndGradeSpokenAnswerUseCase
 import com.rossomak.flashcards.core.ui.composables.rating.labelRes
@@ -252,22 +253,32 @@ class VoiceAnswerController @Inject constructor(
                 voiceCaptureEngine.stopListening()
                 gradeUtterance(event.utterance.wavBytes)
             }
-            is VoiceCaptureEvent.CaptureFailed -> {
-                listenTimeoutJob?.cancel()
-                voiceCaptureEngine.stopListening()
-                _state.update {
-                    it.copy(
-                        phase = VoiceAnswerPhase.WaitingForQuestion,
-                        error = VoiceAnswerFailureReason.CaptureFailed(event.reason),
-                        isShortNoticeSpeaking = true,
-                    )
-                }
-                // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
-                // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
-                speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
-                startShortNoticeTimeout()
-            }
+            is VoiceCaptureEvent.CaptureFailed -> reportCaptureFailure(event.reason)
         }
+    }
+
+    /**
+     * Surfaces a capture failure, from the capture engine or from outside it, such as the service
+     * being refused the microphone foreground-service type. Ignored while voice answering is off,
+     * since there is no listening round to fail, and while a capture failure is already reported.
+     */
+    fun reportCaptureFailure(reason: VoiceCaptureFailureReason) {
+        with(_state.value) {
+            if (!isEnabled || error is VoiceAnswerFailureReason.CaptureFailed) return
+        }
+        listenTimeoutJob?.cancel()
+        voiceCaptureEngine.stopListening()
+        _state.update {
+            it.copy(
+                phase = VoiceAnswerPhase.WaitingForQuestion,
+                error = VoiceAnswerFailureReason.CaptureFailed(reason),
+                isShortNoticeSpeaking = true,
+            )
+        }
+        // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
+        // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
+        speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
+        startShortNoticeTimeout()
     }
 
     /**
