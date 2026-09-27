@@ -18,7 +18,7 @@ A short notice (silence skip, silence pause, grading failure, capture failure) a
 message, not content, so it has no controls. `VoiceAnswerState.isShortNoticeSpeaking` marks it. The flag survives
 `VoiceAnswerController.stop()`, because a pause stops voice answering while its own notice is still speaking. It
 clears when that utterance finishes, on `release()`, or after a 5 s safety timeout. While it is set, `Pending` wins
-over a pause; afterwards the sheet shows the next card's `Transport`, or the ordinary paused `Transport` with no
+over a pause, and the card the notice is about stays on screen; afterwards the sheet shows the next card's `Transport`, or the ordinary paused `Transport` with no
 special wording.
 
 The voice-settings cog exists only in `Transport`. Changing voice settings mid-round would create states the
@@ -54,7 +54,10 @@ name and the rationale. `VoiceAnswerGrade.gradePercent` stays, because it drives
 the cause chain, because the Firebase Functions SDK wraps a failed or timed-out request in its own exception with the
 `IOException` as the cause. Everything else is `ServiceError`, including an HTTP 503 and an entitlement rejection,
 since the server was reached. Each variant has its own snackbar and its own spoken notice; a hands-free user may
-never see the snackbar. The card answer is revealed for a grading failure, which already passed through grading,
+never see the snackbar. The card is requeued like a silence timeout (Failed gap, no Attempt, no Rating) and the next
+card follows. Three grading failures in a row pause the session the way three silences do; the two counters are
+independent, and only a graded answer or a resume resets them. The failure that pauses speaks and shows a pause message
+instead of its cause. The card answer is revealed for a grading failure, which already passed through grading,
 and stays revealed through its notice. It stays hidden for silence timeouts and capture failures.
 
 **The indicator's contract.** The `:core:ui` indicator does no timing. It takes a static

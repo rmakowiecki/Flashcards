@@ -61,4 +61,11 @@ interface VoiceGateway {
      * consecutive-silence count itself stays owned by the caller.
      */
     fun setNextSilenceWillPauseSession(willPause: Boolean)
+
+    /**
+     * The grading-failure counterpart of [setNextSilenceWillPauseSession]: whether the next
+     * grading failure is the one that pauses the session, so the pipeline speaks the pause
+     * notice instead of the per-cause one. The consecutive-failure count stays owned by the caller.
+     */
+    fun setNextGradingFailureWillPauseSession(willPause: Boolean)
 }

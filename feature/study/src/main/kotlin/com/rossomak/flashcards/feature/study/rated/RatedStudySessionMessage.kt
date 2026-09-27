@@ -21,6 +21,9 @@ sealed interface RatedStudySessionMessage {
 
     data object VoiceAnswerSilencePause : RatedStudySessionMessage
 
+    /** Grading failed several times in a row, so voice answering pauses. */
+    data object VoiceAnswerGradingPause : RatedStudySessionMessage
+
     /** A session restored after the microphone was revoked in system Settings; the session ends. */
     data object VoiceAnswerMicPermissionRevoked : RatedStudySessionMessage
 

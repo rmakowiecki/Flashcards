@@ -205,13 +205,19 @@ class RatedStudySessionViewModel @Inject constructor(
     // skip notice is still being spoken. The queue reducer itself (ratedSessionState) still updates
     // immediately — only what the user sees is held back — so the top of the screen keeps showing
     // the card the feedback is actually about instead of jumping to the next question mid-notice.
-    // Runs the moment the phase leaves SpeakingNotice (see observeVoiceAnswerState), whatever the
-    // reason (notice finished naturally, or voice answering was torn down mid-notice).
+    // Runs once the phase has left SpeakingNotice and no short notice is still speaking (see
+    // observeVoiceAnswerState), whatever the reason (notice finished naturally, or voice answering
+    // was torn down mid-notice, e.g. by a pause whose notice is still being spoken).
     private var pendingSessionSync: (() -> Unit)? = null
 
     // Session-scoped, not per-card: counts consecutive silence timeouts, reset by any
     // graded answer, and pauses the session on reaching CONSECUTIVE_SILENCE_PAUSE_THRESHOLD.
     private var consecutiveSilenceCount = 0
+
+    // Session-scoped like consecutiveSilenceCount and independent of it: counts consecutive grading
+    // failures, reset only by a graded answer, and pauses the session on reaching
+    // CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD, so an offline session never cycles the deck forever.
+    private var consecutiveGradingFailureCount = 0
 
     // Session-scoped like the rest of the routed config: a mid-session change updates only this
     // running session unless the user checks "keep as my default" (ADR-0030), so it lives in a
@@ -399,13 +405,12 @@ class RatedStudySessionViewModel @Inject constructor(
                 // silence-timed-out round, never re-triggered by an equal-value re-collection.
                 val justEnteredSpeakingNotice = voiceAnswer.phase == VoiceAnswerPhase.SpeakingNotice &&
                     previousVoiceAnswerPhase != VoiceAnswerPhase.SpeakingNotice
-                // Mirrors justEnteredSpeakingNotice the other way: fires exactly once, the instant
-                // the grade/skip notice stops being the active phase — whether that's the natural
-                // WaitingForQuestion it flips to once the notice finishes speaking, or voice
-                // answering getting torn down mid-notice. Either way the deferred sync below is safe
-                // to run: it's idempotent and there is nothing left mid-notice to interrupt.
-                val justLeftSpeakingNotice = previousVoiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice &&
-                    voiceAnswer.phase != VoiceAnswerPhase.SpeakingNotice
+                // The deferred sync below runs once the grade/skip notice is neither the active phase
+                // nor still being spoken — the natural WaitingForQuestion it flips to once the notice
+                // finishes, or voice answering torn down mid-notice. A pause tears it down while its
+                // own short notice keeps speaking, so the next card also waits for that notice.
+                val isNoticeOver = voiceAnswer.phase != VoiceAnswerPhase.SpeakingNotice &&
+                    !voiceAnswer.isShortNoticeSpeaking
                 previousVoiceAnswerPhase = voiceAnswer.phase
                 _state.update {
                     it.copy(
@@ -422,7 +427,7 @@ class RatedStudySessionViewModel @Inject constructor(
                             voiceAnswer.phase == VoiceAnswerPhase.Grading,
                     )
                 }
-                if (justLeftSpeakingNotice) {
+                if (isNoticeOver) {
                     pendingSessionSync?.invoke()
                     pendingSessionSync = null
                 }
@@ -435,10 +440,9 @@ class RatedStudySessionViewModel @Inject constructor(
                 val grade = voiceAnswer.lastGrade
                 when {
                     grade != null -> onVoiceGraded(grade, voiceAnswer.lastGradedCardId)
-                    // A grading/transcription failure is not counted as a silence timeout — it
-                    // just surfaces a snackbar, leaving the queue and consecutiveSilenceCount
-                    // untouched.
-                    error is VoiceAnswerFailureReason.GradingFailed -> _messages.tryEmit(error.toMessage())
+                    // A grading/transcription failure is not counted as a silence timeout: it has
+                    // its own counter and snackbar, though it requeues the card the same way.
+                    error is VoiceAnswerFailureReason.GradingFailed -> onVoiceGradingFailed(error)
                     else -> onVoiceSilenceTimeout()
                 }
             }
@@ -448,7 +452,7 @@ class RatedStudySessionViewModel @Inject constructor(
     /**
      * The one path a voice grade applies a Rating through — [onAttemptRating] itself, exactly like a
      * manual tap, using the fixed grade-band mapping. An actual graded utterance is the only proof someone is there, so this is also the
-     * one place [consecutiveSilenceCount] resets.
+     * one place [consecutiveSilenceCount] and [consecutiveGradingFailureCount] reset during play.
      *
      * [gradedCardId] guards against grading a card the reducer head has already moved past — the
      * Rated voice transport still allows Next while a question is being read (before listening
@@ -461,7 +465,9 @@ class RatedStudySessionViewModel @Inject constructor(
             return
         }
         consecutiveSilenceCount = 0
+        consecutiveGradingFailureCount = 0
         pushNextSilenceWillPauseSession()
+        pushNextGradingFailureWillPauseSession()
         applyAttemptRating(grade.toFlashcardAttemptRating(), deferSync = true)
     }
 
@@ -486,9 +492,32 @@ class RatedStudySessionViewModel @Inject constructor(
         pendingSessionSync = { syncStateFromRatedSession() }
         if (consecutiveSilenceCount >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD) {
             _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilencePause)
-            pauseForRepeatedSilence()
+            pauseVoiceAnswering()
         } else {
             _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilenceSkip)
+        }
+    }
+
+    /**
+     * A voice answer that could not be graded: requeued exactly like [onVoiceSilenceTimeout] (no
+     * Attempt, no Rating, deferred screen sync), so the next card follows as the spoken notice
+     * promises. Counted on its own: a silence neither resets nor advances
+     * [consecutiveGradingFailureCount], and reaching its threshold pauses the session the same way.
+     */
+    private fun onVoiceGradingFailed(failureReason: VoiceAnswerFailureReason.GradingFailed) {
+        ratedSessionState = ratedSessionState?.let(::requeueAfterSilence)
+        consecutiveGradingFailureCount++
+        pushNextGradingFailureWillPauseSession()
+        // Grading revealed this card's answer; the next card must start hidden, as after a Rating.
+        pendingSessionSync = {
+            _state.update { it.copy(isAnswerRevealed = false) }
+            syncStateFromRatedSession()
+        }
+        if (consecutiveGradingFailureCount >= CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD) {
+            _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerGradingPause)
+            pauseVoiceAnswering()
+        } else {
+            _messages.tryEmit(failureReason.toMessage())
         }
     }
 
@@ -502,20 +531,28 @@ class RatedStudySessionViewModel @Inject constructor(
         voiceGateway.setNextSilenceWillPauseSession(willPause)
     }
 
+    /** The grading-failure counterpart of [pushNextSilenceWillPauseSession], pushed at the same points. */
+    private fun pushNextGradingFailureWillPauseSession() {
+        val willPause = consecutiveGradingFailureCount + 1 >= CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD
+        voiceGateway.setNextGradingFailureWillPauseSession(willPause)
+    }
+
     /**
      * Pausing is not ending: no Terminal State, no navigation event, the queue untouched. Playback
      * and the microphone stop; only the resume affordance stays live.
      */
-    private fun pauseForRepeatedSilence() {
+    private fun pauseVoiceAnswering() {
         if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
         voiceGateway.setVoiceAnswering(false)
         _state.update { it.copy(isVoiceAnswerPaused = true) }
     }
 
-    /** Re-arms voice answering on the same card, counter back at zero. */
+    /** Re-arms voice answering on the same card, both counters back at zero. */
     fun onResumeSession() {
         consecutiveSilenceCount = 0
+        consecutiveGradingFailureCount = 0
         pushNextSilenceWillPauseSession()
+        pushNextGradingFailureWillPauseSession()
         _state.update { it.copy(isVoiceAnswerPaused = false) }
         voiceGateway.setVoiceAnswering(true)
         if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
@@ -543,9 +580,10 @@ class RatedStudySessionViewModel @Inject constructor(
      * mid-[VoiceAnswerPhase.SpeakingNotice] — the feedback about to be read is about the card still
      * on screen, so the queue reducer updates now (the [VoiceGateway] still needs the reordered
      * queue reseeded to know what's next once the notice ends) but everything the user actually
-     * sees — [RatedStudySessionScreenState.currentCard]/`currentCardRatings`, the answer-reveal
+     * sees — [RatedStudySessionScreenState.currentCard] and the progress counters, the answer-reveal
      * reset, and the terminal navigation event — is captured into [pendingSessionSync] and only
-     * runs once that notice actually finishes (observeVoiceAnswerState's SpeakingNotice-exit edge).
+     * runs once that notice actually finishes (see observeVoiceAnswerState).
+     * The one exception is the rated card's attempt markers, which show the new Rating at once.
      */
     private fun applyAttemptRating(rating: FlashcardAttemptRating, deferSync: Boolean) {
         val machine = ratedSessionState ?: return
@@ -559,7 +597,16 @@ class RatedStudySessionViewModel @Inject constructor(
             syncStateFromRatedSession()
             if (outcome.state.isComplete) terminate(abandoned = false)
         }
-        if (deferSync) pendingSessionSync = applyEffects else applyEffects()
+        if (deferSync) {
+            // The markers follow the grade at once, together with the Graded sheet and its spoken
+            // feedback. They describe the rated card, never the machine's new head: rate() has
+            // already removed or re-inserted that card, so machine.currentCardRatings would name
+            // the next card. The deferred sync overwrites them when the card itself changes.
+            _state.update { it.copy(currentCardRatings = machine.currentCardRatings + rating) }
+            pendingSessionSync = applyEffects
+        } else {
+            applyEffects()
+        }
     }
 
     private fun ensureVoiceGatewayStarted() {
@@ -839,6 +886,7 @@ class RatedStudySessionViewModel @Inject constructor(
     private companion object {
         const val EXTENDED_CONTEXT_ADVANCE_DELAY_MS = 500L
         const val CONSECUTIVE_SILENCE_PAUSE_THRESHOLD = 3
+        const val CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD = 3
         const val SECONDS_PER_MINUTE = 60
         const val MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS = 4000L
     }

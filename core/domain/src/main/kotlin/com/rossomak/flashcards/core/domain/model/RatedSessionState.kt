@@ -135,7 +135,8 @@ fun rate(state: RatedSessionState, rating: FlashcardAttemptRating): RatedSession
  * A silence timeout on [state]'s current (head) card: no Attempt, no Rating — the record comes back
  * unchanged, using the Failed gap range. A card nobody answered still needs asking, and Failed's gap
  * is the shortest one available. Never
- * terminal — an un-rated card cannot exhaust its Attempts.
+ * terminal — an un-rated card cannot exhaust its Attempts. A voice answer that could not be graded
+ * is requeued the same way: it produced no Rating either.
  */
 fun requeueAfterSilence(state: RatedSessionState): RatedSessionState {
     val record = state.queue.first()
