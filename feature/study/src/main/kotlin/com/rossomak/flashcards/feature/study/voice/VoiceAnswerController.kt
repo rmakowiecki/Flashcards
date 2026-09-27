@@ -178,7 +178,7 @@ class VoiceAnswerController @Inject constructor(
         releaseWakeLock()
         activeCard = null
         nextSilenceWillPauseSession = false
-        _state.value = VoiceAnswerState(isShortNoticeSpeaking = _state.value.isShortNoticeSpeaking)
+        _state.update { VoiceAnswerState(isShortNoticeSpeaking = it.isShortNoticeSpeaking) }
     }
 
     /** Full teardown when the owning service dies. */
