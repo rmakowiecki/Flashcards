@@ -1,8 +1,9 @@
 import * as admin from "firebase-admin";
+import * as logger from "firebase-functions/logger";
 import { HttpsError } from "firebase-functions/v2/https";
+import { loadXpConfig } from "./xpConfig";
 import {
   DEFAULT_SCORING_STATE,
-  DEFAULT_XP_CONFIG,
   ScoringState,
   StreakAndGoalInput,
   XpBreakdown,
@@ -449,13 +450,22 @@ function readXpBreakdownFields(data: FirebaseFirestore.DocumentData): XpBreakdow
  *    sessions committed since would have moved it on.
  * 2. Otherwise, reads every touched Subcategory's prior progress and the account's prior
  *    [ScoringState], computes the new progress writes, the [XpBreakdown] and the new [ScoringState]
- *    (mirroring `CommitStudySessionUseCase`/`CalculateSessionXpUseCase`), and writes all four
+ *    (mirroring `CommitStudySessionUseCase`/`CalculateSessionXpUseCase`) with the server-owned XP
+ *    configuration (`config/xp`, see `xpConfig.ts`), and writes all four
  *    documents — the session document, every touched Subcategory's progress, the progress summary's
  *    increments, and the full scoring-state overwrite — before returning the freshly computed result.
  */
 export async function submitStudySession(uid: string, request: ValidatedSubmitStudySessionRequest): Promise<SubmitStudySessionResult> {
   const db = admin.firestore();
   const sessionRef = sessionDocRef(db, uid, request.sessionId);
+
+  // A plain read outside the transaction: the configuration is admin-edited, not part of this
+  // commit's consistency boundary, and a transaction retry has no reason to read it again. A missing
+  // or broken document never rejects a submission; it scores with the bundled default instead.
+  const { config, fallbackReason } = await loadXpConfig(db);
+  if (fallbackReason !== undefined) {
+    logger.error(`XP configuration unavailable, scoring with the bundled default: ${fallbackReason}`);
+  }
 
   return db.runTransaction(async (transaction) => {
     const sessionSnapshot = await transaction.get(sessionRef);
@@ -545,7 +555,6 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
     const todayTotalMinutes = Math.floor(todaySeconds / SECONDS_PER_MINUTE);
 
     const currentScoringState = readScoringState(scoringSnapshot);
-    const config = DEFAULT_XP_CONFIG;
     const streakAndGoalInput: StreakAndGoalInput = {
       studyDate: derivedStudyDate,
       dailyGoalMinutes: request.dailyGoalMinutes,

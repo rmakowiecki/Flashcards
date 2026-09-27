@@ -56,6 +56,23 @@ so stale card content never lingers. Three collections are written:
   cards bin-packed by byte size into a map keyed by card id (not an array — see ADR-0037),
   typically one shard per subcategory
 
+## XP configuration
+
+`seed_xp_config.py` writes the server-owned XP configuration document, `config/xp`, from
+`testdata/xp-scoring/default-xp-config.json` at the repo root. The `submitStudySession` function scores
+every session with that document, and the app fetches it for its XP preview. The script validates the
+file first, then overwrites the whole document, so rerunning it resets any console edit to the defaults.
+
+```bash
+python3 seed_xp_config.py --dry-run      # validate and print the document, no writes
+python3 seed_xp_config.py                # overwrite config/xp (same credentials as above)
+```
+
+To change live XP rates without an app release or a function deploy, edit `config/xp` in the Firebase
+console. Every field must stay present and numeric, award fields must be integers, `cardDemastered` must
+be zero or negative, and `levelCurveBase` must be positive. The function scores with its bundled default
+and logs an error while the document is missing or invalid.
+
 ## Notes
 
 - `.tmp/` and any `*service-account*.json` / `*.cred.json` here are gitignored.

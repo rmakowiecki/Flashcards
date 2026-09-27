@@ -26,10 +26,10 @@ export interface XpConfig {
 }
 
 /**
- * The server's own authoritative configuration, hardcoded here as `XpConfig.kt`'s documented defaults.
- * A session payload's own `xpConfig` snapshot (if the client sends one) is never read for scoring:
- * scoring inputs are validated against the server's own stored configuration — today that configuration
- * has exactly one source, this constant.
+ * The bundled fallback configuration, identical to `XpConfig.kt`'s constructor defaults and to the shared
+ * default configuration file. Scoring normally uses the server-owned `config/xp` document (see
+ * `xpConfig.ts`); this constant applies only when that document is missing, invalid or unreadable. A
+ * session payload's own `xpConfig` snapshot (if the client sends one) is never read for scoring.
  */
 export const DEFAULT_XP_CONFIG: XpConfig = {
   newCardStudied: 10,

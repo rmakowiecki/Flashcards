@@ -9,6 +9,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
+    // config/xp: the server-owned XP configuration, every XpConfig field in one document.
+    // submitStudySession scores with it and the client fetches it for its local XP preview.
+    // Readable by any signed-in user, a Guest included; written only by the Admin SDK
+    // (scripts/seed/seed_xp_config.py or a console edit), never by a client.
+    match /config/xp {
+      allow read: if request.auth != null;
+    }
+
     // categories/subcategories/shards (flashcard content) are curated shared
     // content with no owner field; clients may read but only the Admin SDK
     // (which bypasses these rules) may write.

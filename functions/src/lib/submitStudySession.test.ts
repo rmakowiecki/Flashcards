@@ -11,9 +11,11 @@
 // emulator and token round trip for zero extra coverage.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { after, before, describe, it } from "node:test";
+import { after, afterEach, before, describe, it } from "node:test";
 import * as admin from "firebase-admin";
 import { submitStudySession, validateSubmitStudySessionRequest } from "./submitStudySession";
+import { loadXpConfig, xpConfigDocRef } from "./xpConfig";
+import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 
 const TEST_PROJECT_ID = "flashcards-functions-test";
 
@@ -407,5 +409,94 @@ describe("submitStudySession — streak and daily goal", () => {
 
     const sessionBDoc = await admin.firestore().doc(`users/${uid}/sessions/${sessionB.sessionId}`).get();
     assert.equal(sessionBDoc.data()?.studyDate, DEFAULT_STUDY_DATE);
+  });
+});
+
+// The only tests in the suite that write `config/xp`. Every other test above relies on that document
+// being absent (scoring with DEFAULT_XP_CONFIG), so each test here deletes it again afterwards.
+describe("submitStudySession — server-owned XP configuration", () => {
+  // Every award distinct and none equal to its default, so a total can only come out right if every
+  // line read this configuration.
+  const CUSTOM_XP_CONFIG: XpConfig = {
+    newCardStudied: 3,
+    cardMastered: 7,
+    cardPartial: 11,
+    masteryDefended: 13,
+    cardDemastered: -17,
+    sessionCompleted: 19,
+    dailyGoalMet: 29,
+    streakPerDay: 31,
+    streakMaxPerDay: 37,
+    minuteStudied: 23,
+    levelCurveBase: 2000,
+    levelCurveExponent: 1,
+  };
+
+  afterEach(async () => {
+    await xpConfigDocRef(admin.firestore()).delete();
+  });
+
+  it("scores with the document's values when the document is valid", async () => {
+    await xpConfigDocRef(admin.firestore()).set(CUSTOM_XP_CONFIG);
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    const result = await submitStudySession(randomUUID(), request);
+
+    assert.equal(result.breakdown.newCards, CUSTOM_XP_CONFIG.newCardStudied);
+    assert.equal(result.breakdown.mastered, CUSTOM_XP_CONFIG.cardMastered);
+    assert.equal(result.breakdown.timeStudied, CUSTOM_XP_CONFIG.minuteStudied);
+    assert.equal(result.breakdown.sessionCompletionBonus, CUSTOM_XP_CONFIG.sessionCompleted);
+    assert.equal(result.breakdown.streakBonus, CUSTOM_XP_CONFIG.streakPerDay);
+    assert.equal(result.breakdown.xpTotal, 3 + 7 + 23 + 19 + 31);
+    assert.equal(result.xpForNextLevel, 2000, "the level curve also comes from the document: ceil(2000 * 1^1 / 1000) * 1000");
+  });
+
+  it("scores with the bundled default when the document is missing, and still succeeds", async () => {
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    const result = await submitStudySession(randomUUID(), request);
+
+    assert.equal(result.breakdown.xpTotal, 10 + 100 + 10 + 500 + DEFAULT_STREAK_BONUS);
+    assert.equal(result.xpForNextLevel, 1000);
+  });
+
+  it("scores with the bundled default when the document is invalid, and still succeeds", async () => {
+    await xpConfigDocRef(admin.firestore()).set({ ...CUSTOM_XP_CONFIG, cardDemastered: 17 });
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    const result = await submitStudySession(randomUUID(), request);
+
+    assert.equal(result.breakdown.xpTotal, 10 + 100 + 10 + 500 + DEFAULT_STREAK_BONUS);
+    assert.equal(result.xpForNextLevel, 1000);
+  });
+});
+
+describe("loadXpConfig", () => {
+  afterEach(async () => {
+    await xpConfigDocRef(admin.firestore()).delete();
+  });
+
+  it("returns the document's values with no fallback reason", async () => {
+    const custom = { ...DEFAULT_XP_CONFIG, cardMastered: 200 };
+    await xpConfigDocRef(admin.firestore()).set(custom);
+
+    assert.deepEqual(await loadXpConfig(admin.firestore()), { config: custom });
+  });
+
+  it("falls back to the bundled default with a reason when the document is missing", async () => {
+    const loaded = await loadXpConfig(admin.firestore());
+
+    assert.deepEqual(loaded.config, DEFAULT_XP_CONFIG);
+    assert.match(loaded.fallbackReason ?? "", /does not exist/);
+  });
+
+  it("falls back to the bundled default with a reason when the document is invalid", async () => {
+    const { levelCurveBase, ...withoutLevelCurveBase } = DEFAULT_XP_CONFIG;
+    await xpConfigDocRef(admin.firestore()).set(withoutLevelCurveBase);
+
+    const loaded = await loadXpConfig(admin.firestore());
+
+    assert.deepEqual(loaded.config, DEFAULT_XP_CONFIG);
+    assert.match(loaded.fallbackReason ?? "", /invalid: levelCurveBase/);
   });
 });
