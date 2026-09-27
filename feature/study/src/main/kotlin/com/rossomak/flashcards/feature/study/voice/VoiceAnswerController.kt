@@ -129,12 +129,19 @@ class VoiceAnswerController @Inject constructor(
     // needing to know the count itself.
     private var nextSilenceWillPauseSession = false
 
+    // The grading-failure counterpart of nextSilenceWillPauseSession, pushed the same way.
+    private var nextGradingFailureWillPauseSession = false
+
     fun setActiveCard(card: VoiceFlashcard?) {
         activeCard = card
     }
 
     fun setNextSilenceWillPauseSession(willPause: Boolean) {
         nextSilenceWillPauseSession = willPause
+    }
+
+    fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
+        nextGradingFailureWillPauseSession = willPause
     }
 
     fun start() {
@@ -178,6 +185,7 @@ class VoiceAnswerController @Inject constructor(
         releaseWakeLock()
         activeCard = null
         nextSilenceWillPauseSession = false
+        nextGradingFailureWillPauseSession = false
         _state.value = VoiceAnswerState(isShortNoticeSpeaking = _state.value.isShortNoticeSpeaking)
     }
 
@@ -229,12 +237,14 @@ class VoiceAnswerController @Inject constructor(
 
     private suspend fun onSilenceTimeout() {
         voiceCaptureEngine.stopListening()
-        _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true) }
+        // Picked before publishing SpeakingNotice: the ViewModel reacts to that state by pushing the
+        // next round's flag, or by pausing, which clears it through stop().
         val messageRes = if (nextSilenceWillPauseSession) {
             R.string.study_session_voice_answer_skip_pause_spoken_message
         } else {
             R.string.study_session_voice_answer_skip_spoken_message
         }
+        _state.update { it.copy(phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true) }
         speakNotice(context.getString(messageRes))
         startShortNoticeTimeout()
     }
@@ -319,19 +329,25 @@ class VoiceAnswerController @Inject constructor(
             .catch { error ->
                 loge(error) { "voice answer grading/upload failed" }
                 val failureReason = error.toGradingFailureReason()
+                // No screen to look at in this UX — failure must be audible (design doc §Upload
+                // failure handling; silent-drop was explicitly rejected), and it names the cause,
+                // since the snackbar saying the same may never be seen. The failure that pauses the
+                // session announces the pause instead of the cause. Picked before publishing
+                // SpeakingNotice, for the same reason as in onSilenceTimeout().
+                val messageRes = if (nextGradingFailureWillPauseSession) {
+                    R.string.study_session_voice_answer_grading_pause_spoken_message
+                } else {
+                    when (failureReason) {
+                        NoConnection -> R.string.study_session_voice_answer_offline_spoken_message
+                        ServiceError -> R.string.study_session_voice_answer_service_error_spoken_message
+                    }
+                }
                 _state.update {
                     it.copy(
                         phase = VoiceAnswerPhase.SpeakingNotice,
                         error = failureReason,
                         isShortNoticeSpeaking = true,
                     )
-                }
-                // No screen to look at in this UX — failure must be audible (design doc §Upload
-                // failure handling; silent-drop was explicitly rejected), and it names the cause,
-                // since the snackbar saying the same may never be seen.
-                val messageRes = when (failureReason) {
-                    NoConnection -> R.string.study_session_voice_answer_offline_spoken_message
-                    ServiceError -> R.string.study_session_voice_answer_service_error_spoken_message
                 }
                 speakNotice(context.getString(messageRes))
                 startShortNoticeTimeout()

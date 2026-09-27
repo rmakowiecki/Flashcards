@@ -63,6 +63,7 @@ import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingPause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingServiceError
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
@@ -271,6 +272,7 @@ private fun resolveRatedStudySessionMessage(context: Context, message: RatedStud
     VoiceAnswerGradingServiceError -> context.getString(R.string.study_session_voice_answer_service_error_message)
     VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
     VoiceAnswerSilencePause -> context.getString(R.string.study_session_voice_answer_skip_pause_message)
+    VoiceAnswerGradingPause -> context.getString(R.string.study_session_voice_answer_grading_pause_message)
     VoiceAnswerMicPermissionRevoked -> context.getString(R.string.study_session_voice_answer_mic_permission_revoked_message)
     VoiceAnswerCaptureUnavailable -> context.getString(R.string.study_session_voice_answer_capture_unavailable_message)
 }

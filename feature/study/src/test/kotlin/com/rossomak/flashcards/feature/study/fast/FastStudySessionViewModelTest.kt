@@ -999,4 +999,5 @@ private class FakeVoiceGateway : VoiceGateway {
     override fun setNextSilenceWillPauseSession(willPause: Boolean) {
         lastNextSilenceWillPauseSession = willPause
     }
+    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) = Unit
 }

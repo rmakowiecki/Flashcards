@@ -89,6 +89,10 @@ class StudySessionVoiceService : MediaSessionService() {
             voiceAnswerController.setNextSilenceWillPauseSession(willPause)
         }
 
+        fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
+            voiceAnswerController.setNextGradingFailureWillPauseSession(willPause)
+        }
+
         fun stopPlayback() = this@StudySessionVoiceService.stopPlayback()
     }
 

@@ -39,6 +39,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCur
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingPause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingServiceError
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
@@ -1220,6 +1221,16 @@ class RatedStudySessionViewModelTest {
         advanceUntilIdle()
     }
 
+    /** A grading failure round, with the same three-write shape as [emitSilenceTimeout]. */
+    private fun TestScope.emitGradingFailure(failure: VoiceAnswerFailureReason.GradingFailed = VoiceAnswerFailureReason.GradingFailed.NoConnection) {
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, error = failure, isShortNoticeSpeaking = true)
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
+        advanceUntilIdle()
+    }
+
     private fun TestScope.emitGrade(grade: VoiceAnswerGrade, cardId: String) {
         voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
         advanceUntilIdle()
@@ -1419,30 +1430,178 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a grading or transcription failure emits a snackbar message and is not counted as a silence`() =
+    fun `a grading failure re-queues the card within the Failed gap, records no Rating, and shows the next card after its notice`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadTenCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradingFailure()
+
+            viewModel.state.value.currentCard?.id shouldNotBe "card-1"
+            val index = viewModel.state.value.flashcards.indexOfFirst { it.id == "card-1" }
+            (index in StudySessionConfig.FAILED_REQUEUE_MIN_GAP..StudySessionConfig.FAILED_REQUEUE_MAX_GAP) shouldBe true
+            while (viewModel.state.value.currentCard?.id != "card-1") {
+                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+            }
+            viewModel.state.value.currentCardRatings shouldBe emptyList()
+        }
+
+    @Test
+    fun `a grading failure keeps showing its revealed card until the notice finishes, then shows the next card hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+            isEnabled = true,
+            phase = VoiceAnswerPhase.SpeakingNotice,
+            error = VoiceAnswerFailureReason.GradingFailed.NoConnection,
+            isShortNoticeSpeaking = true,
+        )
+        advanceUntilIdle()
+
+        viewModel.state.value.currentCard?.id shouldBe "card-1"
+        viewModel.state.value.isAnswerRevealed shouldBe true
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
+        advanceUntilIdle()
+
+        viewModel.state.value.currentCard?.id shouldBe "card-2"
+        viewModel.state.value.isAnswerRevealed shouldBe false
+    }
+
+    @Test
+    fun `three grading failures in a row pause the session with the grading pause message`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
             viewModel.messages.test {
-                repeat(3) {
-                    voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-                    advanceUntilIdle()
-                    voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                        isEnabled = true,
-                        phase = VoiceAnswerPhase.SpeakingNotice,
-                        error = VoiceAnswerFailureReason.GradingFailed.ServiceError,
-                    )
-                    advanceUntilIdle()
-                    awaitItem() shouldBe VoiceAnswerGradingServiceError
-                    voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-                    advanceUntilIdle()
-                }
+                emitGradingFailure(VoiceAnswerFailureReason.GradingFailed.NoConnection)
+                awaitItem() shouldBe VoiceAnswerGradingOffline
+                emitGradingFailure(VoiceAnswerFailureReason.GradingFailed.ServiceError)
+                awaitItem() shouldBe VoiceAnswerGradingServiceError
+                viewModel.state.value.isVoiceAnswerPaused shouldBe false
+
+                emitGradingFailure(VoiceAnswerFailureReason.GradingFailed.NoConnection)
+
+                awaitItem() shouldBe VoiceAnswerGradingPause
             }
-            // Three in a row — a real silence timeout would have paused by now.
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+            voiceGateway.lastVoiceAnswering shouldBe false
+        }
+
+    @Test
+    fun `a silence does not reset the grading failure count, so failure-silence-failure-failure pauses on the third failure`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradingFailure()
+            emitSilenceTimeout()
+            emitGradingFailure()
+            viewModel.state.value.isVoiceAnswerPaused shouldBe false
+
+            viewModel.messages.test {
+                emitGradingFailure()
+
+                awaitItem() shouldBe VoiceAnswerGradingPause
+            }
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+        }
+
+    @Test
+    fun `a grading failure does not reset the silence count, so silence-failure-silence-silence pauses on the third silence`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitSilenceTimeout()
+            emitGradingFailure()
+            emitSilenceTimeout()
+            viewModel.state.value.isVoiceAnswerPaused shouldBe false
+
+            viewModel.messages.test {
+                emitSilenceTimeout()
+
+                awaitItem() shouldBe VoiceAnswerSilencePause
+            }
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+        }
+
+    @Test
+    fun `a graded answer resets the grading failure count, so failure-failure-grade-failure does not pause`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            repeat(2) { emitGradingFailure() }
+            emitGrade(
+                grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 90, feedback = "f"),
+                cardId = viewModel.state.value.currentCard?.id.orEmpty(),
+            )
+
+            emitGradingFailure()
+
             viewModel.state.value.isVoiceAnswerPaused shouldBe false
         }
+
+    @Test
+    fun `resuming after a grading failure pause resets the grading failure count`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        repeat(3) { emitGradingFailure() }
+
+        viewModel.onResumeSession()
+
+        viewModel.state.value.isVoiceAnswerPaused shouldBe false
+        repeat(2) { emitGradingFailure() }
+        viewModel.state.value.isVoiceAnswerPaused shouldBe false
+    }
+
+    @Test
+    fun `the grading failure pause flag pushed to the gateway says whether the next failure pauses`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradingFailure()
+            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe false
+            emitGradingFailure()
+            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe true
+
+            emitGrade(
+                grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 90, feedback = "f"),
+                cardId = viewModel.state.value.currentCard?.id.orEmpty(),
+            )
+            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe false
+
+            repeat(3) { emitGradingFailure() }
+            viewModel.onResumeSession()
+            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe false
+        }
+
+    @Test
+    fun `a grading failure leaves the silence pause flag untouched`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        createViewModel()
+        advanceUntilIdle()
+        repeat(2) { emitSilenceTimeout() }
+        voiceGateway.lastNextSilenceWillPauseSession shouldBe true
+
+        emitGradingFailure()
+
+        voiceGateway.lastNextSilenceWillPauseSession shouldBe true
+    }
 
     @Test
     fun `a capture failure from a missing mic permission pauses the session like any other capture failure`() =
@@ -1802,6 +1961,7 @@ private class FakeVoiceGateway : VoiceGateway {
 
     var lastVoiceAnswering: Boolean? = null
     var lastNextSilenceWillPauseSession: Boolean? = null
+    var lastNextGradingFailureWillPauseSession: Boolean? = null
 
     var startCalls = 0
     var lastStartCards: List<Flashcard>? = null
@@ -1858,5 +2018,8 @@ private class FakeVoiceGateway : VoiceGateway {
     }
     override fun setNextSilenceWillPauseSession(willPause: Boolean) {
         lastNextSilenceWillPauseSession = willPause
+    }
+    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
+        lastNextGradingFailureWillPauseSession = willPause
     }
 }

@@ -60,6 +60,7 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingVoiceId: String? = null
     private var pendingVoiceAnswering: Boolean? = null
     private var pendingNextSilenceWillPauseSession: Boolean? = null
+    private var pendingNextGradingFailureWillPauseSession: Boolean? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -77,6 +78,7 @@ class StudySessionVoiceGateway @Inject constructor(
             pendingVoiceId?.let { binder.setVoice(it) }
             pendingVoiceAnswering?.let { binder.setVoiceAnswering(it) }
             pendingNextSilenceWillPauseSession?.let { binder.setNextSilenceWillPauseSession(it) }
+            pendingNextGradingFailureWillPauseSession?.let { binder.setNextGradingFailureWillPauseSession(it) }
             collectVoiceState(binder)
             collectVoiceAnswerState(binder)
         }
@@ -116,6 +118,7 @@ class StudySessionVoiceGateway @Inject constructor(
         _voiceAnswerState.value = VoiceAnswerState()
         pendingVoiceAnswering = null
         pendingNextSilenceWillPauseSession = null
+        pendingNextGradingFailureWillPauseSession = null
     }
 
     override fun togglePlayPause() {
@@ -156,6 +159,11 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun setNextSilenceWillPauseSession(willPause: Boolean) {
         pendingNextSilenceWillPauseSession = willPause
         voiceBinder.value?.setNextSilenceWillPauseSession(willPause)
+    }
+
+    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
+        pendingNextGradingFailureWillPauseSession = willPause
+        voiceBinder.value?.setNextGradingFailureWillPauseSession(willPause)
     }
 
     private fun collectVoiceState(binder: StudySessionVoiceService.LocalBinder) {
@@ -219,32 +227,32 @@ class StudySessionVoiceGateway @Inject constructor(
             answerText = card.answer,
         )
     }
+}
 
-    private fun String.forSpeech(): String {
-        // extract code span content; wraps result in single quotes for verbal separation
-        val codeTransformed = replace(Regex("`([^`]*)`")) { match ->
-            val inner = match.groupValues[1]
-                // generic types: List<String> → "List of String"; skips standalone tags like
-                // <service> (no non-ws before <); skips closing tags
-                .replace(Regex("(?<=\\S)<(?!/)([^>]+)>")) { " of ${it.groupValues[1]}" }
-                .replace(Regex("(?<!\\.)\\.(?!\\.)"), " DOT ") // member access dots → " DOT "; lets through ellipsis (...)
-                .replace("_", " ") // snake_case separators → spaces
-                .replace(Regex(" {2,}"), " ") // collapse runs of spaces left by prior replacements
-                .trim()
-            // single quotes in order to verbally separate the inline code from surrounding text;
-            // avoids reading it as a single word
-            "'$inner'"
-        }
-        return codeTransformed
-            // XML/HTML tags → inner content; handles <tag>, </tag>, <tag />; lets through < and >
-            // not forming a full tag
-            .replace(Regex("</?([^>]+?)\\s*/?>")) { it.groupValues[1].trim() }
-            // SCREAMING_SNAKE_CASE → lowercase words; requires at least one underscore, lets through
-            // bare acronyms like HTTP
-            .replace(Regex("\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b")) { it.value.lowercase().replace('_', ' ') }
-            // Unicode arrows → full stop; avoid reading them as "right pointing arrow" etc.; they are
-            // used as visual separators and reading them is distracting
-            .replace(Regex("[→←↑↓⇒⇐⇑⇓↔⇔]"), ".")
-            .replace("`", "'") // remaining stray backticks → single quotes
+private fun String.forSpeech(): String {
+    // extract code span content; wraps result in single quotes for verbal separation
+    val codeTransformed = replace(Regex("`([^`]*)`")) { match ->
+        val inner = match.groupValues[1]
+            // generic types: List<String> → "List of String"; skips standalone tags like
+            // <service> (no non-ws before <); skips closing tags
+            .replace(Regex("(?<=\\S)<(?!/)([^>]+)>")) { " of ${it.groupValues[1]}" }
+            .replace(Regex("(?<!\\.)\\.(?!\\.)"), " DOT ") // member access dots → " DOT "; lets through ellipsis (...)
+            .replace("_", " ") // snake_case separators → spaces
+            .replace(Regex(" {2,}"), " ") // collapse runs of spaces left by prior replacements
+            .trim()
+        // single quotes in order to verbally separate the inline code from surrounding text;
+        // avoids reading it as a single word
+        "'$inner'"
     }
+    return codeTransformed
+        // XML/HTML tags → inner content; handles <tag>, </tag>, <tag />; lets through < and >
+        // not forming a full tag
+        .replace(Regex("</?([^>]+?)\\s*/?>")) { it.groupValues[1].trim() }
+        // SCREAMING_SNAKE_CASE → lowercase words; requires at least one underscore, lets through
+        // bare acronyms like HTTP
+        .replace(Regex("\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b")) { it.value.lowercase().replace('_', ' ') }
+        // Unicode arrows → full stop; avoid reading them as "right pointing arrow" etc.; they are
+        // used as visual separators and reading them is distracting
+        .replace(Regex("[→←↑↓⇒⇐⇑⇓↔⇔]"), ".")
+        .replace("`", "'") // remaining stray backticks → single quotes
 }
