@@ -2,8 +2,8 @@
  * Server-authoritative XP and level scoring. A TypeScript port of
  * `core/domain/.../model/XpConfig.kt`, `ScoringState.kt`, `XpBreakdown.kt` and
  * `CalculateSessionXpUseCase.kt` — kept field-for-field and rule-for-rule identical to that Kotlin
- * source, since the two are expected to agree even though there is no cross-language sharing mechanism
- * in this codebase.
+ * source. Both test suites run the shared scoring cases in `testdata/xp-scoring/` at the repo root, and
+ * both bundled defaults are checked against the default configuration file there.
  *
  * Pure: no Firestore, no Admin SDK. [submitStudySession.ts](./submitStudySession.ts) is the only
  * caller, and is where every read/write this calculation needs actually happens.
