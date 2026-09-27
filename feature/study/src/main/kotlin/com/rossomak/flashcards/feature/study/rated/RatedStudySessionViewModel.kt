@@ -205,8 +205,9 @@ class RatedStudySessionViewModel @Inject constructor(
     // skip notice is still being spoken. The queue reducer itself (ratedSessionState) still updates
     // immediately — only what the user sees is held back — so the top of the screen keeps showing
     // the card the feedback is actually about instead of jumping to the next question mid-notice.
-    // Runs the moment the phase leaves SpeakingNotice (see observeVoiceAnswerState), whatever the
-    // reason (notice finished naturally, or voice answering was torn down mid-notice).
+    // Runs once the phase has left SpeakingNotice and no short notice is still speaking (see
+    // observeVoiceAnswerState), whatever the reason (notice finished naturally, or voice answering
+    // was torn down mid-notice, e.g. by a pause whose notice is still being spoken).
     private var pendingSessionSync: (() -> Unit)? = null
 
     // Session-scoped, not per-card: counts consecutive silence timeouts, reset by any
@@ -404,13 +405,12 @@ class RatedStudySessionViewModel @Inject constructor(
                 // silence-timed-out round, never re-triggered by an equal-value re-collection.
                 val justEnteredSpeakingNotice = voiceAnswer.phase == VoiceAnswerPhase.SpeakingNotice &&
                     previousVoiceAnswerPhase != VoiceAnswerPhase.SpeakingNotice
-                // Mirrors justEnteredSpeakingNotice the other way: fires exactly once, the instant
-                // the grade/skip notice stops being the active phase — whether that's the natural
-                // WaitingForQuestion it flips to once the notice finishes speaking, or voice
-                // answering getting torn down mid-notice. Either way the deferred sync below is safe
-                // to run: it's idempotent and there is nothing left mid-notice to interrupt.
-                val justLeftSpeakingNotice = previousVoiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice &&
-                    voiceAnswer.phase != VoiceAnswerPhase.SpeakingNotice
+                // The deferred sync below runs once the grade/skip notice is neither the active phase
+                // nor still being spoken — the natural WaitingForQuestion it flips to once the notice
+                // finishes, or voice answering torn down mid-notice. A pause tears it down while its
+                // own short notice keeps speaking, so the next card also waits for that notice.
+                val isNoticeOver = voiceAnswer.phase != VoiceAnswerPhase.SpeakingNotice &&
+                    !voiceAnswer.isShortNoticeSpeaking
                 previousVoiceAnswerPhase = voiceAnswer.phase
                 _state.update {
                     it.copy(
@@ -427,7 +427,7 @@ class RatedStudySessionViewModel @Inject constructor(
                             voiceAnswer.phase == VoiceAnswerPhase.Grading,
                     )
                 }
-                if (justLeftSpeakingNotice) {
+                if (isNoticeOver) {
                     pendingSessionSync?.invoke()
                     pendingSessionSync = null
                 }
@@ -582,7 +582,7 @@ class RatedStudySessionViewModel @Inject constructor(
      * queue reseeded to know what's next once the notice ends) but everything the user actually
      * sees — [RatedStudySessionScreenState.currentCard] and the progress counters, the answer-reveal
      * reset, and the terminal navigation event — is captured into [pendingSessionSync] and only
-     * runs once that notice actually finishes (observeVoiceAnswerState's SpeakingNotice-exit edge).
+     * runs once that notice actually finishes (see observeVoiceAnswerState).
      * The one exception is the rated card's attempt markers, which show the new Rating at once.
      */
     private fun applyAttemptRating(rating: FlashcardAttemptRating, deferSync: Boolean) {

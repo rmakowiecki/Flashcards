@@ -1630,6 +1630,62 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
+    fun `a pausing grading failure keeps showing its revealed card until the pause notice finishes`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            repeat(2) { emitGradingFailure() }
+            val pausingCardId = viewModel.state.value.currentCard?.id
+
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+            advanceUntilIdle()
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                isEnabled = true,
+                phase = VoiceAnswerPhase.SpeakingNotice,
+                error = VoiceAnswerFailureReason.GradingFailed.NoConnection,
+                isShortNoticeSpeaking = true,
+            )
+            advanceUntilIdle()
+            // The pause stops voice answering, which resets its state while the notice keeps playing.
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
+            advanceUntilIdle()
+
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+            viewModel.state.value.currentCard?.id shouldBe pausingCardId
+            viewModel.state.value.isAnswerRevealed shouldBe true
+
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
+            advanceUntilIdle()
+
+            viewModel.state.value.currentCard?.id shouldNotBe pausingCardId
+            viewModel.state.value.isAnswerRevealed shouldBe false
+        }
+
+    @Test
+    fun `a pausing silence keeps showing its card until the pause notice finishes`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        repeat(2) { emitSilenceTimeout() }
+        val pausingCardId = viewModel.state.value.currentCard?.id
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true)
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
+        advanceUntilIdle()
+
+        viewModel.state.value.currentCard?.id shouldBe pausingCardId
+
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
+        advanceUntilIdle()
+
+        viewModel.state.value.currentCard?.id shouldNotBe pausingCardId
+    }
+
+    @Test
     fun `a silence does not reset the grading failure count, so failure-silence-failure-failure pauses on the third failure`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()

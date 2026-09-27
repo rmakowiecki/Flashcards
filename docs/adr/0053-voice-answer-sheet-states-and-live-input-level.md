@@ -18,7 +18,7 @@ A short notice (silence skip, silence pause, grading failure, capture failure) a
 message, not content, so it has no controls. `VoiceAnswerState.isShortNoticeSpeaking` marks it. The flag survives
 `VoiceAnswerController.stop()`, because a pause stops voice answering while its own notice is still speaking. It
 clears when that utterance finishes, on `release()`, or after a 5 s safety timeout. While it is set, `Pending` wins
-over a pause; afterwards the sheet shows the next card's `Transport`, or the ordinary paused `Transport` with no
+over a pause, and the card the notice is about stays on screen; afterwards the sheet shows the next card's `Transport`, or the ordinary paused `Transport` with no
 special wording.
 
 The voice-settings cog exists only in `Transport`. Changing voice settings mid-round would create states the
