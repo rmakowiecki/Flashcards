@@ -580,9 +580,10 @@ class RatedStudySessionViewModel @Inject constructor(
      * mid-[VoiceAnswerPhase.SpeakingNotice] — the feedback about to be read is about the card still
      * on screen, so the queue reducer updates now (the [VoiceGateway] still needs the reordered
      * queue reseeded to know what's next once the notice ends) but everything the user actually
-     * sees — [RatedStudySessionScreenState.currentCard]/`currentCardRatings`, the answer-reveal
+     * sees — [RatedStudySessionScreenState.currentCard] and the progress counters, the answer-reveal
      * reset, and the terminal navigation event — is captured into [pendingSessionSync] and only
      * runs once that notice actually finishes (observeVoiceAnswerState's SpeakingNotice-exit edge).
+     * The one exception is the rated card's attempt markers, which show the new Rating at once.
      */
     private fun applyAttemptRating(rating: FlashcardAttemptRating, deferSync: Boolean) {
         val machine = ratedSessionState ?: return
@@ -596,7 +597,16 @@ class RatedStudySessionViewModel @Inject constructor(
             syncStateFromRatedSession()
             if (outcome.state.isComplete) terminate(abandoned = false)
         }
-        if (deferSync) pendingSessionSync = applyEffects else applyEffects()
+        if (deferSync) {
+            // The markers follow the grade at once, together with the Graded sheet and its spoken
+            // feedback. They describe the rated card, never the machine's new head: rate() has
+            // already removed or re-inserted that card, so machine.currentCardRatings would name
+            // the next card. The deferred sync overwrites them when the card itself changes.
+            _state.update { it.copy(currentCardRatings = machine.currentCardRatings + rating) }
+            pendingSessionSync = applyEffects
+        } else {
+            applyEffects()
+        }
     }
 
     private fun ensureVoiceGatewayStarted() {

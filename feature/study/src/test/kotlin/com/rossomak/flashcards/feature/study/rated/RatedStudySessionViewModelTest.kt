@@ -1265,6 +1265,140 @@ class RatedStudySessionViewModelTest {
             viewModel.state.value.flashcards.map { it.id } shouldContain "card-1"
         }
 
+    /** Grading, then the grade's SpeakingNotice, stopping before the notice finishes (see [emitGrade]). */
+    private fun TestScope.emitGradeNotice(gradePercent: Int, cardId: String) {
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+        advanceUntilIdle()
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+            isEnabled = true,
+            phase = VoiceAnswerPhase.SpeakingNotice,
+            lastGrade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = gradePercent, feedback = "f"),
+            lastGradedCardId = cardId,
+        )
+        advanceUntilIdle()
+    }
+
+    private fun TestScope.finishNotice() {
+        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `a voice grade shows its Rating on the attempt markers at once, while the card, progress and reveal wait for the notice`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradeNotice(gradePercent = PARTIAL_GRADE_PERCENT, cardId = "card-1")
+
+            with(viewModel.state.value) {
+                currentCardRatings shouldBe listOf(FlashcardAttemptRating.PartiallyCorrect)
+                currentCard?.id shouldBe "card-1"
+                completedCount shouldBe 0
+                isAnswerRevealed shouldBe true
+            }
+        }
+
+    @Test
+    fun `a voice Correct keeps its marker on the graded card during the feedback, then everything switches to the next card`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT, cardId = "card-1")
+
+            viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+            viewModel.state.value.completedCount shouldBe 0
+
+            finishNotice()
+
+            with(viewModel.state.value) {
+                currentCard?.id shouldBe "card-2"
+                currentCardRatings shouldBe emptyList()
+                completedCount shouldBe 1
+                isAnswerRevealed shouldBe false
+            }
+        }
+
+    @Test
+    fun `a voice Failed that re-inserts the card shows the marker on the graded card, not the next head`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadTenCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradeNotice(gradePercent = FAILED_GRADE_PERCENT, cardId = "card-1")
+
+            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Failed)
+        }
+
+    @Test
+    fun `a voice Correct on the last card updates the marker at once and navigates to the summary only after the notice`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(listOf(flashcard("card-1")))
+            stubRoute(route.copy(cardIds = listOf("card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.events.test {
+                emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT, cardId = "card-1")
+
+                viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+                expectNoEvents()
+
+                finishNotice()
+
+                awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
+            }
+        }
+
+    @Test
+    fun `a silence timeout or grading failure leaves the attempt markers unchanged during its notice`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            // card-1 fails manually and comes back as the head with one Failed marker.
+            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            repeat(2) { viewModel.onAttemptRating(FlashcardAttemptRating.Correct) }
+            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            val markersBefore = listOf(FlashcardAttemptRating.Failed)
+            viewModel.state.value.currentCardRatings shouldBe markersBefore
+
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
+            advanceUntilIdle()
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
+            advanceUntilIdle()
+            viewModel.state.value.currentCardRatings shouldBe markersBefore
+            finishNotice()
+
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
+            advanceUntilIdle()
+            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
+                isEnabled = true,
+                phase = VoiceAnswerPhase.SpeakingNotice,
+                error = VoiceAnswerFailureReason.GradingFailed.NoConnection,
+            )
+            advanceUntilIdle()
+            viewModel.state.value.currentCardRatings shouldBe markersBefore
+        }
+
+    @Test
+    fun `a stale voice grade for a card other than the head leaves the attempt markers unchanged`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT, cardId = "card-2")
+
+            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            viewModel.state.value.currentCardRatings shouldBe emptyList()
+        }
+
     @Test
     fun `a grade in the Correct band finishes the card as Mastered, exactly as a manual Correct does`() =
         runTest(mainDispatcherRule.testDispatcher) {
@@ -1925,6 +2059,9 @@ class RatedStudySessionViewModelTest {
 
     private companion object {
         const val FIXED_SEED = 42L
+        const val CORRECT_GRADE_PERCENT = 95
+        const val PARTIAL_GRADE_PERCENT = 60
+        const val FAILED_GRADE_PERCENT = 20
         const val SPOKEN_RAW_VOICE_LEVEL = 0.9f
         const val SPOKEN_TRANSCRIPT = "remember keeps state across recompositions"
         const val GRADE_RATIONALE = "You named the key difference."
