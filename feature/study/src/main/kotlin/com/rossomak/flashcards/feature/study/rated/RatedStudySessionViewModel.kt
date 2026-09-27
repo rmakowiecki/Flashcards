@@ -618,6 +618,7 @@ class RatedStudySessionViewModel @Inject constructor(
                 cards = flashcards,
                 startIndex = currentCardIndex,
                 subcategoryName = sessionTitle,
+                isVoiceAnsweringSession = true,
             )
         }
         voiceGateway.setSpeechRate(sessionVoiceSettings.speechRate)

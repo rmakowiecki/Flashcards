@@ -56,6 +56,7 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingCards: List<VoiceFlashcard> = emptyList()
     private var pendingStartIndex: Int = 0
     private var pendingSubcategoryName: String = ""
+    private var pendingIsVoiceAnsweringSession: Boolean = false
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
     private var pendingVoiceAnswering: Boolean? = null
@@ -71,7 +72,7 @@ class StudySessionVoiceGateway @Inject constructor(
             }
             val binder = service as? StudySessionVoiceService.LocalBinder ?: return
             voiceBinder.value = binder
-            binder.loadSession(pendingCards, pendingStartIndex, pendingSubcategoryName)
+            binder.loadSession(pendingCards, pendingStartIndex, pendingSubcategoryName, pendingIsVoiceAnsweringSession)
             // setSpeechRate/setVoice can land before the async bind completes (voiceBinder was
             // still null), so replay whatever was requested in the meantime.
             pendingSpeechRate?.let { binder.setPlaybackSpeechRate(it) }
@@ -92,10 +93,12 @@ class StudySessionVoiceGateway @Inject constructor(
         cards: List<Flashcard>,
         startIndex: Int,
         subcategoryName: String,
+        isVoiceAnsweringSession: Boolean,
     ) {
         pendingCards = cards.toVoiceFlashcards()
         pendingStartIndex = startIndex
         pendingSubcategoryName = subcategoryName
+        pendingIsVoiceAnsweringSession = isVoiceAnsweringSession
         // Bind only: MediaSessionService promotes itself to a foreground service when playback
         // starts, so an explicit startForegroundService here would risk a 5s FGS-timeout ANR.
         val intent = Intent(context, StudySessionVoiceService::class.java).apply {

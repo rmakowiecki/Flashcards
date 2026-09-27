@@ -35,7 +35,13 @@ interface VoiceGateway {
      */
     val rawVoiceLevel: Flow<Float>
 
-    fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String)
+    /**
+     * Binds the voice engine and starts reading [cards] from [startIndex]. [isVoiceAnsweringSession]
+     * is fixed for the whole session and keeps the microphone foreground-service type held from the
+     * first question to [stop], even while voice answering is paused, so a background resume can
+     * still listen.
+     */
+    fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String, isVoiceAnsweringSession: Boolean)
 
     /**
      * Swaps in a fresh queue order without touching playback — [cards]'s head is always whatever
