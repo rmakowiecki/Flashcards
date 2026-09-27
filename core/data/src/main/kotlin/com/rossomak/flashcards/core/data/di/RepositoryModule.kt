@@ -12,6 +12,8 @@ import com.rossomak.flashcards.core.data.repository.DefaultUserFavoritesReposito
 import com.rossomak.flashcards.core.data.repository.DefaultXpConfigRepository
 import com.rossomak.flashcards.core.data.source.AuthRemoteDataSource
 import com.rossomak.flashcards.core.data.source.CurationRemoteDataSource
+import com.rossomak.flashcards.core.data.source.DeadLetteredSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.data.source.FileDeadLetteredSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.FirebaseAuthRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource
@@ -85,6 +87,12 @@ abstract class RepositoryModule {
     abstract fun bindPendingSessionSubmissionLocalDataSource(
         filePendingSessionSubmissionLocalDataSource: FilePendingSessionSubmissionLocalDataSource,
     ): PendingSessionSubmissionLocalDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindDeadLetteredSessionSubmissionLocalDataSource(
+        fileDeadLetteredSessionSubmissionLocalDataSource: FileDeadLetteredSessionSubmissionLocalDataSource,
+    ): DeadLetteredSessionSubmissionLocalDataSource
 
     @Binds
     @Singleton
