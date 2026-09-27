@@ -186,7 +186,7 @@ class VoiceAnswerController @Inject constructor(
         activeCard = null
         nextSilenceWillPauseSession = false
         nextGradingFailureWillPauseSession = false
-        _state.value = VoiceAnswerState(isShortNoticeSpeaking = _state.value.isShortNoticeSpeaking)
+        _state.update { VoiceAnswerState(isShortNoticeSpeaking = it.isShortNoticeSpeaking) }
     }
 
     /** Full teardown when the owning service dies. */

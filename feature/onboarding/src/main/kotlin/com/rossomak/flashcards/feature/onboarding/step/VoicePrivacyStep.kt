@@ -43,6 +43,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Playing
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Processing
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.Ready
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState.SpeechDetected
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
@@ -222,7 +223,7 @@ private fun VoiceTestIndicator(
     val contentDescriptionRes = when (voiceDemoState) {
         Listening, SpeechDetected -> R.string.voice_privacy_listening_cd
         Playing -> R.string.voice_privacy_playing_cd
-        Idle, Processing, Ready, is Failed -> R.string.voice_privacy_mic_cd
+        Idle, Processing, Ready, is Failed -> CoreUiR.string.common_voice_capture_mic_cd
     }
     FlashcardsVoiceCaptureIndicator(
         levels = currentVoiceBarsLevels,
