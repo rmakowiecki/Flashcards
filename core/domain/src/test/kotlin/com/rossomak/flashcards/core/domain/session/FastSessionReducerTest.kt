@@ -48,35 +48,46 @@ class FastSessionReducerTest {
 
     @Test
     fun `a manual reveal shows the answer and marks the card Seen`() {
-        val revealed = session.after(AnswerRevealed)
+        val revealed = session.after(AnswerRevealed("card-1"))
 
         revealed.isAnswerRevealed shouldBe true
         revealed.seenCardIds shouldBe listOf("card-1")
     }
 
     @Test
-    fun `the answer phase for the current index marks that card Seen`() {
+    fun `the answer phase alone marks nothing Seen`() {
         val state = session.after(PlaybackChanged(playback(index = 1, phase = VoicePhase.Answer)))
 
         state.currentIndex shouldBe 1
         state.isAnswerRevealed shouldBe true
-        state.seenCardIds shouldBe listOf("card-2")
+        state.seenCardIds.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a revealed answer the player already moved past still marks that card Seen`() {
+        val movedOn = session.after(PlaybackChanged(playback(index = 1, phase = VoicePhase.Question)))
+
+        val state = movedOn.after(AnswerRevealed("card-1"))
+
+        state.seenCardIds shouldBe listOf("card-1")
+        state.isAnswerRevealed shouldBe false
+    }
+
+    @Test
+    fun `a revealed answer for a card outside the session marks nothing`() {
+        session.after(AnswerRevealed("unknown")).seenCardIds.shouldBeEmpty()
     }
 
     @Test
     fun `a revisited card is not recorded twice, and first-seen order holds`() {
-        val state = session.after(
-            PlaybackChanged(playback(index = 1, phase = VoicePhase.Answer)),
-            PlaybackChanged(playback(index = 0, phase = VoicePhase.Answer)),
-            PlaybackChanged(playback(index = 1, phase = VoicePhase.Answer)),
-        )
+        val state = session.after(AnswerRevealed("card-2"), AnswerRevealed("card-1"), AnswerRevealed("card-2"))
 
         state.seenCardIds shouldBe listOf("card-2", "card-1")
     }
 
     @Test
     fun `manual next moves to the next card with the answer hidden`() {
-        val transition = reducer.reduce(session.after(AnswerRevealed), NextCardRequested)
+        val transition = reducer.reduce(session.after(AnswerRevealed("card-1")), NextCardRequested)
 
         transition.state.currentIndex shouldBe 1
         transition.state.isAnswerRevealed shouldBe false
@@ -84,10 +95,30 @@ class FastSessionReducerTest {
     }
 
     @Test
-    fun `manual next on the last card ends the session`() {
+    fun `manual next before the answer shows is ignored`() {
+        val transition = reducer.reduce(session, NextCardRequested)
+
+        transition.state shouldBe session
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `manual next on the last card ends the session once its answer shows`() {
         val onLast = session.copy(currentIndex = CARD_COUNT - 1)
 
-        reducer.reduce(onLast, NextCardRequested).effects shouldBe listOf(FastSessionEffect.SessionComplete)
+        reducer.reduce(onLast, NextCardRequested).effects.shouldBeEmpty()
+        reducer.reduce(onLast.after(AnswerRevealed("card-$CARD_COUNT")), NextCardRequested).effects shouldBe
+            listOf(FastSessionEffect.SessionComplete)
+    }
+
+    @Test
+    fun `read-aloud next is available everywhere except the last card's answer`() {
+        val lastIndex = CARD_COUNT - 1
+
+        session.isReadAloudNextAvailable shouldBe true
+        session.after(PlaybackChanged(playback(index = 0, phase = VoicePhase.Answer))).isReadAloudNextAvailable shouldBe true
+        session.after(PlaybackChanged(playback(index = lastIndex, phase = VoicePhase.Question))).isReadAloudNextAvailable shouldBe true
+        session.after(PlaybackChanged(playback(index = lastIndex, phase = VoicePhase.Answer))).isReadAloudNextAvailable shouldBe false
     }
 
     @Test

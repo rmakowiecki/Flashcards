@@ -323,6 +323,7 @@ class FastStudySessionViewModelTest {
 
     @Test
     fun `onShowAnswer reveals answer when voice inactive`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
         val viewModel = createViewModel()
         advanceUntilIdle()
 
@@ -470,13 +471,12 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `under read-aloud, reaching the answer phase records the card and does not by itself end the session`() =
+    fun `under read-aloud, the player revealing an answer records the card and does not by itself end the session`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createReadAloudViewModel()
 
             viewModel.events.test {
-                playbackGateway.state.value =
-                    VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = 0, totalCards = 3, phase = VoicePhase.Answer)
+                playbackGateway.readAnswer()
                 advanceUntilIdle()
                 expectNoEvents()
             }
@@ -496,7 +496,8 @@ class FastStudySessionViewModelTest {
             // Each card's answer phase is reached in turn as read-aloud progresses through the deck.
             listOf(0, 1, 2).forEach { index ->
                 playbackGateway.state.value =
-                    VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = index, totalCards = 3, phase = VoicePhase.Answer)
+                    VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = index, totalCards = 3, phase = VoicePhase.Question)
+                playbackGateway.readAnswer()
                 advanceUntilIdle()
             }
 
@@ -654,12 +655,35 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `onVoiceNext moves the gateway to the next card`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `onVoiceNext reveals the answer at a question and moves to the next card at an answer`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createReadAloudViewModel()
+
+            viewModel.onVoiceNext()
+            advanceUntilIdle()
+
+            playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.ShowAnswer
+            viewModel.state.value.isAnswerRevealed shouldBe true
+
+            viewModel.onVoiceNext()
+            advanceUntilIdle()
+
+            playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.MoveToNextCard
+            viewModel.state.value.currentCardIndex shouldBe 1
+        }
+
+    @Test
+    fun `the read-aloud next is unavailable at the last card's answer`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
+        playbackGateway.state.value = VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = 2, totalCards = 3)
+        advanceUntilIdle()
 
-        viewModel.onVoiceNext()
+        viewModel.state.value.isReadAloudNextAvailable shouldBe true
 
-        playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.MoveToNextCard
+        playbackGateway.readAnswer()
+        advanceUntilIdle()
+
+        viewModel.state.value.isReadAloudNextAvailable shouldBe false
     }
 
     @Test

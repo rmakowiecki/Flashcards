@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.update
 /**
  * Records every command in [calls], in order, and moves [state] the way the real player would:
  * start plays from the start index, pause and play flip `isPlaying`, card moves change the index.
- * Tests drive what the player reports with [finishQuestion], [finishNotice] and [emit].
+ * Like the real player, [showAnswer] reports the answer revealed. Tests drive what else the player
+ * reports with [readAnswer], [finishQuestion], [finishNotice] and [emit].
  */
 class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
@@ -69,6 +70,12 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     /** Reports a transport [command] from outside the app. */
     fun emitExternal(command: TransportCommand) = emit(PlaybackEvent.ExternalCommand(command))
+
+    /** Moves the presented card to its answer phase and reports it revealed, as reading on by itself does. */
+    fun readAnswer() {
+        state.update { it.copy(phase = VoicePhase.Answer) }
+        cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.AnswerRevealed(it.id)) }
+    }
 
     /** Reports that the presented card's question has been read, as question-only mode does. */
     fun finishQuestion() {
@@ -138,7 +145,7 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     override fun showAnswer() {
         calls += Call.ShowAnswer
-        state.update { it.copy(phase = VoicePhase.Answer) }
+        readAnswer()
     }
 
     override fun advanceAfterVoiceAnswer() {

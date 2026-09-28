@@ -93,13 +93,20 @@ class FastStudySessionCoordinator @Inject constructor(
         playbackGateway.stop()
     }
 
-    /** With read-aloud on the player reads the answer, which is what marks the card Studied. */
+    /** With read-aloud on the player reads the answer and reports it revealed, which marks the card Studied. */
     fun revealAnswer() {
-        if (playback.isActive) playbackGateway.showAnswer() else dispatch(FastSessionInput.AnswerRevealed)
+        val current = state ?: return
+        if (playback.isActive) {
+            playbackGateway.showAnswer()
+        } else {
+            current.cards.getOrNull(current.currentIndex)?.let { card -> dispatch(FastSessionInput.AnswerRevealed(card.id)) }
+        }
     }
 
     /** The manual advance, with read-aloud off. On the last card it ends the session. */
-    fun nextCard() = dispatch(FastSessionInput.NextCardRequested)
+    fun nextCard() {
+        if (!playback.isActive) dispatch(FastSessionInput.NextCardRequested)
+    }
 
     /** Also the resume after an engine failure: the voice stack starts again at the presented card. */
     fun play() {
@@ -115,7 +122,19 @@ class FastStudySessionCoordinator @Inject constructor(
 
     fun pause() = playbackGateway.pause()
 
-    fun next() = playbackGateway.moveToNextCard()
+    /**
+     * The read-aloud Next, in-app or from outside the app: at a question it reveals that card's
+     * answer, at an answer it moves on. At the last card's answer it does nothing; the session ends
+     * when the player finishes reading it.
+     */
+    fun next() {
+        val current = state ?: return
+        when {
+            !current.isReadAloudNextAvailable -> Unit
+            !current.isAnswerRevealed -> playbackGateway.showAnswer()
+            else -> playbackGateway.moveToNextCard()
+        }
+    }
 
     /** Restarts the card once it has played for the rewind threshold, or on the first card; goes back one otherwise. */
     fun previous() {
@@ -230,6 +249,7 @@ class FastStudySessionCoordinator @Inject constructor(
             is PlaybackEvent.ExternalCommand -> onExternalCommand(event.command)
             PlaybackEvent.EngineUnavailable -> dispatch(FastSessionInput.PlaybackEngineUnavailable)
             PlaybackEvent.EndReached -> dispatch(FastSessionInput.PlaybackEndReached)
+            is PlaybackEvent.AnswerRevealed -> dispatch(FastSessionInput.AnswerRevealed(event.cardId))
             // Fast reads answers and speaks no notices.
             is PlaybackEvent.QuestionFinished, is PlaybackEvent.NoticeFinished -> Unit
         }
@@ -281,6 +301,7 @@ class FastStudySessionCoordinator @Inject constructor(
             cards = current.cards,
             currentIndex = current.currentIndex,
             isAnswerRevealed = current.isAnswerRevealed,
+            isReadAloudNextAvailable = current.isReadAloudNextAvailable,
             playback = playback,
             pauseReason = current.pauseReason,
         )

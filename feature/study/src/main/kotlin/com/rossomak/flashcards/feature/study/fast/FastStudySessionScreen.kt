@@ -262,7 +262,6 @@ private fun FastStudySessionSheetContent(
         if (state.isReadAloudMode) {
             FastVoiceTransportControls(
                 state = state,
-                onShowAnswer = onShowAnswer,
                 onVoicePlayPause = onVoicePlayPause,
                 onVoiceNext = onVoiceNext,
                 onVoicePrevious = onVoicePrevious,
@@ -306,7 +305,6 @@ private fun FastStudySessionSheetContent(
 @Composable
 private fun FastVoiceTransportControls(
     state: FastStudySessionScreenState,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
@@ -350,8 +348,8 @@ private fun FastVoiceTransportControls(
             )
             Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
             IconButton(
-                onClick = if (state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-                enabled = state.isVoiceActive,
+                onClick = onVoiceNext,
+                enabled = state.isVoiceActive && state.isReadAloudNextAvailable,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,

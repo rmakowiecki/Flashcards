@@ -9,6 +9,12 @@ sealed interface PlaybackEvent {
     /** In question-only mode (Rated Voice sessions, where the question is read aloud), the question of [cardId] has been read in full. */
     data class QuestionFinished(val cardId: String) : PlaybackEvent
 
+    /**
+     * The answer of [cardId] was revealed: read aloud, or shown while paused. Sent every time the
+     * card enters its answer phase, whether or not a screen is showing it.
+     */
+    data class AnswerRevealed(val cardId: String) : PlaybackEvent
+
     /** [notice] has finished, or was given up on. Exactly one per spoken notice, in speaking order. */
     data class NoticeFinished(val notice: SpokenNotice) : PlaybackEvent
 

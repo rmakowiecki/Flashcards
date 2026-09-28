@@ -297,6 +297,8 @@ class RatedStudySessionCoordinator @Inject constructor(
             PlaybackEvent.EngineUnavailable -> dispatch(RatedSessionInput.PlaybackEngineUnavailable)
             // Question-only reads never reach the end; the queue decides when a Rated session is over.
             PlaybackEvent.EndReached -> Unit
+            // revealAnswer already dispatched the reveal before asking the player to read it.
+            is PlaybackEvent.AnswerRevealed -> Unit
         }
     }
 

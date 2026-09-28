@@ -17,10 +17,10 @@ import javax.inject.Inject
 /** Everything that can happen to a Fast Study Session, as [FastSessionReducer] takes it in. */
 sealed interface FastSessionInput {
 
-    /** The user revealed the answer by hand, with read-aloud off. */
-    data object AnswerRevealed : FastSessionInput
+    /** The answer of [cardId] was revealed: by hand, or by the player reading it. */
+    data class AnswerRevealed(val cardId: String) : FastSessionInput
 
-    /** The manual "next card", with read-aloud off. */
+    /** The manual "next card", with read-aloud off. Ignored until the answer shows. */
     data object NextCardRequested : FastSessionInput
     data class PlaybackChanged(val playback: VoicePlaybackState) : FastSessionInput
 
@@ -64,7 +64,7 @@ class FastSessionReducer @Inject constructor() {
     fun seed(cards: List<Flashcard>): FastSessionState = FastSessionState(cards = cards)
 
     fun reduce(state: FastSessionState, input: FastSessionInput): FastSessionTransition = when (input) {
-        AnswerRevealed -> FastSessionTransition(state.markSeen(state.currentIndex).copy(isAnswerRevealed = true))
+        is AnswerRevealed -> onAnswerRevealed(state, input.cardId)
         NextCardRequested -> onNextCardRequested(state)
         is PlaybackChanged -> onPlaybackChanged(state, input.playback)
         PlaybackEndReached -> FastSessionTransition(state, listOf(FastSessionEffect.SessionComplete))
@@ -72,23 +72,35 @@ class FastSessionReducer @Inject constructor() {
         VoiceStackRestarted -> FastSessionTransition(state.copy(pauseReason = null))
     }
 
-    /** Only reachable once the answer shows, so the last card is always Studied before this ends the session. */
+    /**
+     * Revealing an answer is what makes a card Studied. The player reports the card it read, which
+     * can already be behind the presented one after a quick skip; it still counts.
+     */
+    private fun onAnswerRevealed(state: FastSessionState, cardId: String): FastSessionTransition {
+        val seen = state.markSeen(cardId)
+        val isPresentedCard = state.cards.getOrNull(state.currentIndex)?.id == cardId
+        return FastSessionTransition(if (isPresentedCard) seen.copy(isAnswerRevealed = true) else seen)
+    }
+
+    /** Ignored until the answer shows, so the last card is always Studied before this ends the session. */
     private fun onNextCardRequested(state: FastSessionState): FastSessionTransition =
-        if (state.currentIndex >= state.cards.lastIndex) {
+        if (!state.isAnswerRevealed) {
+            FastSessionTransition(state)
+        } else if (state.currentIndex >= state.cards.lastIndex) {
             FastSessionTransition(state, listOf(FastSessionEffect.SessionComplete))
         } else {
             FastSessionTransition(state.copy(currentIndex = state.currentIndex + 1, isAnswerRevealed = false))
         }
 
     /**
-     * The answer phase for the current index is Studied. Playback state never ends the session:
-     * a pause, a seek or a speed change can leave the player looking exactly like it finished, so
-     * only [PlaybackEndReached] does.
+     * Only what the screen shows. Playback state marks nothing Studied, since a quick skip can
+     * replace an answer phase before it is observed ([AnswerRevealed] does that), and never ends
+     * the session, since a pause, a seek or a speed change can leave the player looking exactly
+     * like it finished ([PlaybackEndReached] does that).
      */
     private fun onPlaybackChanged(state: FastSessionState, playback: VoicePlaybackState): FastSessionTransition {
         if (!playback.isActive) return FastSessionTransition(state)
-        val next = state.copy(currentIndex = playback.currentIndex, isAnswerRevealed = playback.phase == VoicePhase.Answer)
-        return FastSessionTransition(if (playback.phase == VoicePhase.Answer) next.markSeen(playback.currentIndex) else next)
+        return FastSessionTransition(state.copy(currentIndex = playback.currentIndex, isAnswerRevealed = playback.phase == VoicePhase.Answer))
     }
 
     private fun onPlaybackEngineUnavailable(state: FastSessionState): FastSessionTransition {
@@ -99,8 +111,6 @@ class FastSessionReducer @Inject constructor() {
         )
     }
 
-    private fun FastSessionState.markSeen(cardIndex: Int): FastSessionState {
-        val cardId = cards.getOrNull(cardIndex)?.id ?: return this
-        return if (cardId in seenCardIds) this else copy(seenCardIds = seenCardIds + cardId)
-    }
+    private fun FastSessionState.markSeen(cardId: String): FastSessionState =
+        if (cardId in seenCardIds || cards.none { it.id == cardId }) this else copy(seenCardIds = seenCardIds + cardId)
 }

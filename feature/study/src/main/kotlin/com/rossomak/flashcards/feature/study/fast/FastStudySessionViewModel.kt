@@ -147,6 +147,7 @@ class FastStudySessionViewModel @Inject constructor(
             isAnswerRevealed = snapshot.isAnswerRevealed,
             isVoiceActive = snapshot.playback.isActive,
             isVoicePlaying = snapshot.playback.isPlaying,
+            isReadAloudNextAvailable = snapshot.isReadAloudNextAvailable,
             speechRate = snapshot.playback.speechRate,
             isVoiceEngineUnavailable = snapshot.pauseReason == SessionPauseReason.VoiceEngineUnavailable,
         )

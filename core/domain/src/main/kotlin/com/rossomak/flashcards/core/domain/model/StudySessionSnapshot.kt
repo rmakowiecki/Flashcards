@@ -59,12 +59,14 @@ sealed interface FastSessionStateSnapshot {
      * A loaded session. Plain data, like [RatedSessionStateSnapshot.Running].
      *
      * @param currentIndex the presented card's index in [cards].
+     * @param isReadAloudNextAvailable the read-aloud Next does something; false at the last card's answer.
      * @param playback the voice player's transport state.
      */
     data class Running(
         val cards: List<Flashcard> = emptyList(),
         val currentIndex: Int = 0,
         val isAnswerRevealed: Boolean = false,
+        val isReadAloudNextAvailable: Boolean = true,
         val playback: VoicePlaybackState = VoicePlaybackState(),
         val pauseReason: SessionPauseReason? = null,
     ) : FastSessionStateSnapshot

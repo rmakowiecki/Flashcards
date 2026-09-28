@@ -168,12 +168,60 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.calls.takeLast(6) shouldBe listOf(
             Call.Pause,
             Call.Play,
-            Call.MoveToNextCard,
+            Call.ShowAnswer,
             Call.MoveToPreviousCard,
             Call.JumpTo(2),
             Call.Pause,
         )
         playbackGateway.stopCount shouldBe 0
+    }
+
+    // Read-aloud next
+
+    @Test
+    fun `next at a question reveals that card's answer, and next at an answer moves on`() = runTest {
+        val coordinator = startCoordinator()
+
+        playbackGateway.emitExternal(TransportCommand.Next)
+        runCurrent()
+
+        playbackGateway.calls.last() shouldBe Call.ShowAnswer
+        coordinator.runningSnapshot.currentIndex shouldBe 0
+        coordinator.runningSnapshot.isAnswerRevealed shouldBe true
+
+        coordinator.next()
+        runCurrent()
+
+        playbackGateway.calls.last() shouldBe Call.MoveToNextCard
+        coordinator.runningSnapshot.currentIndex shouldBe 1
+    }
+
+    @Test
+    fun `next at the last card's answer does nothing, and the session ends only when the player reaches the end`() = runTest {
+        val coordinator = startCoordinator().also { moveToCard(2) }
+        playbackGateway.readAnswer()
+        runCurrent()
+        val callCount = playbackGateway.calls.size
+
+        coordinator.runningSnapshot.isReadAloudNextAvailable shouldBe false
+        coordinator.next()
+        playbackGateway.emitExternal(TransportCommand.Next)
+        runCurrent()
+
+        playbackGateway.calls.size shouldBe callCount
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `the manual next card is ignored while read-aloud runs`() = runTest {
+        val coordinator = startCoordinator()
+        playbackGateway.readAnswer()
+        runCurrent()
+
+        coordinator.nextCard()
+
+        coordinator.runningSnapshot.currentIndex shouldBe 0
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
     }
 
     // Engine unavailable
@@ -202,7 +250,8 @@ class FastStudySessionCoordinatorTest {
     fun `the player reaching the end ends the session with every Seen card`() = runTest {
         startCoordinator()
         (0..2).forEach { index ->
-            playbackGateway.state.update { it.copy(currentIndex = index, phase = VoicePhase.Answer) }
+            moveToCard(index)
+            playbackGateway.readAnswer()
             runCurrent()
         }
         playbackGateway.state.update { it.copy(isPlaying = false, phase = VoicePhase.Question) }
@@ -215,6 +264,33 @@ class FastStudySessionCoordinatorTest {
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
         result.abandoned shouldBe false
         result.cardResults.map { it.cardId } shouldBe listOf("card-1", "card-2", "card-3")
+    }
+
+    @Test
+    fun `an answer revealed just before a quick skip still counts as Seen`() = runTest {
+        val coordinator = startCoordinator()
+        // The skip lands before the player's answer report is handled.
+        moveToCard(1)
+        playbackGateway.emit(PlaybackEvent.AnswerRevealed("card-1"))
+        runCurrent()
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result
+        result.cardResults.map { it.cardId } shouldBe listOf("card-1")
+    }
+
+    @Test
+    fun `an answer phase the player never reported revealed does not count as Seen`() = runTest {
+        val coordinator = startCoordinator()
+        playbackGateway.state.update { it.copy(phase = VoicePhase.Answer) }
+        runCurrent()
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.cardResults.shouldBeEmpty()
     }
 
     @Test

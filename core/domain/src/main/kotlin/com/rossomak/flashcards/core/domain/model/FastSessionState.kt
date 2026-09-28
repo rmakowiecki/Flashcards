@@ -15,4 +15,12 @@ data class FastSessionState(
     val seenCardIds: List<String> = emptyList(),
     val isAnswerRevealed: Boolean = false,
     val pauseReason: SessionPauseReason? = null,
-)
+) {
+    /**
+     * Whether the read-aloud Next does anything: at a question it reveals that card's answer, at an
+     * answer it moves on. At the last card's answer it does nothing, so the session only ends once
+     * that answer has been read in full.
+     */
+    val isReadAloudNextAvailable: Boolean
+        get() = !isAnswerRevealed || currentIndex < cards.lastIndex
+}

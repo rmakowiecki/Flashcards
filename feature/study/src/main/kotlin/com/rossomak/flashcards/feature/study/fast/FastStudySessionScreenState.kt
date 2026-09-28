@@ -26,6 +26,8 @@ data class FastStudySessionScreenState(
     val isReadAloudMode: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
+    // False at the last card's answer: the session ends only once that answer has been read.
+    val isReadAloudNextAvailable: Boolean = true,
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
     // A voice engine could not start. Read-aloud stays on, never falling back to tap-through, and
     // the play control stays enabled to restart it.

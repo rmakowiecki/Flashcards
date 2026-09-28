@@ -272,6 +272,7 @@ class TtsPlayer(
         } else {
             stopUtterance()
             publishState()
+            cards.getOrNull(index)?.let { card -> onEvent(PlaybackEvent.AnswerRevealed(card.cardId)) }
         }
     }
 
@@ -379,6 +380,7 @@ class TtsPlayer(
         val generationId = ++generation
         requestAudioFocus()
         publishState()
+        onEvent(PlaybackEvent.AnswerRevealed(card.cardId))
         tts.speak(
             card.spokenAnswer.ifBlank { " " },
             TextToSpeech.QUEUE_FLUSH,
