@@ -102,6 +102,10 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
      * [SimpleBasePlayer] must do it manually. Focus is requested once and held for the playback
      * lifetime (never abandoned on pause — abandoning lets a defensively-paused app such as Spotify
      * grab the slot), then auto-pauses on loss and auto-resumes on the following gain.
+     *
+     * A permanent [AudioManager.AUDIOFOCUS_LOSS] is the exception: the system drops our request from
+     * the focus stack, so it is forgotten here and the next play requests focus again. It never
+     * auto-resumes.
      */
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
@@ -112,7 +116,12 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
                 }
             }
 
-            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                audioFocusRequest = null
+                wasPlayingBeforeFocusLoss = false
+                if (isPlaying) doPause()
+            }
+
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 if (isPlaying) {
@@ -145,6 +154,8 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        // A user play or pause overrides any pending auto-resume from a transient focus loss.
+        wasPlayingBeforeFocusLoss = false
         if (playWhenReady) doPlay() else doPause()
         return Futures.immediateVoidFuture()
     }
@@ -236,7 +247,11 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         }
     }
 
-    fun togglePlayPause() = if (isPlaying) doPause() else doPlay()
+    fun togglePlayPause() {
+        // A user play or pause overrides any pending auto-resume from a transient focus loss.
+        wasPlayingBeforeFocusLoss = false
+        if (isPlaying) doPause() else doPlay()
+    }
 
     fun moveToNextCard() {
         if (index >= cards.lastIndex) return

@@ -14,11 +14,15 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 @UnstableApi
@@ -33,7 +37,12 @@ class StudySessionVoiceGateway @Inject constructor(
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = _voiceAnswerState.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private var voiceBinder: StudySessionVoiceService.LocalBinder? = null
+    private val voiceBinder = MutableStateFlow<StudySessionVoiceService.LocalBinder?>(null)
+
+    // Declared after voiceBinder, which it reads at construction.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val rawVoiceLevel: Flow<Float> = voiceBinder.flatMapLatest { binder -> binder?.rawVoiceLevel ?: flowOf(0f) }
+
     private var voiceStateJob: Job? = null
     private var voiceAnswerStateJob: Job? = null
     private var isBound = false
@@ -47,10 +56,12 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingCards: List<VoiceFlashcard> = emptyList()
     private var pendingStartIndex: Int = 0
     private var pendingSubcategoryName: String = ""
+    private var pendingIsVoiceAnsweringSession: Boolean = false
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
     private var pendingVoiceAnswering: Boolean? = null
     private var pendingNextSilenceWillPauseSession: Boolean? = null
+    private var pendingNextGradingFailureWillPauseSession: Boolean? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -60,20 +71,21 @@ class StudySessionVoiceGateway @Inject constructor(
                 return
             }
             val binder = service as? StudySessionVoiceService.LocalBinder ?: return
-            voiceBinder = binder
-            binder.loadSession(pendingCards, pendingStartIndex, pendingSubcategoryName)
+            voiceBinder.value = binder
+            binder.loadSession(pendingCards, pendingStartIndex, pendingSubcategoryName, pendingIsVoiceAnsweringSession)
             // setSpeechRate/setVoice can land before the async bind completes (voiceBinder was
             // still null), so replay whatever was requested in the meantime.
             pendingSpeechRate?.let { binder.setPlaybackSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
             pendingVoiceAnswering?.let { binder.setVoiceAnswering(it) }
             pendingNextSilenceWillPauseSession?.let { binder.setNextSilenceWillPauseSession(it) }
+            pendingNextGradingFailureWillPauseSession?.let { binder.setNextGradingFailureWillPauseSession(it) }
             collectVoiceState(binder)
             collectVoiceAnswerState(binder)
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            voiceBinder = null
+            voiceBinder.value = null
         }
     }
 
@@ -81,10 +93,12 @@ class StudySessionVoiceGateway @Inject constructor(
         cards: List<Flashcard>,
         startIndex: Int,
         subcategoryName: String,
+        isVoiceAnsweringSession: Boolean,
     ) {
         pendingCards = cards.toVoiceFlashcards()
         pendingStartIndex = startIndex
         pendingSubcategoryName = subcategoryName
+        pendingIsVoiceAnsweringSession = isVoiceAnsweringSession
         // Bind only: MediaSessionService promotes itself to a foreground service when playback
         // starts, so an explicit startForegroundService here would risk a 5s FGS-timeout ANR.
         val intent = Intent(context, StudySessionVoiceService::class.java).apply {
@@ -97,56 +111,62 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun updateQueue(cards: List<Flashcard>) {
         val voiceCards = cards.toVoiceFlashcards()
         pendingCards = voiceCards
-        voiceBinder?.updateQueue(voiceCards)
+        voiceBinder.value?.updateQueue(voiceCards)
     }
 
     override fun stop() {
-        voiceBinder?.stopPlayback()
+        voiceBinder.value?.stopPlayback()
         unbind()
         _state.value = VoicePlaybackState()
         _voiceAnswerState.value = VoiceAnswerState()
         pendingVoiceAnswering = null
         pendingNextSilenceWillPauseSession = null
+        pendingNextGradingFailureWillPauseSession = null
     }
 
     override fun togglePlayPause() {
-        voiceBinder?.togglePlayPause()
+        voiceBinder.value?.togglePlayPause()
     }
 
     override fun rewindToNext() {
-        voiceBinder?.moveToNextCard()
+        voiceBinder.value?.moveToNextCard()
     }
 
     override fun rewindToPrevious() {
-        voiceBinder?.moveToPreviousCard()
+        voiceBinder.value?.moveToPreviousCard()
     }
 
     override fun restartCurrentCard() {
-        voiceBinder?.restartCurrentCardPlayback()
+        voiceBinder.value?.restartCurrentCardPlayback()
     }
 
     override fun showAnswer() {
-        voiceBinder?.skipToCardAnswerPlayback()
+        voiceBinder.value?.skipToCardAnswerPlayback()
     }
 
     override fun setSpeechRate(rate: Float) {
         pendingSpeechRate = rate
-        voiceBinder?.setPlaybackSpeechRate(rate)
+        voiceBinder.value?.setPlaybackSpeechRate(rate)
     }
 
     override fun setVoice(voiceId: String?) {
         pendingVoiceId = voiceId
-        voiceBinder?.setVoice(voiceId)
+        voiceBinder.value?.setVoice(voiceId)
     }
 
     override fun setVoiceAnswering(enabled: Boolean) {
         pendingVoiceAnswering = enabled
-        voiceBinder?.setVoiceAnswering(enabled)
+        voiceBinder.value?.setVoiceAnswering(enabled)
     }
 
     override fun setNextSilenceWillPauseSession(willPause: Boolean) {
         pendingNextSilenceWillPauseSession = willPause
-        voiceBinder?.setNextSilenceWillPauseSession(willPause)
+        voiceBinder.value?.setNextSilenceWillPauseSession(willPause)
+    }
+
+    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
+        pendingNextGradingFailureWillPauseSession = willPause
+        voiceBinder.value?.setNextGradingFailureWillPauseSession(willPause)
     }
 
     private fun collectVoiceState(binder: StudySessionVoiceService.LocalBinder) {
@@ -192,7 +212,7 @@ class StudySessionVoiceGateway @Inject constructor(
             runCatching { context.unbindService(serviceConnection) }
             isBound = false
         }
-        voiceBinder = null
+        voiceBinder.value = null
     }
 
     private fun List<Flashcard>.toVoiceFlashcards(): List<VoiceFlashcard> = map { card ->
@@ -210,32 +230,32 @@ class StudySessionVoiceGateway @Inject constructor(
             answerText = card.answer,
         )
     }
+}
 
-    private fun String.forSpeech(): String {
-        // extract code span content; wraps result in single quotes for verbal separation
-        val codeTransformed = replace(Regex("`([^`]*)`")) { match ->
-            val inner = match.groupValues[1]
-                // generic types: List<String> → "List of String"; skips standalone tags like
-                // <service> (no non-ws before <); skips closing tags
-                .replace(Regex("(?<=\\S)<(?!/)([^>]+)>")) { " of ${it.groupValues[1]}" }
-                .replace(Regex("(?<!\\.)\\.(?!\\.)"), " DOT ") // member access dots → " DOT "; lets through ellipsis (...)
-                .replace("_", " ") // snake_case separators → spaces
-                .replace(Regex(" {2,}"), " ") // collapse runs of spaces left by prior replacements
-                .trim()
-            // single quotes in order to verbally separate the inline code from surrounding text;
-            // avoids reading it as a single word
-            "'$inner'"
-        }
-        return codeTransformed
-            // XML/HTML tags → inner content; handles <tag>, </tag>, <tag />; lets through < and >
-            // not forming a full tag
-            .replace(Regex("</?([^>]+?)\\s*/?>")) { it.groupValues[1].trim() }
-            // SCREAMING_SNAKE_CASE → lowercase words; requires at least one underscore, lets through
-            // bare acronyms like HTTP
-            .replace(Regex("\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b")) { it.value.lowercase().replace('_', ' ') }
-            // Unicode arrows → full stop; avoid reading them as "right pointing arrow" etc.; they are
-            // used as visual separators and reading them is distracting
-            .replace(Regex("[→←↑↓⇒⇐⇑⇓↔⇔]"), ".")
-            .replace("`", "'") // remaining stray backticks → single quotes
+private fun String.forSpeech(): String {
+    // extract code span content; wraps result in single quotes for verbal separation
+    val codeTransformed = replace(Regex("`([^`]*)`")) { match ->
+        val inner = match.groupValues[1]
+            // generic types: List<String> → "List of String"; skips standalone tags like
+            // <service> (no non-ws before <); skips closing tags
+            .replace(Regex("(?<=\\S)<(?!/)([^>]+)>")) { " of ${it.groupValues[1]}" }
+            .replace(Regex("(?<!\\.)\\.(?!\\.)"), " DOT ") // member access dots → " DOT "; lets through ellipsis (...)
+            .replace("_", " ") // snake_case separators → spaces
+            .replace(Regex(" {2,}"), " ") // collapse runs of spaces left by prior replacements
+            .trim()
+        // single quotes in order to verbally separate the inline code from surrounding text;
+        // avoids reading it as a single word
+        "'$inner'"
     }
+    return codeTransformed
+        // XML/HTML tags → inner content; handles <tag>, </tag>, <tag />; lets through < and >
+        // not forming a full tag
+        .replace(Regex("</?([^>]+?)\\s*/?>")) { it.groupValues[1].trim() }
+        // SCREAMING_SNAKE_CASE → lowercase words; requires at least one underscore, lets through
+        // bare acronyms like HTTP
+        .replace(Regex("\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b")) { it.value.lowercase().replace('_', ' ') }
+        // Unicode arrows → full stop; avoid reading them as "right pointing arrow" etc.; they are
+        // used as visual separators and reading them is distracting
+        .replace(Regex("[→←↑↓⇒⇐⇑⇓↔⇔]"), ".")
+        .replace("`", "'") // remaining stray backticks → single quotes
 }

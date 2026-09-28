@@ -6,32 +6,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.usecase.CheckVoiceGradingEntitlementUseCase
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndSanitizeUseCase
+import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
 import com.rossomak.flashcards.core.voice.AudioRouteManager
 import com.rossomak.flashcards.core.voice.CaptureRouteType
 import com.rossomak.flashcards.core.voice.PcmPlayer
 import com.rossomak.flashcards.core.voice.SileroVoiceActivityDetector
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
-import com.rossomak.flashcards.core.voice.VoiceLevelWaveShaper
 import com.rossomak.flashcards.core.voice.VoiceObfuscator
 import com.rossomak.flashcards.core.voice.WavEncoder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -58,22 +53,12 @@ class VoiceDebugViewModel @Inject constructor(
     /** True while "Play last answer" is playing; drives the VAD block's indicator instead of the microphone. */
     private val isPlayingLastAnswer = MutableStateFlow(false)
 
-    /**
-     * Level for the VAD block's indicator, kept out of [state]: the played-back last answer while
-     * it plays, otherwise the live microphone.
-     */
+    /** Raw level for the VAD block's indicator: the played-back last answer while it plays, otherwise the live microphone. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val levels: StateFlow<ImmutableList<Float>> = VoiceLevelWaveShaper()
-        .shape(
-            level = isPlayingLastAnswer.flatMapLatest { playing -> if (playing) pcmPlayer.playbackLevel else voiceCaptureEngine.inputLevel },
-            isActive = combine(voiceCaptureEngine.isListening, isPlayingLastAnswer) { listening, playing -> listening || playing },
-        )
-        .map { levels -> levels.toImmutableList() }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = LEVELS_STOP_TIMEOUT.inWholeMilliseconds),
-            initialValue = persistentListOf(),
-        )
+    private val rawVoiceLevel: Flow<Float> = isPlayingLastAnswer.flatMapLatest { playing -> if (playing) pcmPlayer.playbackLevel else voiceCaptureEngine.inputLevel }
+
+    /** Bar levels for the VAD block's indicator, kept out of [state]. */
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = rawVoiceLevel.stateInVoiceBarsLevels(viewModelScope)
 
     private var rawClip: ShortArray = ShortArray(0)
     private var obfuscatedClip: ShortArray = ShortArray(0)
@@ -299,6 +284,5 @@ class VoiceDebugViewModel @Inject constructor(
         const val RAW_CLIP_DURATION_MS = 3_000L
         const val MAX_LOG_LINES = 12
         const val IDLE_ROUTE_LABEL = "Idle"
-        val LEVELS_STOP_TIMEOUT = 5.seconds
     }
 }

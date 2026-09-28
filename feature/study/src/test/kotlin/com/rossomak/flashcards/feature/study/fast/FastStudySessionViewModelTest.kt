@@ -48,8 +48,10 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -640,6 +642,7 @@ class FastStudySessionViewModelTest {
         voiceGateway.startCalls shouldBe 1
         voiceGateway.lastStartCards?.map { it.id } shouldBe route.cardIds
         voiceGateway.lastStartSubcategoryName shouldBe sessionTitle
+        voiceGateway.lastStartIsVoiceAnsweringSession shouldBe false
         voiceGateway.lastSpeechRate shouldBe savedSettings.speechRate
         voiceGateway.lastVoiceId shouldBe savedSettings.voiceId
     }
@@ -940,6 +943,8 @@ private class FakeVoiceGateway : VoiceGateway {
     val voiceAnswerStateFlow = MutableStateFlow(VoiceAnswerState())
     override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
 
+    override val rawVoiceLevel: Flow<Float> = emptyFlow()
+
     var lastVoiceAnswering: Boolean? = null
     var lastNextSilenceWillPauseSession: Boolean? = null
 
@@ -947,6 +952,7 @@ private class FakeVoiceGateway : VoiceGateway {
     var lastStartCards: List<Flashcard>? = null
     var lastStartIndex: Int? = null
     var lastStartSubcategoryName: String? = null
+    var lastStartIsVoiceAnsweringSession: Boolean? = null
     var togglePlayPauseCalls = 0
     var rewindToNextCalls = 0
     var rewindToPreviousCalls = 0
@@ -956,11 +962,12 @@ private class FakeVoiceGateway : VoiceGateway {
     var lastSpeechRate: Float? = null
     var lastVoiceId: String? = null
 
-    override fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String) {
+    override fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String, isVoiceAnsweringSession: Boolean) {
         startCalls++
         lastStartCards = cards
         lastStartIndex = startIndex
         lastStartSubcategoryName = subcategoryName
+        lastStartIsVoiceAnsweringSession = isVoiceAnsweringSession
     }
 
     override fun updateQueue(cards: List<Flashcard>) = Unit
@@ -995,4 +1002,5 @@ private class FakeVoiceGateway : VoiceGateway {
     override fun setNextSilenceWillPauseSession(willPause: Boolean) {
         lastNextSilenceWillPauseSession = willPause
     }
+    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) = Unit
 }

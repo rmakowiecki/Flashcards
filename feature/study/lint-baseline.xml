@@ -56,16 +56,6 @@
             column="23"/>
     </issue>
 
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;percent&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;study_session_voice_answer_grade_spoken_message&quot;>You scored %1$d percent. %2$s&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="18"
-            column="5"/>
-    </issue>
 
     <issue
         id="PluralsCandidate"
