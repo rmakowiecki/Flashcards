@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler
+import com.rossomak.flashcards.core.data.SignedInWorkRunner
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import timber.log.Timber
@@ -22,6 +23,10 @@ import timber.log.Timber
  * a previous process queued locally but never got to drain — no separate "check for
  * leftover records" path exists or is needed, since [SessionSubmissionDrainScheduler]'s own
  * `enqueueUniqueWork(..., KEEP, ...)` call is itself a safe no-op to issue redundantly.
+ *
+ * [SignedInWorkRunner.start] also runs once per process start: it observes the auth state for the
+ * process's lifetime and runs its work (the XP configuration refresh) whenever a user becomes signed
+ * in, the session Firebase restores at app start included.
  */
 @HiltAndroidApp
 class FlashcardsApplication : Application(), Configuration.Provider {
@@ -31,6 +36,9 @@ class FlashcardsApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var sessionSubmissionDrainScheduler: SessionSubmissionDrainScheduler
+
+    @Inject
+    lateinit var signedInWorkRunner: SignedInWorkRunner
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(hiltWorkerFactory).build()
@@ -42,5 +50,6 @@ class FlashcardsApplication : Application(), Configuration.Provider {
         }
         logd { "App start: scheduling session submission drain for recovery" }
         sessionSubmissionDrainScheduler.scheduleDrain()
+        signedInWorkRunner.start()
     }
 }

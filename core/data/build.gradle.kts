@@ -33,6 +33,7 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.google.guava.listenablefuture)
 
+    testImplementation(testFixtures(project(":core:domain")))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)

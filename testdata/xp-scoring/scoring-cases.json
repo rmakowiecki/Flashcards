@@ -1,0 +1,1525 @@
+{
+  "description": "Shared XP scoring cases, run by both the TypeScript submitStudySession scoring module and the Kotlin CalculateSessionXpUseCase. See README.md in this directory for the schema.",
+  "configs": {
+    "test": {
+      "newCardStudied": 10,
+      "cardMastered": 100,
+      "cardPartial": 25,
+      "masteryDefended": 50,
+      "cardDemastered": -80,
+      "sessionCompleted": 500,
+      "dailyGoalMet": 1000,
+      "streakPerDay": 250,
+      "streakMaxPerDay": 2500,
+      "minuteStudied": 10,
+      "levelCurveBase": 1000,
+      "levelCurveExponent": 2
+    },
+    "unusual": {
+      "newCardStudied": 3,
+      "cardMastered": 7,
+      "cardPartial": 11,
+      "masteryDefended": 13,
+      "cardDemastered": -17,
+      "sessionCompleted": 19,
+      "dailyGoalMet": 29,
+      "streakPerDay": 31,
+      "streakMaxPerDay": 37,
+      "minuteStudied": 23,
+      "levelCurveBase": 1000,
+      "levelCurveExponent": 2
+    }
+  },
+  "cases": [
+    {
+      "name": "a card studied for the first time earns the new-card award",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 1
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 10,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 510
+        },
+        "newScoringState": {
+          "xp": 510,
+          "level": 1,
+          "xpIntoCurrentLevel": 510,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a card already studied earns no new-card award, and every line it does not earn stays zero",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 500
+        },
+        "newScoringState": {
+          "xp": 500,
+          "level": 1,
+          "xpIntoCurrentLevel": 500,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a card ending Mastered with no prior mastery earns the mastered award",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 600
+        },
+        "newScoringState": {
+          "xp": 600,
+          "level": 1,
+          "xpIntoCurrentLevel": 600,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a previously mastered card ending Mastered again earns the defense bonus instead of the mastered award",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 50,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 550
+        },
+        "newScoringState": {
+          "xp": 550,
+          "level": 1,
+          "xpIntoCurrentLevel": 550,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a card ending Partial earns the partial award",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 25,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 525
+        },
+        "newScoringState": {
+          "xp": 525,
+          "level": 1,
+          "xpIntoCurrentLevel": 525,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a previously mastered card ending Partial is mastery-neutral: no defense bonus, no loss",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Partial",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 25,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 525
+        },
+        "newScoringState": {
+          "xp": 525,
+          "level": 1,
+          "xpIntoCurrentLevel": 525,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a previously mastered card ending Failed earns the demastered penalty",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": -80,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 420
+        },
+        "newScoringState": {
+          "xp": 420,
+          "level": 1,
+          "xpIntoCurrentLevel": 420,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a never-mastered card ending Failed in an abandoned session earns and costs nothing",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 0
+        },
+        "newScoringState": {
+          "xp": 0,
+          "level": 1,
+          "xpIntoCurrentLevel": 0,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a Rated session combines mastery, defense, partial and loss awards card by card",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": true
+            },
+            {
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": true
+            },
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 25,
+          "masteryDefenseBonus": 50,
+          "demastered": -80,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 595
+        },
+        "newScoringState": {
+          "xp": 595,
+          "level": 1,
+          "xpIntoCurrentLevel": 595,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a Fast session earns new-card, time and completion awards and no mastery awards",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Fast",
+          "durationSeconds": 120,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Seen"
+            }
+          ]
+        },
+        "newCardsStudied": 1
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 10,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 20,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 530
+        },
+        "newScoringState": {
+          "xp": 530,
+          "level": 1,
+          "xpIntoCurrentLevel": 530,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "time studied earns a flat rate per whole minute, rounding partial minutes down",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 179,
+          "abandoned": false,
+          "cardResults": []
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 20,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 520
+        },
+        "newScoringState": {
+          "xp": 520,
+          "level": 1,
+          "xpIntoCurrentLevel": 520,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a finished session earns the completion bonus",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": []
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 500
+        },
+        "newScoringState": {
+          "xp": 500,
+          "level": 1,
+          "xpIntoCurrentLevel": 500,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "an abandoned session omits the completion bonus but keeps every other award",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 60,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 1
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 10,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 10,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 120
+        },
+        "newScoringState": {
+          "xp": 120,
+          "level": 1,
+          "xpIntoCurrentLevel": 120,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a delta smaller than the level threshold stays in the current level",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "xp": 500,
+          "xpIntoCurrentLevel": 500
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 100
+        },
+        "newScoringState": {
+          "xp": 600,
+          "level": 1,
+          "xpIntoCurrentLevel": 600,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "landing exactly on the level threshold crosses the level with nothing left over",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "xp": 900,
+          "xpIntoCurrentLevel": 900
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 100
+        },
+        "newScoringState": {
+          "xp": 1000,
+          "level": 2,
+          "xpIntoCurrentLevel": 0,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": [
+          2
+        ]
+      }
+    },
+    {
+      "name": "crossing one level reports it once and the leftover carries into the new level, with no burst",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "xp": 950,
+          "xpIntoCurrentLevel": 950
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 100
+        },
+        "newScoringState": {
+          "xp": 1050,
+          "level": 2,
+          "xpIntoCurrentLevel": 50,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": [
+          2
+        ]
+      }
+    },
+    {
+      "name": "crossing several levels in one session reports each of them in ascending order",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "xp": 5000,
+          "xpIntoCurrentLevel": 5000
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 100
+        },
+        "newScoringState": {
+          "xp": 5100,
+          "level": 3,
+          "xpIntoCurrentLevel": 100,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "a loss larger than the points in the level is clamped and the level never drops",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "xp": 500,
+          "level": 2,
+          "xpIntoCurrentLevel": 30
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": -80,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": -80
+        },
+        "newScoringState": {
+          "xp": 470,
+          "level": 2,
+          "xpIntoCurrentLevel": 0,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a loss smaller than the points in the level is applied in full",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "xp": 500,
+          "level": 2,
+          "xpIntoCurrentLevel": 100
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 0,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": -80,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": -80
+        },
+        "newScoringState": {
+          "xp": 420,
+          "level": 2,
+          "xpIntoCurrentLevel": 20,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "every award reads its rate from the configuration, none is a literal",
+      "kind": "sessionXp",
+      "input": {
+        "config": "unusual",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 60,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": true
+            },
+            {
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "state": "Failed",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        },
+        "newCardsStudied": 2
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 6,
+          "mastered": 7,
+          "partial": 11,
+          "masteryDefenseBonus": 13,
+          "demastered": -17,
+          "timeStudied": 23,
+          "sessionCompletionBonus": 19,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 62
+        },
+        "newScoringState": {
+          "xp": 62,
+          "level": 1,
+          "xpIntoCurrentLevel": 62,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "the same session under a configuration with a doubled mastered award earns the doubled amount",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "configOverrides": {
+          "cardMastered": 200
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 200,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 700
+        },
+        "newScoringState": {
+          "xp": 700,
+          "level": 1,
+          "xpIntoCurrentLevel": 700,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a finished Rated session under the default configuration",
+      "kind": "sessionXp",
+      "input": {
+        "config": "default",
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 300,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 2
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 20,
+          "mastered": 100,
+          "partial": 25,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 50,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 695
+        },
+        "newScoringState": {
+          "xp": 695,
+          "level": 1,
+          "xpIntoCurrentLevel": 695,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": []
+      }
+    },
+    {
+      "name": "a large award under the default configuration crosses levels on the default curve",
+      "kind": "sessionXp",
+      "input": {
+        "config": "default",
+        "priorState": {
+          "xp": 6950,
+          "level": 2,
+          "xpIntoCurrentLevel": 5950
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 0,
+          "abandoned": true,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 0
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 0,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 0,
+          "sessionCompletionBonus": 0,
+          "dailyGoalBonus": 0,
+          "streakBonus": 0,
+          "xpTotal": 100
+        },
+        "newScoringState": {
+          "xp": 7050,
+          "level": 3,
+          "xpIntoCurrentLevel": 50,
+          "currentStreak": 0,
+          "bestStreak": 0,
+          "lastStudyDate": "",
+          "goalMetDate": ""
+        },
+        "levelsCrossed": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "the level 1 threshold under the test curve",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "test",
+        "level": 1
+      },
+      "expected": {
+        "threshold": 1000
+      }
+    },
+    {
+      "name": "the level 2 threshold under the test curve",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "test",
+        "level": 2
+      },
+      "expected": {
+        "threshold": 4000
+      }
+    },
+    {
+      "name": "the level 3 threshold under the test curve",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "test",
+        "level": 3
+      },
+      "expected": {
+        "threshold": 9000
+      }
+    },
+    {
+      "name": "the level 1 threshold under the default curve",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 1
+      },
+      "expected": {
+        "threshold": 1000
+      }
+    },
+    {
+      "name": "the level 2 threshold under the default curve rounds up to the next thousand",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 2
+      },
+      "expected": {
+        "threshold": 6000
+      }
+    },
+    {
+      "name": "the level 3 threshold under the default curve rounds up to the next thousand",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 3
+      },
+      "expected": {
+        "threshold": 16000
+      }
+    },
+    {
+      "name": "the threshold reads its curve parameters from the configuration, not a literal",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "unusual",
+        "configOverrides": {
+          "levelCurveBase": 500,
+          "levelCurveExponent": 1
+        },
+        "level": 3
+      },
+      "expected": {
+        "threshold": 2000
+      }
+    },
+    {
+      "name": "the streak advances when the study date is exactly one day after the last study date",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 3,
+          "bestStreak": 5,
+          "lastStudyDate": "2026-09-08"
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 999999,
+          "todayTotalMinutes": 0
+        }
+      },
+      "expected": {
+        "streakBonus": 1000,
+        "dailyGoalBonus": 0,
+        "currentStreak": 4,
+        "bestStreak": 5,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "the streak does not advance, and pays no bonus, on the same study date",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 3,
+          "bestStreak": 3,
+          "lastStudyDate": "2026-09-09"
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 999999,
+          "todayTotalMinutes": 0
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 3,
+        "bestStreak": 3,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "the streak resets to 1 after a gap of more than one day and the best streak is kept",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 10,
+          "bestStreak": 10,
+          "lastStudyDate": "2026-09-01"
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 999999,
+          "todayTotalMinutes": 0
+        }
+      },
+      "expected": {
+        "streakBonus": 250,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 10,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "the streak award reaches the per-day cap exactly",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 9,
+          "bestStreak": 9,
+          "lastStudyDate": "2026-09-08"
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 999999,
+          "todayTotalMinutes": 0
+        }
+      },
+      "expected": {
+        "streakBonus": 2500,
+        "dailyGoalBonus": 0,
+        "currentStreak": 10,
+        "bestStreak": 10,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "the streak award is clamped at the per-day cap",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 10,
+          "bestStreak": 10,
+          "lastStudyDate": "2026-09-09"
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-10",
+          "dailyGoalMinutes": 999999,
+          "todayTotalMinutes": 0
+        }
+      },
+      "expected": {
+        "streakBonus": 2500,
+        "dailyGoalBonus": 0,
+        "currentStreak": 11,
+        "bestStreak": 11,
+        "lastStudyDate": "2026-09-10",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "a study date earlier than the last study date changes nothing",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 5,
+          "bestStreak": 5,
+          "lastStudyDate": "2026-09-09"
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-01",
+          "dailyGoalMinutes": 999999,
+          "todayTotalMinutes": 0
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 5,
+        "bestStreak": 5,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "the daily goal pays when today's minutes reach the goal",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalMinutes": 20
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 1000,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "2026-09-09"
+      }
+    },
+    {
+      "name": "the daily goal does not pay twice on the same day",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "goalMetDate": "2026-09-09",
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalMinutes": 40
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "2026-09-09"
+      }
+    },
+    {
+      "name": "the daily goal does not pay below the goal",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalMinutes": 19
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": ""
+      }
+    },
+    {
+      "name": "a study date earlier than the goal-met date changes nothing",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "goalMetDate": "2026-09-09",
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-01",
+          "dailyGoalMinutes": 20,
+          "todayTotalMinutes": 100
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "2026-09-09"
+      }
+    },
+    {
+      "name": "a lowered goal is evaluated live: the same minutes that missed a 60-minute goal clear a 25-minute one",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 25,
+          "todayTotalMinutes": 30
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 1000,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "2026-09-09"
+      }
+    },
+    {
+      "name": "the first-ever submission starts the streak at 1 and evaluates the goal normally",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "test",
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalMinutes": 20
+        }
+      },
+      "expected": {
+        "streakBonus": 250,
+        "dailyGoalBonus": 1000,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "2026-09-09"
+      }
+    },
+    {
+      "name": "both awards read their rate, cap and flat amount from the configuration, not a literal",
+      "kind": "streakAndGoal",
+      "skip": {
+        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
+      },
+      "input": {
+        "config": "unusual",
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalMinutes": 20
+        }
+      },
+      "expected": {
+        "streakBonus": 31,
+        "dailyGoalBonus": 29,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "2026-09-09"
+      }
+    }
+  ]
+}

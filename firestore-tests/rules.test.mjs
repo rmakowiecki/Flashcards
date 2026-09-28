@@ -1,4 +1,5 @@
-// Firestore Security Rules tests, covering the server-authoritative client-read-only rules (ADR-0049).
+// Firestore Security Rules tests, covering the server-authoritative client-read-only rules (ADR-0049)
+// and the server-owned XP configuration.
 // Small and standalone on purpose — this is a guard against a specific class of production-only failure
 // (there is no other way to verify a rule without deploying it), not a second test framework for the
 // project. Run via `npm test` in this directory, which starts the Firestore emulator (see
@@ -24,6 +25,9 @@ const progressDoc = { categoryId: 'cat-1', cards: {} };
 
 /** A minimal, syntactically valid progress-summary document (ADR-0016) — rules don't inspect its shape. */
 const progressSummaryDoc = { subcategories: {} };
+
+/** A minimal XP configuration document — rules don't inspect its shape. */
+const xpConfigDoc = { cardMastered: 100 };
 
 /** A minimal, syntactically valid scoring-state document — rules don't inspect its shape. */
 const scoringStateDoc = { xp: 0, level: 1, xpIntoCurrentLevel: 0, currentStreak: 0, bestStreak: 0, lastStudyDate: '', goalMetDate: '' };
@@ -199,5 +203,43 @@ describe('users/{uid}/progress/user-stats (scoring state, client-read-only, ADR-
 
     await assertFails(getDoc(anonRef));
     await assertFails(setDoc(anonRef, scoringStateDoc));
+  });
+});
+
+describe('config/xp (server-owned XP configuration, client-read-only)', () => {
+  it('an authenticated user can read it', async () => {
+    await seedAsAdmin('config/xp', xpConfigDoc);
+    const userDb = testEnv.authenticatedContext(OWNER_UID).firestore();
+
+    await assertSucceeds(getDoc(doc(userDb, 'config/xp')));
+  });
+
+  it('a Guest (anonymous-auth user) can read it', async () => {
+    await seedAsAdmin('config/xp', xpConfigDoc);
+    const guestDb = testEnv.authenticatedContext(OTHER_UID, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+
+    await assertSucceeds(getDoc(doc(guestDb, 'config/xp')));
+  });
+
+  it('an unauthenticated request cannot read it', async () => {
+    await seedAsAdmin('config/xp', xpConfigDoc);
+    const unauthDb = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(getDoc(doc(unauthDb, 'config/xp')));
+  });
+
+  it('no client can create, update or delete it', async () => {
+    const ownerRef = doc(testEnv.authenticatedContext(OWNER_UID).firestore(), 'config/xp');
+    const otherRef = doc(testEnv.authenticatedContext(OTHER_UID).firestore(), 'config/xp');
+    const unauthRef = doc(testEnv.unauthenticatedContext().firestore(), 'config/xp');
+
+    await assertFails(setDoc(ownerRef, xpConfigDoc));
+    await assertFails(setDoc(unauthRef, xpConfigDoc));
+
+    await seedAsAdmin('config/xp', xpConfigDoc);
+    await assertFails(setDoc(ownerRef, { ...xpConfigDoc, cardMastered: 1000 }));
+    await assertFails(setDoc(otherRef, { ...xpConfigDoc, cardMastered: 1000 }));
+    await assertFails(deleteDoc(ownerRef));
+    await assertFails(deleteDoc(unauthRef));
   });
 });

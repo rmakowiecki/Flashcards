@@ -8,8 +8,10 @@ import com.rossomak.flashcards.core.data.repository.DefaultStudySessionPreferenc
 import com.rossomak.flashcards.core.data.repository.DefaultUserPreferencesRepository
 import com.rossomak.flashcards.core.data.source.DataStoreStudySessionPreferencesLocalDataSource
 import com.rossomak.flashcards.core.data.source.DataStoreUserPreferencesLocalDataSource
+import com.rossomak.flashcards.core.data.source.DataStoreXpConfigLocalDataSource
 import com.rossomak.flashcards.core.data.source.StudySessionPreferencesLocalDataSource
 import com.rossomak.flashcards.core.data.source.UserPreferencesLocalDataSource
+import com.rossomak.flashcards.core.data.source.XpConfigLocalDataSource
 import com.rossomak.flashcards.core.domain.repository.StudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.UserPreferencesRepository
 import dagger.Binds
@@ -23,9 +25,10 @@ import javax.inject.Singleton
 private val Context.userPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
 /**
- * One file, two data sources, two repositories, backed by the single [UserPreferencesDataStore]
- * below — the app's only `DataStore<Preferences>`, voice settings and the voice answering info flag included. One
- * file also means one thing for debug to clear.
+ * One file, three data sources, backed by the single [UserPreferencesDataStore] below — the app's
+ * only `DataStore<Preferences>`, voice settings, the voice answering info flag and the last fetched
+ * XP configuration included. One file also means one thing for debug to clear; clearing the XP
+ * configuration only means the bundled defaults apply until the next fetch.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -54,6 +57,12 @@ abstract class UserPreferencesModule {
     abstract fun bindStudySessionPreferencesLocalDataSource(
         impl: DataStoreStudySessionPreferencesLocalDataSource,
     ): StudySessionPreferencesLocalDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindXpConfigLocalDataSource(
+        impl: DataStoreXpConfigLocalDataSource,
+    ): XpConfigLocalDataSource
 
     companion object {
 

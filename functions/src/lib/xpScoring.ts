@@ -2,8 +2,8 @@
  * Server-authoritative XP and level scoring. A TypeScript port of
  * `core/domain/.../model/XpConfig.kt`, `ScoringState.kt`, `XpBreakdown.kt` and
  * `CalculateSessionXpUseCase.kt` — kept field-for-field and rule-for-rule identical to that Kotlin
- * source, since the two are expected to agree even though there is no cross-language sharing mechanism
- * in this codebase.
+ * source. Both test suites run the shared scoring cases in `testdata/xp-scoring/` at the repo root, and
+ * both bundled defaults are checked against the default configuration file there.
  *
  * Pure: no Firestore, no Admin SDK. [submitStudySession.ts](./submitStudySession.ts) is the only
  * caller, and is where every read/write this calculation needs actually happens.
@@ -26,10 +26,10 @@ export interface XpConfig {
 }
 
 /**
- * The server's own authoritative configuration, hardcoded here as `XpConfig.kt`'s documented defaults.
- * A session payload's own `xpConfig` snapshot (if the client sends one) is never read for scoring:
- * scoring inputs are validated against the server's own stored configuration — today that configuration
- * has exactly one source, this constant.
+ * The bundled fallback configuration, identical to `XpConfig.kt`'s constructor defaults and to the shared
+ * default configuration file. Scoring normally uses the server-owned `config/xp` document (see
+ * `xpConfig.ts`); this constant applies only when that document is missing, invalid or unreadable. A
+ * session payload's own `xpConfig` snapshot (if the client sends one) is never read for scoring.
  */
 export const DEFAULT_XP_CONFIG: XpConfig = {
   newCardStudied: 10,
