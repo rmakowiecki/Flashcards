@@ -19,9 +19,11 @@ interface SessionSubmissionRemoteDataSource {
 
     /**
      * Submits [sessionResult] to the `submitStudySession` callable and returns the score it answered
-     * with. A successful call whose response cannot be read as a [SessionScore] returns success with
-     * `null`: the server already recorded the session, so it is delivered even though its score is
-     * unknown. Only a failed call returns a failure.
+     * with. [ownerUid] is the User who finished the session; the server rejects the call as
+     * `UNAUTHENTICATED` if it is not the User whose ID token the SDK attached, so a sign-in change
+     * mid-call can never credit one User with another's session. A successful call whose response
+     * cannot be read as a [SessionScore] returns success with `null`: the server already recorded the
+     * session, so it is delivered even though its score is unknown. Only a failed call returns a failure.
      */
-    suspend fun submitSession(sessionResult: SessionResult): Result<SessionScore?>
+    suspend fun submitSession(ownerUid: String, sessionResult: SessionResult): Result<SessionScore?>
 }

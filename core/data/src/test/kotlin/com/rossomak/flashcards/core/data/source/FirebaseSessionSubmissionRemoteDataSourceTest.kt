@@ -88,11 +88,12 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val cardResult = session.cardResults.single()
         val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
 
-        val result = createApi().submitSession(session)
+        val result = createApi().submitSession(OWNER_UID, session)
 
         result.isSuccess shouldBe true
         @Suppress("UNCHECKED_CAST")
         val payload = payloadSlot.captured as Map<String, Any>
+        payload["ownerUid"] shouldBe OWNER_UID
         payload["sessionId"] shouldBe session.id
         payload["studyMode"] shouldBe session.mode.name
         payload["durationSeconds"] shouldBe session.durationSeconds
@@ -119,7 +120,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val session = fastSessionResult()
         val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
 
-        createApi().submitSession(session)
+        createApi().submitSession(OWNER_UID, session)
 
         @Suppress("UNCHECKED_CAST")
         val payload = payloadSlot.captured as Map<String, Any>
@@ -135,7 +136,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val error: FirebaseFunctionsException = mockk()
         stubCallable(Tasks.forException(error))
 
-        val result = createApi().submitSession(ratedSessionResult())
+        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
@@ -146,7 +147,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     fun `submitSession reads a Rated response into the server's score`() = runTest {
         stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
 
-        val result = createApi().submitSession(ratedSessionResult())
+        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result shouldBe Result.success(
             SessionScore(
@@ -183,7 +184,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     fun `submitSession reads a Fast response without Rated-only counts`() = runTest {
         stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE + (FIELD_COUNTS to mapOf("newCardsStudied" to 2)))))
 
-        val score = createApi().submitSession(fastSessionResult()).getOrThrow().shouldNotBeNull()
+        val score = createApi().submitSession(OWNER_UID, fastSessionResult()).getOrThrow().shouldNotBeNull()
 
         score.counts shouldBe SessionScoreCounts(newCardsStudied = 2, newlyMastered = null, partial = null, defended = null, demastered = null)
     }
@@ -192,7 +193,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     fun `submitSession reads a response without counts or rates, leaving both null`() = runTest {
         stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE - FIELD_COUNTS - FIELD_RATES)))
 
-        val score = createApi().submitSession(ratedSessionResult()).getOrThrow().shouldNotBeNull()
+        val score = createApi().submitSession(OWNER_UID, ratedSessionResult()).getOrThrow().shouldNotBeNull()
 
         score.counts shouldBe null
         score.rates shouldBe null
@@ -202,7 +203,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     fun `submitSession succeeds without a score on a response missing a required field`() = runTest {
         stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE - "level")))
 
-        val result = createApi().submitSession(ratedSessionResult())
+        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result shouldBe Result.success(null)
     }
@@ -211,13 +212,14 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     fun `submitSession succeeds without a score on a response that is not an object`() = runTest {
         stubCallable(Tasks.forResult(callableResult(null)))
 
-        val result = createApi().submitSession(ratedSessionResult())
+        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result shouldBe Result.success(null)
     }
 
     private companion object {
         const val SUBMIT_STUDY_SESSION_FUNCTION_NAME = "submitStudySession"
+        const val OWNER_UID = "uid-1"
         const val FIELD_COUNTS = "counts"
         const val FIELD_RATES = "rates"
 

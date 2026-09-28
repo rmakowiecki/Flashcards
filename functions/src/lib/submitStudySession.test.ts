@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, afterEach, before, describe, it } from "node:test";
 import * as admin from "firebase-admin";
-import { submitStudySession, validateSubmitStudySessionRequest } from "./submitStudySession";
+import { requireOwnerMatchesCaller, submitStudySession, validateSubmitStudySessionRequest } from "./submitStudySession";
 import { loadXpConfig, xpConfigDocRef } from "./xpConfig";
 import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 
@@ -53,9 +53,11 @@ const DEFAULT_STUDY_DATE = "2026-09-01";
 const DEFAULT_DAILY_GOAL_MINUTES = 999999;
 const DEFAULT_STREAK_BONUS = 250; // 1 * DEFAULT_XP_CONFIG.streakPerDay
 const MAX_UTC_OFFSET_MINUTES = 14 * 60;
+const DEFAULT_OWNER_UID = "owner-uid";
 
 function rawRatedRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    ownerUid: DEFAULT_OWNER_UID,
     sessionId: randomUUID(),
     studyMode: "Rated",
     startedAtEpochMillis: DEFAULT_STARTED_AT_EPOCH_MILLIS,
@@ -73,6 +75,15 @@ function rawRatedRequest(overrides: Record<string, unknown> = {}): Record<string
 }
 
 describe("validateSubmitStudySessionRequest", () => {
+  it("rejects a payload missing ownerUid", () => {
+    const { ownerUid, ...withoutOwnerUid } = rawRatedRequest();
+    assert.throws(() => validateSubmitStudySessionRequest(withoutOwnerUid), /ownerUid/);
+  });
+
+  it("rejects an empty ownerUid", () => {
+    assert.throws(() => validateSubmitStudySessionRequest(rawRatedRequest({ ownerUid: "" })), /ownerUid/);
+  });
+
   it("rejects a payload missing sessionId", () => {
     const { sessionId, ...withoutSessionId } = rawRatedRequest();
     assert.throws(() => validateSubmitStudySessionRequest(withoutSessionId), /sessionId/);
@@ -183,6 +194,18 @@ describe("validateSubmitStudySessionRequest", () => {
     assert.equal(validated.cardResults.length, 1);
     assert.equal(validated.studyDateUtcOffsetMinutes, 0);
     assert.equal(validated.dailyGoalMinutes, DEFAULT_DAILY_GOAL_MINUTES);
+  });
+});
+
+describe("requireOwnerMatchesCaller", () => {
+  it("accepts a session owned by the caller", () => {
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+    assert.doesNotThrow(() => requireOwnerMatchesCaller(DEFAULT_OWNER_UID, request));
+  });
+
+  it("rejects a session owned by another User as unauthenticated", () => {
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+    assert.throws(() => requireOwnerMatchesCaller("other-uid", request), { code: "unauthenticated" });
   });
 });
 
