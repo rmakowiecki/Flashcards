@@ -49,6 +49,8 @@ def validate(config: dict) -> list[str]:
             problems.append(f"cardDemastered must be zero or negative, got {config['cardDemastered']!r}")
         if config["levelCurveBase"] <= 0:
             problems.append(f"levelCurveBase must be positive, got {config['levelCurveBase']!r}")
+        if config["levelCurveExponent"] < 0:
+            problems.append(f"levelCurveExponent must be zero or positive, got {config['levelCurveExponent']!r}")
     unknown = sorted(set(config) - set(INTEGER_FIELDS + CURVE_FIELDS))
     if unknown:
         problems.append(f"unknown fields: {', '.join(unknown)}")

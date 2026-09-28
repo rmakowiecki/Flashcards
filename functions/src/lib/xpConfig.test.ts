@@ -60,4 +60,9 @@ describe("parseXpConfig", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 0 }) ?? "", /levelCurveBase/);
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: -1000 }) ?? "", /levelCurveBase/);
   });
+
+  it("rejects a negative level curve exponent and accepts a zero one", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: -0.5 }) ?? "", /levelCurveExponent/);
+    assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: 0 }), undefined);
+  });
 });

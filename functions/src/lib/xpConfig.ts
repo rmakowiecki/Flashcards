@@ -36,8 +36,9 @@ export type XpConfigParseResult = { config: XpConfig } | { problem: string };
 
 /**
  * Validates a configuration document's data. Every field must be present and a finite number, every
- * award field an integer, the de-mastery penalty at most zero, and the level curve's base positive (a
- * zero or negative base makes every level threshold zero, and the level-up loop would never end).
+ * award field an integer, the de-mastery penalty at most zero, the level curve's base positive (a
+ * zero or negative base makes every level threshold zero, and the level-up loop would never end), and its
+ * exponent zero or positive (a negative exponent makes each level cheaper than the one before it).
  * Unknown fields are ignored.
  */
 export function parseXpConfig(data: unknown): XpConfigParseResult {
@@ -56,6 +57,7 @@ export function parseXpConfig(data: unknown): XpConfigParseResult {
   const complete = config as XpConfig;
   if (complete.cardDemastered > 0) return { problem: `cardDemastered must be zero or negative, got ${complete.cardDemastered}` };
   if (complete.levelCurveBase <= 0) return { problem: `levelCurveBase must be positive, got ${complete.levelCurveBase}` };
+  if (complete.levelCurveExponent < 0) return { problem: `levelCurveExponent must be zero or positive, got ${complete.levelCurveExponent}` };
   return { config: complete };
 }
 
