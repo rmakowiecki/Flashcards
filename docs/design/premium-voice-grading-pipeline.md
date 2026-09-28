@@ -82,7 +82,7 @@ Summary commit (ADR-0014)
 ### Module placement
 
 - **`core:voice`** (new module): `VoiceCaptureEngine` (AudioRecord + BT SCO management), Silero VAD wrapper, obfuscation DSP. No Compose/ViewModel dependencies — reusable and unit-testable in isolation from any specific feature.
-- **`feature/study`**: orchestrates `core:voice` into the study session flow, alongside the existing `TtsPlayer` (`feature/study/src/main/kotlin/com/rossomak/flashcards/feature/study/voice/data/TtsPlayer.kt`). The round's rules run in `core:domain`'s `RatedStudySessionCoordinator` ([ADR-0054](../adr/0054-study-session-rules-in-domain-coordinators.md)). Owns the foreground service lifecycle, wake lock, consent screen, and upload via a repository (Retrofit-based `NetworkModule`, per this project's existing Hilt DI convention in AGENTS.md).
+- **`feature/study`**: orchestrates `core:voice` into the study session flow, alongside the existing `TtsPlayer` (`feature/study/src/main/kotlin/com/rossomak/flashcards/feature/study/voice/data/TtsPlayer.kt`). The round's rules run in `core:domain`'s `RatedStudySessionCoordinator` ([ADR-0054](../adr/0054-study-session-rules-in-domain-coordinators.md)). Owns the foreground service lifecycle, wake lock and consent screen. Uploads go through `VoiceAnswerGradingRepository` (`core:data`), which calls the `transcribeAndGradeSpokenAnswer` Firebase callable.
 
 Rationale: capture/VAD/obfuscation logic has no inherent dependency on the study-session concept and could plausibly be reused elsewhere; session orchestration is genuinely study-specific and belongs where `TtsPlayer` already lives.
 
