@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.feature.study.voice.data
 
 import android.app.PendingIntent
 import android.os.Bundle

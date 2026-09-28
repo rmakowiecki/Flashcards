@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.feature.study.voice.data
 
 import android.content.ComponentName
 import android.content.Context
@@ -9,32 +9,55 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
+import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+/**
+ * The study session's voice stack, as both [StudyVoicePlaybackGateway] and [VoiceCaptureGateway]:
+ * one instance per ViewModel, over the [StudySessionVoiceService] binder. Commands issued before the
+ * asynchronous bind completes are kept and replayed once it does.
+ */
 @UnstableApi
+@ViewModelScoped
+@Suppress("TooManyFunctions") // one method per command of the two gateways it implements.
 class StudySessionVoiceGateway @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) : VoiceGateway {
+) : StudyVoicePlaybackGateway, VoiceCaptureGateway {
 
     private val _state = MutableStateFlow(VoicePlaybackState())
     override val state: StateFlow<VoicePlaybackState> = _state.asStateFlow()
 
-    private val _voiceAnswerState = MutableStateFlow(VoiceAnswerState())
-    override val voiceAnswerState: StateFlow<VoiceAnswerState> = _voiceAnswerState.asStateFlow()
+    // Outlive every bind: the coordinator subscribes once, for the whole session.
+    private val playbackEventChannel = Channel<PlaybackEvent>(Channel.UNLIMITED)
+    override val playbackEvents: Flow<PlaybackEvent> = playbackEventChannel.receiveAsFlow()
+
+    private val captureEventChannel = Channel<CaptureEvent>(Channel.UNLIMITED)
+    override val captureEvents: Flow<CaptureEvent> = captureEventChannel.receiveAsFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val voiceBinder = MutableStateFlow<StudySessionVoiceService.LocalBinder?>(null)
@@ -43,8 +66,7 @@ class StudySessionVoiceGateway @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     override val rawVoiceLevel: Flow<Float> = voiceBinder.flatMapLatest { binder -> binder?.rawVoiceLevel ?: flowOf(0f) }
 
-    private var voiceStateJob: Job? = null
-    private var voiceAnswerStateJob: Job? = null
+    private var binderJobs: List<Job> = emptyList()
     private var isBound = false
 
     // The LocalBinder carries playback state and commands, but MediaSessionService only registers
@@ -55,13 +77,12 @@ class StudySessionVoiceGateway @Inject constructor(
 
     private var pendingCards: List<VoiceFlashcard> = emptyList()
     private var pendingStartIndex: Int = 0
-    private var pendingSubcategoryName: String = ""
+    private var pendingSessionTitle: String = ""
     private var pendingIsVoiceAnsweringSession: Boolean = false
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
+    private var pendingQuestionOnlyMode: Boolean? = null
     private var pendingVoiceAnswering: Boolean? = null
-    private var pendingNextSilenceWillPauseSession: Boolean? = null
-    private var pendingNextGradingFailureWillPauseSession: Boolean? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -72,16 +93,16 @@ class StudySessionVoiceGateway @Inject constructor(
             }
             val binder = service as? StudySessionVoiceService.LocalBinder ?: return
             voiceBinder.value = binder
-            binder.loadSession(pendingCards, pendingStartIndex, pendingSubcategoryName, pendingIsVoiceAnsweringSession)
-            // setSpeechRate/setVoice can land before the async bind completes (voiceBinder was
-            // still null), so replay whatever was requested in the meantime.
-            pendingSpeechRate?.let { binder.setPlaybackSpeechRate(it) }
+            // Subscribed before the replay below, so an event a replayed command causes (such as a
+            // refused microphone type on startVoiceAnswering) is never lost.
+            observe(binder)
+            binder.loadSession(pendingCards, pendingStartIndex, pendingSessionTitle, pendingIsVoiceAnsweringSession)
+            // Commands can land before the async bind completes (voiceBinder was still null), so
+            // replay whatever was requested in the meantime.
+            pendingSpeechRate?.let { binder.setSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
-            pendingVoiceAnswering?.let { binder.setVoiceAnswering(it) }
-            pendingNextSilenceWillPauseSession?.let { binder.setNextSilenceWillPauseSession(it) }
-            pendingNextGradingFailureWillPauseSession?.let { binder.setNextGradingFailureWillPauseSession(it) }
-            collectVoiceState(binder)
-            collectVoiceAnswerState(binder)
+            pendingQuestionOnlyMode?.let { binder.setQuestionOnlyMode(it) }
+            pendingVoiceAnswering?.let { if (it) binder.startVoiceAnswering() }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -92,12 +113,12 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun start(
         cards: List<Flashcard>,
         startIndex: Int,
-        subcategoryName: String,
+        sessionTitle: String,
         isVoiceAnsweringSession: Boolean,
     ) {
         pendingCards = cards.toVoiceFlashcards()
         pendingStartIndex = startIndex
-        pendingSubcategoryName = subcategoryName
+        pendingSessionTitle = sessionTitle
         pendingIsVoiceAnsweringSession = isVoiceAnsweringSession
         // Bind only: MediaSessionService promotes itself to a foreground service when playback
         // starts, so an explicit startForegroundService here would risk a 5s FGS-timeout ANR.
@@ -111,6 +132,7 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun updateQueue(cards: List<Flashcard>) {
         val voiceCards = cards.toVoiceFlashcards()
         pendingCards = voiceCards
+        pendingStartIndex = 0
         voiceBinder.value?.updateQueue(voiceCards)
     }
 
@@ -118,35 +140,50 @@ class StudySessionVoiceGateway @Inject constructor(
         voiceBinder.value?.stopPlayback()
         unbind()
         _state.value = VoicePlaybackState()
-        _voiceAnswerState.value = VoiceAnswerState()
+        pendingQuestionOnlyMode = null
         pendingVoiceAnswering = null
-        pendingNextSilenceWillPauseSession = null
-        pendingNextGradingFailureWillPauseSession = null
     }
 
-    override fun togglePlayPause() {
-        voiceBinder.value?.togglePlayPause()
+    override fun play() {
+        voiceBinder.value?.play()
     }
 
-    override fun rewindToNext() {
+    override fun pause() {
+        voiceBinder.value?.pause()
+    }
+
+    override fun moveToNextCard() {
         voiceBinder.value?.moveToNextCard()
     }
 
-    override fun rewindToPrevious() {
+    override fun moveToPreviousCard() {
         voiceBinder.value?.moveToPreviousCard()
     }
 
+    override fun jumpTo(index: Int) {
+        voiceBinder.value?.jumpTo(index)
+    }
+
     override fun restartCurrentCard() {
-        voiceBinder.value?.restartCurrentCardPlayback()
+        voiceBinder.value?.restartCurrentCard()
     }
 
     override fun showAnswer() {
-        voiceBinder.value?.skipToCardAnswerPlayback()
+        voiceBinder.value?.showAnswer()
+    }
+
+    override fun advanceAfterVoiceAnswer() {
+        voiceBinder.value?.advanceAfterVoiceAnswer()
+    }
+
+    override fun setQuestionOnlyMode(enabled: Boolean) {
+        pendingQuestionOnlyMode = enabled
+        voiceBinder.value?.setQuestionOnlyMode(enabled)
     }
 
     override fun setSpeechRate(rate: Float) {
         pendingSpeechRate = rate
-        voiceBinder.value?.setPlaybackSpeechRate(rate)
+        voiceBinder.value?.setSpeechRate(rate)
     }
 
     override fun setVoice(voiceId: String?) {
@@ -154,40 +191,60 @@ class StudySessionVoiceGateway @Inject constructor(
         voiceBinder.value?.setVoice(voiceId)
     }
 
-    override fun setVoiceAnswering(enabled: Boolean) {
-        pendingVoiceAnswering = enabled
-        voiceBinder.value?.setVoiceAnswering(enabled)
+    /** Before the bind completes, the notice finishes at once, as on an engine that is not ready. */
+    override fun speakNotice(notice: SpokenNotice) {
+        val binder = voiceBinder.value
+        if (binder != null) {
+            binder.speakNotice(notice)
+        } else {
+            playbackEventChannel.trySend(PlaybackEvent.NoticeFinished(notice))
+        }
     }
 
-    override fun setNextSilenceWillPauseSession(willPause: Boolean) {
-        pendingNextSilenceWillPauseSession = willPause
-        voiceBinder.value?.setNextSilenceWillPauseSession(willPause)
+    override fun startVoiceAnswering() {
+        pendingVoiceAnswering = true
+        voiceBinder.value?.startVoiceAnswering()
     }
 
-    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
-        pendingNextGradingFailureWillPauseSession = willPause
-        voiceBinder.value?.setNextGradingFailureWillPauseSession(willPause)
+    override fun stopVoiceAnswering() {
+        pendingVoiceAnswering = false
+        voiceBinder.value?.stopVoiceAnswering()
     }
 
-    private fun collectVoiceState(binder: StudySessionVoiceService.LocalBinder) {
-        voiceStateJob?.cancel()
-        voiceStateJob = scope.launch {
-            binder.state.collect { voice ->
-                if (voice.error != null) {
-                    unbind()
-                    _state.value = VoicePlaybackState(error = voice.error)
-                    return@collect
+    override suspend fun awaitRouteReady() {
+        voiceBinder.filterNotNull().first().awaitRouteReady()
+    }
+
+    override fun startListening() {
+        voiceBinder.value?.startListening()
+    }
+
+    override fun stopListening() {
+        voiceBinder.value?.stopListening()
+    }
+
+    private fun observe(binder: StudySessionVoiceService.LocalBinder) {
+        binderJobs.forEach { it.cancel() }
+        binderJobs = listOf(
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                binder.state.collect { _state.value = it }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                binder.playbackEvents.collect { event ->
+                    // Stops the service before unbinding, so a voice-answering service never
+                    // stays in the foreground with the microphone type after an engine failure.
+                    if (event == PlaybackEvent.EngineUnavailable) {
+                        binder.stopPlayback()
+                        unbind()
+                        _state.value = VoicePlaybackState()
+                    }
+                    playbackEventChannel.trySend(event)
                 }
-                _state.value = voice
-            }
-        }
-    }
-
-    private fun collectVoiceAnswerState(binder: StudySessionVoiceService.LocalBinder) {
-        voiceAnswerStateJob?.cancel()
-        voiceAnswerStateJob = scope.launch {
-            binder.voiceAnswerState.collect { _voiceAnswerState.value = it }
-        }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                binder.captureEvents.collect { captureEventChannel.trySend(it) }
+            },
+        )
     }
 
     private fun connectMediaController() {
@@ -203,10 +260,8 @@ class StudySessionVoiceGateway @Inject constructor(
     }
 
     private fun unbind() {
-        voiceStateJob?.cancel()
-        voiceStateJob = null
-        voiceAnswerStateJob?.cancel()
-        voiceAnswerStateJob = null
+        binderJobs.forEach { it.cancel() }
+        binderJobs = emptyList()
         releaseMediaController()
         if (isBound) {
             runCatching { context.unbindService(serviceConnection) }

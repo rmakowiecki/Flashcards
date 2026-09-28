@@ -2,18 +2,23 @@ package com.rossomak.flashcards.feature.study.fast
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import com.rossomak.flashcards.core.domain.model.CardProgressEntry
+import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.VoicePhase
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
+import com.rossomak.flashcards.core.domain.session.FastSessionReducer
+import com.rossomak.flashcards.core.domain.session.FastStudySessionCoordinator
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
@@ -31,13 +36,8 @@ import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings as VoiceSettingsDialog
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerState
-import com.rossomak.flashcards.feature.study.voice.VoiceGateway
-import com.rossomak.flashcards.feature.study.voice.VoicePhase
-import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -46,12 +46,12 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import io.mockk.verify
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -78,7 +78,8 @@ class FastStudySessionViewModelTest {
     private val xpConfigRepository = FakeXpConfigRepository()
     private val getXpConfig = GetXpConfigUseCase(xpConfigRepository)
     private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress, getXpConfig)
-    private val voiceGateway = FakeVoiceGateway()
+    private val playbackGateway = FakeStudyVoicePlaybackGateway()
+    private val clock = MutableClock(FIXED_INSTANT)
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private val sessionTitle = "Compose"
@@ -108,14 +109,28 @@ class FastStudySessionViewModelTest {
         every { RouteDecoder.decode(any<() -> FastStudySessionRoute>()) } returns route
     }
 
+    /** The real coordinator and reducer on the test fixtures, with a settable clock and the test scheduler's time source. */
     private fun createViewModel(curationRepository: CurationRepository = FakeCurationRepository()): FastStudySessionViewModel =
         FastStudySessionViewModel(
             savedStateHandle,
-            getSessionStartData,
             SubmitCurationReportUseCase(curationRepository),
-            voiceGateway,
+            FastStudySessionCoordinator(
+                getSessionStartData = getSessionStartData,
+                playbackGateway = playbackGateway,
+                reducer = FastSessionReducer(),
+                clock = clock,
+                timeSource = mainDispatcherRule.testDispatcher.scheduler.timeSource,
+                logger = FakeDomainLogger(),
+            ),
             voiceSettingsController,
         )
+
+    /** A read-aloud session on three cards, loaded and reading its first question. */
+    private fun TestScope.createReadAloudViewModel(): FastStudySessionViewModel {
+        stubRoute(route.copy(readAloudEnabled = true))
+        loadThreeCards()
+        return createViewModel().also { advanceUntilIdle() }
+    }
 
     private fun flashcard(id: String, subcategoryId: String = this.subcategoryId): Flashcard = Flashcard(
         id = id,
@@ -195,34 +210,6 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `a card with no prior entry is identifiable as new`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.priorProgressByCardId.keys shouldNotContain "card-1"
-    }
-
-    @Test
-    fun `an existing entry for a card leaves it out of the new-card signal, either mode`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            cardProgressRepository.seed(
-                SubcategoryProgress(
-                    subcategoryId = subcategoryId,
-                    categoryId = "android",
-                    cards = mapOf("card-1" to CardProgressEntry(state = FlashcardStudyProgressState.Seen, firstStudiedAt = FIXED_INSTANT, masteredAt = null)),
-                ),
-            )
-
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.priorProgressByCardId.keys shouldContain "card-1"
-        }
-
-    @Test
     fun `a failed progress read still produces a running session with no error shown`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
@@ -233,7 +220,6 @@ class FastStudySessionViewModelTest {
 
             viewModel.state.value.error shouldBe null
             viewModel.state.value.isLoading shouldBe false
-            viewModel.priorProgressByCardId shouldBe emptyMap()
         }
 
     @Test
@@ -299,18 +285,14 @@ class FastStudySessionViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        voiceGateway.startCalls shouldBe 0
+        playbackGateway.startCalls.size shouldBe 0
     }
 
     @Test
     fun `read-aloud on starts the voice gateway once cards load`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(route.copy(readAloudEnabled = true))
-        loadThreeCards()
+        createReadAloudViewModel()
 
-        createViewModel()
-        advanceUntilIdle()
-
-        voiceGateway.startCalls shouldBe 1
+        playbackGateway.startCalls.size shouldBe 1
     }
 
     @Test
@@ -321,7 +303,7 @@ class FastStudySessionViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        voiceGateway.startCalls shouldBe 0
+        playbackGateway.startCalls.size shouldBe 0
     }
 
     @Test
@@ -334,7 +316,7 @@ class FastStudySessionViewModelTest {
         viewModel.onShowAnswer()
         viewModel.onNextCard()
 
-        voiceGateway.startCalls shouldBe 0
+        playbackGateway.startCalls.size shouldBe 0
         viewModel.state.value.currentCardIndex shouldBe 1
         viewModel.state.value.isAnswerRevealed shouldBe false
     }
@@ -347,19 +329,16 @@ class FastStudySessionViewModelTest {
         viewModel.onShowAnswer()
 
         viewModel.state.value.isAnswerRevealed shouldBe true
-        voiceGateway.showAnswerCalls shouldBe 0
+        playbackGateway.showAnswerCount shouldBe 0
     }
 
     @Test
     fun `onShowAnswer delegates to gateway when voice active`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-        advanceUntilIdle()
+        val viewModel = createReadAloudViewModel()
 
         viewModel.onShowAnswer()
 
-        voiceGateway.showAnswerCalls shouldBe 1
+        playbackGateway.showAnswerCount shouldBe 1
     }
 
     @Test
@@ -493,12 +472,10 @@ class FastStudySessionViewModelTest {
     @Test
     fun `under read-aloud, reaching the answer phase records the card and does not by itself end the session`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createReadAloudViewModel()
 
             viewModel.events.test {
-                voiceGateway.stateFlow.value =
+                playbackGateway.state.value =
                     VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = 0, totalCards = 3, phase = VoicePhase.Answer)
                 advanceUntilIdle()
                 expectNoEvents()
@@ -515,18 +492,16 @@ class FastStudySessionViewModelTest {
     @Test
     fun `read-aloud natural end fires once the queue settles back on the last card's question, not when its answer starts`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createReadAloudViewModel()
             // Each card's answer phase is reached in turn as read-aloud progresses through the deck.
             listOf(0, 1, 2).forEach { index ->
-                voiceGateway.stateFlow.value =
+                playbackGateway.state.value =
                     VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = index, totalCards = 3, phase = VoicePhase.Answer)
                 advanceUntilIdle()
             }
 
             viewModel.events.test {
-                voiceGateway.stateFlow.value =
+                playbackGateway.state.value =
                     VoicePlaybackState(isActive = true, isPlaying = false, currentIndex = 2, totalCards = 3, phase = VoicePhase.Question)
                 advanceUntilIdle()
                 val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
@@ -539,22 +514,20 @@ class FastStudySessionViewModelTest {
     @Test
     fun `the terminal navigation event fires exactly once even if voice state re-settles after natural end`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value =
+            val viewModel = createReadAloudViewModel()
+            playbackGateway.state.value =
                 VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = 2, totalCards = 3, phase = VoicePhase.Answer)
             advanceUntilIdle()
 
             viewModel.events.test {
-                voiceGateway.stateFlow.value =
+                playbackGateway.state.value =
                     VoicePlaybackState(isActive = true, isPlaying = false, currentIndex = 2, totalCards = 3, phase = VoicePhase.Question)
                 advanceUntilIdle()
                 awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
                 // A distinct value (speechRate) so the StateFlow actually re-emits, still matching
-                // the same natural-end condition — terminated must guard this second collection.
-                voiceGateway.stateFlow.value = VoicePlaybackState(
+                // the same natural-end condition — the coordinator's end must guard this second pass.
+                playbackGateway.state.value = VoicePlaybackState(
                     isActive = true,
                     isPlaying = false,
                     currentIndex = 2,
@@ -572,11 +545,9 @@ class FastStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
-            var clockInstant = FIXED_INSTANT
-            viewModel.now = { clockInstant }
             advanceUntilIdle()
 
-            clockInstant = FIXED_INSTANT.plusSeconds(17)
+            clock.instant = FIXED_INSTANT.plusSeconds(17)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -592,11 +563,9 @@ class FastStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
             val viewModel = createViewModel()
-            var clockInstant = FIXED_INSTANT
-            viewModel.now = { clockInstant }
             advanceUntilIdle()
 
-            clockInstant = FIXED_INSTANT.plusSeconds(999)
+            clock.instant = FIXED_INSTANT.plusSeconds(999)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -613,13 +582,11 @@ class FastStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
-            var clockInstant = FIXED_INSTANT
-            viewModel.now = { clockInstant }
             advanceUntilIdle()
 
             // Simulates a long backgrounded gap (a phone call, switching apps) with no lifecycle
             // hook to react to it — v1 is deliberately simplistic: wall time only, no pausing.
-            clockInstant = FIXED_INSTANT.plusSeconds(1_200)
+            clock.instant = FIXED_INSTANT.plusSeconds(1_200)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -639,40 +606,51 @@ class FastStudySessionViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        voiceGateway.startCalls shouldBe 1
-        voiceGateway.lastStartCards?.map { it.id } shouldBe route.cardIds
-        voiceGateway.lastStartSubcategoryName shouldBe sessionTitle
-        voiceGateway.lastStartIsVoiceAnsweringSession shouldBe false
-        voiceGateway.lastSpeechRate shouldBe savedSettings.speechRate
-        voiceGateway.lastVoiceId shouldBe savedSettings.voiceId
+        val start = playbackGateway.startCalls.single()
+        start.cardIds shouldBe route.cardIds
+        start.sessionTitle shouldBe sessionTitle
+        start.isVoiceAnsweringSession shouldBe false
+        playbackGateway.lastSpeechRate shouldBe savedSettings.speechRate
+        playbackGateway.lastVoiceId shouldBe savedSettings.voiceId
     }
 
     @Test
-    fun `observeVoiceState surfaces a voice error and clears active playback`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(route.copy(readAloudEnabled = true))
-        loadThreeCards()
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `an unavailable voice engine pauses read-aloud instead of falling back to tap-through`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
 
         viewModel.messages.test {
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true, error = "playback failed")
+            playbackGateway.emit(PlaybackEvent.EngineUnavailable)
             advanceUntilIdle()
 
             awaitItem() shouldBe FastStudySessionMessage.VoicePlaybackUnavailable
             viewModel.state.value.isVoiceActive shouldBe false
             viewModel.state.value.isVoicePlaying shouldBe false
-            viewModel.state.value.isReadAloudMode shouldBe false
+            viewModel.state.value.isReadAloudMode shouldBe true
+            viewModel.state.value.isVoiceEngineUnavailable shouldBe true
         }
     }
 
     @Test
-    fun `observeVoiceState propagates active index and answer phase`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
+    fun `play after an engine failure restarts the voice stack at the presented card`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+        playbackGateway.moveToNextCard()
+        advanceUntilIdle()
+        playbackGateway.emit(PlaybackEvent.EngineUnavailable)
         advanceUntilIdle()
 
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, currentIndex = 2, phase = VoicePhase.Answer)
+        viewModel.onVoicePlayPause()
+        advanceUntilIdle()
+
+        playbackGateway.startCalls.last().startIndex shouldBe 1
+        viewModel.state.value.isVoiceEngineUnavailable shouldBe false
+        viewModel.state.value.isVoiceActive shouldBe true
+    }
+
+    @Test
+    fun `the player's index and answer phase reach the screen`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+
+        playbackGateway.state.value = VoicePlaybackState(isActive = true, currentIndex = 2, totalCards = 3, phase = VoicePhase.Answer)
         advanceUntilIdle()
 
         viewModel.state.value.currentCardIndex shouldBe 2
@@ -681,23 +659,21 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `onVoiceNext rewinds the gateway to the next card`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `onVoiceNext moves the gateway to the next card`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
 
         viewModel.onVoiceNext()
 
-        voiceGateway.rewindToNextCalls shouldBe 1
+        playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.MoveToNextCard
     }
 
     @Test
-    fun `onVoicePlayPause toggles the gateway during normal playback`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `onVoicePlayPause pauses during normal playback`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
 
         viewModel.onVoicePlayPause()
 
-        voiceGateway.togglePlayPauseCalls shouldBe 1
+        playbackGateway.pauseCount shouldBe 1
     }
 
     @Test
@@ -708,21 +684,17 @@ class FastStudySessionViewModelTest {
 
         viewModel.onVoiceSpeedChange(rate)
 
-        voiceGateway.lastSpeechRate shouldBe rate
+        playbackGateway.lastSpeechRate shouldBe rate
     }
 
     @Test
     fun `ReportProblemOpen pauses playback when voice is playing`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
-        advanceUntilIdle()
+        val viewModel = createReadAloudViewModel()
 
         viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
         advanceUntilIdle()
 
-        voiceGateway.togglePlayPauseCalls shouldBe 1
+        playbackGateway.pauseCount shouldBe 1
     }
 
     @Test
@@ -859,10 +831,7 @@ class FastStudySessionViewModelTest {
     fun `VoiceSettings confirm without keepAsDefault applies for the session but writes nothing`() =
         runTest(mainDispatcherRule.testDispatcher) {
             every { voiceSettingsController.seedDraft(any()) } returns VoiceSettingsDraftState()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-            advanceUntilIdle()
+            val viewModel = createReadAloudViewModel()
             viewModel.onDialogEvent(Open(VoiceSettingsDialog()))
             val draft = (viewModel.state.value.activeDialog as VoiceSettingsDialog).draftState
                 .copy(draftSpeed = 1.5f, draftVoiceId = "voice-1")
@@ -872,8 +841,8 @@ class FastStudySessionViewModelTest {
 
             verify(exactly = 0) { voiceSettingsController.save(any(), any()) }
             verify(exactly = 1) { voiceSettingsController.stopPreview() }
-            voiceGateway.lastSpeechRate shouldBe 1.5f
-            voiceGateway.lastVoiceId shouldBe "voice-1"
+            playbackGateway.lastSpeechRate shouldBe 1.5f
+            playbackGateway.lastVoiceId shouldBe "voice-1"
             viewModel.state.value.activeDialog shouldBe null
         }
 
@@ -911,7 +880,15 @@ class FastStudySessionViewModelTest {
 
         viewModel.onCleared()
 
-        voiceGateway.stopCalls shouldBe 1
+        playbackGateway.stopCount shouldBe 1
+    }
+
+    private class MutableClock(var instant: Instant) : Clock() {
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+
+        override fun withZone(zone: ZoneId?): Clock = this
+
+        override fun instant(): Instant = instant
     }
 
     private companion object {
@@ -934,73 +911,4 @@ class FastStudySessionViewModelTest {
             levelCurveExponent = 14.0,
         )
     }
-}
-
-private class FakeVoiceGateway : VoiceGateway {
-    val stateFlow = MutableStateFlow(VoicePlaybackState())
-    override val state: StateFlow<VoicePlaybackState> = stateFlow
-
-    val voiceAnswerStateFlow = MutableStateFlow(VoiceAnswerState())
-    override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
-
-    override val rawVoiceLevel: Flow<Float> = emptyFlow()
-
-    var lastVoiceAnswering: Boolean? = null
-    var lastNextSilenceWillPauseSession: Boolean? = null
-
-    var startCalls = 0
-    var lastStartCards: List<Flashcard>? = null
-    var lastStartIndex: Int? = null
-    var lastStartSubcategoryName: String? = null
-    var lastStartIsVoiceAnsweringSession: Boolean? = null
-    var togglePlayPauseCalls = 0
-    var rewindToNextCalls = 0
-    var rewindToPreviousCalls = 0
-    var restartCurrentCardCalls = 0
-    var showAnswerCalls = 0
-    var stopCalls = 0
-    var lastSpeechRate: Float? = null
-    var lastVoiceId: String? = null
-
-    override fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String, isVoiceAnsweringSession: Boolean) {
-        startCalls++
-        lastStartCards = cards
-        lastStartIndex = startIndex
-        lastStartSubcategoryName = subcategoryName
-        lastStartIsVoiceAnsweringSession = isVoiceAnsweringSession
-    }
-
-    override fun updateQueue(cards: List<Flashcard>) = Unit
-
-    override fun stop() {
-        stopCalls++
-    }
-    override fun togglePlayPause() {
-        togglePlayPauseCalls++
-    }
-    override fun rewindToNext() {
-        rewindToNextCalls++
-    }
-    override fun rewindToPrevious() {
-        rewindToPreviousCalls++
-    }
-    override fun restartCurrentCard() {
-        restartCurrentCardCalls++
-    }
-    override fun showAnswer() {
-        showAnswerCalls++
-    }
-    override fun setSpeechRate(rate: Float) {
-        lastSpeechRate = rate
-    }
-    override fun setVoice(voiceId: String?) {
-        lastVoiceId = voiceId
-    }
-    override fun setVoiceAnswering(enabled: Boolean) {
-        lastVoiceAnswering = enabled
-    }
-    override fun setNextSilenceWillPauseSession(willPause: Boolean) {
-        lastNextSilenceWillPauseSession = willPause
-    }
-    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) = Unit
 }

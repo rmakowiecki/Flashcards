@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.feature.study.voice.data
 
 data class VoiceFlashcard(
     val spokenQuestion: String,

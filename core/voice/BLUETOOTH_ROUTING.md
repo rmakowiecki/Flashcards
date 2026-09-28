@@ -53,7 +53,7 @@ even with Bluetooth off entirely.
 
 **Cause:** `AudioRouteManager.route` defaults to `CaptureRoute(NONE)`, and `NONE.isCapturable` is
 `false`. `VoiceDebugViewModel` called `VoiceCaptureEngine.startListening()` directly and never called
-`AudioRouteManager.acquireSessionRoute()` first — unlike `feature:study`'s `VoiceAnswerController`,
+`AudioRouteManager.acquireSessionRoute()` first — unlike `feature:study`'s `VoiceCaptureSession`,
 which does. `runCaptureLoop()`'s very first check (`if (!route.isCapturable)`) failed before looking
 at real BT state at all.
 

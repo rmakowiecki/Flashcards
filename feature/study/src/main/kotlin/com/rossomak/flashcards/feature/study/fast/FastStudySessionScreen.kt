@@ -346,7 +346,7 @@ private fun FastVoiceTransportControls(
                     if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd
                 ),
                 onClick = onVoicePlayPause,
-                enabled = state.isVoiceActive,
+                enabled = state.isVoiceActive || state.isVoiceEngineUnavailable,
             )
             Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
             IconButton(

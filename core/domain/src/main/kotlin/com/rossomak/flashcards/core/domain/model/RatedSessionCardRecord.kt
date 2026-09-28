@@ -3,7 +3,7 @@ package com.rossomak.flashcards.core.domain.model
 /**
  * One card's history within a [RatedSessionState]'s queue: the card itself, every Rating recorded
  * across its Attempts so far in order, and whether it entered the session already Mastered — stamped
- * at [RatedSessionState.seed] time from the session-start progress read.
+ * at seed time from the session-start progress read.
  * Mastery Defense is what finally *uses* the flag; this is only where it
  * starts being set.
  *

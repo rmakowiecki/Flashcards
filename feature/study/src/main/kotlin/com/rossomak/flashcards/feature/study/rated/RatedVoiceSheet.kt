@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
+import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButton
@@ -60,7 +61,6 @@ import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.GradingWi
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Listening
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Pending
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Transport
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.StateFlow
 
@@ -361,11 +361,10 @@ private fun RatedVoiceTransportRow(
     modifier: Modifier = Modifier,
 ) {
     // While voice-answering is actively listening/grading/speaking feedback, manual skip
-    // controls must stay disabled: skipping to the answer here would start TtsPlayer reading
-    // the answer aloud while VoiceAnswerController's mic is still hot (grading the TTS's own
-    // voice), and skipping during SPEAKING_NOTICE would start the next question on the main
-    // TTS engine while VoiceAnswerController's separate notice engine is still talking — two
-    // overlapping voices.
+    // controls must stay disabled: skipping to the answer here would start the player reading
+    // the answer aloud while the round's microphone is still open (grading the TTS's own
+    // voice), and skipping during SpeakingNotice would start the next question while the
+    // notice about the current card is still being spoken — two overlapping voices.
     val busyStateSet = setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected, VoiceAnswerPhase.Grading, VoiceAnswerPhase.SpeakingNotice)
     val isVoiceAnswerBusy = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in busyStateSet
     // Pause only needs to stay disabled for the narrower "answer listening" window — it
@@ -392,7 +391,7 @@ private fun RatedVoiceTransportRow(
             icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd),
             onClick = onVoicePlayPause,
-            enabled = state.isVoiceActive && !isVoiceAnswerListening,
+            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && !isVoiceAnswerListening,
         )
         Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
         IconButton(

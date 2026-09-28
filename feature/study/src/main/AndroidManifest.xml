@@ -7,7 +7,7 @@
 
     <application>
         <service
-            android:name=".voice.StudySessionVoiceService"
+            android:name=".voice.data.StudySessionVoiceService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback|microphone">
             <intent-filter>

@@ -2,26 +2,46 @@ package com.rossomak.flashcards.feature.study.rated
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
+import com.rossomak.flashcards.core.domain.model.AppPermission
+import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason
+import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
+import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
+import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
+import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
+import com.rossomak.flashcards.core.domain.repository.FakeVoiceAnswerGradingRepository
+import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
+import com.rossomak.flashcards.core.domain.session.MIN_TRANSCRIPT_DISPLAY
+import com.rossomak.flashcards.core.domain.session.NOTICE_TAIL
+import com.rossomak.flashcards.core.domain.session.RatedSessionReducer
+import com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator
+import com.rossomak.flashcards.core.domain.session.SILENCE_TIMEOUT
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceAnswerLevelUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
@@ -45,12 +65,6 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.Voic
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilencePause
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerState
-import com.rossomak.flashcards.feature.study.voice.VoiceGateway
-import com.rossomak.flashcards.feature.study.voice.VoicePhase
-import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -63,14 +77,18 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import io.mockk.verify
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -99,7 +117,13 @@ class RatedStudySessionViewModelTest {
     private val xpConfigRepository = FakeXpConfigRepository()
     private val getXpConfig = GetXpConfigUseCase(xpConfigRepository)
     private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress, getXpConfig)
-    private val voiceGateway = FakeVoiceGateway()
+    private val playbackGateway = FakeStudyVoicePlaybackGateway()
+    private val captureGateway = FakeVoiceCaptureGateway()
+    private val gradingRepository = FakeVoiceAnswerGradingRepository()
+    private val permissionGateway = FakePermissionGateway().apply {
+        statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Granted)
+    }
+    private val clock = MutableClock(FIXED_INSTANT)
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private val sessionTitle = "Compose"
@@ -125,18 +149,47 @@ class RatedStudySessionViewModelTest {
         unmockkObject(RouteDecoder)
     }
 
+    private var currentRoute: RatedStudySessionRoute = route
+
     private fun stubRoute(route: RatedStudySessionRoute) {
+        currentRoute = route
         every { RouteDecoder.decode(any<() -> RatedStudySessionRoute>()) } returns route
     }
 
+    /** Turns voice answering on for whatever the route currently routes. */
+    private fun enableVoiceAnswering() {
+        stubRoute(currentRoute.copy(voiceAnsweringEnabled = true))
+    }
+
+    /**
+     * The real coordinator and reducer on the test fixtures, with a fixed Random, a settable clock
+     * and the test scheduler's time source.
+     */
     private fun createViewModel(curationRepository: CurationRepository = FakeCurationRepository()): RatedStudySessionViewModel =
         RatedStudySessionViewModel(
             savedStateHandle,
-            getSessionStartData,
             SubmitCurationReportUseCase(curationRepository),
-            voiceGateway,
+            ObserveVoiceAnswerLevelUseCase(captureGateway),
+            RatedStudySessionCoordinator(
+                getSessionStartData = getSessionStartData,
+                playbackGateway = playbackGateway,
+                captureGateway = captureGateway,
+                gradingRepository = gradingRepository,
+                permissionGateway = permissionGateway,
+                reducer = RatedSessionReducer(Random(FIXED_SEED)),
+                clock = clock,
+                timeSource = mainDispatcherRule.testDispatcher.scheduler.timeSource,
+                logger = FakeDomainLogger(),
+            ),
             voiceSettingsController,
         )
+
+    /** A voice-answering session on three cards, loaded and reading its first question. */
+    private fun TestScope.createVoiceViewModel(): RatedStudySessionViewModel {
+        loadThreeCards()
+        enableVoiceAnswering()
+        return createViewModel().also { advanceUntilIdle() }
+    }
 
     private fun flashcard(
         id: String,
@@ -155,6 +208,15 @@ class RatedStudySessionViewModelTest {
         answerSpoken = null,
         extendedContext = extendedContext,
     )
+
+    /** Rates every other head Correct until [cardId] is presented again; fails instead of looping forever. */
+    private fun rateCorrectUntilPresented(viewModel: RatedStudySessionViewModel, cardId: String) {
+        repeat(MAX_CARDS_BEFORE_REAPPEARING) {
+            if (viewModel.state.value.currentCard?.id == cardId) return
+            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+        }
+        viewModel.state.value.currentCard?.id shouldBe cardId
+    }
 
     /** What the toolbar hands over: the report dialog seeded from the card on screen. */
     private fun openReportProblem(viewModel: RatedStudySessionViewModel): ReportCurrentCardProblem {
@@ -291,16 +353,6 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a card with no prior entry is identifiable as new`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.priorProgressByCardId.keys shouldNotContain "card-1"
-    }
-
-    @Test
     fun `a failed progress read still produces a running session with every previously-mastered flag false and no error shown`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
@@ -310,7 +362,6 @@ class RatedStudySessionViewModelTest {
 
             viewModel.state.value.error shouldBe null
             viewModel.state.value.isLoading shouldBe false
-            viewModel.priorProgressByCardId shouldBe emptyMap()
             viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
             viewModel.onDialogEvent(Open(ExitSession))
 
@@ -388,19 +439,16 @@ class RatedStudySessionViewModelTest {
         viewModel.onShowAnswer()
 
         viewModel.state.value.isAnswerRevealed shouldBe true
-        voiceGateway.showAnswerCalls shouldBe 0
+        playbackGateway.showAnswerCount shouldBe 0
     }
 
     @Test
     fun `onShowAnswer delegates to gateway when voice active`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
         viewModel.onShowAnswer()
 
-        voiceGateway.showAnswerCalls shouldBe 1
+        playbackGateway.showAnswerCount shouldBe 1
     }
 
     @Test
@@ -507,15 +555,13 @@ class RatedStudySessionViewModelTest {
     fun `the attempt indicator's slots reflect the current card's Rating list in order`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadTenCards()
-            val viewModel = createViewModel().apply { random = Random(FIXED_SEED) }
+            val viewModel = createViewModel()
             advanceUntilIdle()
 
             viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
             // The card that just went to the back of the queue is not the head any more, so cycle
             // through the others (Correct finishes them immediately) until it resurfaces.
-            while (viewModel.state.value.currentCard?.id != "card-1") {
-                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-            }
+            rateCorrectUntilPresented(viewModel, "card-1")
 
             viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Failed)
             viewModel.state.value.attemptSlots shouldBe listOf(
@@ -607,12 +653,12 @@ class RatedStudySessionViewModelTest {
             loadTenCards()
             val ratingSequence = listOf(FlashcardAttemptRating.Failed, FlashcardAttemptRating.PartiallyCorrect, FlashcardAttemptRating.Failed)
 
-            val firstViewModel = createViewModel().apply { random = Random(FIXED_SEED) }
+            val firstViewModel = createViewModel()
             advanceUntilIdle()
             ratingSequence.forEach(firstViewModel::onAttemptRating)
             val firstOrder = firstViewModel.state.value.flashcards.map { it.id }
 
-            val secondViewModel = createViewModel().apply { random = Random(FIXED_SEED) }
+            val secondViewModel = createViewModel()
             advanceUntilIdle()
             ratingSequence.forEach(secondViewModel::onAttemptRating)
             val secondOrder = secondViewModel.state.value.flashcards.map { it.id }
@@ -647,52 +693,65 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `observeVoiceState surfaces a voice error and clears active playback`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `an unavailable voice engine pauses the session on its voice sheet instead of falling back to manual`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
 
         viewModel.messages.test {
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true, error = "playback failed")
+            playbackGateway.emit(PlaybackEvent.EngineUnavailable)
             advanceUntilIdle()
 
             awaitItem() shouldBe VoicePlaybackUnavailable
         }
-        viewModel.state.value.isVoiceActive shouldBe false
-        viewModel.state.value.isVoicePlaying shouldBe false
+        with(viewModel.state.value) {
+            isVoiceActive shouldBe false
+            isVoicePlaying shouldBe false
+            isVoiceMode shouldBe true
+            isVoiceAnswerPaused shouldBe true
+            isVoiceEngineUnavailable shouldBe true
+        }
     }
 
     @Test
-    fun `observeVoiceState propagates active index and answer phase`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
+    fun `the player reading the answer reveals it, while the presented card stays the queue's head`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+
+        playbackGateway.state.update { it.copy(currentIndex = 2, phase = VoicePhase.Answer) }
         advanceUntilIdle()
 
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, currentIndex = 2, phase = VoicePhase.Answer)
-        advanceUntilIdle()
-
-        viewModel.state.value.currentCardIndex shouldBe 2
+        viewModel.state.value.currentCardIndex shouldBe 0
         viewModel.state.value.isAnswerRevealed shouldBe true
         viewModel.state.value.isVoiceActive shouldBe true
     }
 
     @Test
-    fun `onVoiceNext rewinds the gateway to the next card`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `onVoiceNext skips the presented card and reads the next question`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
 
         viewModel.onVoiceNext()
+        advanceUntilIdle()
 
-        voiceGateway.rewindToNextCalls shouldBe 1
+        viewModel.state.value.currentCard?.id shouldBe "card-2"
+        viewModel.state.value.currentCardRatings shouldBe emptyList()
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
     }
 
     @Test
-    fun `onVoicePlayPause toggles the gateway during normal playback`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `onVoicePrevious restarts the presented card's question`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+
+        viewModel.onVoicePrevious()
+
+        playbackGateway.restartCurrentCardCount shouldBe 1
+        viewModel.state.value.currentCard?.id shouldBe "card-1"
+    }
+
+    @Test
+    fun `onVoicePlayPause pauses during normal playback`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
 
         viewModel.onVoicePlayPause()
 
-        voiceGateway.togglePlayPauseCalls shouldBe 1
+        playbackGateway.pauseCount shouldBe 1
     }
 
     @Test
@@ -703,21 +762,17 @@ class RatedStudySessionViewModelTest {
 
         viewModel.onVoiceSpeedChange(rate)
 
-        voiceGateway.lastSpeechRate shouldBe rate
+        playbackGateway.lastSpeechRate shouldBe rate
     }
 
     @Test
     fun `ReportProblemOpen pauses playback when voice is playing`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
         viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
         advanceUntilIdle()
 
-        voiceGateway.togglePlayPauseCalls shouldBe 1
+        playbackGateway.pauseCount shouldBe 1
     }
 
     @Test
@@ -844,10 +899,7 @@ class RatedStudySessionViewModelTest {
     fun `VoiceSettings confirm without keepAsDefault applies for the session but writes nothing`() =
         runTest(mainDispatcherRule.testDispatcher) {
             every { voiceSettingsController.seedDraft(any()) } returns VoiceSettingsDraftState()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
             viewModel.onDialogEvent(Open(StudySessionDialog.SessionVoiceSettings()))
             val draft = (viewModel.state.value.activeDialog as StudySessionDialog.SessionVoiceSettings).draftState
                 .copy(draftSpeed = 1.5f, draftVoiceId = "voice-1")
@@ -857,8 +909,8 @@ class RatedStudySessionViewModelTest {
 
             verify(exactly = 0) { voiceSettingsController.save(any(), any()) }
             verify(exactly = 1) { voiceSettingsController.stopPreview() }
-            voiceGateway.lastSpeechRate shouldBe 1.5f
-            voiceGateway.lastVoiceId shouldBe "voice-1"
+            playbackGateway.lastSpeechRate shouldBe 1.5f
+            playbackGateway.lastVoiceId shouldBe "voice-1"
             viewModel.state.value.activeDialog shouldBe null
         }
 
@@ -904,16 +956,12 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a routed voice-answering choice bootstraps voice answering on entry`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            stubRoute(route.copy(voiceAnsweringEnabled = true))
-            loadThreeCards()
+            createVoiceViewModel()
 
-            createViewModel()
-            advanceUntilIdle()
-
-            voiceGateway.startCalls shouldBe 1
-            voiceGateway.lastStartCards?.map { it.id } shouldBe route.cardIds
-            voiceGateway.lastStartIsVoiceAnsweringSession shouldBe true
-            voiceGateway.lastVoiceAnswering shouldBe true
+            playbackGateway.startCalls.size shouldBe 1
+            playbackGateway.startCalls.single().cardIds shouldBe route.cardIds
+            playbackGateway.startCalls.single().isVoiceAnsweringSession shouldBe true
+            captureGateway.isVoiceAnsweringStarted shouldBe true
         }
 
     @Test
@@ -924,8 +972,8 @@ class RatedStudySessionViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        voiceGateway.startCalls shouldBe 0
-        voiceGateway.lastVoiceAnswering shouldBe null
+        playbackGateway.startCalls.size shouldBe 0
+        captureGateway.startVoiceAnsweringCount shouldBe 0
     }
 
     private fun reportDraft(viewModel: RatedStudySessionViewModel): ReportCurrentCardProblem =
@@ -938,30 +986,24 @@ class RatedStudySessionViewModelTest {
 
         viewModel.onCleared()
 
-        voiceGateway.stopCalls shouldBe 1
+        playbackGateway.stopCount shouldBe 1
     }
 
     @Test
     fun `voice answer state from the gateway is surfaced in screen state`() = runTest(mainDispatcherRule.testDispatcher) {
-        val grade = VoiceAnswerGrade(sanitizedTranscript = "clean", gradePercent = 82, feedback = "good")
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, lastGrade = grade)
-        advanceUntilIdle()
+        emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
 
         viewModel.state.value.isVoiceAnswerEnabled shouldBe true
-        viewModel.state.value.lastVoiceAnswerGrade shouldBe grade
+        viewModel.state.value.lastVoiceAnswerGrade shouldBe VoiceAnswerGrade(SPOKEN_TRANSCRIPT, CORRECT_GRADE_PERCENT, GRADE_RATIONALE)
     }
 
     @Test
     fun `voice sheet mode is Transport while the question is read`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-        advanceUntilIdle()
-
+        viewModel.state.value.voiceAnswerPhase shouldBe VoiceAnswerPhase.WaitingForQuestion
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
     }
 
@@ -975,41 +1017,44 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `voice sheet mode is Listening while listening or hearing speech`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-        advanceUntilIdle()
+        finishQuestion()
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeechDetected)
-        advanceUntilIdle()
+        captureGateway.emit(CaptureEvent.SpeechStarted)
+        runCurrent()
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
     }
 
     @Test
     fun `voice sheet mode is Pending while grading without a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-        advanceUntilIdle()
+        answer(
+            flow {
+                delay(TRANSCRIPT_DELAY)
+                emit(VoiceAnswerGradingEvent.TranscriptReady(" "))
+                awaitCancellation()
+            },
+        )
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = " ")
-        advanceUntilIdle()
+        advanceTimeBy(TRANSCRIPT_DELAY)
+        runCurrent()
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
     }
 
     @Test
     fun `voice sheet mode is GradingWithTranscript while grading with a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = SPOKEN_TRANSCRIPT)
-        advanceUntilIdle()
+        answer(
+            flow {
+                emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT))
+                awaitCancellation()
+            },
+        )
 
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.GradingWithTranscript(SPOKEN_TRANSCRIPT)
     }
@@ -1036,33 +1081,25 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `voice sheet mode is Pending while speaking a notice without a grade`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
-        advanceUntilIdle()
+        startSilenceNotice()
 
+        viewModel.state.value.voiceAnswerPhase shouldBe VoiceAnswerPhase.SpeakingNotice
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
     }
 
     @Test
     fun `a silence skip shows Pending during its notice with the skip message, then Transport`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
         viewModel.messages.test {
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true)
-            advanceUntilIdle()
+            startSilenceNotice()
 
             awaitItem() shouldBe VoiceAnswerSilenceSkip
             viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
         }
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-        advanceUntilIdle()
+        finishNotice()
 
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
         viewModel.state.value.isVoiceAnswerPaused shouldBe false
@@ -1070,117 +1107,86 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `a pausing silence shows Pending until its notice finishes, then the paused Transport`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
         repeat(2) { emitSilenceTimeout() }
 
         viewModel.messages.test {
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true)
-            advanceUntilIdle()
+            startSilenceNotice()
 
             awaitItem() shouldBe VoiceAnswerSilencePause
         }
-        // The pause stops voice answering, which resets its state while the notice keeps playing.
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
-        advanceUntilIdle()
+        // The pause stops voice answering while its notice keeps playing.
         viewModel.state.value.isVoiceAnswerPaused shouldBe true
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
-        advanceUntilIdle()
+        finishNotice()
 
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
     }
 
     @Test
     fun `a capture failure shows Pending until its notice finishes, then the paused Transport`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
         viewModel.messages.test {
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.WaitingForQuestion,
-                error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable),
-                isShortNoticeSpeaking = true,
-            )
-            advanceUntilIdle()
+            captureGateway.emit(CaptureEvent.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
+            runCurrent()
 
             awaitItem() shouldBe VoiceAnswerCaptureUnavailable
         }
         viewModel.state.value.isVoiceAnswerPaused shouldBe true
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
-        advanceUntilIdle()
-        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
-        advanceUntilIdle()
+        finishNotice()
 
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
     }
 
     @Test
     fun `a grading failure without a connection shows Pending with the offline message`() = runTest(mainDispatcherRule.testDispatcher) {
-        messageAndSheetModeForGradingFailure(VoiceAnswerFailureReason.GradingFailed.NoConnection) shouldBe (VoiceAnswerGradingOffline to RatedVoiceSheetMode.Pending)
+        messageAndSheetModeForGradingFailure(GradingFailureReason.NoConnection) shouldBe (VoiceAnswerGradingOffline to RatedVoiceSheetMode.Pending)
     }
 
     @Test
     fun `a grading service failure shows Pending with the service error message`() = runTest(mainDispatcherRule.testDispatcher) {
-        messageAndSheetModeForGradingFailure(VoiceAnswerFailureReason.GradingFailed.ServiceError) shouldBe (VoiceAnswerGradingServiceError to RatedVoiceSheetMode.Pending)
+        messageAndSheetModeForGradingFailure(GradingFailureReason.ServiceError) shouldBe (VoiceAnswerGradingServiceError to RatedVoiceSheetMode.Pending)
     }
 
-    private suspend fun TestScope.messageAndSheetModeForGradingFailure(failure: VoiceAnswerFailureReason.GradingFailed): Pair<RatedStudySessionMessage, RatedVoiceSheetMode> {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    private suspend fun TestScope.messageAndSheetModeForGradingFailure(failure: GradingFailureReason): Pair<RatedStudySessionMessage, RatedVoiceSheetMode> {
+        val viewModel = createVoiceViewModel()
         lateinit var message: RatedStudySessionMessage
         viewModel.messages.test {
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading, sanitizedTranscript = SPOKEN_TRANSCRIPT)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.SpeakingNotice,
-                sanitizedTranscript = SPOKEN_TRANSCRIPT,
-                error = failure,
-                isShortNoticeSpeaking = true,
+            answer(
+                flow {
+                    emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT))
+                    emit(VoiceAnswerGradingEvent.Failed(failure))
+                },
             )
-            advanceUntilIdle()
+            advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+            runCurrent()
             message = awaitItem()
         }
         return message to viewModel.state.value.voiceSheetMode
     }
 
     private fun TestScope.voiceSheetModeWhileSpeakingGrade(gradePercent: Int): RatedVoiceSheetMode {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        val grade = VoiceAnswerGrade(sanitizedTranscript = SPOKEN_TRANSCRIPT, gradePercent = gradePercent, feedback = GRADE_RATIONALE)
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, lastGrade = grade)
-        advanceUntilIdle()
+        emitGradeNotice(gradePercent = gradePercent)
 
         return viewModel.state.value.voiceSheetMode
     }
 
     @Test
     fun `voice sheet mode is Transport while paused, whatever the phase`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
+        captureGateway.emit(CaptureEvent.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)))
+        runCurrent()
+        finishNotice()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-            isEnabled = true,
-            phase = VoiceAnswerPhase.WaitingForQuestion,
-            error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)),
-        )
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-        advanceUntilIdle()
+        // A question read while paused never reopens the microphone.
+        playbackGateway.play()
+        finishQuestion()
 
         viewModel.state.value.isVoiceAnswerPaused shouldBe true
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
@@ -1196,7 +1202,7 @@ class RatedStudySessionViewModelTest {
             // Lets stateIn subscribe upstream first; the fake's SharedFlow drops emissions with no subscriber.
             runCurrent()
 
-            voiceGateway.rawVoiceLevelFlow.emit(SPOKEN_RAW_VOICE_LEVEL)
+            captureGateway.rawVoiceLevel.emit(SPOKEN_RAW_VOICE_LEVEL)
             advanceTimeBy(FlashcardsVoiceCaptureIndicatorDefaults.LEVEL_INTERVAL_MILLIS.milliseconds)
             runCurrent()
 
@@ -1204,94 +1210,89 @@ class RatedStudySessionViewModelTest {
         }
     }
 
-    /**
-     * Three [MutableStateFlow] writes, each followed by [advanceUntilIdle], so the collector
-     * actually observes every intermediate phase — writing SpeakingNotice twice in a row without
-     * that would conflate into one emission (equal consecutive [VoiceAnswerState] values), silently
-     * dropping a silence timeout. The final WaitingForQuestion write mirrors the real notice-finished
-     * transition ([VoiceAnswerController.onNoticeFinishedSpeaking]) — the screen's queue/currentCard
-     * sync is deferred until the phase actually leaves SpeakingNotice, so a test that stopped at
-     * SpeakingNotice would never see it applied.
-     */
+    /** Reads the presented card's question to its end, which opens the listening window. */
+    private fun TestScope.finishQuestion() {
+        playbackGateway.finishQuestion()
+        runCurrent()
+    }
+
+    /** Finishes the oldest spoken notice, then waits out the tail that follows an advancing one. */
+    private fun TestScope.finishNotice() {
+        playbackGateway.finishNotice()
+        runCurrent()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+    }
+
+    /** A silence round up to its notice, which is still being spoken. */
+    private fun TestScope.startSilenceNotice() {
+        finishQuestion()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+    }
+
+    /** A whole silence round: the question, the silence timeout, its notice and the tail. */
     private fun TestScope.emitSilenceTimeout() {
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-        advanceUntilIdle()
+        startSilenceNotice()
+        finishNotice()
     }
 
-    /** A grading failure round, with the same three-write shape as [emitSilenceTimeout]. */
-    private fun TestScope.emitGradingFailure(failure: VoiceAnswerFailureReason.GradingFailed = VoiceAnswerFailureReason.GradingFailed.NoConnection) {
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, error = failure, isShortNoticeSpeaking = true)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-        advanceUntilIdle()
+    /** Speaks an answer to the presented card, graded by [gradingFlow]. */
+    private fun TestScope.answer(gradingFlow: Flow<VoiceAnswerGradingEvent>) {
+        gradingRepository.gradingFlow = gradingFlow
+        finishQuestion()
+        captureGateway.emit(CaptureEvent.SpeechStarted)
+        captureGateway.emit(CaptureEvent.SpeechEnded)
+        captureGateway.emit(CaptureEvent.UtteranceCaptured(byteArrayOf(1)))
+        runCurrent()
     }
 
-    private fun TestScope.emitGrade(grade: VoiceAnswerGrade, cardId: String) {
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-            isEnabled = true,
-            phase = VoiceAnswerPhase.SpeakingNotice,
-            lastGrade = grade,
-            lastGradedCardId = cardId,
-        )
-        advanceUntilIdle()
-        // Notice-finished edge (see emitSilenceTimeout's kdoc) — this is what actually applies the
-        // deferred queue/currentCard sync in production.
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-            isEnabled = true,
-            phase = VoiceAnswerPhase.WaitingForQuestion,
-            lastGrade = grade,
-            lastGradedCardId = cardId,
-        )
-        advanceUntilIdle()
+    /** A grading-failure round up to its notice, which is still being spoken. */
+    private fun TestScope.startGradingFailureNotice(failure: GradingFailureReason = GradingFailureReason.NoConnection) {
+        answer(flow { emit(VoiceAnswerGradingEvent.Failed(failure)) })
+    }
+
+    /** A whole grading-failure round, notice and tail included. */
+    private fun TestScope.emitGradingFailure(failure: GradingFailureReason = GradingFailureReason.NoConnection) {
+        startGradingFailureNotice(failure)
+        finishNotice()
+    }
+
+    /** A whole graded round, notice and tail included. */
+    private fun TestScope.emitGrade(gradePercent: Int) {
+        emitGradeNotice(gradePercent)
+        finishNotice()
     }
 
     @Test
     fun `a voice grade drives the same Attempt increment and re-insertion as the equivalent manual rating`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
-            emitGrade(grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 20, feedback = "missed it"), cardId = "card-1")
+            emitGrade(gradePercent = FAILED_GRADE_PERCENT)
 
             viewModel.state.value.currentCard?.id shouldNotBe "card-1"
             viewModel.state.value.flashcards.map { it.id } shouldContain "card-1"
         }
 
-    /** Grading, then the grade's SpeakingNotice, stopping before the notice finishes (see [emitGrade]). */
-    private fun TestScope.emitGradeNotice(gradePercent: Int, cardId: String) {
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-            isEnabled = true,
-            phase = VoiceAnswerPhase.SpeakingNotice,
-            lastGrade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = gradePercent, feedback = "f"),
-            lastGradedCardId = cardId,
+    /** A graded round up to its feedback notice, which is still being spoken. */
+    private fun TestScope.emitGradeNotice(gradePercent: Int) {
+        answer(
+            flow {
+                emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT))
+                emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(SPOKEN_TRANSCRIPT, gradePercent, GRADE_RATIONALE)))
+            },
         )
-        advanceUntilIdle()
-    }
-
-    private fun TestScope.finishNotice() {
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-        advanceUntilIdle()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
     }
 
     @Test
     fun `a voice grade shows its Rating on the attempt markers at once, while the card, progress and reveal wait for the notice`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
-            emitGradeNotice(gradePercent = PARTIAL_GRADE_PERCENT, cardId = "card-1")
+            emitGradeNotice(gradePercent = PARTIAL_GRADE_PERCENT)
 
             with(viewModel.state.value) {
                 currentCardRatings shouldBe listOf(FlashcardAttemptRating.PartiallyCorrect)
@@ -1302,16 +1303,14 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a voice Correct keeps its marker on the graded card during the feedback, then everything switches to the next card`() =
+    fun `a voice Correct counts at once and keeps its marker on the graded card during the feedback, then switches to the next card`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
-            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT, cardId = "card-1")
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
 
             viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
-            viewModel.state.value.completedCount shouldBe 0
+            viewModel.state.value.completedCount shouldBe 1
 
             finishNotice()
 
@@ -1327,10 +1326,11 @@ class RatedStudySessionViewModelTest {
     fun `a voice Failed that re-inserts the card shows the marker on the graded card, not the next head`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadTenCards()
+            enableVoiceAnswering()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            emitGradeNotice(gradePercent = FAILED_GRADE_PERCENT, cardId = "card-1")
+            emitGradeNotice(gradePercent = FAILED_GRADE_PERCENT)
 
             viewModel.state.value.currentCard?.id shouldBe "card-1"
             viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Failed)
@@ -1340,12 +1340,12 @@ class RatedStudySessionViewModelTest {
     fun `a voice Correct on the last card updates the marker at once and navigates to the summary only after the notice`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(listOf(flashcard("card-1")))
-            stubRoute(route.copy(cardIds = listOf("card-1")))
+            stubRoute(route.copy(cardIds = listOf("card-1"), voiceAnsweringEnabled = true))
             val viewModel = createViewModel()
             advanceUntilIdle()
 
             viewModel.events.test {
-                emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT, cardId = "card-1")
+                emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
 
                 viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
                 expectNoEvents()
@@ -1359,9 +1359,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a silence timeout or grading failure leaves the attempt markers unchanged during its notice`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
             // card-1 fails manually and comes back as the head with one Failed marker.
             viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
             repeat(2) { viewModel.onAttemptRating(FlashcardAttemptRating.Correct) }
@@ -1369,34 +1367,32 @@ class RatedStudySessionViewModelTest {
             val markersBefore = listOf(FlashcardAttemptRating.Failed)
             viewModel.state.value.currentCardRatings shouldBe markersBefore
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
-            advanceUntilIdle()
+            startSilenceNotice()
             viewModel.state.value.currentCardRatings shouldBe markersBefore
             finishNotice()
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.SpeakingNotice,
-                error = VoiceAnswerFailureReason.GradingFailed.NoConnection,
-            )
-            advanceUntilIdle()
+            startGradingFailureNotice()
             viewModel.state.value.currentCardRatings shouldBe markersBefore
         }
 
     @Test
     fun `a stale voice grade for a card other than the head leaves the attempt markers unchanged`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
+            answer(
+                flow {
+                    emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT))
+                    delay(TRANSCRIPT_DELAY)
+                    emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(SPOKEN_TRANSCRIPT, CORRECT_GRADE_PERCENT, GRADE_RATIONALE)))
+                },
+            )
+            // The head moves on while card-1 is still being graded.
+            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
 
-            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT, cardId = "card-2")
+            advanceTimeBy(MIN_TRANSCRIPT_DISPLAY + TRANSCRIPT_DELAY)
+            runCurrent()
 
-            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            viewModel.state.value.currentCard?.id shouldBe "card-2"
             viewModel.state.value.currentCardRatings shouldBe emptyList()
         }
 
@@ -1404,12 +1400,12 @@ class RatedStudySessionViewModelTest {
     fun `a grade in the Correct band finishes the card as Mastered, exactly as a manual Correct does`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(listOf(flashcard("card-1")))
-            stubRoute(route.copy(cardIds = listOf("card-1")))
+            stubRoute(route.copy(cardIds = listOf("card-1"), voiceAnsweringEnabled = true))
             val viewModel = createViewModel()
             advanceUntilIdle()
 
             viewModel.events.test {
-                emitGrade(grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 95, feedback = "great"), cardId = "card-1")
+                emitGrade(gradePercent = CORRECT_GRADE_PERCENT)
                 awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
             }
             viewModel.state.value.masteredCount shouldBe 1
@@ -1419,16 +1415,15 @@ class RatedStudySessionViewModelTest {
     fun `a silence timeout leaves the card's Rating list and best rating unchanged, and re-queues the card`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadTenCards()
-            val viewModel = createViewModel().apply { random = Random(FIXED_SEED) }
+            enableVoiceAnswering()
+            val viewModel = createViewModel()
             advanceUntilIdle()
 
             emitSilenceTimeout()
 
             viewModel.state.value.currentCard?.id shouldNotBe "card-1"
             viewModel.state.value.flashcards.map { it.id } shouldContain "card-1"
-            while (viewModel.state.value.currentCard?.id != "card-1") {
-                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-            }
+            rateCorrectUntilPresented(viewModel, "card-1")
 
             viewModel.state.value.currentCardRatings shouldBe emptyList()
         }
@@ -1436,6 +1431,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a silence timeout re-queues within the Failed gap range`() = runTest(mainDispatcherRule.testDispatcher) {
         loadTenCards()
+        enableVoiceAnswering()
         val viewModel = createViewModel()
         advanceUntilIdle()
 
@@ -1448,9 +1444,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `two silence timeouts do not pause the session, but the third does`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             repeat(2) { emitSilenceTimeout() }
             viewModel.state.value.isVoiceAnswerPaused shouldBe false
@@ -1463,15 +1457,10 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `the consecutive silence counter resets on a graded answer, so silence-silence-grade-silence does not pause`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             repeat(2) { emitSilenceTimeout() }
-            emitGrade(
-                grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 90, feedback = "f"),
-                cardId = viewModel.state.value.currentCard?.id.orEmpty(),
-            )
+            emitGrade(gradePercent = CORRECT_GRADE_PERCENT)
 
             emitSilenceTimeout()
 
@@ -1482,14 +1471,13 @@ class RatedStudySessionViewModelTest {
     fun `pausing after three silences stops playback, exposes the resume affordance, and records no outcome`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadFourCards()
-            val viewModel = createViewModel().apply { random = Random(FIXED_SEED) }
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
+            enableVoiceAnswering()
+            val viewModel = createViewModel()
             advanceUntilIdle()
             val masteredBefore = viewModel.state.value.masteredCount
             val flashcardsBefore = viewModel.state.value.flashcards.map { it.id }
 
-            // Independently reproduces requeueAfterSilence's exact draw order/range with an
+            // Independently reproduces the silence requeue's exact draw order/range with an
             // unrelated Random instance seeded identically — a 4-card pool's remaining-queue size
             // (3) exceeds the Failed gap's minimum (2), so unlike a 3-card pool this genuinely
             // exercises re-insertion position rather than clamping to a fixed spot every time.
@@ -1510,25 +1498,24 @@ class RatedStudySessionViewModelTest {
             }
 
             viewModel.state.value.isVoiceAnswerPaused shouldBe true
-            voiceGateway.togglePlayPauseCalls shouldBe 1
-            voiceGateway.lastVoiceAnswering shouldBe false
+            playbackGateway.pauseCount shouldBe 1
+            captureGateway.isVoiceAnsweringStarted shouldBe false
             viewModel.state.value.masteredCount shouldBe masteredBefore
             viewModel.state.value.flashcards.map { it.id } shouldBe expectedQueue
         }
 
     @Test
     fun `resuming continues from the same card with the counter reset`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
         repeat(3) { emitSilenceTimeout() }
         val cardBeforePause = viewModel.state.value.currentCard?.id
 
         viewModel.onResumeSession()
+        runCurrent()
 
         viewModel.state.value.isVoiceAnswerPaused shouldBe false
         viewModel.state.value.currentCard?.id shouldBe cardBeforePause
-        voiceGateway.lastVoiceAnswering shouldBe true
+        captureGateway.isVoiceAnsweringStarted shouldBe true
 
         // Counter reset: two more silences must not re-pause.
         repeat(2) { emitSilenceTimeout() }
@@ -1538,9 +1525,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a silence timeout under the pause threshold emits the skip snackbar message`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             viewModel.messages.test {
                 emitSilenceTimeout()
@@ -1552,9 +1537,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `the third consecutive silence timeout emits the pause snackbar message instead of the skip message`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
             repeat(2) { emitSilenceTimeout() }
 
             viewModel.messages.test {
@@ -1568,6 +1551,7 @@ class RatedStudySessionViewModelTest {
     fun `a grading failure re-queues the card within the Failed gap, records no Rating, and shows the next card after its notice`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadTenCards()
+            enableVoiceAnswering()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
@@ -1576,33 +1560,20 @@ class RatedStudySessionViewModelTest {
             viewModel.state.value.currentCard?.id shouldNotBe "card-1"
             val index = viewModel.state.value.flashcards.indexOfFirst { it.id == "card-1" }
             (index in StudySessionConfig.FAILED_REQUEUE_MIN_GAP..StudySessionConfig.FAILED_REQUEUE_MAX_GAP) shouldBe true
-            while (viewModel.state.value.currentCard?.id != "card-1") {
-                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-            }
+            rateCorrectUntilPresented(viewModel, "card-1")
             viewModel.state.value.currentCardRatings shouldBe emptyList()
         }
 
     @Test
     fun `a grading failure keeps showing its revealed card until the notice finishes, then shows the next card hidden`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-            isEnabled = true,
-            phase = VoiceAnswerPhase.SpeakingNotice,
-            error = VoiceAnswerFailureReason.GradingFailed.NoConnection,
-            isShortNoticeSpeaking = true,
-        )
-        advanceUntilIdle()
+        startGradingFailureNotice()
 
         viewModel.state.value.currentCard?.id shouldBe "card-1"
         viewModel.state.value.isAnswerRevealed shouldBe true
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.WaitingForQuestion)
-        advanceUntilIdle()
+        finishNotice()
 
         viewModel.state.value.currentCard?.id shouldBe "card-2"
         viewModel.state.value.isAnswerRevealed shouldBe false
@@ -1611,53 +1582,37 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `three grading failures in a row pause the session with the grading pause message`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             viewModel.messages.test {
-                emitGradingFailure(VoiceAnswerFailureReason.GradingFailed.NoConnection)
+                emitGradingFailure(GradingFailureReason.NoConnection)
                 awaitItem() shouldBe VoiceAnswerGradingOffline
-                emitGradingFailure(VoiceAnswerFailureReason.GradingFailed.ServiceError)
+                emitGradingFailure(GradingFailureReason.ServiceError)
                 awaitItem() shouldBe VoiceAnswerGradingServiceError
                 viewModel.state.value.isVoiceAnswerPaused shouldBe false
 
-                emitGradingFailure(VoiceAnswerFailureReason.GradingFailed.NoConnection)
+                emitGradingFailure(GradingFailureReason.NoConnection)
 
                 awaitItem() shouldBe VoiceAnswerGradingPause
             }
             viewModel.state.value.isVoiceAnswerPaused shouldBe true
-            voiceGateway.lastVoiceAnswering shouldBe false
+            captureGateway.isVoiceAnsweringStarted shouldBe false
         }
 
     @Test
     fun `a pausing grading failure keeps showing its revealed card until the pause notice finishes`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
             repeat(2) { emitGradingFailure() }
             val pausingCardId = viewModel.state.value.currentCard?.id
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.SpeakingNotice,
-                error = VoiceAnswerFailureReason.GradingFailed.NoConnection,
-                isShortNoticeSpeaking = true,
-            )
-            advanceUntilIdle()
-            // The pause stops voice answering, which resets its state while the notice keeps playing.
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
-            advanceUntilIdle()
+            startGradingFailureNotice()
 
             viewModel.state.value.isVoiceAnswerPaused shouldBe true
             viewModel.state.value.currentCard?.id shouldBe pausingCardId
             viewModel.state.value.isAnswerRevealed shouldBe true
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
-            advanceUntilIdle()
+            finishNotice()
 
             viewModel.state.value.currentCard?.id shouldNotBe pausingCardId
             viewModel.state.value.isAnswerRevealed shouldBe false
@@ -1665,23 +1620,15 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `a pausing silence keeps showing its card until the pause notice finishes`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
         repeat(2) { emitSilenceTimeout() }
         val pausingCardId = viewModel.state.value.currentCard?.id
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice, isShortNoticeSpeaking = true)
-        advanceUntilIdle()
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isShortNoticeSpeaking = true)
-        advanceUntilIdle()
+        startSilenceNotice()
 
         viewModel.state.value.currentCard?.id shouldBe pausingCardId
 
-        voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState()
-        advanceUntilIdle()
+        finishNotice()
 
         viewModel.state.value.currentCard?.id shouldNotBe pausingCardId
     }
@@ -1689,9 +1636,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a silence does not reset the grading failure count, so failure-silence-failure-failure pauses on the third failure`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             emitGradingFailure()
             emitSilenceTimeout()
@@ -1709,9 +1654,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a grading failure does not reset the silence count, so silence-failure-silence-silence pauses on the third silence`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             emitSilenceTimeout()
             emitGradingFailure()
@@ -1729,15 +1672,10 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a graded answer resets the grading failure count, so failure-failure-grade-failure does not pause`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             repeat(2) { emitGradingFailure() }
-            emitGrade(
-                grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 90, feedback = "f"),
-                cardId = viewModel.state.value.currentCard?.id.orEmpty(),
-            )
+            emitGrade(gradePercent = CORRECT_GRADE_PERCENT)
 
             emitGradingFailure()
 
@@ -1746,12 +1684,11 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `resuming after a grading failure pause resets the grading failure count`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createVoiceViewModel()
         repeat(3) { emitGradingFailure() }
 
         viewModel.onResumeSession()
+        runCurrent()
 
         viewModel.state.value.isVoiceAnswerPaused shouldBe false
         repeat(2) { emitGradingFailure() }
@@ -1759,39 +1696,30 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `the grading failure pause flag pushed to the gateway says whether the next failure pauses`() =
+    fun `each grading failure's notice names its cause, and the third in a row announces the pause instead`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            createVoiceViewModel()
 
-            emitGradingFailure()
-            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe false
-            emitGradingFailure()
-            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe true
+            emitGradingFailure(GradingFailureReason.NoConnection)
+            emitGradingFailure(GradingFailureReason.ServiceError)
+            emitGradingFailure(GradingFailureReason.NoConnection)
 
-            emitGrade(
-                grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 90, feedback = "f"),
-                cardId = viewModel.state.value.currentCard?.id.orEmpty(),
+            playbackGateway.spokenNotices shouldBe listOf(
+                SpokenNotice.GradingFailed(GradingFailureReason.NoConnection),
+                SpokenNotice.GradingFailed(GradingFailureReason.ServiceError),
+                SpokenNotice.GradingPause,
             )
-            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe false
-
-            repeat(3) { emitGradingFailure() }
-            viewModel.onResumeSession()
-            voiceGateway.lastNextGradingFailureWillPauseSession shouldBe false
         }
 
     @Test
-    fun `a grading failure leaves the silence pause flag untouched`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        createViewModel()
-        advanceUntilIdle()
+    fun `a grading failure leaves the silence count untouched, so the next silence still announces the pause`() = runTest(mainDispatcherRule.testDispatcher) {
+        createVoiceViewModel()
         repeat(2) { emitSilenceTimeout() }
-        voiceGateway.lastNextSilenceWillPauseSession shouldBe true
 
         emitGradingFailure()
+        emitSilenceTimeout()
 
-        voiceGateway.lastNextSilenceWillPauseSession shouldBe true
+        playbackGateway.spokenNotices.last() shouldBe SpokenNotice.SilencePause
     }
 
     @Test
@@ -1799,17 +1727,11 @@ class RatedStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             // Revoking in system Settings kills the process, so a capture-time SecurityException is
             // only a narrow race; it takes the recoverable path rather than a dedicated one.
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             viewModel.messages.test {
-                voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                    isEnabled = true,
-                    phase = VoiceAnswerPhase.WaitingForQuestion,
-                    error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)),
-                )
-                advanceUntilIdle()
+                captureGateway.emit(CaptureEvent.CaptureFailed(VoiceCaptureFailureReason.PermissionMissing(detail = null)))
+                runCurrent()
 
                 awaitItem() shouldBe VoiceAnswerCaptureUnavailable
             }
@@ -1820,14 +1742,14 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a session restored with the mic permission revoked ends the session`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            // Revoking in system Settings kills the process; the restored route re-enables voice
-            // answering and VoiceAnswerController.start() reports this bare form.
+            // Revoking in system Settings kills the process; the restored route starts voice
+            // answering again and finds the permission gone.
+            permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
             loadThreeCards()
+            enableVoiceAnswering()
             val viewModel = createViewModel()
-            advanceUntilIdle()
 
             viewModel.messages.test {
-                voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(error = VoiceAnswerFailureReason.PermissionMissing)
                 advanceUntilIdle()
 
                 awaitItem() shouldBe VoiceAnswerMicPermissionRevoked
@@ -1835,49 +1757,35 @@ class RatedStudySessionViewModelTest {
             viewModel.events.test {
                 awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
             }
+            playbackGateway.startCalls.size shouldBe 0
         }
 
     @Test
     fun `a capture failure unrelated to mic permission pauses the session instead of ending it`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
             viewModel.messages.test {
-                voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                    isEnabled = true,
-                    phase = VoiceAnswerPhase.WaitingForQuestion,
-                    error = VoiceAnswerFailureReason.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable),
-                )
-                advanceUntilIdle()
+                captureGateway.emit(CaptureEvent.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
+                runCurrent()
 
                 awaitItem() shouldBe VoiceAnswerCaptureUnavailable
             }
             viewModel.events.test { expectNoEvents() }
             viewModel.state.value.isVoiceAnswerPaused shouldBe true
-            voiceGateway.lastVoiceAnswering shouldBe false
-            voiceGateway.restartCurrentCardCalls shouldBe 1
+            captureGateway.isVoiceAnsweringStarted shouldBe false
+            playbackGateway.restartCurrentCardCount shouldBe 1
         }
 
     @Test
     fun `isAnswerRevealed stays false while a silence-timeout notice is speaking`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
-            advanceUntilIdle()
-            // Any TTS-engine (not voice-answer) emission while a no-grade SpeakingNotice is active
-            // re-evaluates isAnswerRevealed off the now-current voiceAnswerPhase — exactly the broad
-            // leak this guards against, since it used to treat SpeakingNotice alone as reveal-worthy.
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
-            advanceUntilIdle()
+            startSilenceNotice()
+            // A player update while the no-grade notice is active must not reveal the answer.
+            playbackGateway.state.update { it.copy(speechRate = 1.25f) }
+            runCurrent()
 
             viewModel.state.value.isAnswerRevealed shouldBe false
         }
@@ -1885,22 +1793,11 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `isAnswerRevealed stays true while a grading-failure notice is speaking`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.SpeakingNotice,
-                error = VoiceAnswerFailureReason.GradingFailed.ServiceError,
-            )
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
-            advanceUntilIdle()
+            startGradingFailureNotice(GradingFailureReason.ServiceError)
+            playbackGateway.state.update { it.copy(speechRate = 1.25f) }
+            runCurrent()
 
             viewModel.state.value.isAnswerRevealed shouldBe true
         }
@@ -1908,49 +1805,26 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `isAnswerRevealed turns true while a real grade's notice is speaking`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true)
-            advanceUntilIdle()
-            val grade = VoiceAnswerGrade(sanitizedTranscript = "t", gradePercent = 80, feedback = "ok")
+            val viewModel = createVoiceViewModel()
 
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Grading)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(
-                isEnabled = true,
-                phase = VoiceAnswerPhase.SpeakingNotice,
-                lastGrade = grade,
-                lastGradedCardId = viewModel.state.value.currentCard?.id,
-            )
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
-            advanceUntilIdle()
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
+            playbackGateway.state.update { it.copy(speechRate = 1.25f) }
+            runCurrent()
 
             viewModel.state.value.isAnswerRevealed shouldBe true
         }
 
     @Test
-    fun `the third silence's pause command fires the instant SpeakingNotice is entered, before any notice-finished advance could arrive`() =
+    fun `the third silence's pause fires the instant its notice starts, before the notice finishes`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            voiceGateway.stateFlow.value = VoicePlaybackState(isActive = true, isPlaying = true)
-            advanceUntilIdle()
+            createVoiceViewModel()
             repeat(2) { emitSilenceTimeout() }
 
-            // Only the phase-entry write, not emitSilenceTimeout()'s full WaitingForQuestion
-            // sequence — mirrors production timing exactly: VoiceAnswerController flips to
-            // SpeakingNotice synchronously, strictly before it starts speaking the notice or (later
-            // still, only once that finishes) requests an advance via ADR-0025's ADVANCE_DELAY_MS.
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.Listening)
-            advanceUntilIdle()
-            voiceGateway.voiceAnswerStateFlow.value = VoiceAnswerState(isEnabled = true, phase = VoiceAnswerPhase.SpeakingNotice)
-            advanceUntilIdle()
+            startSilenceNotice()
 
-            voiceGateway.togglePlayPauseCalls shouldBe 1
-            voiceGateway.lastVoiceAnswering shouldBe false
+            playbackGateway.speakingNotices shouldBe listOf(SpokenNotice.SilencePause)
+            playbackGateway.pauseCount shouldBe 1
+            captureGateway.isVoiceAnsweringStarted shouldBe false
         }
 
     @Test
@@ -2015,9 +1889,7 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `a card that received only a silence timeout is absent from cardResults`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
+            val viewModel = createVoiceViewModel()
             emitSilenceTimeout()
             viewModel.onDialogEvent(Open(ExitSession))
 
@@ -2056,11 +1928,9 @@ class RatedStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
-            var clockInstant = FIXED_INSTANT
-            viewModel.now = { clockInstant }
             advanceUntilIdle()
 
-            clockInstant = FIXED_INSTANT.plusSeconds(42)
+            clock.instant = FIXED_INSTANT.plusSeconds(42)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -2076,11 +1946,9 @@ class RatedStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
             val viewModel = createViewModel()
-            var clockInstant = FIXED_INSTANT
-            viewModel.now = { clockInstant }
             advanceUntilIdle()
 
-            clockInstant = FIXED_INSTANT.plusSeconds(999)
+            clock.instant = FIXED_INSTANT.plusSeconds(999)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -2097,13 +1965,11 @@ class RatedStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
-            var clockInstant = FIXED_INSTANT
-            viewModel.now = { clockInstant }
             advanceUntilIdle()
 
             // Simulates a long backgrounded gap (a phone call, switching apps) with no lifecycle
             // hook to react to it — v1 is deliberately simplistic: wall time only, no pausing.
-            clockInstant = FIXED_INSTANT.plusSeconds(1_200)
+            clock.instant = FIXED_INSTANT.plusSeconds(1_200)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -2114,8 +1980,18 @@ class RatedStudySessionViewModelTest {
             }
         }
 
+    private class MutableClock(var instant: Instant) : Clock() {
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+
+        override fun withZone(zone: ZoneId?): Clock = this
+
+        override fun instant(): Instant = instant
+    }
+
     private companion object {
         const val FIXED_SEED = 42L
+        val TRANSCRIPT_DELAY = 200.milliseconds
+        const val MAX_CARDS_BEFORE_REAPPEARING = 10
         const val CORRECT_GRADE_PERCENT = 95
         const val PARTIAL_GRADE_PERCENT = 60
         const val FAILED_GRADE_PERCENT = 20
@@ -2140,82 +2016,5 @@ class RatedStudySessionViewModelTest {
             levelCurveBase = 13.0,
             levelCurveExponent = 14.0,
         )
-    }
-}
-
-private class FakeVoiceGateway : VoiceGateway {
-    val stateFlow = MutableStateFlow(VoicePlaybackState())
-    override val state: StateFlow<VoicePlaybackState> = stateFlow
-
-    val voiceAnswerStateFlow = MutableStateFlow(VoiceAnswerState())
-    override val voiceAnswerState: StateFlow<VoiceAnswerState> = voiceAnswerStateFlow
-
-    val rawVoiceLevelFlow = MutableSharedFlow<Float>()
-    override val rawVoiceLevel: Flow<Float> = rawVoiceLevelFlow
-
-    var lastVoiceAnswering: Boolean? = null
-    var lastNextSilenceWillPauseSession: Boolean? = null
-    var lastNextGradingFailureWillPauseSession: Boolean? = null
-
-    var startCalls = 0
-    var lastStartCards: List<Flashcard>? = null
-    var lastStartIndex: Int? = null
-    var lastStartSubcategoryName: String? = null
-    var lastStartIsVoiceAnsweringSession: Boolean? = null
-    var updateQueueCalls = 0
-    var lastUpdateQueueCards: List<Flashcard>? = null
-    var togglePlayPauseCalls = 0
-    var rewindToNextCalls = 0
-    var rewindToPreviousCalls = 0
-    var restartCurrentCardCalls = 0
-    var showAnswerCalls = 0
-    var stopCalls = 0
-    var lastSpeechRate: Float? = null
-    var lastVoiceId: String? = null
-
-    override fun start(cards: List<Flashcard>, startIndex: Int, subcategoryName: String, isVoiceAnsweringSession: Boolean) {
-        startCalls++
-        lastStartCards = cards
-        lastStartIndex = startIndex
-        lastStartSubcategoryName = subcategoryName
-        lastStartIsVoiceAnsweringSession = isVoiceAnsweringSession
-    }
-
-    override fun updateQueue(cards: List<Flashcard>) {
-        updateQueueCalls++
-        lastUpdateQueueCards = cards
-    }
-    override fun stop() {
-        stopCalls++
-    }
-    override fun togglePlayPause() {
-        togglePlayPauseCalls++
-    }
-    override fun rewindToNext() {
-        rewindToNextCalls++
-    }
-    override fun rewindToPrevious() {
-        rewindToPreviousCalls++
-    }
-    override fun restartCurrentCard() {
-        restartCurrentCardCalls++
-    }
-    override fun showAnswer() {
-        showAnswerCalls++
-    }
-    override fun setSpeechRate(rate: Float) {
-        lastSpeechRate = rate
-    }
-    override fun setVoice(voiceId: String?) {
-        lastVoiceId = voiceId
-    }
-    override fun setVoiceAnswering(enabled: Boolean) {
-        lastVoiceAnswering = enabled
-    }
-    override fun setNextSilenceWillPauseSession(willPause: Boolean) {
-        lastNextSilenceWillPauseSession = willPause
-    }
-    override fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
-        lastNextGradingFailureWillPauseSession = willPause
     }
 }

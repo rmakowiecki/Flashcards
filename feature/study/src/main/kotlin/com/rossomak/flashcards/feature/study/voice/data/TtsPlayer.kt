@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.feature.study.voice.data
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -7,7 +7,6 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.media3.common.MediaItem
@@ -18,6 +17,10 @@ import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.rossomak.flashcards.core.data.voice.VoiceCuration
+import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.VoicePhase
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,16 +32,23 @@ import kotlinx.coroutines.flow.asStateFlow
  * audio focus). It owns the TTS engine and the per-card sequence:
  * speak question -> pause -> speak answer -> pause -> next card.
  *
- * Two entry points drive the same internal state, then call [publishState] to refresh both the Media3
- * state and the [voiceState] side-channel:
- *  - System transport controls route through Media3 into the `handle*` overrides.
- *  - The in-app UI routes through [StudySessionVoiceService.LocalBinder] into the `command*` methods.
+ * Only the study session coordinators drive it, through [StudySessionVoiceService.LocalBinder]. System
+ * transport controls reach Media3's `handle*` overrides, which never act: they report a
+ * [PlaybackEvent.ExternalCommand] through [onEvent], and the coordinator applies it exactly like the
+ * matching in-app command. Every change calls [publishState] to refresh both the Media3 state and
+ * the [voiceState] side-channel.
  *
  * [voiceState] carries TTS-specific fields ([VoicePhase], between-card pause) that the standard
- * [Player] state cannot express; the ViewModel observes it via the binder.
+ * [Player] state cannot express.
+ *
+ * It makes no session decision. Audio-focus auto-pause and auto-resume are the one behavior it
+ * still runs by itself.
  */
 @UnstableApi
-class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
+class TtsPlayer(
+    context: Context,
+    private val onEvent: (PlaybackEvent) -> Unit,
+) : SimpleBasePlayer(Looper.getMainLooper()) {
 
     private val _voiceState = MutableStateFlow(VoicePlaybackState())
     val voiceState: StateFlow<VoicePlaybackState> = _voiceState.asStateFlow()
@@ -61,15 +71,10 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     private var pendingVoiceId: String? = null
     private var subcategoryName = ""
 
-    // Rated voice-answering (ADR-0025): question-only playback that stops after the question
-    // instead of auto-progressing to the answer, so VoiceAnswerController can listen for a
-    // spoken answer. Distinct from Fast mode's continuous question->pause->answer->next loop.
-    private var isVoiceAnsweringMode = false
-    private var isAwaitingSpokenAnswer = false
-
-    // User paused (to keep reading the revealed answer/feedback) right as grading finished —
-    // defer the auto-advance until they resume instead of yanking playback out from under them.
-    private var pendingVoiceAnswerAdvance = false
+    // Rated voice answering (ADR-0025): stops after each question instead of going on to the
+    // answer, and reports QuestionFinished so the coordinator can open the listening window.
+    // Distinct from Fast mode's continuous question->pause->answer->next loop.
+    private var isQuestionOnlyMode = false
 
     /**
      * Incremented on every new utterance and every interrupting command. An [onDone] callback whose
@@ -77,7 +82,6 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
      * ignored — this is how a naturally finished utterance is told apart from a stopped one.
      */
     private var generation = 0
-    private var cardStartedAtMs = 0L
 
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
         if (status == TextToSpeech.SUCCESS) {
@@ -93,7 +97,7 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
                 speakQuestion()
             }
         } else {
-            _voiceState.value = VoicePlaybackState(error = ERROR_TTS_UNAVAILABLE)
+            onEvent(PlaybackEvent.EngineUnavailable)
         }
     }
 
@@ -154,16 +158,14 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
-        // A user play or pause overrides any pending auto-resume from a transient focus loss.
-        wasPlayingBeforeFocusLoss = false
-        if (playWhenReady) doPlay() else doPause()
+        onEvent(PlaybackEvent.ExternalCommand(if (playWhenReady) TransportCommand.Play else TransportCommand.Pause))
         return Futures.immediateVoidFuture()
     }
 
     override fun handlePrepare(): ListenableFuture<*> = Futures.immediateVoidFuture()
 
     override fun handleStop(): ListenableFuture<*> {
-        stopPlayback()
+        onEvent(PlaybackEvent.ExternalCommand(TransportCommand.Stop))
         return Futures.immediateVoidFuture()
     }
 
@@ -177,12 +179,13 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         positionMs: Long,
         seekCommand: Int
     ): ListenableFuture<*> {
-        when (seekCommand) {
-            COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> moveToNextCard()
-            COMMAND_SEEK_TO_PREVIOUS -> doSmartPrevious() // system back: rewind-or-previous
-            COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> moveToPreviousCard()
-            else -> if (mediaItemIndex != index) jumpTo(mediaItemIndex)
+        val command = when (seekCommand) {
+            COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> TransportCommand.Next
+            COMMAND_SEEK_TO_PREVIOUS -> TransportCommand.Previous
+            COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> TransportCommand.PreviousCard
+            else -> if (mediaItemIndex != index) TransportCommand.JumpTo(mediaItemIndex) else null
         }
+        command?.let { onEvent(PlaybackEvent.ExternalCommand(it)) }
         return Futures.immediateVoidFuture()
     }
 
@@ -192,13 +195,10 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         this.index = if (cards.isEmpty()) 0 else startIndex.coerceIn(0, cards.lastIndex)
         this.phase = VoicePhase.Question
         this.isBetweenPause = false
-        this.isAwaitingSpokenAnswer = false
-        this.pendingVoiceAnswerAdvance = false
         if (cards.isEmpty()) {
             publishState()
             return
         }
-        cardStartedAtMs = SystemClock.elapsedRealtime()
         if (ttsReady) speakQuestion() else startWhenReady = true
     }
 
@@ -213,33 +213,20 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         publishState()
     }
 
-    /** Toggles between Fast's continuous auto-advance and Rated voice-answering's stop-after-question shape. */
-    fun setVoiceAnsweringMode(enabled: Boolean) {
-        isVoiceAnsweringMode = enabled
-        if (!enabled) isAwaitingSpokenAnswer = false
+    /** Toggles between Fast's continuous auto-advance and Rated voice answering's stop-after-question shape. */
+    fun setQuestionOnlyMode(enabled: Boolean) {
+        isQuestionOnlyMode = enabled
         publishState()
     }
 
-    /** Called once a spoken answer has been graded (or skipped after a silence timeout); moves on to the next question. */
-    fun advanceToNextCardAfterVoiceAnswer() {
-        if (!isVoiceAnsweringMode) return
-        if (!isPlaying) {
-            // User paused while reading the revealed answer/feedback — hold here; doPlay() runs
-            // this once they resume instead of re-reading the question they already answered.
-            pendingVoiceAnswerAdvance = true
-            return
-        }
-        doAdvanceToNextCardAfterVoiceAnswer()
-    }
-
-    // The rated queue's just-answered card is never still at cards[0] by the time this runs —
-    // ViewModel.onRating already called updateQueue with that card removed/reinserted elsewhere
-    // before the SpeakingNotice utterance finishes speaking (ADR-0046). So cards[0] is already the
-    // next-up card; unlike Fast's fixed-list advance, this never increments index.
-    private fun doAdvanceToNextCardAfterVoiceAnswer() {
+    /**
+     * Reads the question of `cards[0]`, or stops when the queue is empty. The coordinator always
+     * hands over the reordered queue first, so `cards[0]` is already the next card to ask; unlike
+     * Fast's fixed-list advance, this never increments [index].
+     */
+    fun advanceAfterVoiceAnswer() {
         if (cards.isNotEmpty()) {
             index = 0
-            cardStartedAtMs = SystemClock.elapsedRealtime()
             speakQuestion()
         } else {
             isPlaying = false
@@ -247,10 +234,20 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         }
     }
 
-    fun togglePlayPause() {
-        // A user play or pause overrides any pending auto-resume from a transient focus loss.
+    /**
+     * Starts or resumes reading. Named apart from [Player.play], which the Media3 session routes to
+     * [handleSetPlayWhenReady]. Clears an auto-resume pending from a transient focus loss: the user
+     * decided.
+     */
+    fun startReading() {
         wasPlayingBeforeFocusLoss = false
-        if (isPlaying) doPause() else doPlay()
+        doPlay()
+    }
+
+    /** Pauses reading; the counterpart of [startReading]. */
+    fun pauseReading() {
+        wasPlayingBeforeFocusLoss = false
+        doPause()
     }
 
     fun moveToNextCard() {
@@ -318,25 +315,18 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     fun stopPlayback() {
         isPlaying = false
         startWhenReady = false
-        pendingVoiceAnswerAdvance = false
         generation++
         stopUtterance()
         abandonAudioFocus()
         cards = emptyList()
         index = 0
         isBetweenPause = false
-        isAwaitingSpokenAnswer = false
         _voiceState.value = VoicePlaybackState(isActive = false)
         invalidateState()
     }
 
     private fun doPlay() {
         if (cards.isEmpty()) return
-        if (pendingVoiceAnswerAdvance) {
-            pendingVoiceAnswerAdvance = false
-            doAdvanceToNextCardAfterVoiceAnswer()
-            return
-        }
         when (phase) {
             VoicePhase.Question -> speakQuestion()
             VoicePhase.Answer -> speakAnswer()
@@ -349,16 +339,8 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         publishState()
     }
 
-    /** Rewind-or-previous used by system transport: within the threshold, jump to the previous card. */
-    private fun doSmartPrevious() {
-        val elapsed = SystemClock.elapsedRealtime() - cardStartedAtMs
-        if (elapsed < VoicePlaybackState.REWIND_THRESHOLD_MS && index > 0) {
-            index--
-        }
-        moveToQuestion()
-    }
-
-    private fun jumpTo(targetIndex: Int) {
+    fun jumpTo(targetIndex: Int) {
+        if (cards.isEmpty()) return
         index = targetIndex.coerceIn(0, cards.lastIndex)
         moveToQuestion()
     }
@@ -367,8 +349,6 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     private fun moveToQuestion() {
         phase = VoicePhase.Question
         isBetweenPause = false
-        isAwaitingSpokenAnswer = false
-        cardStartedAtMs = SystemClock.elapsedRealtime()
         if (isPlaying) {
             speakQuestion()
         } else {
@@ -381,7 +361,6 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         val card = cards.getOrNull(index) ?: return
         phase = VoicePhase.Question
         isPlaying = true
-        isAwaitingSpokenAnswer = false
         val generationId = ++generation
         requestAudioFocus()
         publishState()
@@ -421,7 +400,6 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         if (index < cards.lastIndex) {
             index++
             isBetweenPause = false
-            cardStartedAtMs = SystemClock.elapsedRealtime()
             speakQuestion()
         } else {
             phase =
@@ -461,9 +439,8 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
         if (generationId != generation) return // superseded by a newer command/utterance
         when (utteranceId.substringBefore(SEPARATOR)) {
             TAG_QUESTION ->
-                if (isVoiceAnsweringMode) {
-                    isAwaitingSpokenAnswer = true
-                    publishState()
+                if (isQuestionOnlyMode) {
+                    cards.getOrNull(index)?.let { card -> onEvent(PlaybackEvent.QuestionFinished(card.cardId)) }
                 } else {
                     silence(QUESTION_TO_ANSWER_PAUSE_MS, TAG_PAUSE)
                 }
@@ -505,7 +482,6 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
             totalCards = cards.size,
             phase = phase,
             isInBetweenPause = isBetweenPause,
-            isAwaitingSpokenAnswer = isAwaitingSpokenAnswer,
             speechRate = speechRate,
         )
         invalidateState()
@@ -549,7 +525,6 @@ class TtsPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     }
 
     private companion object {
-        const val ERROR_TTS_UNAVAILABLE = "tts_unavailable"
         const val DEFAULT_TITLE = "Study session"
 
         const val QUESTION_TO_ANSWER_PAUSE_MS = 1_500L
