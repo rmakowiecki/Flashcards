@@ -2,7 +2,7 @@ package com.rossomak.flashcards.feature.study.rated
 
 /**
  * One-shot transient snackbar messages for a Rated voice study session.
- * Grading feedback is deliberately absent: it's long-form (grade percent + rationale), so it
+ * Grading feedback is deliberately absent: it's long-form (Rating + rationale), so it
  * renders as bottom-sheet plain text instead of a snackbar.
  */
 sealed interface RatedStudySessionMessage {
@@ -11,11 +11,18 @@ sealed interface RatedStudySessionMessage {
 
     data object CurationSubmissionFailed : RatedStudySessionMessage
 
-    data object VoiceAnswerGradingFailed : RatedStudySessionMessage
+    /** Grading could not reach its service: the device is offline or the request timed out. */
+    data object VoiceAnswerGradingOffline : RatedStudySessionMessage
+
+    /** The grading service was reached but did not return a grade. */
+    data object VoiceAnswerGradingServiceError : RatedStudySessionMessage
 
     data object VoiceAnswerSilenceSkip : RatedStudySessionMessage
 
     data object VoiceAnswerSilencePause : RatedStudySessionMessage
+
+    /** Grading failed several times in a row, so voice answering pauses. */
+    data object VoiceAnswerGradingPause : RatedStudySessionMessage
 
     /** A session restored after the microphone was revoked in system Settings; the session ends. */
     data object VoiceAnswerMicPermissionRevoked : RatedStudySessionMessage
