@@ -61,6 +61,16 @@ describe("parseXpConfig", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: -1000 }) ?? "", /levelCurveBase/);
   });
 
+  it("rejects an award outside the Android Int range and accepts its bounds", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, cardMastered: 2_147_483_648 }) ?? "", /cardMastered/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, cardDemastered: -2_147_483_649 }) ?? "", /cardDemastered/);
+    assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, cardMastered: 2_147_483_647, cardDemastered: -2_147_483_648 }), undefined);
+  });
+
+  it("rejects a level curve base so small the starting level's threshold rounds to zero", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: Number.MIN_VALUE }) ?? "", /levelCurveBase/);
+  });
+
   it("rejects a negative level curve exponent and accepts a zero one", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: -0.5 }) ?? "", /levelCurveExponent/);
     assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: 0 }), undefined);

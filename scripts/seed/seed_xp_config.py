@@ -26,12 +26,22 @@ DEFAULT_CONFIG_FILE = os.path.join(
 COLLECTION = "config"
 DOCUMENT = "xp"
 
-# Mirrors functions/src/lib/xpConfig.ts: award fields are whole points, the curve fields any finite number.
+# Mirrors functions/src/lib/xpConfig.ts: award fields are whole points in Int range, the curve fields finite numbers.
 INTEGER_FIELDS = (
     "newCardStudied", "cardMastered", "cardPartial", "masteryDefended", "cardDemastered",
     "sessionCompleted", "dailyGoalMet", "streakPerDay", "streakMaxPerDay", "minuteStudied",
 )
 CURVE_FIELDS = ("levelCurveBase", "levelCurveExponent")
+# The Android client holds award fields as Kotlin `Int`, so an award outside this range is one it cannot load.
+INT_MIN, INT_MAX = -2**31, 2**31 - 1
+# Mirrors levelThreshold in functions/src/lib/xpScoring.ts.
+STARTING_LEVEL = 1
+LEVEL_THRESHOLD_ROUNDING_UNIT = 1000
+
+
+def level_threshold(config: dict, level: int) -> float:
+    return math.ceil(config["levelCurveBase"] * level ** config["levelCurveExponent"] / LEVEL_THRESHOLD_ROUNDING_UNIT) \
+        * LEVEL_THRESHOLD_ROUNDING_UNIT
 
 
 def validate(config: dict) -> list[str]:
@@ -44,6 +54,8 @@ def validate(config: dict) -> list[str]:
             problems.append(f"{field} must be a finite number, got {value!r}")
         elif field in INTEGER_FIELDS and value != int(value):
             problems.append(f"{field} must be an integer, got {value!r}")
+        elif field in INTEGER_FIELDS and not INT_MIN <= value <= INT_MAX:
+            problems.append(f"{field} must be between {INT_MIN} and {INT_MAX}, got {value!r}")
     if not problems:
         if config["cardDemastered"] > 0:
             problems.append(f"cardDemastered must be zero or negative, got {config['cardDemastered']!r}")
@@ -51,6 +63,10 @@ def validate(config: dict) -> list[str]:
             problems.append(f"levelCurveBase must be positive, got {config['levelCurveBase']!r}")
         if config["levelCurveExponent"] < 0:
             problems.append(f"levelCurveExponent must be zero or positive, got {config['levelCurveExponent']!r}")
+        elif config["levelCurveBase"] > 0 and level_threshold(config, STARTING_LEVEL) <= 0:
+            problems.append(
+                f"levelCurveBase {config['levelCurveBase']!r} is too small: the starting level's threshold rounds to zero"
+            )
     unknown = sorted(set(config) - set(INTEGER_FIELDS + CURVE_FIELDS))
     if unknown:
         problems.append(f"unknown fields: {', '.join(unknown)}")

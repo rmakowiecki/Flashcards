@@ -1,4 +1,4 @@
-import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
+import { DEFAULT_XP_CONFIG, levelThreshold, STARTING_LEVEL, XpConfig } from "./xpScoring";
 
 /**
  * The server-owned XP configuration: one Firestore document, `config/xp`, holding every `XpConfig`
@@ -14,6 +14,10 @@ import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 // Firestore segments, named per this repo's Firestore-constants convention.
 const XP_CONFIG_COLLECTION = "config";
 const XP_CONFIG_DOCUMENT = "xp";
+
+// The Android client holds award fields as Kotlin `Int`, so an award outside this range is one it cannot load.
+const INT_MIN = -2_147_483_648;
+const INT_MAX = 2_147_483_647;
 
 /** Award fields: whole points, so every one must be an integer. */
 const INTEGER_FIELDS = [
@@ -36,9 +40,12 @@ export type XpConfigParseResult = { config: XpConfig } | { problem: string };
 
 /**
  * Validates a configuration document's data. Every field must be present and a finite number, every
- * award field an integer, the de-mastery penalty at most zero, the level curve's base positive (a
- * zero or negative base makes every level threshold zero, and the level-up loop would never end), and its
- * exponent zero or positive (a negative exponent makes each level cheaper than the one before it).
+ * award field an integer within the Android client's `Int` range, the de-mastery penalty at most zero,
+ * the level curve's base positive (a zero or negative base makes every level threshold zero, and the
+ * level-up loop would never end), its exponent zero or positive (a negative exponent makes each level
+ * cheaper than the one before it), and the starting level's threshold above zero (a base so small it
+ * rounds to a zero threshold ends the level-up loop no better). With a nonnegative exponent, every later
+ * level's threshold is at least the starting level's.
  * Unknown fields are ignored.
  */
 export function parseXpConfig(data: unknown): XpConfigParseResult {
@@ -53,11 +60,14 @@ export function parseXpConfig(data: unknown): XpConfigParseResult {
   }
   for (const field of INTEGER_FIELDS) {
     if (!Number.isInteger(config[field])) return { problem: `${field} must be an integer, got ${config[field]}` };
+    const award = config[field] as number;
+    if (award < INT_MIN || award > INT_MAX) return { problem: `${field} must be between ${INT_MIN} and ${INT_MAX}, got ${award}` };
   }
   const complete = config as XpConfig;
   if (complete.cardDemastered > 0) return { problem: `cardDemastered must be zero or negative, got ${complete.cardDemastered}` };
   if (complete.levelCurveBase <= 0) return { problem: `levelCurveBase must be positive, got ${complete.levelCurveBase}` };
   if (complete.levelCurveExponent < 0) return { problem: `levelCurveExponent must be zero or positive, got ${complete.levelCurveExponent}` };
+  if (levelThreshold(complete, STARTING_LEVEL) <= 0) return { problem: `levelCurveBase ${complete.levelCurveBase} is too small: the starting level's threshold rounds to zero` };
   return { config: complete };
 }
 

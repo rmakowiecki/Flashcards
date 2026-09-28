@@ -61,6 +61,12 @@ class XpConfigMapperTest {
     }
 
     @Test
+    fun `a level curve base so small the starting threshold rounds to zero is rejected`() {
+        shouldThrow<IllegalArgumentException> { VALID_DTO.copy(levelCurveBase = Double.MIN_VALUE).toDomain() }
+            .message shouldContain "levelCurveBase"
+    }
+
+    @Test
     fun `a negative level curve exponent is rejected and a zero one accepted`() {
         shouldThrow<IllegalArgumentException> { VALID_DTO.copy(levelCurveExponent = -0.5).toDomain() }
             .message shouldContain "levelCurveExponent"
