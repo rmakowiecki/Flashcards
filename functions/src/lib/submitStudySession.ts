@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import { HttpsError } from "firebase-functions/v2/https";
+import { CardProgressUpdate, CardState, StudyMode, mergeSessionIntoCardProgress } from "./cardProgressMerge";
 import { loadXpConfig } from "./xpConfig";
 import {
   DEFAULT_SCORING_STATE,
@@ -23,9 +24,6 @@ import {
  * test can invoke them without going through the `onCall` wrapper or a running Functions emulator —
  * only a real Firestore (emulator or production) is ever needed to exercise this file.
  */
-
-type StudyMode = "Rated" | "Fast";
-type CardState = "Mastered" | "Partial" | "Failed" | "Seen";
 
 // Firestore collection/document segments — every one named, per this repo's Firestore-constants
 // convention (AGENTS.md's "Data Layer Standards", already followed in TS by `entitlement.ts`).
@@ -362,50 +360,6 @@ export function requireOwnerMatchesCaller(callerUid: string, request: ValidatedS
   }
 }
 
-interface CardProgressUpdateFields {
-  state: CardState;
-  stampFirstStudied: boolean;
-  stampMastered: boolean;
-}
-
-/** Mirrors `CommitStudySessionUseCase.resolveMasteredDelta`. Fast's `state` is always `Seen`, hence always `0`. */
-function resolveMasteredDelta(entry: SubmitStudySessionCardResult, wasMastered: boolean): number {
-  switch (entry.state) {
-    case "Mastered":
-      return wasMastered ? 0 : 1;
-    case "Failed":
-      return wasMastered ? -1 : 0;
-    default:
-      return 0;
-  }
-}
-
-/** Mirrors `CommitStudySessionUseCase.resolveUpdate`/`resolveFastUpdate`/`resolveRatedUpdate`. `null` means "write nothing". */
-function resolveUpdate(
-  studyMode: StudyMode,
-  entry: SubmitStudySessionCardResult,
-  priorExists: boolean,
-  wasMastered: boolean,
-): CardProgressUpdateFields | null {
-  if (studyMode === "Fast") {
-    return priorExists ? null : { state: "Seen", stampFirstStudied: true, stampMastered: false };
-  }
-  if (!priorExists) {
-    return { state: entry.state, stampFirstStudied: true, stampMastered: entry.state === "Mastered" };
-  }
-  switch (entry.state) {
-    case "Mastered":
-      return wasMastered ? null : { state: "Mastered", stampFirstStudied: false, stampMastered: true };
-    case "Partial":
-      return wasMastered ? null : { state: "Partial", stampFirstStudied: false, stampMastered: false };
-    case "Failed":
-      return { state: "Failed", stampFirstStudied: false, stampMastered: false };
-    default:
-      // Rejected at validation time: a Rated cardResults entry can never be "Seen".
-      throw new Error("unreachable: Rated card result resolved to Seen");
-  }
-}
-
 function usersDoc(db: FirebaseFirestore.Firestore, uid: string): FirebaseFirestore.DocumentReference {
   return db.collection(USERS_COLLECTION).doc(uid);
 }
@@ -587,51 +541,14 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
       priorCardsBySubcategory.set(subcategoryId, cardStates);
     });
 
-    let newCardsStudied = 0;
-    // Map, not a plain object, keyed by client-controlled cardId/subcategoryId strings. Belt-and-
-    // suspenders: `requireFirestoreSafeId` already rejects the one value ("__proto__") a bracket
-    // assignment into `{}` would mishandle (Object.prototype's `__proto__` is an accessor, so
-    // `obj[key] = v` reassigns the prototype instead of creating an own property), and Firestore's
-    // own write path independently rejects that same reserved-name shape too — but a Map sidesteps
-    // the whole hazard class without depending on either of those holding.
-    const progressWrites = new Map<string, Map<string, CardProgressUpdateFields>>();
-    const summaryDeltas = new Map<string, { masteredDelta: number; studiedDelta: number }>();
-
-    for (const subcategoryId of touchedSubcategoryIds) {
-      const priorCards = priorCardsBySubcategory.get(subcategoryId) ?? new Map<string, CardState>();
-      const entries = request.cardResults.filter((entry) => entry.subcategoryId === subcategoryId);
-      const cardUpdates = new Map<string, CardProgressUpdateFields>();
-      let masteredDelta = 0;
-      let studiedDelta = 0;
-
-      for (const entry of entries) {
-        const priorState = priorCards.get(entry.cardId);
-        const priorExists = priorState !== undefined;
-        const wasMastered = priorState === "Mastered";
-        if (!priorExists) {
-          newCardsStudied++;
-          studiedDelta++;
-        }
-        masteredDelta += resolveMasteredDelta(entry, wasMastered);
-
-        const update = resolveUpdate(request.studyMode, entry, priorExists, wasMastered);
-        if (update) cardUpdates.set(entry.cardId, update);
-      }
-
-      if (cardUpdates.size > 0) progressWrites.set(subcategoryId, cardUpdates);
-      if (masteredDelta !== 0 || studiedDelta !== 0) summaryDeltas.set(subcategoryId, { masteredDelta, studiedDelta });
-    }
-
-    // wasPreviouslyMastered is authoritative here, not trusted from the client: this transaction
-    // already read every touched card's prior state above (priorCardsBySubcategory) to compute
-    // progressWrites/summaryDeltas, so scoring and the persisted defended/demastered counters reuse
-    // that same server-read state rather than request.cardResults' own copy of the flag.
-    // Fast entries carry no wasPreviouslyMastered at all (ADR-0014: Rated-only field) — left
-    // untouched here, not coerced into a stray `false`.
-    const authoritativeCardResults = request.cardResults.map((entry) =>
-      entry.wasPreviouslyMastered === undefined
-        ? entry
-        : { ...entry, wasPreviouslyMastered: priorCardsBySubcategory.get(entry.subcategoryId)?.get(entry.cardId) === "Mastered" },
+    // Card Progress writes, summary deltas, the new-card count and the authoritative
+    // wasPreviouslyMastered flags all come from the prior state read above, not from the client's own
+    // copy of the flags. Fast entries carry no wasPreviouslyMastered at all (ADR-0014: Rated-only
+    // field) and are left untouched, not coerced into a stray `false`.
+    const { progressWrites, summaryDeltas, newCardsStudied, authoritativeCardResults } = mergeSessionIntoCardProgress(
+      priorCardsBySubcategory,
+      request.studyMode,
+      request.cardResults,
     );
 
     // This session isn't in todaySessionsSnapshot's results yet — it doesn't exist until this
