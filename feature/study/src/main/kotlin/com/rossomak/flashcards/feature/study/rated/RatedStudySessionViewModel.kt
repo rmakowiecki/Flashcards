@@ -33,6 +33,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
+import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -193,7 +194,7 @@ class RatedStudySessionViewModel @Inject constructor(
 
     private fun RatedStudySessionScreenState.fromSnapshot(snapshot: RatedSessionStateSnapshot) = when (snapshot) {
         Loading -> copy(isLoading = true, error = null)
-        LoadFailed -> copy(isLoading = false, error = LOAD_ERROR)
+        LoadFailed -> copy(isLoading = false, error = R.string.study_session_load_error_message)
         is Running -> fromRunningSnapshot(snapshot)
     }
 
@@ -465,6 +466,5 @@ class RatedStudySessionViewModel @Inject constructor(
     private companion object {
         const val EXTENDED_CONTEXT_ADVANCE_DELAY_MS = 500L
         const val MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS = 4000L
-        const val LOAD_ERROR = "Could not load flashcards"
     }
 }

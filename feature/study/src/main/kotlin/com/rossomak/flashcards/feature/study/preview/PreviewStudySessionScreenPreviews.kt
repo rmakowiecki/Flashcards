@@ -5,6 +5,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
+import com.rossomak.flashcards.feature.study.R
 
 @Preview(showBackground = true)
 @Composable
@@ -34,7 +35,7 @@ private fun PreviewStudySessionErrorPreview() {
             categoryName = "Android",
             subcategoryNames = listOf("Compose"),
             isLoading = false,
-            error = "Could not load flashcards",
+            error = R.string.study_session_load_error_message,
         ),
         onNavigateBack = {},
         onRetry = {},

@@ -37,6 +37,7 @@ import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
+import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
@@ -236,7 +237,7 @@ class PreviewStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe "Could not load flashcards"
+        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
         viewModel.state.value.canStart shouldBe false
     }
 
@@ -916,7 +917,7 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.error shouldBe "Could not load flashcards"
+        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
 
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
         viewModel.onRetry()
