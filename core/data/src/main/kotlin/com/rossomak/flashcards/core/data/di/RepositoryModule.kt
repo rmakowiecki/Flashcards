@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.core.data.di
 
+import com.rossomak.flashcards.core.data.network.DefaultNetworkAvailability
+import com.rossomak.flashcards.core.data.network.NetworkAvailability
 import com.rossomak.flashcards.core.data.repository.DefaultAppShortcutsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
@@ -81,6 +83,9 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSessionSubmissionRemoteDataSource(firebaseSessionSubmissionRemoteDataSource: FirebaseSessionSubmissionRemoteDataSource): SessionSubmissionRemoteDataSource
+
+    @Binds
+    abstract fun bindNetworkAvailability(defaultNetworkAvailability: DefaultNetworkAvailability): NetworkAvailability
 
     @Binds
     @Singleton

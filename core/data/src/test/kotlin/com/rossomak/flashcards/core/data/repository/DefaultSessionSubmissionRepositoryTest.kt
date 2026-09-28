@@ -1,55 +1,62 @@
 package com.rossomak.flashcards.core.data.repository
 
-import android.util.Log
+import androidx.work.Data
+import androidx.work.WorkInfo
 import com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler
+import com.rossomak.flashcards.core.data.mapper.toDto
+import com.rossomak.flashcards.core.data.model.DeliveredSessionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
+import com.rossomak.flashcards.core.data.network.NetworkAvailability
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.data.worker.SessionDeliveryReport
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import io.mockk.verify
 import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
 class DefaultSessionSubmissionRepositoryTest {
 
     private val localDataSource = FakePendingSessionSubmissionLocalDataSource()
-    private val drainScheduler: SessionSubmissionDrainScheduler = mockk(relaxed = true)
+    private val drainScheduler: SessionSubmissionDrainScheduler = mockk()
     private val authRepository = FakeAuthRepository().apply { userToReturn = SIGNED_IN_USER }
+    private var internetAvailable = true
+    private val drainWorkInfo = MutableStateFlow<WorkInfo?>(workInfo(WorkInfo.State.ENQUEUED))
 
-    private fun createRepository(): DefaultSessionSubmissionRepository =
-        DefaultSessionSubmissionRepository(localDataSource, drainScheduler, authRepository)
+    private fun createRepository(
+        pendingLocalDataSource: PendingSessionSubmissionLocalDataSource = localDataSource,
+    ): DefaultSessionSubmissionRepository =
+        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, NetworkAvailability { internetAvailable })
 
     @Before
     fun setUp() {
-        // Debug logging and a local-write failure both go through android.util.Log, unavailable
-        // outside instrumented/Robolectric tests — stub it rather than pull in either just for this.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.e(any(), any(), any()) } returns 0
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(Log::class)
+        every { drainScheduler.scheduleDrainForFinishedSession() } returns REQUEST_ID
+        every { drainScheduler.observeDrain(REQUEST_ID) } returns drainWorkInfo
     }
 
     private fun sessionResult(): SessionResult.Rated = SessionResult.Rated(
-        id = "session-1",
+        id = SESSION_ID,
         startedAt = Instant.parse("2026-09-08T10:00:00Z"),
         durationSeconds = 60,
         abandoned = false,
@@ -72,67 +79,133 @@ class DefaultSessionSubmissionRepositoryTest {
     )
 
     @Test
-    fun `submitSession appends the mapped session stamped with the signed-in uid and schedules a drain`() = runTest {
+    fun `submitSession appends the session stamped with the signed-in uid and schedules a replacing drain`() = runTest {
         val session = sessionResult()
 
-        val result = createRepository().submitSession(session)
+        createRepository().submitSession(session)
 
-        result.isSuccess shouldBe true
         localDataSource.listAll() shouldBe listOf(session.toDto(SIGNED_IN_USER.uid))
-        verify(exactly = 1) { drainScheduler.scheduleDrain() }
+        verify(exactly = 1) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
     @Test
-    fun `submitSession returns success once queued, independent of whether the drain has run yet`() = runTest {
-        // scheduleDrain is relaxed/never actually runs a Worker in this test — the point under test
-        // is that submitSession's own success does not wait on delivery, only on the local append.
-        val result = createRepository().submitSession(sessionResult())
+    fun `a progress report with this session's score emits InFlight then Scored`() = runTest {
+        drainWorkInfo.value = workInfo(WorkInfo.State.RUNNING, progress = report(DeliveredSessionDto.Scored(SCORE.toDto())))
 
-        result.isSuccess shouldBe true
+        val statuses = createRepository().submitSession(sessionResult()).toList()
+
+        statuses shouldBe listOf(InFlight, Scored(SCORE))
     }
 
     @Test
-    fun `with nobody signed in submitSession returns a failure Result without queuing or scheduling`() = runTest {
+    fun `an output report with this session's rejection emits Rejected`() = runTest {
+        drainWorkInfo.value = workInfo(WorkInfo.State.SUCCEEDED, output = report(DeliveredSessionDto.Rejected))
+
+        val statuses = createRepository().submitSession(sessionResult()).toList()
+
+        statuses shouldBe listOf(InFlight, Rejected)
+    }
+
+    @Test
+    fun `a finished run without this session emits NotDelivered`() = runTest {
+        drainWorkInfo.value = workInfo(WorkInfo.State.SUCCEEDED)
+
+        val statuses = createRepository().submitSession(sessionResult()).toList()
+
+        statuses shouldBe listOf(InFlight, NotDelivered)
+    }
+
+    @Test
+    fun `a run back in the queue after an attempt emits NotDelivered`() = runTest {
+        drainWorkInfo.value = workInfo(WorkInfo.State.ENQUEUED, runAttemptCount = 1)
+
+        val statuses = createRepository().submitSession(sessionResult()).toList()
+
+        statuses shouldBe listOf(InFlight, NotDelivered)
+    }
+
+    @Test
+    fun `no internet at submit time emits only NotDelivered, with the session still queued and the drain scheduled`() = runTest {
+        internetAvailable = false
+
+        val statuses = createRepository().submitSession(sessionResult()).toList()
+
+        statuses shouldBe listOf(NotDelivered)
+        localDataSource.listAll().size shouldBe 1
+        verify(exactly = 1) { drainScheduler.scheduleDrainForFinishedSession() }
+        verify(exactly = 0) { drainScheduler.observeDrain(any()) }
+    }
+
+    @Test
+    fun `with nobody signed in submitSession emits NotDelivered without queuing or scheduling`() = runTest {
         authRepository.userToReturn = null
 
-        val result = createRepository().submitSession(sessionResult())
+        val statuses = createRepository().submitSession(sessionResult()).toList()
 
-        result.isFailure shouldBe true
+        statuses shouldBe listOf(NotDelivered)
         localDataSource.listAll() shouldBe emptyList()
-        verify(exactly = 0) { drainScheduler.scheduleDrain() }
+        verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
     @Test
-    fun `a local append failure is caught, logged and returned as a failure Result, never thrown`() = runTest {
-        val failingLocalDataSource = ThrowingPendingSessionSubmissionLocalDataSource()
-        val repository = DefaultSessionSubmissionRepository(failingLocalDataSource, drainScheduler, authRepository)
+    fun `a local append failure is logged and emits NotDelivered, never thrown`() = runTest {
+        val statuses = createRepository(ThrowingPendingSessionSubmissionLocalDataSource()).submitSession(sessionResult()).toList()
 
-        val result = repository.submitSession(sessionResult())
-
-        result.isFailure shouldBe true
-        result.exceptionOrNull() shouldBe failingLocalDataSource.thrownException
-        verify(exactly = 0) { drainScheduler.scheduleDrain() }
+        statuses shouldBe listOf(NotDelivered)
+        verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
     @Test
-    fun `a cancellation during local append is rethrown, never caught as a failure Result`() = runTest {
-        val cancellingLocalDataSource = CancellingPendingSessionSubmissionLocalDataSource()
-        val repository = DefaultSessionSubmissionRepository(cancellingLocalDataSource, drainScheduler, authRepository)
-
-        shouldThrow<CancellationException> { repository.submitSession(sessionResult()) }
-        verify(exactly = 0) { drainScheduler.scheduleDrain() }
+    fun `a cancellation during local append is rethrown`() = runTest {
+        shouldThrow<CancellationException> { createRepository(CancellingPendingSessionSubmissionLocalDataSource()).submitSession(sessionResult()) }
+        verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
+
+    @Test
+    fun `submitting the same session again queues it once`() = runTest {
+        val repository = createRepository()
+
+        repository.submitSession(sessionResult())
+        repository.submitSession(sessionResult())
+
+        localDataSource.listAll().size shouldBe 1
+    }
+
+    private fun report(deliveredSession: DeliveredSessionDto): Data = SessionDeliveryReport.toData(mapOf(SESSION_ID to deliveredSession))
 
     private companion object {
+        const val SESSION_ID = "session-1"
+        val REQUEST_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val SIGNED_IN_USER = AuthUser(uid = "uid-1", email = "user@example.com", displayName = "User", photoUrl = null)
+        val SCORE = SessionScore(
+            breakdown = XpBreakdown(newCards = 10, mastered = 100, streakBonus = 250),
+            level = 1,
+            xpIntoCurrentLevel = 360,
+            xpForNextLevel = 1000,
+            levelsCrossed = emptyList(),
+            counts = null,
+            rates = null,
+        )
+
+        fun workInfo(
+            state: WorkInfo.State,
+            output: Data = Data.EMPTY,
+            progress: Data = Data.EMPTY,
+            runAttemptCount: Int = 0,
+        ): WorkInfo = WorkInfo(
+            id = REQUEST_ID,
+            state = state,
+            tags = emptySet(),
+            outputData = output,
+            progress = progress,
+            runAttemptCount = runAttemptCount,
+        )
     }
 }
 
 private class ThrowingPendingSessionSubmissionLocalDataSource : PendingSessionSubmissionLocalDataSource {
 
-    val thrownException = IllegalStateException("disk full")
-
-    override suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto): Unit = throw thrownException
+    override suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto): Unit = error("disk full")
 
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = emptyList()
 

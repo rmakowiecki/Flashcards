@@ -4,17 +4,36 @@ import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
+import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.SessionXpResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import java.time.Instant
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SubmitStudySessionUseCaseTest {
 
     private val sessionSubmissionRepository = FakeSessionSubmissionRepository()
@@ -79,19 +98,109 @@ class SubmitStudySessionUseCaseTest {
     private fun fastEntry(cardId: String = "card-1", subcategoryId: String = "sub-1"): FlashcardResult.Fast =
         FlashcardResult.Fast(cardId = cardId, subcategoryId = subcategoryId, state = FlashcardStudyProgressState.Seen)
 
-    private suspend fun SubmitStudySessionUseCase.invokeAndCapturePreview(sessionResult: SessionResult): Result<SessionXpResult> {
-        var preview: Result<SessionXpResult>? = null
-        invoke(sessionResult) { preview = it }
-        return requireNotNull(preview) { "onPreviewReady was never called" }
-    }
+    private suspend fun SubmitStudySessionUseCase.invokeAndCapturePreview(sessionResult: SessionResult): Result<SessionXpResult> =
+        invoke(sessionResult).map { result -> (result as LocalPreview).sessionXpResult }
 
     @Test
     fun `hands the exact session result to the submission repository`() = runTest {
         val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
 
-        createUseCase().invokeAndCapturePreview(session)
+        createUseCase().invoke(session)
 
         sessionSubmissionRepository.submittedSessionResults shouldBe listOf(session)
+    }
+
+    @Test
+    fun `a Scored status within the budget returns the server's score`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flow {
+            emit(InFlight)
+            delay(2.seconds)
+            emit(Scored(SERVER_SCORE))
+        }
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result shouldBe Result.success(ServerScored(SERVER_SCORE))
+        currentTime shouldBe 2.seconds.inWholeMilliseconds
+    }
+
+    @Test
+    fun `NotDelivered returns the local preview immediately`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, NotDelivered)
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result.getOrThrow().shouldBeInstanceOf<LocalPreview>()
+        currentTime shouldBe 0L
+    }
+
+    @Test
+    fun `Rejected returns the local preview immediately`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Rejected)
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result.getOrThrow().shouldBeInstanceOf<LocalPreview>()
+        currentTime shouldBe 0L
+    }
+
+    @Test
+    fun `no final status within the budget returns the local preview exactly when the budget runs out`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flow {
+            emit(InFlight)
+            awaitCancellation()
+        }
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result.getOrThrow().shouldBeInstanceOf<LocalPreview>()
+        currentTime shouldBe SubmitStudySessionUseCase.SERVER_RESULT_BUDGET.inWholeMilliseconds
+    }
+
+    @Test
+    fun `a Scored status arriving after the budget never replaces the local preview`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flow {
+            emit(InFlight)
+            delay(SubmitStudySessionUseCase.SERVER_RESULT_BUDGET + 1.seconds)
+            emit(Scored(SERVER_SCORE))
+        }
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+        advanceUntilIdle()
+
+        result.getOrThrow().shouldBeInstanceOf<LocalPreview>()
+    }
+
+    @Test
+    fun `the preview baseline is read before the session is submitted`() = runTest {
+        var cardProgressReadsAtSubmit: List<String>? = null
+        var scoringStateReadsAtSubmit: Int? = null
+        sessionSubmissionRepository.onSubmit = {
+            cardProgressReadsAtSubmit = cardProgressRepository.requestedSubcategoryIds.toList()
+            scoringStateReadsAtSubmit = scoringStateRepository.getScoringStateCallCount
+        }
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        createUseCase().invoke(session)
+
+        cardProgressReadsAtSubmit shouldBe listOf("sub-1")
+        scoringStateReadsAtSubmit shouldBe 1
+    }
+
+    @Test
+    fun `a failed baseline read does not fail a server-scored result`() = runTest {
+        scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result shouldBe Result.success(ServerScored(SERVER_SCORE))
     }
 
     @Test
@@ -146,7 +255,7 @@ class SubmitStudySessionUseCaseTest {
     }
 
     @Test
-    fun `a failed prior-progress read fails the preview but the session is still submitted`() = runTest {
+    fun `a failed prior-progress read fails the fallback preview but the session is still submitted`() = runTest {
         val error = IllegalStateException("firestore down")
         cardProgressRepository.resultToReturn = Result.failure(error)
         val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
@@ -159,7 +268,7 @@ class SubmitStudySessionUseCaseTest {
     }
 
     @Test
-    fun `a failed scoring-state read fails the preview but the session is still submitted`() = runTest {
+    fun `a failed scoring-state read fails the fallback preview but the session is still submitted`() = runTest {
         val error = IllegalStateException("firestore down")
         scoringStateRepository.resultToReturn = Result.failure(error)
         val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
@@ -192,20 +301,21 @@ class SubmitStudySessionUseCaseTest {
         preview.newScoringState.xp shouldBe priorXp + preview.breakdown.xpTotal
     }
 
-    @Test
-    fun `a failed submission does not affect the already-computed preview`() = runTest {
-        sessionSubmissionRepository.resultToReturn = Result.failure(IllegalStateException("unauthenticated"))
-        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
-
-        val preview = createUseCase().invokeAndCapturePreview(session)
-
-        preview.isSuccess shouldBe true
-        preview.getOrThrow().breakdown.mastered shouldBe 100
-    }
-
     private fun priorEntry(): CardProgressEntry = CardProgressEntry(
         state = FlashcardStudyProgressState.Partial,
         firstStudiedAt = Instant.parse("2026-01-01T00:00:00Z"),
         masteredAt = null,
     )
+
+    private companion object {
+        val SERVER_SCORE = SessionScore(
+            breakdown = XpBreakdown(newCards = 10, mastered = 100, streakBonus = 250),
+            level = 2,
+            xpIntoCurrentLevel = 40,
+            xpForNextLevel = 6000,
+            levelsCrossed = listOf(2),
+            counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
+            rates = null,
+        )
+    }
 }

@@ -19,8 +19,8 @@ class FakePendingSessionSubmissionLocalDataSource : PendingSessionSubmissionLoca
     }
 
     override suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto) {
-        entries.add(pendingSessionSubmission)
         appendedEntries.add(pendingSessionSubmission)
+        if (entries.none { it.id == pendingSessionSubmission.id }) entries.add(pendingSessionSubmission)
     }
 
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = entries.toList()

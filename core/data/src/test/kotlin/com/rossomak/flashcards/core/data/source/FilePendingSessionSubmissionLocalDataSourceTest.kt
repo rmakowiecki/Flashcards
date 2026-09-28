@@ -109,6 +109,17 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
     }
 
     @Test
+    fun `append of a session id already queued keeps only the first entry`() = runTest {
+        val dataSource = createDataSource()
+        val first = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
+
+        dataSource.append(first)
+        dataSource.append(pendingSubmission("session-1", startedAtEpochMillis = 2_000L))
+
+        dataSource.listAll() shouldBe listOf(first)
+    }
+
+    @Test
     fun `remove clears only the matching entry, keeping the rest`() = runTest {
         val dataSource = createDataSource()
         val first = pendingSubmission("session-1")

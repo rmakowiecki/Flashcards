@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionScore
 
 /**
  * Client-side contract for the `submitStudySession` Firebase Callable — the raw network leg only,
@@ -17,9 +18,12 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 interface SessionSubmissionRemoteDataSource {
 
     /**
-     * Submits [sessionResult] to the `submitStudySession` callable. [ownerUid] is the User who finished
-     * the session; the server rejects the call as `UNAUTHENTICATED` if it is not the User whose ID token
-     * the SDK attached, so a sign-in change mid-call can never credit one User with another's session.
+     * Submits [sessionResult] to the `submitStudySession` callable and returns the score it answered
+     * with. [ownerUid] is the User who finished the session; the server rejects the call as
+     * `UNAUTHENTICATED` if it is not the User whose ID token the SDK attached, so a sign-in change
+     * mid-call can never credit one User with another's session. A successful call whose response
+     * cannot be read as a [SessionScore] returns success with `null`: the server already recorded the
+     * session, so it is delivered even though its score is unknown. Only a failed call returns a failure.
      */
-    suspend fun submitSession(ownerUid: String, sessionResult: SessionResult): Result<Unit>
+    suspend fun submitSession(ownerUid: String, sessionResult: SessionResult): Result<SessionScore?>
 }

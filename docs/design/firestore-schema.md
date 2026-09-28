@@ -100,14 +100,21 @@ users/{uid}/sessions/{sessionId}                      → { sessionId, startTime
                                                           cardCount, newCardsStudied,
                                                           // RATED only:
                                                           cardsMastered, cardsPartial,
-                                                          cardsDefended, cardsDemastered }
+                                                          cardsDefended, cardsDemastered,
+                                                          // scoring, both modes:
+                                                          newCards … streakBonus, xpTotal,
+                                                          levelAfter, xpIntoCurrentLevelAfter,
+                                                          xpForNextLevelAfter, levelsCrossed[],
+                                                          xpRates: { newCardStudied, cardMastered,
+                                                            cardPartial, masteryDefended, cardDemastered,
+                                                            minuteStudied, sessionCompleted } }
     ... plus embedded  cardResults: { <cardId>: { subcategoryId, state,
                                                           // RATED entries only:
                                                           attemptsUsed, wasPreviouslyMastered
                                                           } }  // no transcript, ever
 ```
 
-- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. Home's Recents carousel renders from one `orderBy(startTimestamp).limit(n)` query with no joins. `cardResults` is embedded rather than split into a subcollection because Firestore bills per document read — splitting saved Recents no reads while costing a write per card. The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md).
+- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. Home's Recents carousel renders from one `orderBy(startTimestamp).limit(n)` query with no joins. `cardResults` is embedded rather than split into a subcollection because Firestore bills per document read — splitting saved Recents no reads while costing a write per card. The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md). The scoring fields let a retried submission answer from this document alone: `xpRates` records the per-line rates the session was scored with (absent on documents written before it was added), and the function's response derives each XP line's count from the stored counters (newly Mastered = `cardsMastered − cardsDefended`).
 
 ## Per-subcategory progress detail
 
