@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.data.source
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.SubcategoryProgressDto
 import javax.inject.Inject
@@ -17,6 +18,10 @@ import kotlinx.coroutines.tasks.await
  *
  * Read-only: the server-authoritative `submitStudySession` Cloud Function is the sole
  * writer of this collection now — this client never composes a write for it.
+ *
+ * [Source.SERVER] skips the local cache and, on success, refreshes it:
+ * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] reads that way after each
+ * delivery, so later default-source reads see the server's new state.
  */
 class CardProgressRemoteDataSource @Inject constructor(
     private val firestore: FirebaseFirestore,
@@ -31,8 +36,8 @@ class CardProgressRemoteDataSource @Inject constructor(
         .document(DETAILS_DOCUMENT_ID)
         .collection(SUBCATEGORIES_COLLECTION_ID)
 
-    suspend fun getProgress(subcategoryId: String): SubcategoryProgressDto? {
-        val document = collection().document(subcategoryId).get().await()
+    suspend fun getProgress(subcategoryId: String, source: Source = Source.DEFAULT): SubcategoryProgressDto? {
+        val document = collection().document(subcategoryId).get(source).await()
         if (!document.exists()) return null
 
         val categoryId = document.getString(FIELD_CATEGORY_ID) ?: return null

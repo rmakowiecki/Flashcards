@@ -77,11 +77,12 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val cardResult = session.cardResults.single()
         val payloadSlot = stubCallable(Tasks.forResult(mockk()))
 
-        val result = createApi().submitSession(session)
+        val result = createApi().submitSession(OWNER_UID, session)
 
         result.isSuccess shouldBe true
         @Suppress("UNCHECKED_CAST")
         val payload = payloadSlot.captured as Map<String, Any>
+        payload["ownerUid"] shouldBe OWNER_UID
         payload["sessionId"] shouldBe session.id
         payload["studyMode"] shouldBe session.mode.name
         payload["durationSeconds"] shouldBe session.durationSeconds
@@ -108,7 +109,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val session = fastSessionResult()
         val payloadSlot = stubCallable(Tasks.forResult(mockk()))
 
-        createApi().submitSession(session)
+        createApi().submitSession(OWNER_UID, session)
 
         @Suppress("UNCHECKED_CAST")
         val payload = payloadSlot.captured as Map<String, Any>
@@ -124,7 +125,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val error: FirebaseFunctionsException = mockk()
         stubCallable(Tasks.forException(error))
 
-        val result = createApi().submitSession(ratedSessionResult())
+        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
@@ -133,5 +134,6 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
 
     private companion object {
         const val SUBMIT_STUDY_SESSION_FUNCTION_NAME = "submitStudySession"
+        const val OWNER_UID = "uid-1"
     }
 }

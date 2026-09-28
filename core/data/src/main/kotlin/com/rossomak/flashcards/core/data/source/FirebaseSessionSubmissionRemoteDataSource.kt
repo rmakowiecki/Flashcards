@@ -33,9 +33,9 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
     // this call site has no surrounding try/catch of its own — narrowing this would let an
     // unanticipated exception type crash instead of surfacing as Result.failure.
     @Suppress("TooGenericExceptionCaught")
-    override suspend fun submitSession(sessionResult: SessionResult): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun submitSession(ownerUid: String, sessionResult: SessionResult): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            functions.getHttpsCallable(SUBMIT_STUDY_SESSION_FUNCTION_NAME).call(sessionResult.toPayload()).await()
+            functions.getHttpsCallable(SUBMIT_STUDY_SESSION_FUNCTION_NAME).call(sessionResult.toPayload(ownerUid)).await()
             Result.success(Unit)
         } catch (exception: CancellationException) {
             throw exception
@@ -44,7 +44,8 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         }
     }
 
-    private fun SessionResult.toPayload(): Map<String, Any> = mapOf(
+    private fun SessionResult.toPayload(ownerUid: String): Map<String, Any> = mapOf(
+        FIELD_OWNER_UID to ownerUid,
         FIELD_SESSION_ID to id,
         FIELD_STUDY_MODE to mode.name,
         FIELD_STARTED_AT_EPOCH_MILLIS to startedAt.toEpochMilli(),
@@ -74,6 +75,7 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val SUBMIT_STUDY_SESSION_FUNCTION_NAME = "submitStudySession"
 
         // Mirrors ValidatedSubmitStudySessionRequest's field names in functions/src/lib/submitStudySession.ts.
+        const val FIELD_OWNER_UID = "ownerUid"
         const val FIELD_SESSION_ID = "sessionId"
         const val FIELD_STUDY_MODE = "studyMode"
         const val FIELD_STARTED_AT_EPOCH_MILLIS = "startedAtEpochMillis"

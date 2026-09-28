@@ -4,6 +4,8 @@ import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -15,9 +17,10 @@ class SignedInWorkRunnerTest {
 
     private val authRepository = FakeAuthRepository()
     private val xpConfigRepository = FakeXpConfigRepository()
+    private val sessionSubmissionDrainScheduler: SessionSubmissionDrainScheduler = mockk(relaxed = true)
 
     private fun TestScope.startRunner() {
-        SignedInWorkRunner(backgroundScope, authRepository, xpConfigRepository).start()
+        SignedInWorkRunner(backgroundScope, authRepository, xpConfigRepository, sessionSubmissionDrainScheduler).start()
     }
 
     @Test
@@ -37,6 +40,27 @@ class SignedInWorkRunnerTest {
         authRepository.userToReturn = USER
 
         xpConfigRepository.refreshCallCount shouldBe 1
+    }
+
+    @Test
+    fun `a sign-in schedules a drain of the pending sessions`() = runTest(UnconfinedTestDispatcher()) {
+        startRunner()
+        verify(exactly = 0) { sessionSubmissionDrainScheduler.scheduleDrain() }
+
+        authRepository.userToReturn = USER
+
+        verify(exactly = 1) { sessionSubmissionDrainScheduler.scheduleDrain() }
+    }
+
+    @Test
+    fun `signing out and back in schedules another drain`() = runTest(UnconfinedTestDispatcher()) {
+        authRepository.userToReturn = USER
+        startRunner()
+
+        authRepository.signOut()
+        authRepository.userToReturn = USER
+
+        verify(exactly = 2) { sessionSubmissionDrainScheduler.scheduleDrain() }
     }
 
     @Test

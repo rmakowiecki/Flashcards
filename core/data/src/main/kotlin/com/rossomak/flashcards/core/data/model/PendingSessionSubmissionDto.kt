@@ -15,6 +15,12 @@ import kotlinx.serialization.Serializable
  * enum/`Instant` handling, for the same reason: no contextual serializer to wire up, and one
  * unsurprising encoding this whole data layer already uses elsewhere.
  *
+ * [uid] is the User who finished the session, stamped at append time. It is queue metadata, not part
+ * of the domain [com.rossomak.flashcards.core.domain.model.SessionResult]:
+ * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] delivers an entry only
+ * while that same User is signed in. It defaults to blank only so an entry queued before this field
+ * existed still decodes; [PendingSessionSubmissionMapper.toDomain] rejects a blank [uid] as malformed.
+ *
  * See [PendingSessionSubmissionMapper] for the `toDto()`/`toDomain()` conversions, and
  * [com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLocalDataSource] for where
  * these get persisted, one JSON-encoded entry per line.
@@ -29,6 +35,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PendingSessionSubmissionDto(
     val id: String,
+    val uid: String = "",
     val mode: String,
     val startedAtEpochMillis: Long,
     val durationSeconds: Int,
@@ -45,7 +52,7 @@ data class PendingSessionSubmissionDto(
     // one). Unlike an ordinary permanently-invalid entry, PendingSessionSubmissionMapper.toDomain()
     // migrates these two sentinels away (blank studyDate, non-positive dailyGoalMinutes) before the
     // domain object ever reaches submitStudySession, so a legacy entry submits successfully instead
-    // of being dropped once SessionSubmissionDeliveryWorker exhausts its retry limit.
+    // of being permanently rejected by the server's validation.
     val studyDate: String = "",
     val dailyGoalMinutes: Int = 0,
     // No default: unlike studyDate/dailyGoalMinutes above, no shipped app version ever queued an entry

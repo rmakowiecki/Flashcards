@@ -56,8 +56,9 @@ import kotlinx.serialization.json.Json
  * can leave a torn trailing line — [readAll]'s per-line skip handles that the same way it handles any
  * other corrupted line.
  *
- * **App-start recovery**: this class has no init-time logic of its own. [com.rossomak.flashcards.FlashcardsApplication]
- * unconditionally re-enqueues the drain worker on every app start (via
+ * **App-start recovery**: this class has no init-time logic of its own.
+ * [com.rossomak.flashcards.core.data.SignedInWorkRunner] re-enqueues the drain worker whenever a User
+ * is signed in, the session Firebase restores at app start included (via
  * [com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler]), and that worker always starts
  * by reading whatever this file currently holds — so a session queued by a process that got killed
  * before draining is picked up the next time the app runs, with no separate "check for leftover

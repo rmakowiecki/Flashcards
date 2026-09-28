@@ -3,8 +3,6 @@ package com.rossomak.flashcards
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.rossomak.flashcards.core.common.logd
-import com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler
 import com.rossomak.flashcards.core.data.SignedInWorkRunner
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -19,23 +17,17 @@ import timber.log.Timber
  * would otherwise try, and fail, to build that worker on the app's first WorkManager access) — this
  * `Configuration.Provider` implementation and that manifest removal must always land together.
  *
- * [scheduleDrain] runs unconditionally on every app start: the sole recovery mechanism for a session
- * a previous process queued locally but never got to drain — no separate "check for
- * leftover records" path exists or is needed, since [SessionSubmissionDrainScheduler]'s own
- * `enqueueUniqueWork(..., KEEP, ...)` call is itself a safe no-op to issue redundantly.
- *
- * [SignedInWorkRunner.start] also runs once per process start: it observes the auth state for the
- * process's lifetime and runs its work (the XP configuration refresh) whenever a user becomes signed
- * in, the session Firebase restores at app start included.
+ * [SignedInWorkRunner.start] runs once per process start: it observes the auth state for the
+ * process's lifetime and runs its work (the XP configuration refresh and a drain of that User's
+ * pending sessions) whenever a user becomes signed in, the session Firebase restores at app start
+ * included. That drain is also the recovery path for a session a previous process queued locally but
+ * never got to deliver, so no separate app-start drain is needed.
  */
 @HiltAndroidApp
 class FlashcardsApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var hiltWorkerFactory: HiltWorkerFactory
-
-    @Inject
-    lateinit var sessionSubmissionDrainScheduler: SessionSubmissionDrainScheduler
 
     @Inject
     lateinit var signedInWorkRunner: SignedInWorkRunner
@@ -48,8 +40,6 @@ class FlashcardsApplication : Application(), Configuration.Provider {
         if (BuildConfig.LOGGING_ENABLED) {
             Timber.plant(Timber.DebugTree())
         }
-        logd { "App start: scheduling session submission drain for recovery" }
-        sessionSubmissionDrainScheduler.scheduleDrain()
         signedInWorkRunner.start()
     }
 }
