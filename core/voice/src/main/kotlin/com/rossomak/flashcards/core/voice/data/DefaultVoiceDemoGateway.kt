@@ -24,7 +24,6 @@ import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.CaptureFailed
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechEnded
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechStarted
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.UtteranceCaptured
-import com.rossomak.flashcards.core.voice.VoiceLevelWaveShaper
 import dagger.hilt.android.ViewModelLifecycle
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -73,10 +71,7 @@ class DefaultVoiceDemoGateway @Inject constructor(
     private val isPlaying: Flow<Boolean> = _state.map { state -> state is Playing }.distinctUntilChanged()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override val levels: Flow<List<Float>> = VoiceLevelWaveShaper().shape(
-        level = isPlaying.flatMapLatest { playing -> if (playing) pcmPlayer.playbackLevel else voiceCaptureEngine.inputLevel },
-        isActive = combine(voiceCaptureEngine.isListening, isPlaying) { listening, playing -> listening || playing },
-    )
+    override val rawVoiceLevel: Flow<Float> = isPlaying.flatMapLatest { playing -> if (playing) pcmPlayer.playbackLevel else voiceCaptureEngine.inputLevel }
 
     // Main.immediate: the public calls arrive on Main, so every job field and state write runs on one
     // thread and a late capture event can't race stop().

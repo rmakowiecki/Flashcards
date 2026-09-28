@@ -86,7 +86,7 @@ The interaction mechanic of a Study Session. Two values:
 _Avoid_: Automatic mode, Passive mode, Browse mode, Voice mode (voice is the delivery mechanism, not the mode name)
 
 **Attempt**:
-A single presentation of a Flashcard to the user within a **Rated** Study Session, completed when the user submits a **Rating**. Each Flashcard has a maximum number of Attempts per session, user-configurable in Settings (default 3, max 5). A Voice Answering silence timeout consumes no Attempt. Does not apply to Fast Study Sessions.
+A single presentation of a Flashcard to the user within a **Rated** Study Session, completed when the user submits a **Rating**. Each Flashcard has a maximum number of Attempts per session, user-configurable in Settings (default 3, max 5). A Voice Answering silence timeout or grading failure consumes no Attempt. Does not apply to Fast Study Sessions.
 _Avoid_: Turn, Round, Try
 
 **Rating**:

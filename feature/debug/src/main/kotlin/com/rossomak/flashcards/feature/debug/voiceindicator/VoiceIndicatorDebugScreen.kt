@@ -50,20 +50,20 @@ fun VoiceIndicatorDebugScreen(
     VoiceIndicatorDebugContent(
         modifier = modifier,
         state = state,
-        levels = viewModel.levels,
+        voiceBarsLevels = viewModel.voiceBarsLevels,
         onNavigateBack = onNavigateBack,
         onSpeechSimulatedChange = viewModel::onSpeechSimulatedChange,
         onLevelIntervalChange = viewModel::onLevelIntervalChange,
     )
 }
 
-/** [levels] is a flow so only [LiveVoiceCaptureIndicator] recomposes per snapshot. */
+/** [voiceBarsLevels] is a flow so only [LiveVoiceCaptureIndicator] recomposes per snapshot. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoiceIndicatorDebugContent(
     modifier: Modifier = Modifier,
     state: VoiceIndicatorDebugScreenState,
-    levels: StateFlow<ImmutableList<Float>>,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
     onNavigateBack: () -> Unit,
     onSpeechSimulatedChange: (Boolean) -> Unit,
     onLevelIntervalChange: (Int) -> Unit,
@@ -98,7 +98,7 @@ fun VoiceIndicatorDebugContent(
                     .padding(vertical = MaterialTheme.spacing.xlarge),
                 contentAlignment = Alignment.Center,
             ) {
-                LiveVoiceCaptureIndicator(levels = levels, levelIntervalMillis = state.levelIntervalMillis)
+                LiveVoiceCaptureIndicator(voiceBarsLevels = voiceBarsLevels, levelIntervalMillis = state.levelIntervalMillis)
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -121,10 +121,10 @@ fun VoiceIndicatorDebugContent(
 }
 
 @Composable
-private fun LiveVoiceCaptureIndicator(levels: StateFlow<ImmutableList<Float>>, levelIntervalMillis: Int) {
-    val currentLevels by levels.collectAsStateWithLifecycle()
+private fun LiveVoiceCaptureIndicator(voiceBarsLevels: StateFlow<ImmutableList<Float>>, levelIntervalMillis: Int) {
+    val currentVoiceBarsLevels by voiceBarsLevels.collectAsStateWithLifecycle()
     FlashcardsVoiceCaptureIndicator(
-        levels = currentLevels,
+        levels = currentVoiceBarsLevels,
         contentDescription = stringResource(CoreUiR.string.common_voice_capture_listening_cd),
         levelIntervalMillis = levelIntervalMillis,
     )
@@ -141,7 +141,7 @@ private fun VoiceIndicatorDebugContentPreview() {
     FlashcardsTheme {
         VoiceIndicatorDebugContent(
             state = VoiceIndicatorDebugScreenState(),
-            levels = MutableStateFlow(PreviewWaveLevels),
+            voiceBarsLevels = MutableStateFlow(PreviewWaveLevels),
             onNavigateBack = {},
             onSpeechSimulatedChange = {},
             onLevelIntervalChange = {},

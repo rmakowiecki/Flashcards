@@ -1,31 +1,24 @@
-# System TTS + MediaSessionCompat stack for Fast mode voice playback
+# System TTS in a Media3 player for voice playback
 
 ## Decision
 
-Fast Study Mode uses Android's system `TextToSpeech` engine for speech synthesis and `androidx.media` `MediaSessionCompat` + `NotificationCompat.MediaStyle` for lock-screen / notification transport controls. TTS is owned by a foreground `Service` (`StudySessionVoiceService`, `foregroundServiceType="mediaPlayback"`).
+Voice playback (Fast mode read-aloud, and the question read-out of Rated voice answering) uses Android's system `TextToSpeech` engine wrapped in a Media3 `SimpleBasePlayer` (`TtsPlayer`), hosted by a Media3 `MediaSessionService` (`StudySessionVoiceService`). Media3 provides the media notification, lock-screen and Bluetooth transport controls, and media-button handling. Fast sessions keep Media3's default notification and foreground behavior; a Rated voice-answering session overrides it to hold the `microphone` foreground-service type (see [ADR-0027](0027-bluetooth-mic-capture-le-audio-first-sco-fallback-bt-strict-screen-off.md), decision 5).
 
 ## Context
 
-Fast mode requires: spoken question→pause→answer auto-advance, background/screen-off survival, persistent notification with prev/play-pause/next actions, and lock-screen controls identical to music players. Two candidate stacks were evaluated.
-
-## Alternatives considered
-
-**Media3 (ExoPlayer) with a TTS-backed player:**
-The current recommended Android media stack. Would give `MediaSessionService` integration, system-managed session lifecycle, and seamless Bluetooth/wired headset handling out of the box. However, `TextToSpeech` is not a `Player` — bridging it requires wrapping each utterance as a `MediaItem` with a custom `MediaSource`, managing the TTS→audio track pipeline, or pre-synthesising to a file and feeding that to ExoPlayer. All paths add significant complexity for a feature that is inherently sequential utterances, not continuous audio streams.
-
-**System TTS + MediaSessionCompat (chosen):**
-`TextToSpeech` handles synthesis directly; `MediaSessionCompat` handles lock-screen transport and media-button events via `MediaButtonReceiver`; `NotificationCompat.MediaStyle` publishes the notification. The service drives playback via `UtteranceProgressListener` callbacks and a generation-counter guard to distinguish natural completion from interrupted utterances. Simpler, battle-tested on all API levels, and sufficient for the sequential utterance model Fast mode needs.
+Fast mode requires: spoken question→pause→answer auto-advance, background/screen-off survival, persistent notification with prev/play-pause/next actions, and lock-screen controls identical to music players.
 
 ## Key rationale
 
-- TTS is fundamentally utterance-based, not stream-based. Forcing it into a `Player` abstraction adds indirection with no gain for this use case.
-- `MediaSessionCompat` covers the full lock-screen + Bluetooth + notification requirement without requiring Media3.
-- If future Fast mode needs continuous background audio (e.g. ambient music mixing), the service can be migrated to Media3 at that point. The `LocalBinder` API surface is narrow enough that the ViewModel is insulated from the change.
+- TTS is utterance-based, not stream-based. `SimpleBasePlayer` lets `TextToSpeech` act as a `Player` directly, with no ExoPlayer, no custom `MediaSource` and no synthesis to a file, so Media3's session, notification and controller support come almost for free.
+- The legacy `androidx.media` stack (`MediaSessionCompat` + `MediaButtonReceiver` + `NotificationCompat.MediaStyle`) would need all of that wired by hand.
+- The player drives playback via `UtteranceProgressListener` callbacks and a generation-counter guard to distinguish natural completion from interrupted utterances.
 
 ## Consequences
 
 - App must declare `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, and `POST_NOTIFICATIONS` permissions.
-- TTS language is fixed to `Locale.US` (app is English-only); voice/language selection is deferred to a future Settings option.
+- `MediaSessionService` only registers its session, and so only shows the notification and goes foreground, once a `MediaController` connects. `StudySessionVoiceGateway` binds to the service for commands and state, and connects a `MediaController` only to activate that system surface.
+- TTS language is fixed to `Locale.US` (app is English-only).
 - Speech rate is configurable (0.5×–2×) but restarts the current utterance on change (TTS cannot resume mid-word).
-- Audio focus is managed manually (`AudioFocusRequest`): `AUDIOFOCUS_LOSS_TRANSIENT` pauses with auto-resume; `AUDIOFOCUS_LOSS` pauses without auto-resume.
+- Audio focus is managed manually (`AudioFocusRequest`), since `SimpleBasePlayer` does not handle it: `AUDIOFOCUS_LOSS_TRANSIENT` pauses with auto-resume; `AUDIOFOCUS_LOSS` pauses without auto-resume, and since the system drops the request on a permanent loss, the next play requests focus again. A user play or pause cancels any pending auto-resume.
 - Backtick characters are stripped from spoken text at session load time (`forSpeech()` in `StudySessionVoiceGateway`) to prevent TTS from reading "backtick" aloud; Flashcard model text is unaffected.
