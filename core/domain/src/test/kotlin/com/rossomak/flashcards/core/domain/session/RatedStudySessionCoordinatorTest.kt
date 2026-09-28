@@ -210,7 +210,7 @@ class RatedStudySessionCoordinatorTest {
         val coordinator = startCoordinator()
         openListening()
 
-        advanceTimeBy(SILENCE_TIMEOUT * 2)
+        advanceTimeBy(ROUTE_READY_TIMEOUT - 1.milliseconds)
         captureGateway.isListening shouldBe false
         routeReady.complete(Unit)
         runCurrent()
@@ -218,6 +218,22 @@ class RatedStudySessionCoordinatorTest {
         advanceTimeBy(SILENCE_TIMEOUT - 1.milliseconds)
 
         coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.Listening
+    }
+
+    @Test
+    fun `a route that is not ready within 5 seconds pauses voice answering as a capture failure`() = runTest {
+        captureGateway.routeReadyGate = CompletableDeferred()
+        val coordinator = startCoordinator()
+        openListening()
+
+        advanceTimeBy(ROUTE_READY_TIMEOUT - 1.milliseconds)
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+
+        advanceTimeBy(2.milliseconds)
+        captureGateway.isListening shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
+        playbackGateway.spokenNotices shouldBe listOf(SpokenNotice.CaptureFailed)
+        events shouldBe listOf(RatedSessionEvent.VoiceAnswerCaptureUnavailable)
     }
 
     @Test

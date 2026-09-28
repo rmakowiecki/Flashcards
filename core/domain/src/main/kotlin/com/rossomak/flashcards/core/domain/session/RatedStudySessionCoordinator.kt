@@ -15,6 +15,7 @@ import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
+import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
@@ -57,6 +58,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Runs one Rated Study Session: loads its cards, holds the [RatedSessionReducer] state, runs every
@@ -403,11 +405,17 @@ class RatedStudySessionCoordinator @Inject constructor(
         when (effect) {
             is SyncQueue -> if (isVoiceStackStarted) playbackGateway.updateQueue(effect.cards)
             AdvanceAfterVoiceAnswer -> playbackGateway.advanceAfterVoiceAnswer()
-            // The silence timer only starts once the route is ready and the microphone is open.
+            // The silence timer only starts once the route is ready and the microphone is open. A
+            // route that never settles fails the round like a microphone that dropped out.
             is OpenListeningWindow -> {
                 listeningJob?.cancel()
                 listeningJob = scope.launch {
-                    captureGateway.awaitRouteReady()
+                    val routeReady = withTimeoutOrNull(ROUTE_READY_TIMEOUT) { captureGateway.awaitRouteReady() }
+                    if (routeReady == null) {
+                        logger.warn { "Capture route not ready after $ROUTE_READY_TIMEOUT, voice answering paused" }
+                        dispatch(RatedSessionInput.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
+                        return@launch
+                    }
                     captureGateway.startListening()
                     delay(SILENCE_TIMEOUT)
                     dispatch(RatedSessionInput.SilenceTimedOut)
