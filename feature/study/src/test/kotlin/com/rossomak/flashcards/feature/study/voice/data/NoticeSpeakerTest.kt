@@ -5,7 +5,6 @@ import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -79,13 +78,30 @@ class NoticeSpeakerTest {
     }
 
     @Test
-    fun `feedback the engine started has no time bound`() = runTest {
+    fun `feedback the engine started outlives the short watchdog and finishes when the engine reports it done`() = runTest {
         val speaker = createSpeaker()
 
         speaker.speak(feedback)
         engine.listener.onUtteranceStarted(engine.spokenUtteranceIds.single())
-        advanceTimeBy(LONG_FEEDBACK)
+        advanceTimeBy(NoticeSpeaker.STARTED_FEEDBACK_TIMEOUT - 1.milliseconds)
         finished shouldBe emptyList()
+
+        engine.listener.onUtteranceEnded(engine.spokenUtteranceIds.single())
+        runCurrent()
+        finished shouldBe listOf(feedback)
+        engine.stopCount shouldBe 0
+    }
+
+    @Test
+    fun `feedback still speaking 20 seconds after it started is cut off and finished`() = runTest {
+        val speaker = createSpeaker()
+
+        speaker.speak(feedback)
+        engine.listener.onUtteranceStarted(engine.spokenUtteranceIds.single())
+        advanceTimeBy(NoticeSpeaker.STARTED_FEEDBACK_TIMEOUT + 1.milliseconds)
+
+        engine.stopCount shouldBe 1
+        finished shouldBe listOf(feedback)
 
         engine.listener.onUtteranceEnded(engine.spokenUtteranceIds.single())
         runCurrent()
@@ -142,15 +158,16 @@ class NoticeSpeakerTest {
 
     private class FakeNoticeEngine(val listener: NoticeEngineListener) : NoticeEngine {
         val spokenUtteranceIds = mutableListOf<String>()
+        var stopCount = 0
 
         override fun speak(text: String, utteranceId: String) {
             spokenUtteranceIds += utteranceId
         }
 
-        override fun shutdown() = Unit
-    }
+        override fun stop() {
+            stopCount++
+        }
 
-    private companion object {
-        val LONG_FEEDBACK = 30.seconds
+        override fun shutdown() = Unit
     }
 }

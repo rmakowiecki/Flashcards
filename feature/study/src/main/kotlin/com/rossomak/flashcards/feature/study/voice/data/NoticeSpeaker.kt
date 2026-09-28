@@ -17,6 +17,9 @@ internal interface NoticeEngine {
 
     /** Queues [text] behind anything already speaking. */
     fun speak(text: String, utteranceId: String)
+
+    /** Cuts what is speaking and drops everything queued; each one is reported ended. */
+    fun stop()
     fun shutdown()
 }
 
@@ -35,8 +38,9 @@ internal interface NoticeEngineListener {
  * session decision; it only guarantees [onNoticeFinished]:
  * - exactly once per [speak] call, in call order, even when a later notice is given up on first;
  * - a short notice is given up on [WATCHDOG_TIMEOUT] after [speak] at the latest;
- * - [SpokenNotice.Feedback] is given up on only if the engine has not started it within
- *   [WATCHDOG_TIMEOUT]; once it speaks, it has no time bound;
+ * - [SpokenNotice.Feedback] is given up on if the engine has not started it within
+ *   [WATCHDOG_TIMEOUT]; once it speaks, it is cut off [STARTED_FEEDBACK_TIMEOUT] later, a bound
+ *   real feedback never reaches that only guards against an engine that stops reporting;
  * - a notice spoken while the engine is not ready, or after it failed, finishes at once.
  *
  * A late engine callback for a notice already given up on is dropped. Everything runs on [scope].
@@ -102,8 +106,15 @@ internal class NoticeSpeaker(
     }
 
     private fun onStarted(utteranceId: String) {
-        val pending = pendingNotices.firstOrNull { it.utteranceId == utteranceId } ?: return
-        if (pending.notice is SpokenNotice.Feedback) pending.watchdog?.cancel()
+        val pending = pendingNotices.firstOrNull { it.utteranceId == utteranceId && !it.isFinished } ?: return
+        if (pending.notice !is SpokenNotice.Feedback) return
+        pending.watchdog?.cancel()
+        pending.watchdog = scope.launch {
+            delay(STARTED_FEEDBACK_TIMEOUT)
+            // Stopped first, so nothing spoken in reaction to the finish is flushed with it.
+            engine.stop()
+            finish(pending.utteranceId)
+        }
     }
 
     private fun finish(utteranceId: String) {
@@ -122,6 +133,7 @@ internal class NoticeSpeaker(
 
     companion object {
         val WATCHDOG_TIMEOUT: Duration = 5.seconds
+        val STARTED_FEEDBACK_TIMEOUT: Duration = 20.seconds
         private const val UTTERANCE_PREFIX = "notice-"
     }
 }
@@ -156,10 +168,18 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
         override fun onError(utteranceId: String?, errorCode: Int) {
             utteranceId?.let(listener::onUtteranceEnded)
         }
+
+        override fun onStop(utteranceId: String?, interrupted: Boolean) {
+            utteranceId?.let(listener::onUtteranceEnded)
+        }
     }
 
     override fun speak(text: String, utteranceId: String) {
         tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
+    }
+
+    override fun stop() {
+        runCatching { tts.stop() }
     }
 
     override fun shutdown() {
