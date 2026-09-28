@@ -287,7 +287,10 @@ class VoiceAnswerController @Inject constructor(
         }
         // Own utterance id, not NOTICE_UTTERANCE_ID: this failure pauses the session rather than advancing to the next card,
         // so it must not trigger onNoticeFinishedSpeaking()'s advance-request callback the way the grade/skip notices do.
-        speakStandaloneNotice(context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message))
+        speakNotice(
+            context.getString(R.string.study_session_voice_answer_capture_unavailable_spoken_message),
+            utteranceId = CAPTURE_FAILURE_NOTICE_UTTERANCE_ID,
+        )
         startShortNoticeTimeout()
     }
 
@@ -432,17 +435,13 @@ class VoiceAnswerController @Inject constructor(
         _state.update { it.copy(isShortNoticeSpeaking = false) }
     }
 
-    private fun speakNotice(text: String) {
-        noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, NOTICE_UTTERANCE_ID)
-    }
-
     /**
-     * Same TTS channel as [speakNotice], different utterance id: [noticeUtteranceListener] only
-     * chains into [onNoticeFinishedSpeaking]'s advance-next-card callback for [NOTICE_UTTERANCE_ID],
-     * so a notice spoken here finishes as a no-op rather than advancing the session.
+     * [noticeUtteranceListener] only chains into [onNoticeFinishedSpeaking]'s advance-next-card
+     * callback for [NOTICE_UTTERANCE_ID], so a notice spoken with [CAPTURE_FAILURE_NOTICE_UTTERANCE_ID]
+     * finishes as a no-op rather than advancing the session.
      */
-    private fun speakStandaloneNotice(text: String) {
-        noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, CAPTURE_FAILURE_NOTICE_UTTERANCE_ID)
+    private fun speakNotice(text: String, utteranceId: String = NOTICE_UTTERANCE_ID) {
+        noticeTts?.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
 
     private fun hasRecordAudioPermission(): Boolean =
