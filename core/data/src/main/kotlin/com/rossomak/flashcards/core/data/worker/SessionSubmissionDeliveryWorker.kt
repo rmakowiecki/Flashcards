@@ -9,7 +9,9 @@ import com.google.firebase.functions.FirebaseFunctionsException
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
+import com.rossomak.flashcards.core.data.mapper.toDto
 import com.rossomak.flashcards.core.data.model.DeadLetteredSessionSubmissionDto
+import com.rossomak.flashcards.core.data.model.DeliveredSessionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDomain
 import com.rossomak.flashcards.core.data.source.DeadLetteredSessionSubmissionLocalDataSource
@@ -23,6 +25,7 @@ import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 
 /**
  * Drains the pending-session-submission queue. See
@@ -68,6 +71,16 @@ import java.io.IOException
  * resubmitted; an entry that *was* delivered but failed to clear locally before a crash gets resent on
  * the next run — harmless, since `submitStudySession` is idempotent per session id.
  *
+ * **Delivery report**: after each entry the server scored or rejected, [doWork] adds it to
+ * [deliveredSessions] and publishes the whole map as progress with [setProgress], right after the
+ * submission and before the refresh and removal below, so a Session Summary waiting on this session sees
+ * its result as soon as possible. A run that ends in [Result.success] also returns the same map as output
+ * data. See [SessionDeliveryReport] for the format and its size cap. WorkManager discards progress and
+ * output of a run that returns [Result.retry]; a waiting Summary then shows its local preview instead.
+ * Publishing progress is best-effort: a failure to do so is logged and never stops the drain. A session
+ * the server recorded but answered unreadably is delivered without a score: it is refreshed and removed
+ * like any delivered session but left out of the report, so a waiting Summary shows its local preview.
+ *
  * **Post-delivery refresh**: after each successful submission, [doWork] asks
  * [sessionServerStateRefresher] to re-read the User's scoring state and the session's Card Progress
  * documents from the server, updating the Firestore cache. Every failure of this step is ignored; the
@@ -100,6 +113,9 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
     private val authRepository: AuthRepository,
 ) : CoroutineWorker(context, workerParameters) {
 
+    /** Every session this run resolved, in delivery order: its server score, or the rejection marker. */
+    private val deliveredSessions = LinkedHashMap<String, DeliveredSessionDto>()
+
     override suspend fun doWork(): Result {
         val signedInUid = authRepository.getCurrentUser()?.uid
         if (signedInUid == null) {
@@ -129,7 +145,7 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
             if (deliver(entry) == StopAndRetry) return Result.retry()
         }
         logd { "Drain finished: all ${ownEntries.size} entries for the signed-in User resolved" }
-        return Result.success()
+        return Result.success(SessionDeliveryReport.toData(deliveredSessions))
     }
 
     private suspend fun deliver(entry: PendingSessionSubmissionDto): EntryDeliveryResult {
@@ -140,22 +156,39 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
             localDataSource.remove(entry.id)
             return Continue
         }
-        val failure = sessionSubmissionRemoteDataSource.submitSession(sessionResult).exceptionOrNull()
-        if (failure == null) {
-            sessionServerStateRefresher.refresh(sessionResult)
-            localDataSource.remove(entry.id)
-            logd { "Session ${entry.id} delivered and removed from queue" }
-            return Continue
-        }
+        val failure = sessionSubmissionRemoteDataSource.submitSession(sessionResult).fold(
+            onSuccess = { score ->
+                if (score != null) report(entry.id, DeliveredSessionDto.Scored(score.toDto()))
+                sessionServerStateRefresher.refresh(sessionResult)
+                localDataSource.remove(entry.id)
+                logd { "Session ${entry.id} delivered and removed from queue" }
+                return Continue
+            },
+            onFailure = { exception -> exception },
+        )
         return when (classifySessionDeliveryFailure(failure)) {
             Transient -> {
                 logw(failure) { "Submission of session ${entry.id} failed transiently, stopping drain and returning retry" }
                 StopAndRetry
             }
             Permanent -> {
+                report(entry.id, DeliveredSessionDto.Rejected)
                 deadLetter(entry, failure)
                 Continue
             }
+        }
+    }
+
+    // Broad on purpose: the report is best-effort, so no failure to publish it may stop the drain.
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun report(sessionId: String, deliveredSession: DeliveredSessionDto) {
+        deliveredSessions[sessionId] = deliveredSession
+        try {
+            setProgress(SessionDeliveryReport.toData(deliveredSessions))
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            logw(exception) { "Could not publish the delivery report after session $sessionId" }
         }
     }
 

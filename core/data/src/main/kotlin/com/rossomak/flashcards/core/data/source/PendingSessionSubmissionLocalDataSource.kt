@@ -16,6 +16,11 @@ import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
  */
 interface PendingSessionSubmissionLocalDataSource {
 
+    /**
+     * Adds [pendingSessionSubmission] to the queue, unless an entry with the same session id is already
+     * queued: a session submitted again, as when the Session Summary is recreated after process death,
+     * is still delivered once.
+     */
     suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto)
 
     suspend fun listAll(): List<PendingSessionSubmissionDto>

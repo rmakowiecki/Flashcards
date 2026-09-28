@@ -1,8 +1,13 @@
 package com.rossomak.flashcards.core.data.source
 
 import com.google.firebase.functions.FirebaseFunctions
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +22,12 @@ import kotlinx.coroutines.withContext
  * The wire payload's field names mirror `functions/src/lib/submitStudySession.ts`'s own
  * `ValidatedSubmitStudySessionRequest` shape 1:1 — this is the one seam where these contracts must agree
  * across languages with no compiler to enforce it.
+ *
+ * The response is read into a [SessionScore]. `counts` and `rates` are read leniently: when either is
+ * missing, as from a function deployed before it returned them, the score carries `null` for it instead
+ * of failing. Any other missing or malformed field makes the whole response unreadable: that is logged
+ * and returned as success with a `null` score. The call itself succeeded, so the server has recorded the
+ * session, and retrying would only replay the same unreadable answer and block every later queue entry.
  *
  * A field added to [SessionResult] needs updating here (`toPayload()`, this class's own network-wire
  * subset) **and independently** in [com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto]
@@ -33,14 +44,19 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
     // this call site has no surrounding try/catch of its own — narrowing this would let an
     // unanticipated exception type crash instead of surfacing as Result.failure.
     @Suppress("TooGenericExceptionCaught")
-    override suspend fun submitSession(sessionResult: SessionResult): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
+    override suspend fun submitSession(sessionResult: SessionResult): Result<SessionScore?> = withContext(Dispatchers.IO) {
+        val response = try {
             functions.getHttpsCallable(SUBMIT_STUDY_SESSION_FUNCTION_NAME).call(sessionResult.toPayload()).await()
-            Result.success(Unit)
         } catch (exception: CancellationException) {
             throw exception
         } catch (exception: Exception) {
-            Result.failure(exception)
+            return@withContext Result.failure(exception)
+        }
+        try {
+            Result.success(parseSessionScore(response.getData()))
+        } catch (exception: IllegalArgumentException) {
+            logw(exception) { "Unreadable submitStudySession response for session ${sessionResult.id}, treating it as delivered without a score" }
+            Result.success(null)
         }
     }
 
@@ -70,8 +86,93 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         }
     }
 
+    /** Throws [IllegalArgumentException] when a required field is missing or has the wrong type. */
+    private fun parseSessionScore(data: Any?): SessionScore {
+        val response = requireMap(data, "response")
+        return SessionScore(
+            breakdown = parseBreakdown(requireMap(response[FIELD_BREAKDOWN], FIELD_BREAKDOWN)),
+            level = requireInt(response, FIELD_LEVEL),
+            xpIntoCurrentLevel = requireLong(response, FIELD_XP_INTO_CURRENT_LEVEL),
+            xpForNextLevel = requireLong(response, FIELD_XP_FOR_NEXT_LEVEL),
+            levelsCrossed = requireList(response[FIELD_LEVELS_CROSSED], FIELD_LEVELS_CROSSED).map { level ->
+                requireNotNull((level as? Number)?.toInt()) { "Non-numeric entry in $FIELD_LEVELS_CROSSED" }
+            },
+            counts = (response[FIELD_COUNTS] as? Map<*, *>)?.let(::parseCounts),
+            rates = (response[FIELD_RATES] as? Map<*, *>)?.let(::parseRates),
+        )
+    }
+
+    private fun parseBreakdown(breakdown: Map<*, *>): XpBreakdown = XpBreakdown(
+        newCards = requireInt(breakdown, FIELD_NEW_CARDS),
+        mastered = requireInt(breakdown, FIELD_MASTERED),
+        partial = requireInt(breakdown, FIELD_PARTIAL),
+        masteryDefenseBonus = requireInt(breakdown, FIELD_MASTERY_DEFENSE_BONUS),
+        demastered = requireInt(breakdown, FIELD_DEMASTERED),
+        timeStudied = requireInt(breakdown, FIELD_TIME_STUDIED),
+        sessionCompletionBonus = requireInt(breakdown, FIELD_SESSION_COMPLETION_BONUS),
+        dailyGoalBonus = requireInt(breakdown, FIELD_DAILY_GOAL_BONUS),
+        streakBonus = requireInt(breakdown, FIELD_STREAK_BONUS),
+    )
+
+    private fun parseCounts(counts: Map<*, *>): SessionScoreCounts = SessionScoreCounts(
+        newCardsStudied = requireInt(counts, FIELD_NEW_CARDS_STUDIED),
+        newlyMastered = optionalInt(counts, FIELD_NEWLY_MASTERED),
+        partial = optionalInt(counts, FIELD_PARTIAL),
+        defended = optionalInt(counts, FIELD_DEFENDED),
+        demastered = optionalInt(counts, FIELD_DEMASTERED),
+    )
+
+    private fun parseRates(rates: Map<*, *>): SessionScoreRates = SessionScoreRates(
+        newCardStudied = requireInt(rates, FIELD_RATE_NEW_CARD_STUDIED),
+        cardMastered = requireInt(rates, FIELD_RATE_CARD_MASTERED),
+        cardPartial = requireInt(rates, FIELD_RATE_CARD_PARTIAL),
+        masteryDefended = requireInt(rates, FIELD_RATE_MASTERY_DEFENDED),
+        cardDemastered = requireInt(rates, FIELD_RATE_CARD_DEMASTERED),
+        minuteStudied = requireInt(rates, FIELD_RATE_MINUTE_STUDIED),
+        sessionCompleted = requireInt(rates, FIELD_RATE_SESSION_COMPLETED),
+    )
+
+    private fun requireMap(value: Any?, name: String): Map<*, *> = requireNotNull(value as? Map<*, *>) { "Missing or non-object $name" }
+
+    private fun requireList(value: Any?, name: String): List<*> = requireNotNull(value as? List<*>) { "Missing or non-list $name" }
+
+    private fun requireInt(fields: Map<*, *>, name: String): Int = requireNotNull(optionalInt(fields, name)) { "Missing or non-numeric $name" }
+
+    private fun requireLong(fields: Map<*, *>, name: String): Long =
+        requireNotNull((fields[name] as? Number)?.toLong()) { "Missing or non-numeric $name" }
+
+    private fun optionalInt(fields: Map<*, *>, name: String): Int? = (fields[name] as? Number)?.toInt()
+
     private companion object {
         const val SUBMIT_STUDY_SESSION_FUNCTION_NAME = "submitStudySession"
+
+        // Mirrors SubmitStudySessionResult's field names in functions/src/lib/submitStudySession.ts.
+        const val FIELD_BREAKDOWN = "breakdown"
+        const val FIELD_LEVEL = "level"
+        const val FIELD_XP_INTO_CURRENT_LEVEL = "xpIntoCurrentLevel"
+        const val FIELD_XP_FOR_NEXT_LEVEL = "xpForNextLevel"
+        const val FIELD_LEVELS_CROSSED = "levelsCrossed"
+        const val FIELD_COUNTS = "counts"
+        const val FIELD_RATES = "rates"
+        const val FIELD_NEW_CARDS = "newCards"
+        const val FIELD_MASTERED = "mastered"
+        const val FIELD_PARTIAL = "partial"
+        const val FIELD_MASTERY_DEFENSE_BONUS = "masteryDefenseBonus"
+        const val FIELD_DEMASTERED = "demastered"
+        const val FIELD_TIME_STUDIED = "timeStudied"
+        const val FIELD_SESSION_COMPLETION_BONUS = "sessionCompletionBonus"
+        const val FIELD_DAILY_GOAL_BONUS = "dailyGoalBonus"
+        const val FIELD_STREAK_BONUS = "streakBonus"
+        const val FIELD_NEW_CARDS_STUDIED = "newCardsStudied"
+        const val FIELD_NEWLY_MASTERED = "newlyMastered"
+        const val FIELD_DEFENDED = "defended"
+        const val FIELD_RATE_NEW_CARD_STUDIED = "newCardStudied"
+        const val FIELD_RATE_CARD_MASTERED = "cardMastered"
+        const val FIELD_RATE_CARD_PARTIAL = "cardPartial"
+        const val FIELD_RATE_MASTERY_DEFENDED = "masteryDefended"
+        const val FIELD_RATE_CARD_DEMASTERED = "cardDemastered"
+        const val FIELD_RATE_MINUTE_STUDIED = "minuteStudied"
+        const val FIELD_RATE_SESSION_COMPLETED = "sessionCompleted"
 
         // Mirrors ValidatedSubmitStudySessionRequest's field names in functions/src/lib/submitStudySession.ts.
         const val FIELD_SESSION_ID = "sessionId"

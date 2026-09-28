@@ -73,4 +73,23 @@ class SessionSubmissionDrainSchedulerTest {
 
         verify(exactly = 2) { workManager.enqueueUniqueWork(any(), ExistingWorkPolicy.KEEP, any<OneTimeWorkRequest>()) }
     }
+
+    @Test
+    fun `scheduleDrainForFinishedSession enqueues with REPLACE and returns the enqueued request's id`() {
+        val requestSlot = slot<OneTimeWorkRequest>()
+        every { workManager.enqueueUniqueWork(any(), any(), capture(requestSlot)) } returns mockk()
+
+        val requestId = createScheduler().scheduleDrainForFinishedSession()
+
+        verify(exactly = 1) {
+            workManager.enqueueUniqueWork(
+                SessionSubmissionDrainScheduler.UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                any<OneTimeWorkRequest>(),
+            )
+        }
+        requestId shouldBe requestSlot.captured.id
+        requestSlot.captured.workSpec.workerClassName shouldBe SessionSubmissionDeliveryWorker::class.java.name
+        requestSlot.captured.workSpec.constraints.requiredNetworkType shouldBe NetworkType.CONNECTED
+    }
 }
