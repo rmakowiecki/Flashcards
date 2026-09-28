@@ -61,7 +61,11 @@ interface StudyVoicePlaybackGateway {
 
     /** In question-only mode the player stops after each question and reports [PlaybackEvent.QuestionFinished]. */
     fun setQuestionOnlyMode(enabled: Boolean)
+
+    /** Applies to the questions and answers, and to the spoken notices. */
     fun setSpeechRate(rate: Float)
+
+    /** Applies to the questions and answers, and to the spoken notices. */
     fun setVoice(voiceId: String?)
 
     /** Queues [notice] on the notice voice. Always answered by exactly one [PlaybackEvent.NoticeFinished]. */

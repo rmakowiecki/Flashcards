@@ -4,6 +4,7 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -21,6 +22,12 @@ internal interface NoticeEngine {
     /** Cuts what is speaking and drops everything queued; each one is reported ended. */
     fun stop()
     fun shutdown()
+
+    /** Applies from the next utterance; one already speaking keeps its voice. */
+    fun setVoice(voiceId: String?)
+
+    /** Applies from the next utterance; one already speaking keeps its rate. */
+    fun setSpeechRate(rate: Float)
 }
 
 /** What a [NoticeEngine] reports, on any thread. */
@@ -94,6 +101,10 @@ internal class NoticeSpeaker(
         }
     }
 
+    fun setVoice(voiceId: String?) = engine.setVoice(voiceId)
+
+    fun setSpeechRate(rate: Float) = engine.setSpeechRate(rate)
+
     fun release() {
         pendingNotices.forEach { it.watchdog?.cancel() }
         pendingNotices.clear()
@@ -138,14 +149,24 @@ internal class NoticeSpeaker(
     }
 }
 
-/** A [NoticeEngine] on the system [TextToSpeech], always in English: the app's content is English only. */
+/**
+ * A [NoticeEngine] on the system [TextToSpeech], always in English: the app's content is English
+ * only. Speaks with the session voice and speech rate, like the questions; a voice or rate set
+ * before the engine is ready applies once it is.
+ */
 internal class TextToSpeechNoticeEngine(context: Context, private val listener: NoticeEngineListener) : NoticeEngine {
 
+    private var isReady = false
+    private var voiceId: String? = null
+    private var speechRate = VoicePlaybackState.DEFAULT_SPEECH_RATE
+
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
-        val isReady = status == TextToSpeech.SUCCESS
+        isReady = status == TextToSpeech.SUCCESS
         if (isReady) {
             // Never the device's system locale (e.g. Polish), which garbles English notice text.
             tts.language = Locale.US
+            tts.applySessionVoice(voiceId)
+            tts.setSpeechRate(speechRate)
             tts.setOnUtteranceProgressListener(progressListener)
         }
         listener.onInitialized(isReady)
@@ -184,5 +205,15 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
 
     override fun shutdown() {
         runCatching { tts.shutdown() }
+    }
+
+    override fun setVoice(voiceId: String?) {
+        this.voiceId = voiceId
+        if (isReady) tts.applySessionVoice(voiceId)
+    }
+
+    override fun setSpeechRate(rate: Float) {
+        speechRate = rate.coerceIn(VoicePlaybackState.MIN_SPEECH_RATE, VoicePlaybackState.MAX_SPEECH_RATE)
+        if (isReady) tts.setSpeechRate(speechRate)
     }
 }

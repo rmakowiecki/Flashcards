@@ -298,15 +298,7 @@ class TtsPlayer(
         }
     }
 
-    /**
-     * [voiceId] `null` means "no explicit choice yet" — resolves to a curated English voice,
-     * never the device's system default (which may not even be English).
-     */
-    private fun applyVoice(voiceId: String?) {
-        val resolved = voiceId?.let { id -> tts.voices?.firstOrNull { it.name == id } }
-            ?: VoiceCuration.curate(tts.voices.orEmpty()).firstOrNull()
-        if (resolved != null) tts.voice = resolved
-    }
+    private fun applyVoice(voiceId: String?) = tts.applySessionVoice(voiceId)
 
     fun setPlaybackSpeechRate(rate: Float) {
         speechRate =
@@ -575,4 +567,15 @@ class TtsPlayer(
 
         fun utteranceId(tag: String, generation: Int): String = "$tag$SEPARATOR$generation"
     }
+}
+
+/**
+ * [voiceId] `null` means "no explicit choice yet" — resolves to a curated English voice, never the
+ * device's system default (which may not even be English). Shared by the question and notice
+ * engines, so both speak with the same voice.
+ */
+internal fun TextToSpeech.applySessionVoice(voiceId: String?) {
+    val resolved = voiceId?.let { id -> voices?.firstOrNull { it.name == id } }
+        ?: VoiceCuration.curate(voices.orEmpty()).firstOrNull()
+    if (resolved != null) voice = resolved
 }

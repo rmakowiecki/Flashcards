@@ -169,5 +169,9 @@ class NoticeSpeakerTest {
         }
 
         override fun shutdown() = Unit
+
+        override fun setVoice(voiceId: String?) = Unit
+
+        override fun setSpeechRate(rate: Float) = Unit
     }
 }

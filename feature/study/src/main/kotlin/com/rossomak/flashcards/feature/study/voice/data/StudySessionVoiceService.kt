@@ -123,9 +123,16 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun setAdvanceGate(closed: Boolean) = player.setAdvanceGate(closed)
 
-        fun setSpeechRate(rate: Float) = player.setPlaybackSpeechRate(rate)
+        // Notices and feedback speak with the same voice and rate as the questions.
+        fun setSpeechRate(rate: Float) {
+            player.setPlaybackSpeechRate(rate)
+            noticeSpeaker.setSpeechRate(rate)
+        }
 
-        fun setVoice(voiceId: String?) = player.setVoice(voiceId)
+        fun setVoice(voiceId: String?) {
+            player.setVoice(voiceId)
+            noticeSpeaker.setVoice(voiceId)
+        }
 
         fun speakNotice(notice: SpokenNotice) = noticeSpeaker.speak(notice)
 
