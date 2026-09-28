@@ -40,7 +40,10 @@ import java.io.IOException
  * never cause a retry, so a run with only foreign entries left ends in [Result.success]; each one is
  * delivered once its own User signs in again. The signed-in uid is checked again before each
  * submission: the callable sends whoever is signed in *now*, so if the User changed mid-run, [doWork]
- * stops and returns [Result.retry] instead of crediting the new User with the old User's sessions. The
+ * stops and returns [Result.retry] instead of crediting the new User with the old User's sessions.
+ * That check can't close the gap between itself and the SDK attaching the ID token inside the call, so
+ * each submission also carries the entry's uid and the server rejects a mismatch as `UNAUTHENTICATED`,
+ * a transient failure that leaves the entry queued. The
  * retried run reads the new uid; this also covers the drain the new sign-in could not schedule, since
  * `ExistingWorkPolicy.KEEP` ignores it while this run is active.
  *
@@ -75,8 +78,10 @@ import java.io.IOException
  *
  * A queue entry that fails to convert back to a domain [com.rossomak.flashcards.core.domain.model.SessionResult]
  * (no owning uid, unknown `mode`/`state`, or a `Rated` card result missing
- * `attemptsUsed`/`wasPreviouslyMastered`) is malformed beyond repair, not a delivery failure: [doWork]
- * logs it, removes it from the queue, and continues to the next entry.
+ * `attemptsUsed`/`wasPreviouslyMastered`) is malformed beyond repair: [doWork] moves it to
+ * [deadLetterLocalDataSource] exactly as stored, with the conversion exception as its failure, and
+ * continues to the next entry. A blank-uid entry keeps its blank uid; it is never assigned to the
+ * signed-in User.
  *
  * [localDataSource] and [deadLetterLocalDataSource] can throw an [IOException] if a file exists but
  * can't be read (see [com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLocalDataSource]
@@ -136,11 +141,10 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
         val sessionResult = try {
             entry.toDomain()
         } catch (exception: IllegalArgumentException) {
-            loge(exception) { "Session ${entry.id} is malformed and cannot be converted, dropping it from the queue" }
-            localDataSource.remove(entry.id)
+            deadLetter(entry, exception)
             return Continue
         }
-        val failure = sessionSubmissionRemoteDataSource.submitSession(sessionResult).exceptionOrNull()
+        val failure = sessionSubmissionRemoteDataSource.submitSession(entry.uid, sessionResult).exceptionOrNull()
         if (failure == null) {
             sessionServerStateRefresher.refresh(sessionResult)
             localDataSource.remove(entry.id)
@@ -159,7 +163,11 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
         }
     }
 
-    /** Appends to the dead-letter record before removing from the queue, so a crash in between duplicates the entry instead of losing it. */
+    /**
+     * Appends to the dead-letter record before removing from the queue, so a crash in between duplicates the
+     * entry instead of losing it. [failure] is either the server's permanent rejection or the
+     * [IllegalArgumentException] of an entry that could not be converted.
+     */
     private suspend fun deadLetter(entry: PendingSessionSubmissionDto, failure: Throwable) {
         val failureCode = (failure as? FirebaseFunctionsException)?.code?.name ?: failure.javaClass.simpleName
         deadLetterLocalDataSource.append(
@@ -171,7 +179,7 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
             ),
         )
         localDataSource.remove(entry.id)
-        loge(failure) { "Session ${entry.id} permanently rejected ($failureCode), moved to the dead-letter record" }
+        loge(failure) { "Session ${entry.id} is undeliverable ($failureCode), moved to the dead-letter record" }
     }
 }
 
