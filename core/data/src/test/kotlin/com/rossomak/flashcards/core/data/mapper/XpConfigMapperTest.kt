@@ -67,6 +67,15 @@ class XpConfigMapperTest {
     }
 
     @Test
+    fun `a level curve whose threshold overflows a safe integer by level 1000 is rejected and a steep one below it accepted`() {
+        shouldThrow<IllegalArgumentException> { VALID_DTO.copy(levelCurveBase = 1000.0, levelCurveExponent = 1024.0).toDomain() }
+            .message shouldContain "Infinity"
+        shouldThrow<IllegalArgumentException> { VALID_DTO.copy(levelCurveBase = 1000.0, levelCurveExponent = 5.0).toDomain() }
+            .message shouldContain "levelCurveExponent"
+        VALID_DTO.copy(levelCurveBase = 1000.0, levelCurveExponent = 4.0).toDomain().levelCurveExponent shouldBe 4.0
+    }
+
+    @Test
     fun `a negative level curve exponent is rejected and a zero one accepted`() {
         shouldThrow<IllegalArgumentException> { VALID_DTO.copy(levelCurveExponent = -0.5).toDomain() }
             .message shouldContain "levelCurveExponent"

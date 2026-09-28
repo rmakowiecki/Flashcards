@@ -37,11 +37,20 @@ INT_MIN, INT_MAX = -2**31, 2**31 - 1
 # Mirrors levelThreshold in functions/src/lib/xpScoring.ts.
 STARTING_LEVEL = 1
 LEVEL_THRESHOLD_ROUNDING_UNIT = 1000
+# Every level threshold up to this level must be a safe integer (JavaScript's Number.MAX_SAFE_INTEGER).
+MAX_VALIDATED_LEVEL = 1000
+MAX_SAFE_INTEGER = 2**53 - 1
 
 
 def level_threshold(config: dict, level: int) -> float:
-    return math.ceil(config["levelCurveBase"] * level ** config["levelCurveExponent"] / LEVEL_THRESHOLD_ROUNDING_UNIT) \
-        * LEVEL_THRESHOLD_ROUNDING_UNIT
+    """Math.inf where the JavaScript formula gives Infinity, rather than raising OverflowError."""
+    try:
+        raw = config["levelCurveBase"] * float(level) ** config["levelCurveExponent"]
+    except OverflowError:
+        return math.inf
+    if not math.isfinite(raw):
+        return math.inf
+    return math.ceil(raw / LEVEL_THRESHOLD_ROUNDING_UNIT) * LEVEL_THRESHOLD_ROUNDING_UNIT
 
 
 def validate(config: dict) -> list[str]:
@@ -66,6 +75,11 @@ def validate(config: dict) -> list[str]:
         elif config["levelCurveBase"] > 0 and level_threshold(config, STARTING_LEVEL) <= 0:
             problems.append(
                 f"levelCurveBase {config['levelCurveBase']!r} is too small: the starting level's threshold rounds to zero"
+            )
+        elif config["levelCurveBase"] > 0 and not level_threshold(config, MAX_VALIDATED_LEVEL) <= MAX_SAFE_INTEGER:
+            problems.append(
+                f"levelCurveBase {config['levelCurveBase']!r} / levelCurveExponent {config['levelCurveExponent']!r} give a "
+                f"level-{MAX_VALIDATED_LEVEL} threshold of {level_threshold(config, MAX_VALIDATED_LEVEL)}, above {MAX_SAFE_INTEGER}"
             )
     unknown = sorted(set(config) - set(INTEGER_FIELDS + CURVE_FIELDS))
     if unknown:

@@ -71,6 +71,12 @@ describe("parseXpConfig", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: Number.MIN_VALUE }) ?? "", /levelCurveBase/);
   });
 
+  it("rejects a level curve whose threshold overflows a safe integer by level 1000 and accepts a steep one below it", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 1000, levelCurveExponent: 1024 }) ?? "", /Infinity/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 1000, levelCurveExponent: 5 }) ?? "", /levelCurveExponent/);
+    assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 1000, levelCurveExponent: 4 }), undefined);
+  });
+
   it("rejects a negative level curve exponent and accepts a zero one", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: -0.5 }) ?? "", /levelCurveExponent/);
     assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: 0 }), undefined);
