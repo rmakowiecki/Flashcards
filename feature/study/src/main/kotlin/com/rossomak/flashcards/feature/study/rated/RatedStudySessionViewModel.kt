@@ -218,6 +218,8 @@ class RatedStudySessionViewModel @Inject constructor(
         currentCardRatings = snapshot.currentCardRatings,
         isVoiceAnswerPaused = snapshot.voiceAnswerPauseReason != null || snapshot.pauseReason != null,
         isVoiceEngineUnavailable = snapshot.pauseReason == SessionPauseReason.VoiceEngineUnavailable,
+        isVoiceRoundPaused = snapshot.isPausedWhileGrading || snapshot.isPausedAfterFeedback || snapshot.isHeldAtAdvancePoint,
+        availableTransportCommands = snapshot.availableTransportCommands,
     )
 
     /**
@@ -265,6 +267,12 @@ class RatedStudySessionViewModel @Inject constructor(
 
     fun onVoicePrevious() {
         coordinator.previous()
+        showSessionNow()
+    }
+
+    /** A tap on the grading feedback: skips it and moves on, like "next" does there. */
+    fun onVoiceFeedbackSkip() {
+        coordinator.skipFeedback()
         showSessionNow()
     }
 

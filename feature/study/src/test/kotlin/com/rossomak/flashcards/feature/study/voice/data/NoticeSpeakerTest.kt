@@ -137,6 +137,54 @@ class NoticeSpeakerTest {
     }
 
     @Test
+    fun `a stopped feedback never finishes, and its late stop callback is dropped`() = runTest {
+        val speaker = createSpeaker()
+        speaker.speak(feedback)
+        val stoppedUtteranceId = engine.spokenUtteranceIds.single()
+        engine.listener.onUtteranceStarted(stoppedUtteranceId)
+        runCurrent()
+
+        speaker.stopFeedback()
+        engine.listener.onUtteranceEnded(stoppedUtteranceId)
+        advanceTimeBy(NoticeSpeaker.STARTED_FEEDBACK_TIMEOUT * 2)
+
+        engine.stopCount shouldBe 1
+        finished shouldBe emptyList()
+    }
+
+    @Test
+    fun `a replay spoken before the stopped feedback's callback lands finishes only on its own end`() = runTest {
+        val speaker = createSpeaker()
+        speaker.speak(feedback)
+        val stoppedUtteranceId = engine.spokenUtteranceIds.single()
+
+        speaker.stopFeedback()
+        speaker.speak(feedback)
+        val replayUtteranceId = engine.spokenUtteranceIds.last()
+        engine.listener.onUtteranceStarted(replayUtteranceId)
+        engine.listener.onUtteranceEnded(stoppedUtteranceId)
+        runCurrent()
+        finished shouldBe emptyList()
+
+        engine.listener.onUtteranceEnded(replayUtteranceId)
+        runCurrent()
+        finished shouldBe listOf(feedback)
+    }
+
+    @Test
+    fun `stopping with no feedback speaking leaves short notices alone`() = runTest {
+        val speaker = createSpeaker()
+        speaker.speak(SpokenNotice.SilenceSkip)
+
+        speaker.stopFeedback()
+
+        engine.stopCount shouldBe 0
+        engine.listener.onUtteranceEnded(engine.spokenUtteranceIds.single())
+        runCurrent()
+        finished shouldBe listOf(SpokenNotice.SilenceSkip)
+    }
+
+    @Test
     fun `a notice spoken before the engine is ready finishes at once`() = runTest {
         val speaker = createSpeaker(isEngineReady = null)
 

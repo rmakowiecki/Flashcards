@@ -26,6 +26,11 @@ sealed interface RatedSessionStateSnapshot {
      * @param isVoiceAnsweringActive voice answering is on for this session and nothing has paused it.
      * @param isHeldAtAdvancePoint a requested hold stopped the session at the auto-advance point, on
      * the card it just finished.
+     * @param isPausedWhileGrading the user paused while the answer was being graded.
+     * @param isPausedAfterFeedback the session is paused on the graded card; play reads the
+     * feedback again.
+     * @param availableTransportCommands what the in-app row, the notification and a headset may
+     * offer now.
      */
     data class Running(
         val cards: List<Flashcard> = emptyList(),
@@ -43,6 +48,9 @@ sealed interface RatedSessionStateSnapshot {
         val isPausedAtAdvancePoint: Boolean = false,
         val isHeldAtAdvancePoint: Boolean = false,
         val pauseReason: SessionPauseReason? = null,
+        val isPausedWhileGrading: Boolean = false,
+        val isPausedAfterFeedback: Boolean = false,
+        val availableTransportCommands: Set<TransportCommandType> = emptySet(),
     ) : RatedSessionStateSnapshot
 }
 
@@ -67,6 +75,7 @@ sealed interface FastSessionStateSnapshot {
      * @param pauseReason who paused the session; `null` while nothing did.
      * @param isHeldAtAdvancePoint a requested hold stopped read-aloud at the auto-advance point, on
      * the card it just finished.
+     * @param availableTransportCommands what the notification and a headset may offer now.
      */
     data class Running(
         val cards: List<Flashcard> = emptyList(),
@@ -76,5 +85,6 @@ sealed interface FastSessionStateSnapshot {
         val playback: VoicePlaybackState = VoicePlaybackState(),
         val pauseReason: FastPauseReason? = null,
         val isHeldAtAdvancePoint: Boolean = false,
+        val availableTransportCommands: Set<TransportCommandType> = TransportCommandType.entries.toSet(),
     ) : FastSessionStateSnapshot
 }

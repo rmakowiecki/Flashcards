@@ -22,8 +22,15 @@ sealed interface RatedSessionEffect {
 
     /** Wait the notice tail, then report [RatedSessionInput.NoticeTailElapsed]. */
     data object StartNoticeTail : RatedSessionEffect
+    data object CancelNoticeTail : RatedSessionEffect
+
+    /** Cut the grading feedback being spoken, without it ever reporting finished. */
+    data object StopFeedback : RatedSessionEffect
     data object PausePlayback : RatedSessionEffect
     data object Play : RatedSessionEffect
+
+    /** Mark the player playing again without reading anything: the round goes on on another voice. */
+    data object ResumeWithoutReading : RatedSessionEffect
     data object RestartCurrentCard : RatedSessionEffect
     data object StopVoiceAnswering : RatedSessionEffect
     data object StartVoiceAnswering : RatedSessionEffect

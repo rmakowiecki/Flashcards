@@ -19,8 +19,11 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.rossomak.flashcards.core.data.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.type
+import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +82,12 @@ class TtsPlayer(
     // While closed, Fast's loop stops on the current card at the end of the pause after its answer
     // and reports AdvanceGateReached; the coordinator decides when to move on.
     private var isAdvanceGateClosed = false
+
+    // What the system controls offer, as the coordinator last set it. Every command until then.
+    private var transportCommands: Set<TransportCommandType> = TransportCommandType.entries.toSet()
+
+    // The session's own counter, shown instead of the position in the list once set.
+    private var sessionProgress: Pair<Int, Int>? = null
 
     /**
      * Incremented on every new utterance and every interrupting command. An [onDone] callback whose
@@ -141,19 +150,20 @@ class TtsPlayer(
     }
 
     override fun getState(): State {
+        val progress = sessionProgress
         val items = cards.mapIndexed { cardIndex, _ ->
             MediaItemData.Builder("card-$cardIndex")
                 .setMediaItem(MediaItem.Builder().setMediaId("card-$cardIndex").build())
                 .setMediaMetadata(
                     MediaMetadata.Builder()
                         .setTitle(subcategoryName.ifBlank { DEFAULT_TITLE })
-                        .setArtist("${cardIndex + 1} / ${cards.size}")
+                        .setArtist(progress?.let { (completed, total) -> "$completed / $total" } ?: "${cardIndex + 1} / ${cards.size}")
                         .build()
                 )
                 .build()
         }
         return State.Builder()
-            .setAvailableCommands(AVAILABLE_COMMANDS)
+            .setAvailableCommands(transportCommands.toPlayerCommands())
             .setPlaybackState(if (cards.isEmpty()) STATE_IDLE else STATE_READY)
             .setPlayWhenReady(isPlaying, PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
             .setPlaylist(items)
@@ -161,15 +171,18 @@ class TtsPlayer(
             .build()
     }
 
+    // Media3 checks only the commands it publishes; one play-pause command covers both, and a
+    // controller can race an update, so every handler checks the exact command again.
+
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
-        onEvent(PlaybackEvent.ExternalCommand(if (playWhenReady) TransportCommand.Play else TransportCommand.Pause))
+        reportExternal(if (playWhenReady) TransportCommand.Play else TransportCommand.Pause)
         return Futures.immediateVoidFuture()
     }
 
     override fun handlePrepare(): ListenableFuture<*> = Futures.immediateVoidFuture()
 
     override fun handleStop(): ListenableFuture<*> {
-        onEvent(PlaybackEvent.ExternalCommand(TransportCommand.Stop))
+        reportExternal(TransportCommand.Stop)
         return Futures.immediateVoidFuture()
     }
 
@@ -189,8 +202,37 @@ class TtsPlayer(
             COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> TransportCommand.PreviousCard
             else -> if (mediaItemIndex != index) TransportCommand.JumpTo(mediaItemIndex) else null
         }
-        command?.let { onEvent(PlaybackEvent.ExternalCommand(it)) }
+        command?.let(::reportExternal)
         return Futures.immediateVoidFuture()
+    }
+
+    private fun reportExternal(command: TransportCommand) {
+        if (command.type in transportCommands) onEvent(PlaybackEvent.ExternalCommand(command))
+    }
+
+    /** The commands the system controls offer from now on; see [StudyVoicePlaybackGateway.setAvailableCommands]. */
+    fun setTransportCommands(commands: Set<TransportCommandType>) {
+        if (commands == transportCommands) return
+        transportCommands = commands
+        invalidateState()
+    }
+
+    /** Shows [completedCount] of [totalCount] as the subtitle, instead of the position in the list. */
+    fun setSessionProgress(completedCount: Int, totalCount: Int) {
+        sessionProgress = completedCount to totalCount
+        invalidateState()
+    }
+
+    /**
+     * Reports playing again without reading anything, while the voice round goes on on the notice
+     * voice. Nothing is in flight, so a later read starts cleanly.
+     */
+    fun resumeWithoutReading() {
+        if (cards.isEmpty()) return
+        wasPlayingBeforeFocusLoss = false
+        isPlaying = true
+        requestAudioFocus()
+        publishState()
     }
 
     fun loadAndStartSession(cards: List<VoiceFlashcard>, startIndex: Int, subcategoryName: String) {
@@ -324,6 +366,8 @@ class TtsPlayer(
         index = 0
         isBetweenPause = false
         isAdvanceGateClosed = false
+        transportCommands = TransportCommandType.entries.toSet()
+        sessionProgress = null
         _voiceState.value = VoicePlaybackState(isActive = false)
         invalidateState()
     }
@@ -548,25 +592,34 @@ class TtsPlayer(
         const val TAG_ANSWER = "answer"
         const val TAG_BETWEEN = "between"
 
-        val AVAILABLE_COMMANDS = Player.Commands.Builder()
-            .addAll(
-                COMMAND_PLAY_PAUSE,
-                COMMAND_PREPARE,
-                COMMAND_STOP,
-                COMMAND_SEEK_TO_NEXT,
-                COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-                COMMAND_SEEK_TO_PREVIOUS,
-                COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-                COMMAND_SEEK_TO_MEDIA_ITEM,
-                COMMAND_GET_CURRENT_MEDIA_ITEM,
-                COMMAND_GET_METADATA,
-                COMMAND_GET_TIMELINE,
-                COMMAND_RELEASE,
-            )
-            .build()
-
         fun utteranceId(tag: String, generation: Int): String = "$tag$SEPARATOR$generation"
     }
+}
+
+/**
+ * The Media3 commands for a set of transport commands. Play and pause share one command, offered
+ * whenever either is; the player itself refuses the one not in the set.
+ */
+@UnstableApi
+internal fun Set<TransportCommandType>.toPlayerCommands(): Player.Commands {
+    val builder = Player.Commands.Builder().addAll(
+        Player.COMMAND_PREPARE,
+        Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
+        Player.COMMAND_GET_METADATA,
+        Player.COMMAND_GET_TIMELINE,
+        Player.COMMAND_RELEASE,
+    )
+    forEach { type ->
+        when (type) {
+            TransportCommandType.Play, TransportCommandType.Pause -> builder.add(Player.COMMAND_PLAY_PAUSE)
+            TransportCommandType.Stop -> builder.add(Player.COMMAND_STOP)
+            TransportCommandType.Next -> builder.addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            TransportCommandType.Previous -> builder.add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            TransportCommandType.PreviousCard -> builder.add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+            TransportCommandType.JumpTo -> builder.add(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+        }
+    }
+    return builder.build()
 }
 
 /**

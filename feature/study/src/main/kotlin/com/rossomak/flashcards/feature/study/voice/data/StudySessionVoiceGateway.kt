@@ -13,6 +13,7 @@ import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
@@ -85,6 +86,10 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingAdvanceGateClosed: Boolean? = null
     private var pendingVoiceAnswering: Boolean? = null
 
+    // Kept across stop(): a restarted voice stack binds again and gets them replayed.
+    private var pendingTransportCommands: Set<TransportCommandType>? = null
+    private var pendingSessionProgress: Pair<Int, Int>? = null
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             if (!isBound) {
@@ -105,6 +110,8 @@ class StudySessionVoiceGateway @Inject constructor(
             pendingQuestionOnlyMode?.let { binder.setQuestionOnlyMode(it) }
             pendingAdvanceGateClosed?.let { binder.setAdvanceGate(it) }
             pendingVoiceAnswering?.let { if (it) binder.startVoiceAnswering() }
+            pendingTransportCommands?.let { binder.setAvailableCommands(it) }
+            pendingSessionProgress?.let { (completedCount, totalCount) -> binder.setSessionProgress(completedCount, totalCount) }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -207,6 +214,25 @@ class StudySessionVoiceGateway @Inject constructor(
         } else {
             playbackEventChannel.trySend(PlaybackEvent.NoticeFinished(notice))
         }
+    }
+
+    /** Before the bind completes no notice is speaking: each one finished at once. */
+    override fun stopFeedback() {
+        voiceBinder.value?.stopFeedback()
+    }
+
+    override fun resumeWithoutReading() {
+        voiceBinder.value?.resumeWithoutReading()
+    }
+
+    override fun setAvailableCommands(commands: Set<TransportCommandType>) {
+        pendingTransportCommands = commands
+        voiceBinder.value?.setAvailableCommands(commands)
+    }
+
+    override fun setSessionProgress(completedCount: Int, totalCount: Int) {
+        pendingSessionProgress = completedCount to totalCount
+        voiceBinder.value?.setSessionProgress(completedCount, totalCount)
     }
 
     override fun startVoiceAnswering() {

@@ -17,6 +17,7 @@ import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
@@ -1312,6 +1313,88 @@ class RatedStudySessionViewModelTest {
 
         viewModel.state.value.isVoiceAnswerPaused shouldBe true
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+    }
+
+    @Test
+    fun `a headset pause during the feedback shows the paused transport row, and play reads the feedback again as Graded`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
+
+            playbackGateway.emitExternal(TransportCommand.Pause)
+            runCurrent()
+
+            with(viewModel.state.value) {
+                voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+                currentCard?.id shouldBe "card-1"
+                isVoicePlaying shouldBe false
+                availableTransportCommands shouldBe setOf(TransportCommandType.Play, TransportCommandType.Next)
+            }
+
+            viewModel.onVoicePlayPause()
+            runCurrent()
+
+            viewModel.state.value.voiceSheetMode.shouldBeInstanceOf<RatedVoiceSheetMode.Graded>()
+            viewModel.state.value.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+        }
+
+    @Test
+    fun `a pause while grading shows the paused transport row, and play goes back to the grading mode`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            answer(flow { emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT)) })
+
+            playbackGateway.emitExternal(TransportCommand.Pause)
+            runCurrent()
+            viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+
+            viewModel.onVoicePlayPause()
+            runCurrent()
+            viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.GradingWithTranscript(SPOKEN_TRANSCRIPT)
+        }
+
+    @Test
+    fun `a tap on the feedback skips it and reads the next question`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+        emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
+
+        viewModel.onVoiceFeedbackSkip()
+        runCurrent()
+
+        viewModel.state.value.currentCard?.id shouldNotBe "card-1"
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
+        playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.AdvanceAfterVoiceAnswer
+    }
+
+    @Test
+    fun `the sheet has no transport row while listening, grading or speaking a short notice, though pause is offered outside the app`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            val pauseOnly = setOf(TransportCommandType.Pause, TransportCommandType.Stop)
+
+            finishQuestion()
+            viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
+            viewModel.state.value.availableTransportCommands shouldBe pauseOnly
+
+            advanceTimeBy(SILENCE_TIMEOUT)
+            runCurrent()
+            viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+            viewModel.state.value.availableTransportCommands shouldBe pauseOnly
+            finishNotice()
+
+            answer(flow { emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT)) })
+            viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.GradingWithTranscript(SPOKEN_TRANSCRIPT)
+            viewModel.state.value.availableTransportCommands shouldBe pauseOnly
+        }
+
+    @Test
+    fun `previous is enabled at the question of a voice session`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+
+        viewModel.state.value.availableTransportCommands shouldContain TransportCommandType.Previous
+        viewModel.onVoicePrevious()
+
+        playbackGateway.restartCurrentCardCount shouldBe 1
     }
 
     @Test

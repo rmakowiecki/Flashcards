@@ -17,3 +17,20 @@ sealed interface TransportCommand {
 
     data object Stop : TransportCommand
 }
+
+/**
+ * A [TransportCommand] without its arguments: what a transport surface can offer at a given
+ * moment. Play and pause are separate, so a state can offer pause alone.
+ */
+enum class TransportCommandType { Play, Pause, Next, Previous, PreviousCard, JumpTo, Stop }
+
+val TransportCommand.type: TransportCommandType
+    get() = when (this) {
+        TransportCommand.Play -> TransportCommandType.Play
+        TransportCommand.Pause -> TransportCommandType.Pause
+        TransportCommand.Next -> TransportCommandType.Next
+        TransportCommand.Previous -> TransportCommandType.Previous
+        TransportCommand.PreviousCard -> TransportCommandType.PreviousCard
+        is TransportCommand.JumpTo -> TransportCommandType.JumpTo
+        TransportCommand.Stop -> TransportCommandType.Stop
+    }

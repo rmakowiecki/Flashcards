@@ -18,6 +18,7 @@ import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import dagger.hilt.android.AndroidEntryPoint
@@ -135,6 +136,14 @@ class StudySessionVoiceService : MediaSessionService() {
         }
 
         fun speakNotice(notice: SpokenNotice) = noticeSpeaker.speak(notice)
+
+        fun stopFeedback() = noticeSpeaker.stopFeedback()
+
+        fun resumeWithoutReading() = player.resumeWithoutReading()
+
+        fun setAvailableCommands(commands: Set<TransportCommandType>) = player.setTransportCommands(commands)
+
+        fun setSessionProgress(completedCount: Int, totalCount: Int) = player.setSessionProgress(completedCount, totalCount)
 
         fun startVoiceAnswering() {
             voiceCaptureSession.start()

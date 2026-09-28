@@ -80,7 +80,8 @@ internal fun RatedTransitionBuilder.onTranscriptReady(transcript: String) {
 /**
  * A grade rates the head exactly like a manual tap, but the head stays until the feedback notice
  * has finished. A grade for a card that is no longer the head is stale: its Rating is dropped, but
- * its feedback is still spoken.
+ * its feedback is still spoken. A grade that arrives while paused is recorded all the same, and
+ * its feedback waits for the next play.
  */
 internal fun RatedTransitionBuilder.onGraded(grade: VoiceAnswerGrade) {
     if (state.round.phase != Grading || !state.round.hasUtterance) return
@@ -89,7 +90,11 @@ internal fun RatedTransitionBuilder.onGraded(grade: VoiceAnswerGrade) {
         state = recordRating(state, rating, random).copy(consecutiveSilenceCount = 0, consecutiveGradingFailureCount = 0)
     }
     state = state.copy(round = state.round.copy(phase = SpeakingNotice, grade = grade))
-    speakNotice(SpokenNotice.Feedback(rating, grade.feedback))
+    if (state.isPausedWhileGrading) {
+        state = state.copy(isPausedWhileGrading = false, isPausedAfterFeedback = true)
+    } else {
+        speakNotice(SpokenNotice.Feedback(rating, grade.feedback))
+    }
 }
 
 /** Nothing heard: the card goes back unanswered, and the third silence in a row pauses voice answering. */
@@ -113,17 +118,32 @@ internal fun RatedTransitionBuilder.onSilenceTimedOut() {
 /**
  * The answer could not be graded: the card goes back unanswered, like after a silence, counted on
  * its own counter. The third failure in a row pauses voice answering.
+ *
+ * A failure that arrives while paused still reports itself and applies its effect, but its notice
+ * is not spoken: the session waits paused at the auto-advance point, or voice answering pauses.
  */
 internal fun RatedTransitionBuilder.onGradingFailed(reason: GradingFailureReason) {
     if (state.round.phase != Grading || !state.round.hasUtterance) return
+    val isPaused = state.isPausedWhileGrading
     state = recordSilence(state, random).copy(
         consecutiveGradingFailureCount = state.consecutiveGradingFailureCount + 1,
         round = state.round.copy(phase = SpeakingNotice, gradingFailure = reason),
+        isPausedWhileGrading = false,
     )
     if (state.consecutiveGradingFailureCount >= CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD) {
-        speakNotice(SpokenNotice.GradingPause)
+        if (!isPaused) speakNotice(SpokenNotice.GradingPause)
         pauseVoiceAnswering(VoiceAnswerPauseReason.GradingFailures)
         emit(Emit(VoiceAnswerGradingPause))
+        // Without a notice to wait for, the sync runs now.
+        if (isPaused) {
+            syncQueue()
+            if (state.isComplete) emit(SessionComplete)
+        }
+    } else if (isPaused) {
+        emit(Emit(VoiceAnswerGradingFailed(reason)))
+        syncQueue()
+        state = state.copy(round = state.idleRound())
+        if (state.isComplete) emit(SessionComplete) else state = state.copy(isPausedAtAdvancePoint = true)
     } else {
         speakNotice(SpokenNotice.GradingFailed(reason))
         emit(Emit(VoiceAnswerGradingFailed(reason)))
@@ -155,12 +175,59 @@ private fun RatedTransitionBuilder.pauseVoiceAnswering(reason: VoiceAnswerPauseR
         round = VoiceAnswerRound(),
         isPausedAtAdvancePoint = false,
         isHeldAtAdvancePoint = false,
+        isPausedWhileGrading = false,
+        isPausedAfterFeedback = false,
     )
 }
 
 private fun RatedTransitionBuilder.speakNotice(notice: SpokenNotice) {
     state = state.copy(speakingNotices = state.speakingNotices + notice)
     emit(RatedSessionEffect.SpeakNotice(notice))
+}
+
+/**
+ * A user pause, by phase. The open microphone closes and the round starts over from the question,
+ * with nothing counted. Grading goes on. The grading feedback stops before the auto-advance point,
+ * so the queue sync waits, and it is read again from the start on play. A short notice always
+ * finishes, and the tail after it finds the session paused.
+ */
+internal fun RatedTransitionBuilder.pauseVoiceRound() {
+    if (!state.isVoiceAnsweringActive) return
+    when {
+        state.isFeedbackPlaying -> {
+            stopFeedback()
+            emit(RatedSessionEffect.CancelNoticeTail)
+            state = state.copy(isPausedAfterFeedback = true)
+        }
+        state.round.phase == Listening || state.round.phase == SpeechDetected -> {
+            emit(StopListening)
+            state = state.copy(round = state.idleRound())
+        }
+        state.round.phase == Grading -> state = state.copy(isPausedWhileGrading = true)
+        else -> Unit
+    }
+}
+
+/** Stops the feedback and reaches the auto-advance point at once, the same way its natural end does. */
+internal fun RatedTransitionBuilder.skipFeedback() {
+    stopFeedback()
+    emit(RatedSessionEffect.CancelNoticeTail)
+    moveOnFromAdvancePoint()
+}
+
+/** Reads the whole feedback again. The Rating was applied when the grade arrived and is never applied twice. */
+internal fun RatedTransitionBuilder.replayFeedback() {
+    val grade = state.round.grade ?: return
+    state = state.copy(isPausedAfterFeedback = false)
+    emit(RatedSessionEffect.ResumeWithoutReading)
+    speakNotice(SpokenNotice.Feedback(grade.toFlashcardAttemptRating(), grade.feedback))
+}
+
+/** The feedback leaves [RatedSessionState.speakingNotices] here, since a stopped feedback never reports finished. */
+private fun RatedTransitionBuilder.stopFeedback() {
+    if (state.speakingNotices.none { it is SpokenNotice.Feedback }) return
+    state = state.copy(speakingNotices = state.speakingNotices.filterNot { it is SpokenNotice.Feedback })
+    emit(RatedSessionEffect.StopFeedback)
 }
 
 /**

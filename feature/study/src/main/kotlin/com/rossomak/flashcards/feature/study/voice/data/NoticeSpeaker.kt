@@ -43,7 +43,8 @@ internal interface NoticeEngineListener {
  * Speaks [SpokenNotice]s on a text-to-speech engine of their own, separate from [TtsPlayer]'s, so a
  * notice callback never touches the player's utterance state machine (ADR-0031). It makes no
  * session decision; it only guarantees [onNoticeFinished]:
- * - exactly once per [speak] call, in call order, even when a later notice is given up on first;
+ * - exactly once per [speak] call, in call order, even when a later notice is given up on first,
+ *   except for a feedback cut by [stopFeedback], which never reports finished;
  * - a short notice is given up on [WATCHDOG_TIMEOUT] after [speak] at the latest;
  * - [SpokenNotice.Feedback] is given up on if the engine has not started it within
  *   [WATCHDOG_TIMEOUT]; once it speaks, it is cut off [STARTED_FEEDBACK_TIMEOUT] later, a bound
@@ -99,6 +100,23 @@ internal class NoticeSpeaker(
             delay(WATCHDOG_TIMEOUT)
             finish(pending.utteranceId)
         }
+    }
+
+    /**
+     * Cuts the [SpokenNotice.Feedback] being spoken and forgets it: no [onNoticeFinished] for it,
+     * and the engine's late callback for it is dropped. The one exception to the guarantee above.
+     * Text-to-speech cannot pause mid-utterance and a finish carries no id, so a stopped feedback
+     * that still reported finished could be taken for the end of a replay started right after it.
+     * Short notices are never cut.
+     */
+    fun stopFeedback() {
+        val feedback = pendingNotices.filter { it.notice is SpokenNotice.Feedback && !it.isFinished }
+        if (feedback.isEmpty()) return
+        feedback.forEach { it.watchdog?.cancel() }
+        // Forgotten before the stop, so the stop's own callback finds nothing to finish.
+        pendingNotices.removeAll(feedback)
+        engine.stop()
+        deliverFinished()
     }
 
     fun setVoice(voiceId: String?) = engine.setVoice(voiceId)

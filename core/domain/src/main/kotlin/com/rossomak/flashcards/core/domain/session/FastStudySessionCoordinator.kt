@@ -9,6 +9,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
@@ -64,6 +65,7 @@ class FastStudySessionCoordinator @Inject constructor(
     private var playback = VoicePlaybackState()
     private var isObservingVoiceStack = false
     private var hasEnded = false
+    private var pushedTransportCommands: Set<TransportCommandType>? = null
 
     // When the presented card last started or restarted, for the rewind threshold.
     private var presentedCardStartedAt: ComparableTimeMark = timeSource.markNow()
@@ -332,8 +334,14 @@ class FastStudySessionCoordinator @Inject constructor(
         }
     }
 
+    /** The system transport controls get the same commands as the screen; unchanged ones are not sent again. */
     private fun publishPresentationState() {
         val current = state ?: return
+        val availableCommands = current.availableTransportCommands
+        if (setup.readAloudEnabled && availableCommands != pushedTransportCommands) {
+            pushedTransportCommands = availableCommands
+            playbackGateway.setAvailableCommands(availableCommands)
+        }
         _sessionState.value = FastSessionStateSnapshot.Running(
             cards = current.cards,
             currentIndex = current.currentIndex,
@@ -342,6 +350,7 @@ class FastStudySessionCoordinator @Inject constructor(
             playback = playback,
             pauseReason = current.pauseReason,
             isHeldAtAdvancePoint = current.isHeldAtAdvancePoint,
+            availableTransportCommands = availableCommands,
         )
     }
 

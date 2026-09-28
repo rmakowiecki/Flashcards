@@ -54,6 +54,11 @@ package com.rossomak.flashcards.core.domain.model
  * hold moves on and plays.
  * @param isPausedTemporarily playback is paused by a temporary pause, which plays again when it
  * ends; a user pause or play in between replaces it.
+ * @param isPausedWhileGrading the user paused while the answer was being graded. Grading goes on;
+ * a grade that arrives meanwhile is recorded without speaking its feedback.
+ * @param isPausedAfterFeedback the user paused the grading feedback, or it arrived while paused: the
+ * session waits on the graded card, before the auto-advance point. Play reads the feedback again
+ * from the start; next moves on without playing.
  */
 data class RatedSessionState(
     val queue: List<RatedSessionCardRecord>,
@@ -75,6 +80,8 @@ data class RatedSessionState(
     val isAdvanceHoldRequested: Boolean = false,
     val isHeldAtAdvancePoint: Boolean = false,
     val isPausedTemporarily: Boolean = false,
+    val isPausedWhileGrading: Boolean = false,
+    val isPausedAfterFeedback: Boolean = false,
 ) {
     /** How many distinct cards have resolved [FlashcardTerminalRating.Mastered] so far. */
     val masteredCount: Int get() = terminalStates.values.count { it.terminalState == FlashcardTerminalRating.Mastered }
@@ -106,6 +113,20 @@ data class RatedSessionState(
     /** Voice answering is on for this session and nothing has paused it. */
     val isVoiceAnsweringActive: Boolean
         get() = isVoiceAnsweringSession && voiceAnswerPauseReason == null && pauseReason == null
+
+    /**
+     * The grading feedback is being read, or its tail is running: the round has a grade, and
+     * nothing has paused or held it.
+     */
+    val isFeedbackPlaying: Boolean
+        get() = isVoiceAnsweringActive &&
+            round.phase == VoiceAnswerPhase.SpeakingNotice &&
+            round.grade != null &&
+            !isPausedAfterFeedback &&
+            !isHeldAtAdvancePoint
+
+    /** A notice other than the grading feedback is still being spoken. */
+    val isShortNoticeSpeaking: Boolean get() = speakingNotices.any { it.isShort }
 }
 
 /** How the head of a [RatedSessionState.queue] moves at the next queue sync. */

@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
@@ -373,6 +374,28 @@ class FastStudySessionCoordinatorTest {
 
         playbackGateway.calls.size shouldBe callCount
         events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `the system controls drop next at the last card's answer, and get it back on a restart`() = runTest {
+        val coordinator = startCoordinator().also { moveToCard(2) }
+        playbackGateway.availableCommandsUpdates.last() shouldBe TransportCommandType.entries.toSet()
+
+        playbackGateway.readAnswer()
+        runCurrent()
+        playbackGateway.availableCommandsUpdates.last() shouldBe TransportCommandType.entries.toSet() - TransportCommandType.Next
+        coordinator.runningSnapshot.availableTransportCommands shouldBe playbackGateway.availableCommandsUpdates.last()
+
+        moveToCard(2)
+
+        playbackGateway.availableCommandsUpdates.last() shouldBe TransportCommandType.entries.toSet()
+    }
+
+    @Test
+    fun `read-aloud off never sends commands to the system controls`() = runTest {
+        startCoordinator(setup.copy(readAloudEnabled = false))
+
+        playbackGateway.availableCommandsUpdates shouldBe emptyList()
     }
 
     @Test

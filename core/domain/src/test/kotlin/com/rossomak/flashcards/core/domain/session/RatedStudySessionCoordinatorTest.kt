@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
@@ -317,11 +318,33 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `a pause before the tail ends holds the session, and the next play advances`() = runTest {
+    fun `a pause before the feedback tail ends waits after the feedback, and the next play reads it again`() = runTest {
         gradingRepository.gradingFlow = gradedFlow()
         val coordinator = startCoordinator()
         captureAnswer()
         advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        coordinator.pause()
+        runCurrent()
+
+        advanceTimeBy(NOTICE_TAIL * 2)
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        coordinator.runningSnapshot.isPausedAfterFeedback shouldBe true
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+
+        coordinator.play()
+
+        playbackGateway.spokenNotices shouldBe List(2) { SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE) }
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.playCount shouldBe 0
+    }
+
+    @Test
+    fun `a pause before a short notice's tail ends holds the session, and the next play advances`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
         runCurrent()
         finishNotice()
         coordinator.pause()
@@ -335,6 +358,145 @@ class RatedStudySessionCoordinatorTest {
 
         playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
         playbackGateway.playCount shouldBe 0
+    }
+
+    // Pause in every phase
+
+    @Test
+    fun `a pause while listening closes the microphone and stops the silence timer, counting nothing`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.pause()
+        advanceTimeBy(SILENCE_TIMEOUT * 2)
+        runCurrent()
+
+        captureGateway.isListening shouldBe false
+        playbackGateway.spokenNotices shouldBe emptyList()
+        events shouldBe emptyList()
+        with(coordinator.runningSnapshot) {
+            round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+            cards.firstOrNull()?.id shouldBe "card-1"
+        }
+    }
+
+    @Test
+    fun `a grade that arrives while paused is recorded silently, and play reads its feedback`() = runTest {
+        val gradeGate = CompletableDeferred<Unit>()
+        gradingRepository.gradingFlow = flow {
+            emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
+            gradeGate.await()
+            emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
+        }
+        val coordinator = startCoordinator()
+        captureAnswer()
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+
+        gradeGate.complete(Unit)
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        playbackGateway.spokenNotices shouldBe emptyList()
+        coordinator.runningSnapshot.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+        coordinator.runningSnapshot.isPausedAfterFeedback shouldBe true
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        playbackGateway.spokenNotices shouldBe listOf(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
+        playbackGateway.calls shouldContain Call.ResumeWithoutReading
+        coordinator.runningSnapshot.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+    }
+
+    @Test
+    fun `a pause during the feedback then an immediate play reads it again, and only its own end advances`() = runTest {
+        gradingRepository.gradingFlow = gradedFlow()
+        val coordinator = startCoordinator()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        coordinator.pause()
+        coordinator.play()
+        runCurrent()
+        advanceTimeBy(NOTICE_TAIL * 2)
+
+        playbackGateway.calls shouldContain Call.StopFeedback
+        playbackGateway.speakingNotices shouldBe listOf(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL + 1.milliseconds)
+
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
+    }
+
+    @Test
+    fun `skipping the feedback syncs the queue once and reads the next question`() = runTest {
+        gradingRepository.gradingFlow = gradedFlow()
+        val coordinator = startCoordinator()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        coordinator.skipFeedback()
+        advanceTimeBy(NOTICE_TAIL * 2)
+
+        playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        coordinator.runningSnapshot.currentCardRatings shouldBe emptyList()
+    }
+
+    @Test
+    fun `external next during the feedback skips it and is reported`() = runTest {
+        gradingRepository.gradingFlow = gradedFlow()
+        val coordinator = startCoordinator()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        playbackGateway.emitExternal(TransportCommand.Next)
+        runCurrent()
+
+        playbackGateway.calls shouldContain Call.StopFeedback
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        events shouldContain RatedSessionEvent.ExternalTransportCommand(TransportCommand.Next)
+    }
+
+    // Available commands
+
+    @Test
+    fun `the system controls get the live commands and the session's own counter`() = runTest {
+        startCoordinator()
+        playbackGateway.availableCommandsUpdates.last() shouldBe setOf(
+            TransportCommandType.Pause,
+            TransportCommandType.Stop,
+            TransportCommandType.Next,
+            TransportCommandType.Previous,
+            TransportCommandType.PreviousCard,
+        )
+        playbackGateway.sessionProgressUpdates.last() shouldBe FakeStudyVoicePlaybackGateway.SessionProgress(completedCount = 0, totalCount = 3)
+
+        openListening()
+
+        playbackGateway.availableCommandsUpdates.last() shouldBe setOf(TransportCommandType.Pause, TransportCommandType.Stop)
+    }
+
+    @Test
+    fun `an external play while only pause is offered is ignored`() = runTest {
+        startCoordinator()
+        openListening()
+        val callsBefore = playbackGateway.calls.size
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        playbackGateway.calls.size shouldBe callsBefore
+        events shouldBe emptyList()
     }
 
     // The advance hold

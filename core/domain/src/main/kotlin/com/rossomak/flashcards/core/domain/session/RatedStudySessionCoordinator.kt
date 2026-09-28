@@ -14,19 +14,21 @@ import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
-import com.rossomak.flashcards.core.domain.model.isShort
 import com.rossomak.flashcards.core.domain.model.sealRatedCardResults
+import com.rossomak.flashcards.core.domain.model.type
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
 import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelSilenceTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Emit
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Grade
@@ -34,10 +36,12 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.OpenListen
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartVoiceAnswering
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopFeedback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopListening
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopVoiceStack
@@ -108,6 +112,8 @@ class RatedStudySessionCoordinator @Inject constructor(
     private var noticeTailJob: Job? = null
     private var isMicPermissionRevoked = false
     private var hasEnded = false
+    private var pushedTransportCommands: Set<TransportCommandType>? = null
+    private var pushedSessionProgress: Pair<Int, Int>? = null
 
     /**
      * The session-start progress read, merged across the routed Subcategories. A failed read leaves
@@ -162,6 +168,11 @@ class RatedStudySessionCoordinator @Inject constructor(
 
     fun previous() {
         dispatch(RatedSessionInput.PreviousRequested)
+    }
+
+    /** Skips the grading feedback being read and moves on; does nothing once it has ended or paused. */
+    fun skipFeedback() {
+        dispatch(RatedSessionInput.FeedbackSkipRequested)
     }
 
     /**
@@ -342,9 +353,12 @@ class RatedStudySessionCoordinator @Inject constructor(
 
     /**
      * Applied exactly like the matching in-app command. A controller's stop only pauses. A command
-     * that changed the session is then reported, so the screen can react to it.
+     * the session does not offer right now is ignored: a controller can race the update of the
+     * offered set. A command that changed the session is then reported, so the screen can react to it.
      */
     private fun onExternalCommand(command: TransportCommand) {
+        val current = state ?: return
+        if (command.type !in current.availableTransportCommands) return
         val isChanged = when (command) {
             TransportCommand.Play -> applyPlay()
             TransportCommand.Pause, TransportCommand.Stop -> dispatch(RatedSessionInput.PauseRequested)
@@ -436,8 +450,11 @@ class RatedStudySessionCoordinator @Inject constructor(
                     dispatch(RatedSessionInput.NoticeTailElapsed)
                 }
             }
+            CancelNoticeTail -> noticeTailJob?.cancel()
+            StopFeedback -> playbackGateway.stopFeedback()
             PausePlayback -> playbackGateway.pause()
             Play -> playbackGateway.play()
+            ResumeWithoutReading -> playbackGateway.resumeWithoutReading()
             RestartCurrentCard -> playbackGateway.restartCurrentCard()
             StopVoiceAnswering -> {
                 listeningJob?.cancel()
@@ -504,8 +521,24 @@ class RatedStudySessionCoordinator @Inject constructor(
         eventChannel.trySend(RatedSessionEvent.MicPermissionRevoked)
     }
 
+    /**
+     * Publishes the snapshot, and hands the system transport controls the same commands and counter
+     * the screen shows, so the two never drift apart. Unchanged values are not sent again.
+     */
     private fun publish() {
         val current = state ?: return
+        val availableCommands = current.availableTransportCommands
+        if (current.isVoiceAnsweringSession) {
+            if (availableCommands != pushedTransportCommands) {
+                pushedTransportCommands = availableCommands
+                playbackGateway.setAvailableCommands(availableCommands)
+            }
+            val progress = current.completedCount to current.distinctCardCount
+            if (progress != pushedSessionProgress) {
+                pushedSessionProgress = progress
+                playbackGateway.setSessionProgress(completedCount = progress.first, totalCount = progress.second)
+            }
+        }
         _sessionState.value = with(current) {
             RatedSessionStateSnapshot.Running(
                 cards = remainingCards,
@@ -517,12 +550,15 @@ class RatedStudySessionCoordinator @Inject constructor(
                 playback = playback,
                 round = round,
                 speakingNotice = speakingNotices.firstOrNull(),
-                isShortNoticeSpeaking = speakingNotices.any { it.isShort },
+                isShortNoticeSpeaking = isShortNoticeSpeaking,
                 isVoiceAnsweringActive = isVoiceAnsweringActive,
                 voiceAnswerPauseReason = voiceAnswerPauseReason,
                 isPausedAtAdvancePoint = isPausedAtAdvancePoint,
                 isHeldAtAdvancePoint = isHeldAtAdvancePoint,
                 pauseReason = pauseReason,
+                isPausedWhileGrading = isPausedWhileGrading,
+                isPausedAfterFeedback = isPausedAfterFeedback,
+                availableTransportCommands = availableCommands,
             )
         }
     }

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,9 +44,10 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButton
@@ -76,6 +78,7 @@ private val RatedVoiceSheetMode.group: RatedVoiceSheetGroup
         Listening, Pending, is GradingWithTranscript, is Graded -> RatedVoiceSheetGroup.VoiceRound
     }
 
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
 internal fun RatedVoiceSheetContent(
     state: RatedStudySessionScreenState,
@@ -84,6 +87,7 @@ internal fun RatedVoiceSheetContent(
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
+    onVoiceFeedbackSkip: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
     val voiceSheetMode = state.voiceSheetMode
@@ -114,6 +118,7 @@ internal fun RatedVoiceSheetContent(
             RatedVoiceSheetGroup.VoiceRound -> RatedVoiceRoundSheet(
                 voiceSheetMode = voiceSheetMode,
                 voiceBarsLevels = voiceBarsLevels,
+                onFeedbackSkip = onVoiceFeedbackSkip,
             )
         }
     }
@@ -155,11 +160,16 @@ private fun RatedVoiceTransportSheet(
  * progress disc or the Rating circle, with the label under it and the title and paragraph beside
  * it once there is text to show. The three discs stay separate composables; only the slot is kept
  * across the grading modes, and only the slot animates its bounds when it moves to the left.
+ *
+ * While the feedback is read ([Graded]) a tap anywhere on the sheet skips it, with no visual hint;
+ * TalkBack offers it as the sheet's click action.
  */
 @Composable
-private fun RatedVoiceRoundSheet(voiceSheetMode: RatedVoiceSheetMode, voiceBarsLevels: StateFlow<ImmutableList<Float>>) {
+private fun RatedVoiceRoundSheet(voiceSheetMode: RatedVoiceSheetMode, voiceBarsLevels: StateFlow<ImmutableList<Float>>, onFeedbackSkip: () -> Unit) {
     // Collected here, not at the screen root: a new level every wave interval recomposes only the round.
     val currentVoiceBarsLevels by voiceBarsLevels.collectAsStateWithLifecycle()
+    val isFeedbackSkippable = voiceSheetMode is Graded
+    val skipFeedbackLabel = stringResource(R.string.study_session_voice_feedback_skip_cd)
     val isListening = voiceSheetMode == Listening
     val isBadgeCentered = voiceSheetMode !is GradingWithTranscript && voiceSheetMode !is Graded
     val roundDescription = ratedVoiceRoundDescription(voiceSheetMode)
@@ -172,9 +182,22 @@ private fun RatedVoiceRoundSheet(voiceSheetMode: RatedVoiceSheetMode, voiceBarsL
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .clickable(
+                    interactionSource = null,
+                    indication = null,
+                    enabled = isFeedbackSkippable,
+                    onClickLabel = skipFeedbackLabel,
+                    onClick = onFeedbackSkip,
+                )
                 .clearAndSetSemantics {
                     roundDescription?.let { contentDescription = it }
                     liveRegion = LiveRegionMode.Polite
+                    if (isFeedbackSkippable) {
+                        onClick(label = skipFeedbackLabel) {
+                            onFeedbackSkip()
+                            true
+                        }
+                    }
                 },
         ) {
             // Listening to Pending happens in place: the indicator folds its bars into its disc
@@ -360,18 +383,9 @@ private fun RatedVoiceTransportRow(
     onVoicePrevious: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // While voice-answering is actively listening/grading/speaking feedback, manual skip
-    // controls must stay disabled: skipping to the answer here would start the player reading
-    // the answer aloud while the round's microphone is still open (grading the TTS's own
-    // voice), and skipping during SpeakingNotice would start the next question while the
-    // notice about the current card is still being spoken — two overlapping voices.
-    val busyStateSet = setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected, VoiceAnswerPhase.Grading, VoiceAnswerPhase.SpeakingNotice)
-    val isVoiceAnswerBusy = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in busyStateSet
-    // Pause only needs to stay disabled for the narrower "answer listening" window — it
-    // toggles the main TtsPlayer, which is a no-op while the mic is what's actually capturing
-    // (LISTENING/SPEECH_DETECTED); re-enables the moment the answer (or its absence) has been
-    // noted and GRADING/SPEAKING_NOTICE takes over.
-    val isVoiceAnswerListening = state.isVoiceAnswerEnabled && state.voiceAnswerPhase in setOf(VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected)
+    // The same commands the notification and a headset offer, so the surfaces never drift apart.
+    val commands = state.availableTransportCommands
+    val playPauseCommand = if (state.isVoicePlaying) TransportCommandType.Pause else TransportCommandType.Play
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
@@ -379,7 +393,7 @@ private fun RatedVoiceTransportRow(
     ) {
         IconButton(
             onClick = onVoicePrevious,
-            enabled = state.isVoiceActive && state.currentCardIndex > 0 && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
+            enabled = state.isVoiceActive && TransportCommandType.Previous in commands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
@@ -391,12 +405,12 @@ private fun RatedVoiceTransportRow(
             icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd),
             onClick = onVoicePlayPause,
-            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && !isVoiceAnswerListening,
+            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && playPauseCommand in commands,
         )
         Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
         IconButton(
             onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-            enabled = state.isVoiceActive && !isVoiceAnswerBusy && !state.isVoiceAnswerPaused,
+            enabled = state.isVoiceActive && TransportCommandType.Next in commands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,

@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import kotlinx.coroutines.channels.Channel
@@ -38,7 +39,12 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
         data class SetSpeechRate(val rate: Float) : Call
         data class SetVoice(val voiceId: String?) : Call
         data class SpeakNotice(val notice: SpokenNotice) : Call
+        data object StopFeedback : Call
+        data object ResumeWithoutReading : Call
     }
+
+    /** One [setSessionProgress] call. */
+    data class SessionProgress(val completedCount: Int, val totalCount: Int)
 
     override val state = MutableStateFlow(VoicePlaybackState())
 
@@ -64,6 +70,13 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     val lastSpeechRate: Float? get() = calls.filterIsInstance<Call.SetSpeechRate>().lastOrNull()?.rate
     val lastVoiceId: String? get() = calls.filterIsInstance<Call.SetVoice>().lastOrNull()?.voiceId
     val spokenNotices: List<SpokenNotice> get() = calls.filterIsInstance<Call.SpeakNotice>().map { it.notice }
+
+    // Kept apart from [calls]: they follow every state change, and would crowd the command order.
+    /** Every [setAvailableCommands] call, in order. */
+    val availableCommandsUpdates = mutableListOf<Set<TransportCommandType>>()
+
+    /** Every [setSessionProgress] call, in order. */
+    val sessionProgressUpdates = mutableListOf<SessionProgress>()
 
     /** The advance gate, as last set. */
     var isAdvanceGateClosed: Boolean = false
@@ -200,5 +213,24 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     override fun speakNotice(notice: SpokenNotice) {
         calls += Call.SpeakNotice(notice)
         speakingNotices += notice
+    }
+
+    /** Like the real player, a stopped feedback never reports finished. */
+    override fun stopFeedback() {
+        calls += Call.StopFeedback
+        speakingNotices.removeAll { it is SpokenNotice.Feedback }
+    }
+
+    override fun resumeWithoutReading() {
+        calls += Call.ResumeWithoutReading
+        state.update { it.copy(isPlaying = it.isActive) }
+    }
+
+    override fun setAvailableCommands(commands: Set<TransportCommandType>) {
+        availableCommandsUpdates += commands
+    }
+
+    override fun setSessionProgress(completedCount: Int, totalCount: Int) {
+        sessionProgressUpdates += SessionProgress(completedCount, totalCount)
     }
 }
