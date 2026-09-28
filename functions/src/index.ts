@@ -6,6 +6,7 @@ import { transcribeWithElevenLabsScribe } from "./lib/elevenlabs";
 import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
 import {
   SubmitStudySessionResult,
+  requireOwnerMatchesCaller,
   submitStudySession as runSubmitStudySession,
   validateSubmitStudySessionRequest,
 } from "./lib/submitStudySession";
@@ -144,5 +145,6 @@ export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResu
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Missing Firebase ID token");
   const validated = validateSubmitStudySessionRequest(request.data);
+  requireOwnerMatchesCaller(uid, validated);
   return runSubmitStudySession(uid, validated);
 });

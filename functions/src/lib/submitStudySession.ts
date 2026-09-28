@@ -116,6 +116,13 @@ export interface SubmitStudySessionCardResult {
 }
 
 export interface ValidatedSubmitStudySessionRequest {
+  /**
+   * The uid of the User who finished the session, as stored in the client's pending-submission queue.
+   * Checked against the caller's auth uid by `requireOwnerMatchesCaller`: the client picks the entry
+   * before the SDK attaches an ID token, so a sign-in change in between must never commit one User's
+   * session to another.
+   */
+  ownerUid: string;
   sessionId: string;
   studyMode: StudyMode;
   startedAtEpochMillis: number;
@@ -260,6 +267,7 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
   if (typeof data !== "object" || data === null) fail("request body must be an object");
   const body = data as Record<string, unknown>;
 
+  const ownerUid = requireNonEmptyString(body.ownerUid, "ownerUid");
   const sessionId = requireFirestoreSafeId(body.sessionId, "sessionId");
   const studyMode = body.studyMode;
   if (studyMode !== "Rated" && studyMode !== "Fast") fail("studyMode must be Rated or Fast");
@@ -299,6 +307,7 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
   }
 
   return {
+    ownerUid,
     sessionId,
     studyMode,
     startedAtEpochMillis,
@@ -312,6 +321,17 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
     studyDateUtcOffsetMinutes,
     dailyGoalMinutes,
   };
+}
+
+/**
+ * Rejects a session whose queued owner is not the signed-in caller. `unauthenticated`, not a
+ * validation code: the session itself is fine, only the token is the wrong User's, so the client keeps
+ * it queued and delivers it once its owner signs in again instead of dead-lettering it.
+ */
+export function requireOwnerMatchesCaller(callerUid: string, request: ValidatedSubmitStudySessionRequest): void {
+  if (request.ownerUid !== callerUid) {
+    throw new HttpsError("unauthenticated", "Session owner does not match the signed-in user");
+  }
 }
 
 interface CardProgressUpdateFields {
