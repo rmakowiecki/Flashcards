@@ -9,14 +9,14 @@ import java.io.IOException
  * the whole cause chain is searched. Everything else, including an HTTP 503, an entitlement
  * rejection or a protocol violation, means the service was reached.
  */
-internal fun Throwable.toGradingFailureReason(): GradingFailureReason {
+internal fun Throwable.toGradingFailureReason(): GradingFailureReason =
+    if (isConnectionFailure()) GradingFailureReason.NoConnection else GradingFailureReason.ServiceError
+
+/** The service was never reached: an [IOException] anywhere in the cause chain. */
+internal fun Throwable.isConnectionFailure(): Boolean {
     // Bounded, since a malformed cause chain can loop back on itself.
     val causeChain = generateSequence(this) { throwable -> throwable.cause }.take(MAX_CAUSE_CHAIN_DEPTH)
-    return if (causeChain.any { throwable -> throwable is IOException }) {
-        GradingFailureReason.NoConnection
-    } else {
-        GradingFailureReason.ServiceError
-    }
+    return causeChain.any { throwable -> throwable is IOException }
 }
 
 private const val MAX_CAUSE_CHAIN_DEPTH = 16

@@ -29,9 +29,9 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
 
     /**
      * Collects the single streamed call (ADR-0028), re-emitting each wire event as a domain
-     * [VoiceAnswerGradingEvent]. A transient [IOException] retries the *whole* call from
-     * scratch with backoff — the server has no partial-progress concept to resume, so a retry
-     * after the transcript chunk already arrived simply re-emits a fresh
+     * [VoiceAnswerGradingEvent]. A transient [IOException], bare or wrapped by the SDK, retries
+     * the *whole* call from scratch with backoff — the server has no partial-progress concept to
+     * resume, so a retry after the transcript chunk already arrived simply re-emits a fresh
      * [VoiceAnswerGradingEvent.TranscriptReady] to the collector. Any other failure, and an
      * [IOException] once the retries run out, ends the flow with [VoiceAnswerGradingEvent.Failed]
      * rather than throwing; only cancellation propagates.
@@ -68,7 +68,7 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
             }
     }
         .retryWhen { cause, attempt ->
-            val shouldRetry = cause is IOException && attempt + 1 < MAX_UPLOAD_ATTEMPTS
+            val shouldRetry = cause.isConnectionFailure() && attempt + 1 < MAX_UPLOAD_ATTEMPTS
             if (shouldRetry) delay(BASE_RETRY_DELAY_MS * (1L shl attempt.toInt()))
             shouldRetry
         }

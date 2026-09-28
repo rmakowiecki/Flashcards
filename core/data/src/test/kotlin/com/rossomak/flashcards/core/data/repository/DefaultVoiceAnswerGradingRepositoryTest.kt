@@ -72,6 +72,21 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     }
 
     @Test
+    fun `transcribeAndGradeSpokenAnswer retries an io failure the SDK wrapped in its own exception`() = runTest {
+        every {
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+        } returns flow<VoiceGradingStreamEventDto> {
+            throw IllegalStateException("request failed", IOException("timeout"))
+        } andThen successfulStream()
+
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+            awaitItem() shouldBe VoiceAnswerGradingEvent.TranscriptReady(sanitizedTranscript)
+            awaitItem() shouldBe VoiceAnswerGradingEvent.Graded(expectedGrade)
+            awaitComplete()
+        }
+    }
+
+    @Test
     fun `transcribeAndGradeSpokenAnswer gives up after exhausting retries and ends with a no-connection failure`() = runTest {
         every {
             voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
