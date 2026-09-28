@@ -48,6 +48,11 @@ class FlashcardViewModel @Inject constructor(
 }
 ```
 
+### Session Coordinators (Domain Layer)
+Stateful session logic (a Study Session's queue, rounds, timers and result) lives in `core:domain`, not in a ViewModel: a pure `XxxReducer` (state + input in, next state + ordered effects out, constructor takes only `Random`) run by a stateful `XxxCoordinator` that holds the state, executes the effects and talks to gateways and repositories directly. The ViewModel starts the coordinator with `viewModelScope`, stops it in `onCleared()`, and only maps its snapshot and events to screen state, messages and navigation. The snapshot is plain data: derived rules live on the reducer state, and the coordinator copies their results into the snapshot. See [ADR-0054](./docs/adr/0054-study-session-rules-in-domain-coordinators.md).
+- **Boundary rule**: state that anything other than the screen can change (headset, notification, audio focus, an engine failure, a timer) lives in the coordinator; the ViewModel may request a change but never owns or mirrors it.
+- **Timer rule**: every timer that changes round or session state lives in the coordinator; implementations keep only platform mechanics.
+
 ### Use Cases (Domain Layer)
 - One use case = one business action
 - Return `Result<T>` for operations that can fail

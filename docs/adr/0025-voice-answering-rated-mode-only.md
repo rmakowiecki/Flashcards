@@ -10,7 +10,7 @@ Engine-sharing, silence-timeout, and grade-band mechanics are documented in [ADR
 
 ## Context
 
-The original implementation gated `VoiceAnswerController`'s activation on `StudySessionViewModel.isVoiceActive`, which only ever became `true` via `onVoiceAutoStart()` — itself only triggered `when route.studyMode == StudyMode.FAST`. Net effect: voice answering was reachable only in Fast mode and unreachable in Rated mode — the opposite of the intended use case (phone-in-pocket hands-free *rating*, which only makes sense where a rating step exists at all — Fast mode has none, per ADR-0016: "Fast mode has no Rating step... There is no Correct/Failed outcome per card").
+The original implementation gated the voice-answering controller's activation on `StudySessionViewModel.isVoiceActive`, which only ever became `true` via `onVoiceAutoStart()` — itself only triggered `when route.studyMode == StudyMode.FAST`. Net effect: voice answering was reachable only in Fast mode and unreachable in Rated mode — the opposite of the intended use case (phone-in-pocket hands-free *rating*, which only makes sense where a rating step exists at all — Fast mode has none, per ADR-0016: "Fast mode has no Rating step... There is no Correct/Failed outcome per card").
 
 Neither the design doc (`docs/design/premium-voice-grading-pipeline.md`) nor any prior ADR specified Fast vs. Rated scoping — this was an implementation gap, not a documented decision being reversed.
 
@@ -23,4 +23,5 @@ Neither the design doc (`docs/design/premium-voice-grading-pipeline.md`) nor any
 ## Consequences
 
 - Rated gains exactly two submodes (voice-answering, manual); Fast is untouched by this decision.
+- The submode never changes once the session starts: a voice-answering session never falls back to the manual one. When a voice engine cannot start, the session pauses (`SessionPauseReason.VoiceEngineUnavailable`) and a resume restarts the voice stack ([ADR-0054](0054-study-session-rules-in-domain-coordinators.md)).
 - Follow-up, still not built: the "TTS-reading-only, voice-answering off" middle Rated mode, contingent on manual self-rating buttons existing at all.

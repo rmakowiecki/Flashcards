@@ -15,9 +15,9 @@ and a short-notice flag:
 | `Graded` | `SpeakingNotice` with a grade | Rating circle left, Rating name, "Your answer rating" + rationale |
 
 A short notice (silence skip, silence pause, grading failure, capture failure) always maps to `Pending`: a status
-message, not content, so it has no controls. `VoiceAnswerState.isShortNoticeSpeaking` marks it. The flag survives
-`VoiceAnswerController.stop()`, because a pause stops voice answering while its own notice is still speaking. It
-clears when that utterance finishes, on `release()`, or after a 5 s safety timeout. While it is set, `Pending` wins
+message, not content, so it has no controls. The Rated session snapshot's `isShortNoticeSpeaking` marks it. The
+flag survives a pause, because a pause stops voice answering while its own notice is still speaking. It clears when
+`NoticeSpeaker` reports that notice finished: when the utterance ends, or after a 5 s watchdog. While it is set, `Pending` wins
 over a pause, and the card the notice is about stays on screen; afterwards the sheet shows the next card's `Transport`, or the ordinary paused `Transport` with no
 special wording.
 
@@ -36,8 +36,9 @@ circle, which carries the Rating color. There is no shared disc and no color ani
 **The user's spoken answer.** The sanitized transcript ([ADR-0028](0028-voice-answering-not-background-only-streamed-transcript-then-grade.md))
 appears only in the sheet, only from its arrival until the grade, and never comes back after grading. Its sole job
 is letting the user confirm their speech was recognized, so it stays on screen for at least one second:
-`holdGradedUntilTranscriptShown` in `VoiceAnswerController` holds the grade, or a grading failure, until then. The
-hold sits in the controller, not the UI, so the spoken notice and the visual change still start together. The
+`holdGradedUntilTranscriptShown`, applied by `RatedStudySessionCoordinator`, holds the grade, or a grading failure,
+until then. The hold sits in the coordinator, not the UI, so the spoken notice and the visual change still start
+together. The
 transcript is display-only: never spoken by TTS and never exposed to TalkBack, whether as a content description, a
 live region or focusable text. The voice round exposes one polite live region announcing "Listening", then "Grading",
 then the Rating name. The rationale is left to the spoken feedback.
@@ -49,8 +50,9 @@ scrolls inside it and is never truncated.
 name and the rationale. `VoiceAnswerGrade.gradePercent` stays, because it drives the grade bands
 ([ADR-0031](0031-voice-answering-shared-tts-engine-silence-timeout-grade-bands.md)).
 
-**Grading failures stay snackbars.** `VoiceAnswerFailureReason.GradingFailed` is sealed: `NoConnection` or
-`ServiceError`. `Throwable.toGradingFailureReason()` returns `NoConnection` when an `IOException` appears anywhere in
+**Grading failures stay snackbars.** `GradingFailureReason` is sealed: `NoConnection` or `ServiceError`. The
+grading repository classifies a failure itself and ends the stream with it: `Throwable.toGradingFailureReason()`
+returns `NoConnection` when an `IOException` appears anywhere in
 the cause chain, because the Firebase Functions SDK wraps a failed or timed-out request in its own exception with the
 `IOException` as the cause. Everything else is `ServiceError`, including an HTTP 503 and an entitlement rejection,
 since the server was reached. Each variant has its own snackbar and its own spoken notice; a hands-free user may
@@ -113,8 +115,8 @@ so it must follow the real signal, including sound the VAD would not call speech
 ## Consequences
 
 - Every voice-round phase maps to a real sheet mode; there is no fallback layout.
-- `VoiceAnswerController` has no unit tests (it depends on the capture engine and TTS), so its timing logic lives in
-  pure, separately tested pieces: `holdGradedUntilTranscriptShown`, `toGradingFailureReason` and
-  `VoiceLevelWaveShaper`.
-- The short-notice flag has a 5 s timeout, so notices must stay short.
+- The round's timing lives in `core:domain` and is tested in virtual time: `RatedSessionReducer`,
+  `RatedStudySessionCoordinator` and `holdGradedUntilTranscriptShown`. `toGradingFailureReason`, `NoticeSpeaker`'s
+  watchdog and `VoiceLevelWaveShaper` are tested on their own.
+- A short notice is given up on 5 s after it is spoken, so notices must stay short.
 - The same indicator and pipeline serve the Rated sheet, the onboarding voice test and the Voice debug screen.
