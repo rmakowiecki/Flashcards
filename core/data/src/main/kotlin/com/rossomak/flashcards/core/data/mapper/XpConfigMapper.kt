@@ -5,8 +5,9 @@ import com.rossomak.flashcards.core.domain.model.XpConfig
 
 /**
  * Validates with the same rules `submitStudySession` applies to the same document: every field
- * present and finite, every award a whole number, the de-mastery penalty at most zero, and the level
- * curve's base positive (a base of zero or less makes every level threshold zero).
+ * present and finite, every award a whole number, the de-mastery penalty at most zero, the level
+ * curve's base positive (a base of zero or less makes every level threshold zero), and its exponent
+ * zero or positive (a negative exponent makes each level cheaper than the one before it).
  *
  * @throws IllegalArgumentException naming the first invalid field.
  */
@@ -27,6 +28,7 @@ fun XpConfigDto.toDomain(): XpConfig {
     )
     require(config.cardDemastered <= 0) { "cardDemastered must be zero or negative, got ${config.cardDemastered}" }
     require(config.levelCurveBase > 0) { "levelCurveBase must be positive, got ${config.levelCurveBase}" }
+    require(config.levelCurveExponent >= 0) { "levelCurveExponent must be zero or positive, got ${config.levelCurveExponent}" }
     return config
 }
 
