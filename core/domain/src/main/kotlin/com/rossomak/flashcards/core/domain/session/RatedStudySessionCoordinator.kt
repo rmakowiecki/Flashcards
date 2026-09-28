@@ -157,14 +157,18 @@ class RatedStudySessionCoordinator @Inject constructor(
     /**
      * Resumes a paused session, with the microphone permission checked first (ADR-0052). After an
      * engine failure the whole voice stack starts again at the presented card; after a voice-answer
-     * pause, voice answering starts again on the same card.
+     * pause, voice answering starts again on the same card. The pause is read after the permission
+     * check, so a second resume that waited behind the first finds nothing left to resume.
      */
     fun resume() {
-        val current = state ?: return
+        if (state == null) return
         requireNotNull(scope).launch {
+            val isMicrophoneNeeded = state?.isVoiceAnsweringSession == true
+            val isMicrophoneAvailable = !isMicrophoneNeeded || isMicrophoneGranted()
+            val current = state ?: return@launch
             val isEnginePause = current.pauseReason == SessionPauseReason.VoiceEngineUnavailable
             if (!isEnginePause && current.voiceAnswerPauseReason == null) return@launch
-            if (current.isVoiceAnsweringSession && !isMicrophoneGranted()) {
+            if (!isMicrophoneAvailable) {
                 onMicPermissionRevoked()
                 return@launch
             }

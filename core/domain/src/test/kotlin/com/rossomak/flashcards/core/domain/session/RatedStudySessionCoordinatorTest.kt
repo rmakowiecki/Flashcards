@@ -394,6 +394,22 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.startCalls.size shouldBe 2
     }
 
+    @Test
+    fun `a double resume during an engine pause restarts the voice stack once`() = runTest {
+        val coordinator = startCoordinator()
+        playbackGateway.emit(PlaybackEvent.EngineUnavailable)
+        runCurrent()
+        val stopsBeforeResume = playbackGateway.stopCount
+
+        coordinator.resume()
+        coordinator.resume()
+        runCurrent()
+
+        playbackGateway.startCalls.size shouldBe 2
+        playbackGateway.stopCount shouldBe stopsBeforeResume + 1
+        coordinator.runningSnapshot.pauseReason shouldBe null
+    }
+
     // External commands
 
     @Test
