@@ -10,11 +10,13 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
  * always zero for a Fast result — Fast never produces those outcomes — and the content chooses the
  * reduced Fast variant off [mode] rather than inferring it from the counts being zero.
  *
- * [xpLines]/[xpTotal]/[level]/[xpIntoCurrentLevel]/[xpForNextLevel] all stay at
- * their zero defaults until the session's commit resolves — the state is populated from the route
+ * [xpLines]/[xpTotal]/[level]/[xpIntoCurrentLevel]/[xpForNextLevel]/[levelsCrossed] all stay at
+ * their zero defaults until the session's submission resolves — the state is populated from the route
  * synchronously, before that I/O-dependent calculation can possibly have run. [xpLines] never
  * includes a zero-[XpBreakdownLine.amount] entry; a future redesign replaces this plain
  * list with the animated pour, against content this makes real for the first time.
+ *
+ * [levelsCrossed] is carried for a Level-up celebration and not rendered yet.
  */
 data class StudySessionSummaryScreenState(
     val mode: StudyMode = StudyMode.Rated,
@@ -30,4 +32,5 @@ data class StudySessionSummaryScreenState(
     val level: Int = ScoringState.STARTING_LEVEL,
     val xpIntoCurrentLevel: Long = 0,
     val xpForNextLevel: Long = 0,
+    val levelsCrossed: List<Int> = emptyList(),
 )

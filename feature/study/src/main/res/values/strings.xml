@@ -90,6 +90,9 @@
     <string name="study_session_summary_xp_row_mastery_lost_label">Mastery Lost</string>
     <string name="study_session_summary_xp_row_time_studied_label">Time Studied</string>
     <string name="study_session_summary_xp_row_session_completed_label">Session Completed</string>
+    <string name="study_session_summary_xp_row_daily_goal_label">Daily Goal Met</string>
+    <string name="study_session_summary_xp_row_streak_label">Study Streak</string>
+    <string name="study_session_summary_xp_row_amount_label">%1$d XP</string>
 
     <string name="preview_session_quick_title">Quick session</string>
     <string name="preview_session_custom_title">Custom session</string>

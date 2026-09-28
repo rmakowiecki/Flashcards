@@ -29,7 +29,9 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shield
@@ -637,11 +639,22 @@ private fun XpPourPhaseContent(
 private fun AnimatedXpBreakdownRow(line: XpBreakdownLine, modifier: Modifier = Modifier) {
     FlashcardsXpBreakdownRow(
         label = stringResource(xpBreakdownRowLabelRes(line.source)),
-        value = stringResource(R.string.study_session_summary_xp_row_value, line.count, line.rate, line.amount),
+        value = xpBreakdownRowValue(line),
         icon = xpBreakdownRowIcon(line.source),
         modifier = modifier,
         tone = if (line.isLoss) FlashcardsXpBreakdownTone.Loss else FlashcardsXpBreakdownTone.Gain,
     )
+}
+
+@Composable
+private fun xpBreakdownRowValue(line: XpBreakdownLine): String {
+    val count = line.count
+    val rate = line.rate
+    return if (count != null && rate != null) {
+        stringResource(R.string.study_session_summary_xp_row_value, count, rate, line.amount)
+    } else {
+        stringResource(R.string.study_session_summary_xp_row_amount_label, line.amount)
+    }
 }
 
 private fun xpBreakdownRowLabelRes(source: XpAwardSource): Int = when (source) {
@@ -652,6 +665,8 @@ private fun xpBreakdownRowLabelRes(source: XpAwardSource): Int = when (source) {
     XpAwardSource.MasteryLost -> R.string.study_session_summary_xp_row_mastery_lost_label
     XpAwardSource.TimeStudied -> R.string.study_session_summary_xp_row_time_studied_label
     XpAwardSource.SessionCompleted -> R.string.study_session_summary_xp_row_session_completed_label
+    XpAwardSource.DailyGoal -> R.string.study_session_summary_xp_row_daily_goal_label
+    XpAwardSource.Streak -> R.string.study_session_summary_xp_row_streak_label
 }
 
 private fun xpBreakdownRowIcon(source: XpAwardSource): ImageVector = when (source) {
@@ -662,6 +677,8 @@ private fun xpBreakdownRowIcon(source: XpAwardSource): ImageVector = when (sourc
     XpAwardSource.MasteryLost -> Icons.AutoMirrored.Filled.TrendingDown
     XpAwardSource.TimeStudied -> Icons.Filled.Schedule
     XpAwardSource.SessionCompleted -> Icons.Filled.CheckCircle
+    XpAwardSource.DailyGoal -> Icons.Filled.EmojiEvents
+    XpAwardSource.Streak -> Icons.Filled.LocalFireDepartment
 }
 
 /**

@@ -5,8 +5,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionResult.Fast
+import com.rossomak.flashcards.core.domain.model.SessionResult.Rated
+import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
+import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.SessionXpResult
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.XpBreakdown
+import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
@@ -100,13 +109,11 @@ class StudySessionSummaryViewModel @Inject constructor(
      * preferences read, not re-read at eventual delivery time if the session sits in the offline queue
      * (ADR-0048), baked into the immutable [SessionResult] from this point on.
      *
-     * [SubmitStudySessionUseCase] hands back the optimistic preview immediately, decoupled from
-     * whatever its own submission to the server-authoritative `submitStudySession` Cloud Function
-     * returns — that call's own outcome carries no further authority here and is never
-     * inspected (see that use case's own KDoc). Only a failed local read behind the preview itself —
-     * this account's prior card progress or scoring state — surfaces [StudySessionSummaryMessage.SaveFailed]
-     * and leaves [state]'s XP fields at their zero defaults; the counts derived from [SessionResult]
-     * itself are untouched either way. [state]'s non-XP fields (mode, duration, counts, …) are already
+     * [state] keeps `isLoading` until [SubmitStudySessionUseCase] returns, which it does exactly once:
+     * with the server's score ([ServerScored]) when it arrives in time, otherwise with the local preview
+     * ([LocalPreview]). Only a failed local read behind that preview — this account's prior card
+     * progress or scoring state — surfaces [StudySessionSummaryMessage.SaveFailed] and leaves [state]'s
+     * XP fields at their zero defaults. [state]'s non-XP fields (mode, duration, counts, …) are already
      * set synchronously in `init`, above, and are not touched again here.
      */
     private fun submitSession() {
@@ -114,24 +121,51 @@ class StudySessionSummaryViewModel @Inject constructor(
             val dailyGoalMinutes = observeUserPreferences().first().dailyGoalMinutes
             val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
 
-            submitStudySession(result) { previewResult ->
-                previewResult
-                    .onSuccess { xpResult -> applyXpResult(result, xpResult) }
-                    .onFailure { onPreviewFailed() }
-            }
+            submitStudySession(result)
+                .onSuccess { submissionResult ->
+                    when (submissionResult) {
+                        is ServerScored -> applyServerScore(result, submissionResult.score)
+                        is LocalPreview -> applyLocalPreview(result, submissionResult.sessionXpResult)
+                    }
+                }
+                .onFailure { onPreviewFailed() }
         }
     }
 
-    private fun applyXpResult(result: SessionResult, xpResult: SessionXpResult) {
+    /**
+     * Every line's count, rate and amount come from [score]. A server answer missing its counts or its
+     * rates shows each line's amount only: no client-side value is mixed into the server's lines.
+     */
+    private fun applyServerScore(result: SessionResult, score: SessionScore) {
+        _state.update {
+            it.copy(
+                xpLines = buildXpBreakdownLines(result, score.breakdown, score.counts, score.rates),
+                isLoading = false,
+                xpTotal = score.breakdown.xpTotal,
+                level = score.level,
+                xpIntoCurrentLevel = score.xpIntoCurrentLevel,
+                xpForNextLevel = score.xpForNextLevel,
+                levelsCrossed = score.levelsCrossed,
+            )
+        }
+    }
+
+    private fun applyLocalPreview(result: SessionResult, xpResult: SessionXpResult) {
         val config = result.xpConfig
         _state.update {
             it.copy(
-                xpLines = buildXpBreakdownLines(result, xpResult),
+                xpLines = buildXpBreakdownLines(
+                    result = result,
+                    breakdown = xpResult.breakdown,
+                    counts = sessionFlagCounts(result, newCardsStudied = xpResult.newCardsStudied),
+                    rates = config.toLineRates(),
+                ),
                 isLoading = false,
                 xpTotal = xpResult.breakdown.xpTotal,
                 level = xpResult.newScoringState.level,
                 xpIntoCurrentLevel = xpResult.newScoringState.xpIntoCurrentLevel,
                 xpForNextLevel = config.levelThreshold(xpResult.newScoringState.level),
+                levelsCrossed = xpResult.levelsCrossed,
             )
         }
     }
@@ -145,38 +179,66 @@ class StudySessionSummaryViewModel @Inject constructor(
 private const val SECONDS_PER_MINUTE = 60
 
 /**
- * The plain itemised breakdown: one [XpBreakdownLine] per source [xpResult]
- * actually awarded XP for, in the same order as the awards table, zero-[XpBreakdownLine.amount] sources
- * dropped entirely. [SessionXpResult.newCardsStudied], [SessionResult.Rated.partialCount] and counts
- * derived from `cardResults` here (mirroring [CalculateSessionXpUseCase][com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase]'s
- * own split between a fresh mastery and a defended one) supply each line's [XpBreakdownLine.count];
- * [XpConfig][com.rossomak.flashcards.core.domain.model.XpConfig]'s rates and [xpResult]'s
- * already-multiplied totals supply the rest — nothing here recomputes an amount.
+ * The plain itemised breakdown: one [XpBreakdownLine] per source [breakdown] actually awarded XP for,
+ * in the same order as [XpBreakdown]'s fields, zero-[XpBreakdownLine.amount] sources dropped entirely.
+ * [counts] and [rates] supply each multiplied line's [XpBreakdownLine.count] and
+ * [XpBreakdownLine.rate]; [breakdown]'s already-multiplied totals supply the amounts — nothing here
+ * recomputes an amount. When [counts] or [rates] is `null`, every multiplied line carries its amount
+ * only. The Daily Goal and Streak lines are not multiplied per item, so they always carry their amount
+ * only.
  */
-private fun buildXpBreakdownLines(result: SessionResult, xpResult: SessionXpResult): List<XpBreakdownLine> {
-    val config = result.xpConfig
+private fun buildXpBreakdownLines(
+    result: SessionResult,
+    breakdown: XpBreakdown,
+    counts: SessionScoreCounts?,
+    rates: SessionScoreRates?,
+): List<XpBreakdownLine> {
     val minutesStudied = result.durationSeconds / SECONDS_PER_MINUTE
-    val lines = mutableListOf(
-        XpBreakdownLine(XpAwardSource.NewCards, xpResult.newCardsStudied, config.newCardStudied, xpResult.breakdown.newCards),
-    )
-    if (result is SessionResult.Rated) {
-        // Defended (Mastered again after already being Mastered) earns masteryDefenseBonus instead
-        // of mastered, not in addition — so newlyMasteredCount, not result.masteredCount, is what
-        // count × rate must reproduce mastered's amount.
-        val newlyMasteredCount = result.cardResults.count { it.state == FlashcardStudyProgressState.Mastered && !it.wasPreviouslyMastered }
-        val defendedCount = result.cardResults.count { it.state == FlashcardStudyProgressState.Mastered && it.wasPreviouslyMastered }
-        val demasteredCount = result.cardResults.count { it.state == FlashcardStudyProgressState.Failed && it.wasPreviouslyMastered }
-        lines += XpBreakdownLine(XpAwardSource.Mastered, newlyMasteredCount, config.cardMastered, xpResult.breakdown.mastered)
-        lines += XpBreakdownLine(XpAwardSource.Partial, result.partialCount, config.cardPartial, xpResult.breakdown.partial)
-        lines += XpBreakdownLine(XpAwardSource.MasteryDefended, defendedCount, config.masteryDefended, xpResult.breakdown.masteryDefenseBonus)
-        lines += XpBreakdownLine(XpAwardSource.MasteryLost, demasteredCount, config.cardDemastered, xpResult.breakdown.demastered)
+    val lines = mutableListOf<XpBreakdownLine>()
+    fun addMultiplied(source: XpAwardSource, amount: Int, count: (SessionScoreCounts) -> Int?, rate: (SessionScoreRates) -> Int) {
+        lines += if (counts == null || rates == null) {
+            XpBreakdownLine(source, count = null, rate = null, amount = amount)
+        } else {
+            XpBreakdownLine(source, count = count(counts) ?: 0, rate = rate(rates), amount = amount)
+        }
     }
-    lines += XpBreakdownLine(XpAwardSource.TimeStudied, minutesStudied, config.minuteStudied, xpResult.breakdown.timeStudied)
-    lines += XpBreakdownLine(
-        XpAwardSource.SessionCompleted,
-        count = if (result.abandoned) 0 else 1,
-        rate = config.sessionCompleted,
-        amount = xpResult.breakdown.sessionCompletionBonus,
-    )
+    addMultiplied(XpAwardSource.NewCards, breakdown.newCards, { it.newCardsStudied }, { it.newCardStudied })
+    if (result is Rated) {
+        addMultiplied(XpAwardSource.Mastered, breakdown.mastered, { it.newlyMastered }, { it.cardMastered })
+        addMultiplied(XpAwardSource.Partial, breakdown.partial, { it.partial }, { it.cardPartial })
+        addMultiplied(XpAwardSource.MasteryDefended, breakdown.masteryDefenseBonus, { it.defended }, { it.masteryDefended })
+        addMultiplied(XpAwardSource.MasteryLost, breakdown.demastered, { it.demastered }, { it.cardDemastered })
+    }
+    addMultiplied(XpAwardSource.TimeStudied, breakdown.timeStudied, { minutesStudied }, { it.minuteStudied })
+    addMultiplied(XpAwardSource.SessionCompleted, breakdown.sessionCompletionBonus, { if (result.abandoned) 0 else 1 }, { it.sessionCompleted })
+    lines += XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = breakdown.dailyGoalBonus)
+    lines += XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = breakdown.streakBonus)
     return lines.filter { it.amount != 0 }
 }
+
+/**
+ * The line counts read off the session's own card results, mirroring
+ * [CalculateSessionXpUseCase][com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase]'s
+ * split between a fresh mastery and a defended one: a defended card (Mastered again after already being
+ * Mastered) earns the defense award instead of the mastery one, not in addition.
+ */
+private fun sessionFlagCounts(result: SessionResult, newCardsStudied: Int): SessionScoreCounts = when (result) {
+    is Rated -> SessionScoreCounts(
+        newCardsStudied = newCardsStudied,
+        newlyMastered = result.cardResults.count { it.state == FlashcardStudyProgressState.Mastered && !it.wasPreviouslyMastered },
+        partial = result.partialCount,
+        defended = result.cardResults.count { it.state == FlashcardStudyProgressState.Mastered && it.wasPreviouslyMastered },
+        demastered = result.cardResults.count { it.state == FlashcardStudyProgressState.Failed && it.wasPreviouslyMastered },
+    )
+    is Fast -> SessionScoreCounts(newCardsStudied = newCardsStudied, newlyMastered = null, partial = null, defended = null, demastered = null)
+}
+
+private fun XpConfig.toLineRates(): SessionScoreRates = SessionScoreRates(
+    newCardStudied = newCardStudied,
+    cardMastered = cardMastered,
+    cardPartial = cardPartial,
+    masteryDefended = masteryDefended,
+    cardDemastered = cardDemastered,
+    minuteStudied = minuteStudied,
+    sessionCompleted = sessionCompleted,
+)
