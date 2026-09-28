@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
@@ -71,26 +72,44 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     }
 
     @Test
-    fun `transcribeAndGradeSpokenAnswer gives up after exhausting retries and surfaces the failure`() = runTest {
-        val error = IOException("network down")
+    fun `transcribeAndGradeSpokenAnswer gives up after exhausting retries and ends with a no-connection failure`() = runTest {
         every {
             voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
-        } returns flow<VoiceGradingStreamEventDto> { throw error }
+        } returns flow<VoiceGradingStreamEventDto> { throw IOException("network down") }
 
         createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
-            awaitError() shouldBe error
+            awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
+            awaitComplete()
+        }
+        coVerify(exactly = MAX_UPLOAD_ATTEMPTS) {
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         }
     }
 
     @Test
-    fun `transcribeAndGradeSpokenAnswer surfaces entitlement rejection without retrying`() = runTest {
-        val error = VoiceGradingEntitlementException()
+    fun `transcribeAndGradeSpokenAnswer ends an entitlement rejection with a service-error failure, without retrying`() = runTest {
         every {
             voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
-        } returns flow<VoiceGradingStreamEventDto> { throw error }
+        } returns flow<VoiceGradingStreamEventDto> { throw VoiceGradingEntitlementException() }
 
         createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
-            awaitError() shouldBe error
+            awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.ServiceError)
+            awaitComplete()
+        }
+        coVerify(exactly = 1) {
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+        }
+    }
+
+    @Test
+    fun `transcribeAndGradeSpokenAnswer ends a grade that arrives before any transcript with a service-error failure`() = runTest {
+        every {
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+        } returns flow { emit(VoiceGradingStreamEventDto.Graded(expectedGrade.gradePercent, expectedGrade.feedback)) }
+
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+            awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.ServiceError)
+            awaitComplete()
         }
     }
 
@@ -137,5 +156,9 @@ class DefaultVoiceAnswerGradingRepositoryTest {
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { voiceGradingRemoteDataSource.checkEntitlement() }
+    }
+
+    private companion object {
+        const val MAX_UPLOAD_ATTEMPTS = 3
     }
 }
