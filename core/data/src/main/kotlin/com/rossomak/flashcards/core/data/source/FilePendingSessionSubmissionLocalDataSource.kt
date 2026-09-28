@@ -10,6 +10,11 @@ import java.io.IOException
 import java.io.RandomAccessFile
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -57,6 +62,10 @@ import kotlinx.serialization.json.Json
  * can leave a torn trailing line — [readAll]'s per-line skip handles that the same way it handles any
  * other corrupted line.
  *
+ * **Observing**: [observeAll] serves [entries], an in-memory copy of the queue loaded from [file] once,
+ * on the first [observeAll] collection, and replaced inside [mutex] by every [append], [listAll] and
+ * [remove], so observers see each change without polling the file.
+ *
  * **App-start recovery**: this class has no init-time logic of its own.
  * [com.rossomak.flashcards.core.data.SignedInWorkRunner] re-enqueues the drain worker whenever a User
  * is signed in, the session Firebase restores at app start included (via
@@ -72,9 +81,13 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
     private val mutex = Mutex()
     private val file: File get() = File(context.filesDir, FILE_NAME)
 
+    /** `null` until the first [observeAll] collection loads it; written only while holding [mutex]. */
+    private val entries = MutableStateFlow<List<PendingSessionSubmissionDto>?>(null)
+
     override suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto) = withContext(Dispatchers.IO) {
         mutex.withLock {
-            if (isQueued(pendingSessionSubmission.id)) {
+            val queued = readQueuedOrNull(pendingSessionSubmission.id)
+            if (queued.orEmpty().any { it.id == pendingSessionSubmission.id }) {
                 Log.d(TAG, "Session ${pendingSessionSubmission.id} is already queued, not appending it again")
                 return@withLock Unit
             }
@@ -90,16 +103,20 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
                 writer.newLine()
             }
             Log.d(TAG, "Appended session ${pendingSessionSubmission.id} to queue file")
+            if (entries.value != null) entries.value = (queued ?: entries.value.orEmpty()) + pendingSessionSubmission
             Unit
         }
     }
 
-    /** Must only be called while holding [mutex]. An unreadable file counts as not queued: appending a duplicate is harmless, losing the session is not. */
-    private fun isQueued(sessionId: String): Boolean = try {
-        readAll().any { it.id == sessionId }
+    /**
+     * Must only be called while holding [mutex]. `null` for an unreadable file, which counts as not
+     * queued: appending a duplicate is harmless, losing the session is not.
+     */
+    private fun readQueuedOrNull(sessionId: String): List<PendingSessionSubmissionDto>? = try {
+        readAll()
     } catch (exception: IOException) {
         Log.e(TAG, "Could not read queue file to check for session $sessionId, appending it regardless", exception)
-        false
+        null
     }
 
     /** Must only be called while holding [mutex]. False for a missing or empty file — nothing to separate from. */
@@ -122,7 +139,10 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
      */
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = withContext(Dispatchers.IO) {
         mutex.withLock {
-            readAll().also { Log.d(TAG, "Read queue file: ${it.size} entries") }
+            readAll().also { queued ->
+                Log.d(TAG, "Read queue file: ${queued.size} entries")
+                if (entries.value != null) entries.value = queued
+            }
         }
     }
 
@@ -140,9 +160,27 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
         mutex.withLock {
             val updated = readAll().filterNot { it.id == sessionId }
             writeAll(updated)
+            if (entries.value != null) entries.value = updated
             Log.d(TAG, "Removed session $sessionId from queue file, ${updated.size} entries remain")
             Unit
         }
+    }
+
+    override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flow {
+        if (entries.value == null) {
+            withContext(Dispatchers.IO) {
+                mutex.withLock { if (entries.value == null) entries.value = readAllForObservers() }
+            }
+        }
+        emitAll(entries.filterNotNull())
+    }
+
+    /** Must only be called while holding [mutex]. */
+    private fun readAllForObservers(): List<PendingSessionSubmissionDto> = try {
+        readAll()
+    } catch (exception: IOException) {
+        Log.e(TAG, "Could not read queue file for observers, projecting no pending sessions", exception)
+        emptyList()
     }
 
     /**

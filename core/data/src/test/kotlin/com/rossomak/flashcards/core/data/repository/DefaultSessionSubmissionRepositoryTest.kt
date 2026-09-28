@@ -30,7 +30,9 @@ import io.mockk.verify
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -210,6 +212,8 @@ private class ThrowingPendingSessionSubmissionLocalDataSource : PendingSessionSu
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = emptyList()
 
     override suspend fun remove(sessionId: String) = Unit
+
+    override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flowOf(emptyList())
 }
 
 private class CancellingPendingSessionSubmissionLocalDataSource : PendingSessionSubmissionLocalDataSource {
@@ -220,4 +224,6 @@ private class CancellingPendingSessionSubmissionLocalDataSource : PendingSession
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = emptyList()
 
     override suspend fun remove(sessionId: String) = Unit
+
+    override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flowOf(emptyList())
 }
