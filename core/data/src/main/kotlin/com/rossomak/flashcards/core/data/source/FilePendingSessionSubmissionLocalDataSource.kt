@@ -47,8 +47,9 @@ import kotlinx.serialization.json.Json
  * one [mutex] — without it, an interleaved write risks a lost update or a torn line.
  *
  * [append] writes incrementally: it opens [file] in append mode and writes just the new entry as one
- * more line, without reading the rest of the queue first — cheap, and it means a queue with an
- * unreadable *backlog* still accepts new sessions; only draining/reading the backlog is affected.
+ * more line. It reads the queue first only to skip a session id already queued; if that read fails, it
+ * appends anyway, so a queue with an unreadable *backlog* still accepts new sessions (at worst as a
+ * duplicate, which delivery handles idempotently); only draining/reading the backlog is affected.
  * [remove] has to drop one line out of the middle, so it still reads every entry, filters, and rewrites
  * the whole file. [writeAll] (used by [remove], and by nothing else) writes to a sibling temp file
  * first, then atomically renames it over [file]: a process death mid-write leaves either the old
@@ -73,6 +74,10 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
 
     override suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            if (isQueued(pendingSessionSubmission.id)) {
+                Log.d(TAG, "Session ${pendingSessionSubmission.id} is already queued, not appending it again")
+                return@withLock Unit
+            }
             // A prior append() can have died mid-write, leaving the file's last byte something other
             // than '\n' (a torn trailing line). Appending straight onto that would concatenate this
             // entry's JSON onto the torn one, corrupting both instead of just the one already lost —
@@ -87,6 +92,14 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
             Log.d(TAG, "Appended session ${pendingSessionSubmission.id} to queue file")
             Unit
         }
+    }
+
+    /** Must only be called while holding [mutex]. An unreadable file counts as not queued: appending a duplicate is harmless, losing the session is not. */
+    private fun isQueued(sessionId: String): Boolean = try {
+        readAll().any { it.id == sessionId }
+    } catch (exception: IOException) {
+        Log.e(TAG, "Could not read queue file to check for session $sessionId, appending it regardless", exception)
+        false
     }
 
     /** Must only be called while holding [mutex]. False for a missing or empty file — nothing to separate from. */

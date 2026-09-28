@@ -17,6 +17,16 @@ import { requireOwnerMatchesCaller, submitStudySession, validateSubmitStudySessi
 import { loadXpConfig, xpConfigDocRef } from "./xpConfig";
 import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 
+const DEFAULT_XP_RATES = {
+  newCardStudied: DEFAULT_XP_CONFIG.newCardStudied,
+  cardMastered: DEFAULT_XP_CONFIG.cardMastered,
+  cardPartial: DEFAULT_XP_CONFIG.cardPartial,
+  masteryDefended: DEFAULT_XP_CONFIG.masteryDefended,
+  cardDemastered: DEFAULT_XP_CONFIG.cardDemastered,
+  minuteStudied: DEFAULT_XP_CONFIG.minuteStudied,
+  sessionCompleted: DEFAULT_XP_CONFIG.sessionCompleted,
+};
+
 const TEST_PROJECT_ID = "flashcards-functions-test";
 
 before(() => {
@@ -219,6 +229,9 @@ describe("submitStudySession", () => {
     assert.equal(result.level, 1);
     assert.equal(result.xpIntoCurrentLevel, result.breakdown.xpTotal);
     assert.deepEqual(result.levelsCrossed, []);
+    assert.equal(result.durationSeconds, 60);
+    assert.deepEqual(result.rates, DEFAULT_XP_RATES);
+    assert.deepEqual(result.counts, { newCardsStudied: 1, newlyMastered: 1, partial: 0, defended: 0, demastered: 0 });
 
     const db = admin.firestore();
     const sessionDoc = await db.doc(`users/${uid}/sessions/${request.sessionId}`).get();
@@ -232,6 +245,7 @@ describe("submitStudySession", () => {
     assert.equal(cards["card-1"].state, "Mastered");
     assert.ok(cards["card-1"].masteredAt, "a newly mastered card must stamp masteredAt");
     assert.ok(cards["card-1"].firstStudiedAt, "a card with no prior entry must stamp firstStudiedAt");
+    assert.deepEqual(sessionDoc.data()?.xpRates, DEFAULT_XP_RATES, "the rates the session was scored with are stored with it");
 
     const summaryDoc = await db.doc(`users/${uid}/progress/summary`).get();
     assert.equal(summaryDoc.data()?.subcategories?.["sub-1"]?.masteredCount, 1);
@@ -253,6 +267,33 @@ describe("submitStudySession", () => {
 
     const scoringDoc = await admin.firestore().doc(`users/${uid}/progress/user-stats`).get();
     assert.equal(scoringDoc.data()?.xp, first.breakdown.xpTotal, "xp must not be awarded twice");
+  });
+
+  it("a retry answers with the stored rates, not the XP configuration in force at retry time", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+    const first = await submitStudySession(uid, request);
+
+    await xpConfigDocRef(admin.firestore()).set({ ...DEFAULT_XP_CONFIG, cardMastered: 1 });
+    try {
+      const second = await submitStudySession(uid, request);
+      assert.deepEqual(second, first);
+    } finally {
+      await xpConfigDocRef(admin.firestore()).delete();
+    }
+  });
+
+  it("a retry of a session stored before rates were recorded omits rates and still returns every other field", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+    const first = await submitStudySession(uid, request);
+    await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).update({ xpRates: admin.firestore.FieldValue.delete() });
+
+    const second = await submitStudySession(uid, request);
+
+    assert.equal("rates" in second, false, "rates must be absent, not a placeholder");
+    const { rates, ...firstWithoutRates } = first;
+    assert.deepEqual(second, firstWithoutRates);
   });
 
   it("two concurrent submissions of the same not-yet-processed session award exactly once (the actual race the idempotency check exists for)", async () => {
@@ -326,6 +367,67 @@ describe("submitStudySession", () => {
     const summaryDoc = await admin.firestore().doc(`users/${uid}/progress/summary`).get();
     // Only the first session's mastery counted; the defended session's masteredDelta is 0.
     assert.equal(summaryDoc.data()?.subcategories?.[subcategoryId]?.masteredCount, 1);
+  });
+
+  it("Rated counts use the server-read prior mastery, matching the breakdown line for line, and a retry repeats them", async () => {
+    const uid = randomUUID();
+    const subcategoryId = "sub-1";
+    await submitStudySession(
+      uid,
+      validateSubmitStudySessionRequest(
+        rawRatedRequest({
+          cardResults: [
+            { cardId: "card-defended", subcategoryId, state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false },
+            { cardId: "card-lost", subcategoryId, state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false },
+          ],
+        }),
+      ),
+    );
+    // The client claims no card was previously Mastered; the server's own Card Progress read wins.
+    const request = validateSubmitStudySessionRequest(
+      rawRatedRequest({
+        cardResults: [
+          { cardId: "card-defended", subcategoryId, state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false },
+          { cardId: "card-lost", subcategoryId, state: "Failed", attemptsUsed: 3, wasPreviouslyMastered: false },
+          { cardId: "card-new-mastered", subcategoryId, state: "Mastered", attemptsUsed: 2, wasPreviouslyMastered: false },
+          { cardId: "card-new-partial", subcategoryId, state: "Partial", attemptsUsed: 3, wasPreviouslyMastered: false },
+        ],
+      }),
+    );
+
+    const result = await submitStudySession(uid, request);
+
+    assert.deepEqual(result.counts, { newCardsStudied: 2, newlyMastered: 1, partial: 1, defended: 1, demastered: 1 });
+    const counts = result.counts as Required<typeof result.counts>;
+    assert.equal(result.breakdown.newCards, counts.newCardsStudied * DEFAULT_XP_CONFIG.newCardStudied);
+    assert.equal(result.breakdown.mastered, counts.newlyMastered * DEFAULT_XP_CONFIG.cardMastered);
+    assert.equal(result.breakdown.partial, counts.partial * DEFAULT_XP_CONFIG.cardPartial);
+    assert.equal(result.breakdown.masteryDefenseBonus, counts.defended * DEFAULT_XP_CONFIG.masteryDefended);
+    assert.equal(result.breakdown.demastered, counts.demastered * DEFAULT_XP_CONFIG.cardDemastered);
+
+    const retry = await submitStudySession(uid, request);
+    assert.deepEqual(retry, result);
+  });
+
+  it("a Fast submission's counts carry newCardsStudied only, with no Rated-only counts", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(
+      rawRatedRequest({
+        studyMode: "Fast",
+        durationSeconds: 125,
+        cardResults: [
+          { cardId: "card-1", subcategoryId: "sub-1", state: "Seen" },
+          { cardId: "card-2", subcategoryId: "sub-1", state: "Seen" },
+        ],
+      }),
+    );
+
+    const result = await submitStudySession(uid, request);
+
+    assert.deepEqual(result.counts, { newCardsStudied: 2 });
+    assert.equal(result.durationSeconds, 125);
+    assert.deepEqual(result.rates, DEFAULT_XP_RATES);
+    assert.deepEqual(await submitStudySession(uid, request), result);
   });
 
   it("a card Failed on its first exposure still counts as studied, exactly like a Fast session's Seen card", async () => {
@@ -472,6 +574,8 @@ describe("submitStudySession — server-owned XP configuration", () => {
     assert.equal(result.breakdown.streakBonus, CUSTOM_XP_CONFIG.streakPerDay);
     assert.equal(result.breakdown.xpTotal, 3 + 7 + 23 + 19 + 31);
     assert.equal(result.xpForNextLevel, 2000, "the level curve also comes from the document: ceil(2000 * 1^1 / 1000) * 1000");
+    assert.equal(result.rates?.cardMastered, CUSTOM_XP_CONFIG.cardMastered, "the returned rates are the document's, not the default");
+    assert.equal(result.rates?.minuteStudied, CUSTOM_XP_CONFIG.minuteStudied);
   });
 
   it("scores with the bundled default when the document is missing, and still succeeds", async () => {
