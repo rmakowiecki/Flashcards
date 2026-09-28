@@ -22,6 +22,10 @@ import kotlinx.coroutines.launch
  * triggers the work once at app start, and a sign-out followed by a sign-in triggers it again. A Guest
  * linking to a real account keeps the same uid and does not trigger it.
  *
+ * The drain it schedules is what delivers a signed-in User's pending sessions queued before a sign-out:
+ * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] delivers only the
+ * signed-in User's entries, so each User's sessions go out once that User is signed in again.
+ *
  * Every task is fire-and-forget in [applicationScope]: it never blocks another task or the UI, and
  * each task handles its own failures.
  */
@@ -30,6 +34,7 @@ class SignedInWorkRunner @Inject constructor(
     @param:ApplicationScope private val applicationScope: CoroutineScope,
     private val authRepository: AuthRepository,
     private val xpConfigRepository: XpConfigRepository,
+    private val sessionSubmissionDrainScheduler: SessionSubmissionDrainScheduler,
 ) {
 
     fun start() {
@@ -43,7 +48,8 @@ class SignedInWorkRunner @Inject constructor(
     }
 
     private fun onSignedIn() {
-        logd { "Signed in: refreshing the XP configuration" }
+        logd { "Signed in: refreshing the XP configuration and draining the User's pending sessions" }
         applicationScope.launch { xpConfigRepository.refreshXpConfig() }
+        sessionSubmissionDrainScheduler.scheduleDrain()
     }
 }

@@ -58,7 +58,7 @@ class PendingSessionSubmissionMapperTest {
     fun `toDto then toDomain round-trips a Rated session losslessly, including xpConfig`() {
         val original = ratedSessionResult()
 
-        val roundTripped = original.toDto().toDomain()
+        val roundTripped = original.toDto(UID).toDomain()
 
         roundTripped shouldBe original
     }
@@ -67,14 +67,28 @@ class PendingSessionSubmissionMapperTest {
     fun `toDto then toDomain round-trips a Fast session losslessly`() {
         val original = fastSessionResult()
 
-        val roundTripped = original.toDto().toDomain()
+        val roundTripped = original.toDto(UID).toDomain()
 
         roundTripped shouldBe original
     }
 
     @Test
+    fun `toDto stamps the owning uid`() {
+        val dto = fastSessionResult().toDto(UID)
+
+        dto.uid shouldBe UID
+    }
+
+    @Test
+    fun `toDomain throws for an entry without an owning uid`() {
+        val malformedDto = fastSessionResult().toDto(UID).copy(uid = "")
+
+        shouldThrow<IllegalArgumentException> { malformedDto.toDomain() }
+    }
+
+    @Test
     fun `toDto omits attemptsUsed and wasPreviouslyMastered for a Fast card result`() {
-        val dto = fastSessionResult().toDto()
+        val dto = fastSessionResult().toDto(UID)
 
         val cardResult = dto.cardResults.single()
         cardResult.attemptsUsed shouldBe null
@@ -83,7 +97,7 @@ class PendingSessionSubmissionMapperTest {
 
     @Test
     fun `toDomain derives studyDate from startedAtEpochMillis for a legacy entry with a blank studyDate`() {
-        val legacyDto = fastSessionResult().toDto().copy(studyDate = "")
+        val legacyDto = fastSessionResult().toDto(UID).copy(studyDate = "")
 
         val migrated = legacyDto.toDomain()
 
@@ -92,7 +106,7 @@ class PendingSessionSubmissionMapperTest {
 
     @Test
     fun `toDomain substitutes the default daily goal for a legacy entry with a non-positive dailyGoalMinutes`() {
-        val legacyDto = fastSessionResult().toDto().copy(dailyGoalMinutes = 0)
+        val legacyDto = fastSessionResult().toDto(UID).copy(dailyGoalMinutes = 0)
 
         val migrated = legacyDto.toDomain()
 
@@ -101,7 +115,7 @@ class PendingSessionSubmissionMapperTest {
 
     @Test
     fun `toDomain leaves a well-formed entry's studyDate and dailyGoalMinutes untouched`() {
-        val dto = fastSessionResult().toDto()
+        val dto = fastSessionResult().toDto(UID)
 
         val migrated = dto.toDomain()
 
@@ -111,14 +125,14 @@ class PendingSessionSubmissionMapperTest {
 
     @Test
     fun `toDomain throws for an unknown mode`() {
-        val malformedDto = fastSessionResult().toDto().copy(mode = "Unknown")
+        val malformedDto = fastSessionResult().toDto(UID).copy(mode = "Unknown")
 
         shouldThrow<IllegalArgumentException> { malformedDto.toDomain() }
     }
 
     @Test
     fun `toDomain throws for an unknown card result state`() {
-        val malformedDto = fastSessionResult().toDto().let { dto ->
+        val malformedDto = fastSessionResult().toDto(UID).let { dto ->
             dto.copy(cardResults = dto.cardResults.map { it.copy(state = "Unknown") })
         }
 
@@ -127,7 +141,7 @@ class PendingSessionSubmissionMapperTest {
 
     @Test
     fun `toDomain throws for a Rated entry missing attemptsUsed`() {
-        val malformedDto = ratedSessionResult().toDto().let { dto ->
+        val malformedDto = ratedSessionResult().toDto(UID).let { dto ->
             dto.copy(cardResults = dto.cardResults.map { it.copy(attemptsUsed = null) })
         }
 
@@ -136,10 +150,14 @@ class PendingSessionSubmissionMapperTest {
 
     @Test
     fun `toDomain throws for a Rated entry missing wasPreviouslyMastered`() {
-        val malformedDto = ratedSessionResult().toDto().let { dto ->
+        val malformedDto = ratedSessionResult().toDto(UID).let { dto ->
             dto.copy(cardResults = dto.cardResults.map { it.copy(wasPreviouslyMastered = null) })
         }
 
         shouldThrow<IllegalArgumentException> { malformedDto.toDomain() }
+    }
+
+    private companion object {
+        const val UID = "uid-1"
     }
 }

@@ -5,6 +5,7 @@ import com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -19,14 +20,16 @@ import kotlinx.coroutines.CancellationException
  * any of this: it still just calls `submitSession`. This is the queue's *write* side —
  * [submitSession] appends the session to [localDataSource]'s local durable store and asks
  * [drainScheduler] to schedule delivery, then returns success once the session is durably *queued*,
- * not once it has actually been *delivered*. Delivery itself is
+ * not once it has actually been *delivered*. Each entry is stamped with the uid of the User signed in
+ * right now — a Study Session cannot finish without one — so the queue delivers it only to that User's
+ * account, even after a sign-out and a different User signing in on the same device. Delivery itself is
  * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker]'s job, reading straight
  * from [localDataSource] on its own schedule — see that class's doc for the drain loop, its FIFO
- * ordering, and its retry policy; see
+ * ordering, its per-User filtering and its failure handling; see
  * [com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLocalDataSource] for the
  * local store's shape and concurrency guarantee.
  *
- * A local-write failure (e.g. disk full) is caught here rather than propagated — matching this app's
+ * A local-write failure (e.g. disk full), or no signed-in User, is caught here rather than propagated — matching this app's
  * existing fire-and-forget submission UX, where [SubmitStudySessionUseCase]'s caller never surfaces
  * `submitSession`'s result to the UI either way — but is logged non-fatally rather than dropped with
  * zero trace.
@@ -34,6 +37,7 @@ import kotlinx.coroutines.CancellationException
 class DefaultSessionSubmissionRepository @Inject constructor(
     private val localDataSource: PendingSessionSubmissionLocalDataSource,
     private val drainScheduler: SessionSubmissionDrainScheduler,
+    private val authRepository: AuthRepository,
 ) : SessionSubmissionRepository {
 
     // Broad on purpose, matching FirebaseSessionSubmissionRemoteDataSource's own suppression: a local file
@@ -43,7 +47,8 @@ class DefaultSessionSubmissionRepository @Inject constructor(
     @Suppress("TooGenericExceptionCaught")
     override suspend fun submitSession(sessionResult: SessionResult): Result<Unit> = try {
         Log.d(TAG, "Queuing session ${sessionResult.id} (mode=${sessionResult.mode}) for durable delivery")
-        localDataSource.append(sessionResult.toDto())
+        val uid = requireNotNull(authRepository.getCurrentUser()?.uid) { "No signed-in User to own session ${sessionResult.id}" }
+        localDataSource.append(sessionResult.toDto(uid))
         drainScheduler.scheduleDrain()
         Log.d(TAG, "Session ${sessionResult.id} queued, drain scheduled")
         Result.success(Unit)

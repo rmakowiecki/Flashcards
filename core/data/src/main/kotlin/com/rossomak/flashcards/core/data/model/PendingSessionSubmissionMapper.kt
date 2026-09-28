@@ -12,8 +12,9 @@ import java.time.ZoneId
 /** `toDto()`/`toDomain()` conversions between [SessionResult] and [PendingSessionSubmissionDto]. */
 object PendingSessionSubmissionMapper {
 
-    fun SessionResult.toDto(): PendingSessionSubmissionDto = PendingSessionSubmissionDto(
+    fun SessionResult.toDto(uid: String): PendingSessionSubmissionDto = PendingSessionSubmissionDto(
         id = id,
+        uid = uid,
         mode = mode.name,
         startedAtEpochMillis = startedAt.toEpochMilli(),
         durationSeconds = durationSeconds,
@@ -33,14 +34,22 @@ object PendingSessionSubmissionMapper {
      * A blank [PendingSessionSubmissionDto.studyDate] or non-positive
      * [PendingSessionSubmissionDto.dailyGoalMinutes] means this entry was queued by an app version
      * that predates those fields (see that DTO's own doc) — migrate both sentinels here, once, so the
-     * resulting [SessionResult] passes `submitStudySession`'s validation instead of being retried and
-     * eventually dropped by [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker].
+     * resulting [SessionResult] passes `submitStudySession`'s validation instead of being permanently
+     * rejected and dead-lettered by [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker].
      * [studyDate] is derived from [PendingSessionSubmissionDto.startedAtEpochMillis] in the device's
      * *current* default zone — the original capture-time zone is not itself persisted, so this is a
      * best-effort reconstruction, not a guaranteed match of what the Summary ViewModel would have
      * computed at the time.
+     *
+     * Throws [IllegalArgumentException] for a malformed entry, including one with a blank
+     * [PendingSessionSubmissionDto.uid]: no User owns it, so it can never be delivered.
      */
-    fun PendingSessionSubmissionDto.toDomain(): SessionResult = when (StudyMode.valueOf(mode)) {
+    fun PendingSessionSubmissionDto.toDomain(): SessionResult {
+        require(uid.isNotBlank()) { "Pending session '$id' has no owning uid" }
+        return toOwnedDomain()
+    }
+
+    private fun PendingSessionSubmissionDto.toOwnedDomain(): SessionResult = when (StudyMode.valueOf(mode)) {
         StudyMode.Rated -> SessionResult.Rated(
             id = id,
             startedAt = Instant.ofEpochMilli(startedAtEpochMillis),

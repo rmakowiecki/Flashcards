@@ -1,15 +1,25 @@
 package com.rossomak.flashcards.core.data.worker
 
 import android.content.Context
-import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker.Result
 import androidx.work.WorkerParameters
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.rossomak.flashcards.core.common.logd
+import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.logw
+import com.rossomak.flashcards.core.data.model.DeadLetteredSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDomain
+import com.rossomak.flashcards.core.data.source.DeadLetteredSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource
+import com.rossomak.flashcards.core.data.worker.EntryDeliveryResult.Continue
+import com.rossomak.flashcards.core.data.worker.EntryDeliveryResult.StopAndRetry
+import com.rossomak.flashcards.core.data.worker.SessionDeliveryFailure.Permanent
+import com.rossomak.flashcards.core.data.worker.SessionDeliveryFailure.Transient
+import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.IOException
@@ -23,9 +33,23 @@ import java.io.IOException
  * [com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler] — never constructed or enqueued
  * any other way.
  *
- * [doWork] reads every entry [localDataSource] currently holds, sorts it FIFO by
- * [com.rossomak.flashcards.core.domain.model.SessionResult.startedAt] (oldest first), and submits
- * each one in turn to [sessionSubmissionRemoteDataSource] — the network-only
+ * **Ownership**: every entry carries the uid of the User who finished the session. [doWork] reads the
+ * signed-in uid first. With nobody signed in it returns [Result.success] at once, delivering nothing:
+ * [com.rossomak.flashcards.core.data.SignedInWorkRunner] schedules a new drain on the next sign-in.
+ * Otherwise it delivers only that User's entries. Other Users' entries stay in the file untouched and
+ * never cause a retry, so a run with only foreign entries left ends in [Result.success]; each one is
+ * delivered once its own User signs in again. The signed-in uid is checked again before each
+ * submission: the callable sends whoever is signed in *now*, so if the User changed mid-run, [doWork]
+ * stops and returns [Result.retry] instead of crediting the new User with the old User's sessions.
+ * That check can't close the gap between itself and the SDK attaching the ID token inside the call, so
+ * each submission also carries the entry's uid and the server rejects a mismatch as `UNAUTHENTICATED`,
+ * a transient failure that leaves the entry queued. The
+ * retried run reads the new uid; this also covers the drain the new sign-in could not schedule, since
+ * `ExistingWorkPolicy.KEEP` ignores it while this run is active.
+ *
+ * [doWork] sorts the signed-in User's entries FIFO by
+ * [com.rossomak.flashcards.core.domain.model.SessionResult.startedAt] (oldest first) and submits each
+ * one in turn to [sessionSubmissionRemoteDataSource] — the network-only
  * [com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource], not the
  * [com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository] interface, so this
  * worker can never accidentally re-enqueue what it is itself draining. FIFO ordering is a
@@ -34,57 +58,41 @@ import java.io.IOException
  * delivering an earlier-started session before a later one keeps those outcomes closer to what they
  * would have been if both had been submitted live.
  *
- * On any entry's delivery failure, [doWork] stops that entry's run and returns [Result.retry] — the
- * failed entry and everything after it in this run stay queued, untouched. No bespoke backoff timer
- * lives here: [androidx.work.WorkManager]'s own retry/backoff policy on the enqueued
- * [androidx.work.OneTimeWorkRequest] governs when the next attempt happens. A retried run re-reads
- * [localDataSource] from scratch, so an entry already cleared by a successful earlier attempt is
- * never resubmitted; an entry that *was* actually delivered to the function on a previous attempt but
- * failed to clear locally before a crash gets resent on the next run — harmless, since
- * `submitStudySession` is idempotent per session id.
+ * **Failures** are split by [classifySessionDeliveryFailure]:
+ * - [SessionDeliveryFailure.Transient] (network, outage, expired token, any non-Functions exception):
+ *   [doWork] stops and returns [Result.retry]. The failed entry and every later one stay queued. There
+ *   is no attempt limit: a flaky connection can never make the queue give up on a session.
+ *   [androidx.work.WorkManager]'s own backoff policy decides when the next run happens.
+ * - [SessionDeliveryFailure.Permanent] (the server rejected the session itself): the entry moves to
+ *   [deadLetterLocalDataSource] with the failure code, message and a timestamp, is logged at error
+ *   level, and the run continues with the next entry.
  *
- * Retries are bounded by [runAttemptCount] against [MAX_DELIVERY_ATTEMPTS], but only for the *head*
- * entry of a run: [runAttemptCount] counts this enqueued request's own attempts, not any individual
- * entry's — when every entry fails for the same shared-cause reason (backend outage, rejected auth
- * token), every entry hits the bound on the same attempt, and only the head one has actually been
- * retried that many times. Once the head is exhausted, [doWork] drops that one entry — logging it as a
- * permanent failure rather than silently losing it — and moves on to the rest of the queue in the
- * *same* run, instead of retrying it forever and blocking every entry behind it. Every later entry in
- * that same run still returns [Result.retry] on failure, no matter [runAttemptCount], so a shared-cause
- * outage cannot drop more than one entry per exhausted run. A fresh entry appended later resets the
- * count for itself: it isn't the same request attempt, and [ExistingWorkPolicy][androidx.work.ExistingWorkPolicy.KEEP]
- * only reuses the still-running/enqueued request, never a completed one.
+ * A retried run re-reads [localDataSource] from scratch, so an entry already cleared is never
+ * resubmitted; an entry that *was* delivered but failed to clear locally before a crash gets resent on
+ * the next run — harmless, since `submitStudySession` is idempotent per session id.
  *
- * **Known limitation**: [runAttemptCount] is still a property of the *WorkRequest*, not of any one
- * entry, so an entry's own count of real delivery attempts isn't tracked precisely once it stops being
- * the head partway through a shared-cause outage. Concretely: if the head is dropped on attempt 5 and a
- * later entry also fails that same run, that later entry's [Result.retry] carries the request forward —
- * on the *next* run it becomes the new head with [runAttemptCount] already past the bound, so it can be
- * dropped after fewer than [MAX_DELIVERY_ATTEMPTS] attempts of its own. This is accepted as a rare,
- * bounded edge case (it only bites during a multi-entry, multi-run shared-cause outage, and even then
- * drops at most one entry early rather than the whole queue) rather than fixed by giving
- * [com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto] its own durable per-entry
- * attempt counter.
+ * **Post-delivery refresh**: after each successful submission, [doWork] asks
+ * [sessionServerStateRefresher] to re-read the User's scoring state and the session's Card Progress
+ * documents from the server, updating the Firestore cache. Every failure of this step is ignored; the
+ * entry is removed from the queue either way.
  *
  * A queue entry that fails to convert back to a domain [com.rossomak.flashcards.core.domain.model.SessionResult]
- * (unknown `mode`/`state`, or a `Rated` card result missing `attemptsUsed`/`wasPreviouslyMastered`) is
- * malformed beyond repair, not a delivery failure: [doWork] catches that conversion, logs the invalid
- * entry, removes it from the queue, and continues to the next entry rather than stalling every entry
- * behind it or retrying something that can never succeed.
+ * (no owning uid, unknown `mode`/`state`, or a `Rated` card result missing
+ * `attemptsUsed`/`wasPreviouslyMastered`) is malformed beyond repair: [doWork] moves it to
+ * [deadLetterLocalDataSource] exactly as stored, with the conversion exception as its failure, and
+ * continues to the next entry. A blank-uid entry keeps its blank uid; it is never assigned to the
+ * signed-in User.
  *
- * [localDataSource]'s [PendingSessionSubmissionLocalDataSource.listAll] and
- * [PendingSessionSubmissionLocalDataSource.remove] can each throw an [IOException] if the queue file
- * exists but genuinely can't be read (see each one's own doc for why that's deliberately not swallowed
- * there). [doWork] catches that around the initial read and around each entry's submit-then-remove
- * step alike, returning [Result.retry] either way — an unreadable file must never look like a drained,
- * empty queue to WorkManager, which would otherwise report [Result.success] for a run that never
- * actually looked at the real queue and never gets rescheduled to try again.
+ * [localDataSource] and [deadLetterLocalDataSource] can throw an [IOException] if a file exists but
+ * can't be read (see [com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLocalDataSource]
+ * for why that's deliberately not swallowed there). [doWork] turns that into [Result.retry]: an
+ * unreadable file must never look like a drained, empty queue to WorkManager.
  *
  * Recovery after the app (or the process WorkManager was running in) is killed mid-drain needs no
- * separate code path: [com.rossomak.flashcards.FlashcardsApplication] unconditionally calls
- * [com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler.scheduleDrain] on every app
- * start, and `ExistingWorkPolicy.KEEP` makes that call a safe no-op if a drain is already pending —
- * this worker's next run, whenever it happens, always starts by reading the file fresh.
+ * separate code path: [com.rossomak.flashcards.core.data.SignedInWorkRunner] calls
+ * [com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler.scheduleDrain] on every sign-in,
+ * the session Firebase restores at app start included; `ExistingWorkPolicy.KEEP` makes that call a
+ * safe no-op if a drain is already pending — this worker's next run always starts by reading the file fresh.
  */
 @HiltWorker
 class SessionSubmissionDeliveryWorker @AssistedInject constructor(
@@ -92,61 +100,88 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
     @Assisted workerParameters: WorkerParameters,
     private val sessionSubmissionRemoteDataSource: SessionSubmissionRemoteDataSource,
     private val localDataSource: PendingSessionSubmissionLocalDataSource,
+    private val deadLetterLocalDataSource: DeadLetteredSessionSubmissionLocalDataSource,
+    private val sessionServerStateRefresher: SessionServerStateRefresher,
+    private val authRepository: AuthRepository,
 ) : CoroutineWorker(context, workerParameters) {
 
     override suspend fun doWork(): Result {
-        val pendingEntries: List<PendingSessionSubmissionDto>
-        try {
-            pendingEntries = localDataSource.listAll().sortedBy { it.startedAtEpochMillis }
-        } catch (exception: IOException) {
-            Log.e(TAG, "Pending session submission queue file could not be read, retrying the drain", exception)
-            return Result.retry()
+        val signedInUid = authRepository.getCurrentUser()?.uid
+        if (signedInUid == null) {
+            logd { "Drain skipped: nobody is signed in, the next sign-in schedules a new drain" }
+            return Result.success()
         }
-        Log.d(TAG, "Drain started: ${pendingEntries.size} pending entr${if (pendingEntries.size == 1) "y" else "ies"} (attempt ${runAttemptCount + 1})")
-        try {
-            pendingEntries.forEachIndexed { index, entry ->
-                Log.d(TAG, "Submitting session ${entry.id} (${index + 1}/${pendingEntries.size})")
-                val domainSessionResult = try {
-                    entry.toDomain()
-                } catch (exception: IllegalArgumentException) {
-                    Log.e(TAG, "Session ${entry.id} is malformed and cannot be converted, dropping it from the queue", exception)
-                    localDataSource.remove(entry.id)
-                    return@forEachIndexed
-                }
-                val submissionResult = sessionSubmissionRemoteDataSource.submitSession(domainSessionResult)
-                if (submissionResult.isFailure) {
-                    if (index == 0 && runAttemptCount + 1 >= MAX_DELIVERY_ATTEMPTS) {
-                        Log.e(
-                            TAG,
-                            "Session ${entry.id} failed to deliver after $MAX_DELIVERY_ATTEMPTS attempts, " +
-                                "dropping it from the queue so later entries can proceed",
-                            submissionResult.exceptionOrNull(),
-                        )
-                        localDataSource.remove(entry.id)
-                        return@forEachIndexed
-                    }
-                    Log.w(
-                        TAG,
-                        "Submission failed for session ${entry.id} (attempt ${runAttemptCount + 1}/$MAX_DELIVERY_ATTEMPTS), stopping drain and returning retry",
-                        submissionResult.exceptionOrNull(),
-                    )
-                    return Result.retry()
-                }
-                localDataSource.remove(entry.id)
-                Log.d(TAG, "Session ${entry.id} delivered and removed from queue")
+        return try {
+            drain(signedInUid)
+        } catch (exception: IOException) {
+            loge(exception) { "Session submission queue files could not be read or written, retrying the drain" }
+            Result.retry()
+        }
+    }
+
+    private suspend fun drain(signedInUid: String): Result {
+        // A blank uid is not another User's entry but a malformed one: keep it in the run so the
+        // conversion below removes it.
+        val ownEntries = localDataSource.listAll()
+            .filter { entry -> entry.uid == signedInUid || entry.uid.isBlank() }
+            .sortedBy { it.startedAtEpochMillis }
+        logd { "Drain started: ${ownEntries.size} pending entries for the signed-in User (attempt ${runAttemptCount + 1})" }
+        for (entry in ownEntries) {
+            if (authRepository.getCurrentUser()?.uid != signedInUid) {
+                logd { "Signed-in User changed mid-drain, returning retry so the next run drains the new User's entries" }
+                return Result.retry()
             }
-        } catch (exception: IOException) {
-            Log.e(TAG, "Pending session submission queue file could not be read while removing an entry, retrying the drain", exception)
-            return Result.retry()
+            if (deliver(entry) == StopAndRetry) return Result.retry()
         }
-        Log.d(TAG, "Drain finished: all ${pendingEntries.size} entr${if (pendingEntries.size == 1) "y" else "ies"} resolved")
+        logd { "Drain finished: all ${ownEntries.size} entries for the signed-in User resolved" }
         return Result.success()
     }
 
-    private companion object {
-        const val TAG = "SessionSubmissionDrainWorker"
+    private suspend fun deliver(entry: PendingSessionSubmissionDto): EntryDeliveryResult {
+        val sessionResult = try {
+            entry.toDomain()
+        } catch (exception: IllegalArgumentException) {
+            deadLetter(entry, exception)
+            return Continue
+        }
+        val failure = sessionSubmissionRemoteDataSource.submitSession(entry.uid, sessionResult).exceptionOrNull()
+        if (failure == null) {
+            sessionServerStateRefresher.refresh(sessionResult)
+            localDataSource.remove(entry.id)
+            logd { "Session ${entry.id} delivered and removed from queue" }
+            return Continue
+        }
+        return when (classifySessionDeliveryFailure(failure)) {
+            Transient -> {
+                logw(failure) { "Submission of session ${entry.id} failed transiently, stopping drain and returning retry" }
+                StopAndRetry
+            }
+            Permanent -> {
+                deadLetter(entry, failure)
+                Continue
+            }
+        }
+    }
 
-        /** See this class's own doc for why the attempt bound only ever applies to the head entry of a run. */
-        const val MAX_DELIVERY_ATTEMPTS = 5
+    /**
+     * Appends to the dead-letter record before removing from the queue, so a crash in between duplicates the
+     * entry instead of losing it. [failure] is either the server's permanent rejection or the
+     * [IllegalArgumentException] of an entry that could not be converted.
+     */
+    private suspend fun deadLetter(entry: PendingSessionSubmissionDto, failure: Throwable) {
+        val failureCode = (failure as? FirebaseFunctionsException)?.code?.name ?: failure.javaClass.simpleName
+        deadLetterLocalDataSource.append(
+            DeadLetteredSessionSubmissionDto(
+                entry = entry,
+                failureCode = failureCode,
+                failureMessage = failure.message,
+                deadLetteredAtEpochMillis = System.currentTimeMillis(),
+            ),
+        )
+        localDataSource.remove(entry.id)
+        loge(failure) { "Session ${entry.id} is undeliverable ($failureCode), moved to the dead-letter record" }
     }
 }
+
+/** What the drain does after one entry: move on to the next one, or stop the run and retry later. */
+private enum class EntryDeliveryResult { Continue, StopAndRetry }

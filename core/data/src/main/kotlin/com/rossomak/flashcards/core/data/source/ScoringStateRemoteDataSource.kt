@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.source
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
 import com.rossomak.flashcards.core.domain.model.ScoringState.Companion.STARTING_LEVEL
 import javax.inject.Inject
@@ -14,6 +15,10 @@ import kotlinx.coroutines.tasks.await
  * [com.rossomak.flashcards.core.domain.model.ScoringState] itself, so this client never composes a
  * write for it; [getScoringState] only ever feeds
  * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s optimistic preview.
+ *
+ * [Source.SERVER] skips the local cache and, on success, refreshes it:
+ * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] reads that way after each
+ * delivery, so later default-source reads see the server's new state.
  */
 class ScoringStateRemoteDataSource @Inject constructor(
     private val firestore: FirebaseFirestore,
@@ -23,8 +28,8 @@ class ScoringStateRemoteDataSource @Inject constructor(
     private val uid: String
         get() = requireNotNull(firebaseAuth.currentUser?.uid) { "No authenticated user" }
 
-    suspend fun getScoringState(): ScoringStateDto? {
-        val document = firestore.collection(COLLECTION_PATH_TEMPLATE.format(uid)).document(DOCUMENT_ID).get().await()
+    suspend fun getScoringState(source: Source = Source.DEFAULT): ScoringStateDto? {
+        val document = firestore.collection(COLLECTION_PATH_TEMPLATE.format(uid)).document(DOCUMENT_ID).get(source).await()
         if (!document.exists()) return null
 
         return ScoringStateDto(
