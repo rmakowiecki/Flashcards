@@ -36,6 +36,10 @@ sealed interface RatedSessionInput {
     data object NoticeTailElapsed : RatedSessionInput
     data object PlayRequested : RatedSessionInput
     data object PauseRequested : RatedSessionInput
+    data object TemporaryPauseRequested : RatedSessionInput
+    data object TemporaryPauseEnded : RatedSessionInput
+    data object AdvanceHoldRequested : RatedSessionInput
+    data object AdvanceHoldReleased : RatedSessionInput
 
     /** Voice answering resumes after a pause of its own. The microphone permission is already confirmed. */
     data object VoiceAnsweringResumed : RatedSessionInput

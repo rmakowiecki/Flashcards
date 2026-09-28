@@ -76,6 +76,10 @@ class TtsPlayer(
     // Distinct from Fast mode's continuous question->pause->answer->next loop.
     private var isQuestionOnlyMode = false
 
+    // While closed, Fast's loop stops on the current card at the end of the pause after its answer
+    // and reports AdvanceGateReached; the coordinator decides when to move on.
+    private var isAdvanceGateClosed = false
+
     /**
      * Incremented on every new utterance and every interrupting command. An [onDone] callback whose
      * embedded generation no longer matches has been superseded (e.g. by a pause or skip) and is
@@ -219,6 +223,11 @@ class TtsPlayer(
         publishState()
     }
 
+    /** Closes or opens the gate at the end of the pause after an answer; see [isAdvanceGateClosed]. */
+    fun setAdvanceGate(closed: Boolean) {
+        isAdvanceGateClosed = closed
+    }
+
     /**
      * Reads the question of `cards[0]`, or stops when the queue is empty. The coordinator always
      * hands over the reordered queue first, so `cards[0]` is already the next card to ask; unlike
@@ -322,6 +331,7 @@ class TtsPlayer(
         cards = emptyList()
         index = 0
         isBetweenPause = false
+        isAdvanceGateClosed = false
         _voiceState.value = VoicePlaybackState(isActive = false)
         invalidateState()
     }
@@ -412,6 +422,13 @@ class TtsPlayer(
         }
     }
 
+    /** Stays on the current card's answer, paused, and leaves moving on to the coordinator. */
+    private fun stopAtAdvanceGate() {
+        isPlaying = false
+        publishState()
+        onEvent(PlaybackEvent.AdvanceGateReached)
+    }
+
     private val utteranceListener = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) = Unit
 
@@ -456,7 +473,7 @@ class TtsPlayer(
 
             TAG_BETWEEN -> {
                 isBetweenPause = false
-                advanceAfterCard()
+                if (isAdvanceGateClosed) stopAtAdvanceGate() else advanceAfterCard()
             }
         }
     }

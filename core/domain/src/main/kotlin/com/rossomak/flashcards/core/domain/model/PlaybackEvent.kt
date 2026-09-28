@@ -24,6 +24,12 @@ sealed interface PlaybackEvent {
      */
     data object EndReached : PlaybackEvent
 
+    /**
+     * The player finished the pause after an answer with the advance gate closed, and stopped on the
+     * current card instead of moving on. Sent only while the gate is closed.
+     */
+    data object AdvanceGateReached : PlaybackEvent
+
     /** A text-to-speech engine, for questions or for notices, could not start. */
     data object EngineUnavailable : PlaybackEvent
 }

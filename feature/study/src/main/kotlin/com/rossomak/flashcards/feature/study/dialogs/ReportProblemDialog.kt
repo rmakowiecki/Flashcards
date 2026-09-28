@@ -98,6 +98,9 @@ private val REPORTABLE_PROBLEMS = listOf(
  * The draft always starts empty — this files a fresh report rather than editing the card's
  * previous one, so an unchecked box is never ambiguous between "not a problem" and "already
  * reported".
+ *
+ * While a submission is in flight the caller passes [areActionsEnabled] = false, so the checked set
+ * the user sees is the one being sent.
  */
 @Composable
 fun ReportProblemDialog(
@@ -106,6 +109,8 @@ fun ReportProblemDialog(
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    isSubmitEnabled: Boolean = selectedActions.isNotEmpty(),
+    areActionsEnabled: Boolean = true,
 ) {
     FlashcardsDecisionDialog(
         title = stringResource(R.string.report_problem_dialog_title),
@@ -115,7 +120,7 @@ fun ReportProblemDialog(
         modifier = modifier,
         icon = Icons.Default.Flag,
         supportingText = stringResource(R.string.report_problem_dialog_message),
-        confirmEnabled = selectedActions.isNotEmpty(),
+        confirmEnabled = isSubmitEnabled,
     ) {
         FlashcardsMultiSelectGroup {
             REPORTABLE_PROBLEMS.forEach { problem ->
@@ -124,6 +129,7 @@ fun ReportProblemDialog(
                     label = stringResource(problem.labelRes),
                     checked = problem.action in selectedActions,
                     onCheckedChange = { checked -> onActionCheckedChange(problem.action, checked) },
+                    enabled = areActionsEnabled,
                 )
             }
         }
@@ -149,5 +155,18 @@ private fun ReportProblemDialogEmptyPreview() {
         onActionCheckedChange = { _, _ -> },
         onSubmit = {},
         onCancel = {},
+    )
+}
+
+@Preview
+@Composable
+private fun ReportProblemDialogSubmittingPreview() {
+    ReportProblemDialog(
+        selectedActions = setOf(CurationAction.WrongTags),
+        onActionCheckedChange = { _, _ -> },
+        onSubmit = {},
+        onCancel = {},
+        isSubmitEnabled = false,
+        areActionsEnabled = false,
     )
 }

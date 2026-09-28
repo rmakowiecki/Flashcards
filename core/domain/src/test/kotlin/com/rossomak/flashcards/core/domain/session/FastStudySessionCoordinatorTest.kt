@@ -2,11 +2,11 @@ package com.rossomak.flashcards.core.domain.session
 
 import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
+import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
-import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
@@ -153,14 +153,14 @@ class FastStudySessionCoordinatorTest {
 
     @Test
     fun `external commands map onto the player`() = runTest {
-        startCoordinator()
+        startCoordinator().also { moveToCard(1) }
 
         listOf(
             TransportCommand.Pause,
             TransportCommand.Play,
             TransportCommand.Next,
             TransportCommand.PreviousCard,
-            TransportCommand.JumpTo(2),
+            TransportCommand.JumpTo(0),
             TransportCommand.Stop,
         ).forEach(playbackGateway::emitExternal)
         runCurrent()
@@ -170,10 +170,173 @@ class FastStudySessionCoordinatorTest {
             Call.Play,
             Call.ShowAnswer,
             Call.MoveToPreviousCard,
-            Call.JumpTo(2),
+            Call.JumpTo(0),
             Call.Pause,
         )
         playbackGateway.stopCount shouldBe 0
+    }
+
+    @Test
+    fun `an external command that changed the session is reported, and an ignored one is not`() = runTest {
+        startCoordinator().also { moveToCard(2) }
+        playbackGateway.readAnswer()
+        runCurrent()
+
+        playbackGateway.emitExternal(TransportCommand.Next)
+        playbackGateway.emitExternal(TransportCommand.Play)
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.ExternalTransportCommand>() shouldBe
+            listOf(FastSessionEvent.ExternalTransportCommand(TransportCommand.Pause))
+    }
+
+    // The advance hold
+
+    @Test
+    fun `with a hold requested read-aloud keeps playing and stops held at the auto-advance point`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.holdAdvance()
+        playbackGateway.isAdvanceGateClosed shouldBe true
+        playbackGateway.pauseCount shouldBe 0
+        playbackGateway.readAnswer()
+        playbackGateway.reachAdvancePoint()
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
+        coordinator.runningSnapshot.currentIndex shouldBe 0
+    }
+
+    @Test
+    fun `releasing a held session moves on and plays, and a second release changes nothing`() = runTest {
+        val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        playbackGateway.calls.takeLast(3) shouldBe listOf(Call.SetAdvanceGate(closed = false), Call.MoveToNextCard, Call.Play)
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.currentIndex shouldBe 1
+        val callCount = playbackGateway.calls.size
+
+        coordinator.releaseAdvance()
+
+        playbackGateway.calls.size shouldBe callCount
+    }
+
+    @Test
+    fun `an external pause at a hold turns it into a user pause, and the release does not resume it`() = runTest {
+        val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
+
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.User
+        coordinator.runningSnapshot.currentIndex shouldBe 0
+        playbackGateway.calls.last() shouldBe Call.SetAdvanceGate(closed = false)
+    }
+
+    @Test
+    fun `external play at a hold moves on at once and is reported`() = runTest {
+        externalCommandAtHoldMovesOn(TransportCommand.Play)
+    }
+
+    @Test
+    fun `external next at a hold moves on at once and is reported`() = runTest {
+        externalCommandAtHoldMovesOn(TransportCommand.Next)
+    }
+
+    private fun TestScope.externalCommandAtHoldMovesOn(command: TransportCommand) {
+        val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
+
+        playbackGateway.emitExternal(command)
+        runCurrent()
+
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.MoveToNextCard, Call.Play)
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.currentIndex shouldBe 1
+        events shouldContain FastSessionEvent.ExternalTransportCommand(command)
+    }
+
+    @Test
+    fun `releasing a hold on the last card ends the session`() = runTest {
+        val coordinator = startCoordinator().also { moveToCard(2) }
+        holdAtAdvancePoint(coordinator)
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result
+        result.abandoned shouldBe false
+    }
+
+    @Test
+    fun `external play at a hold on the last card ends the session`() = runTest {
+        val coordinator = startCoordinator().also { moveToCard(2) }
+        holdAtAdvancePoint(coordinator)
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.abandoned shouldBe false
+    }
+
+    @Test
+    fun `a temporary pause plays again when it ends, unless the user paused meanwhile`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Pause
+        coordinator.endTemporaryPause()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Play
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        coordinator.pause()
+        runCurrent()
+        coordinator.endTemporaryPause()
+
+        playbackGateway.calls.last() shouldBe Call.Pause
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.User
+    }
+
+    @Test
+    fun `an engine pause is never resumed by a release or the end of a temporary pause`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        playbackGateway.emit(PlaybackEvent.EngineUnavailable)
+        runCurrent()
+
+        coordinator.releaseAdvance()
+        coordinator.endTemporaryPause()
+
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.EngineUnavailable
+        playbackGateway.startCalls.size shouldBe 1
+    }
+
+    @Test
+    fun `transport commands reach the player only through the reducer's effects`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.pause()
+        runCurrent()
+
+        coordinator.pause()
+
+        playbackGateway.pauseCount shouldBe 2
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.User
+    }
+
+    private fun TestScope.holdAtAdvancePoint(coordinator: FastStudySessionCoordinator) {
+        coordinator.holdAdvance()
+        playbackGateway.readAnswer()
+        playbackGateway.reachAdvancePoint()
+        runCurrent()
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
     }
 
     // Read-aloud next
@@ -232,7 +395,7 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.emit(PlaybackEvent.EngineUnavailable)
         runCurrent()
 
-        coordinator.runningSnapshot.pauseReason shouldBe SessionPauseReason.VoiceEngineUnavailable
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.EngineUnavailable
         coordinator.runningSnapshot.currentIndex shouldBe 2
         events shouldContain FastSessionEvent.VoicePlaybackUnavailable
         playbackGateway.stopCount shouldBe 1

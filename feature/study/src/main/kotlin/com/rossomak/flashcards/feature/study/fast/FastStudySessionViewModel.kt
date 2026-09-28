@@ -3,11 +3,12 @@ package com.rossomak.flashcards.feature.study.fast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.LoadFailed
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.Loading
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.Running
-import com.rossomak.flashcards.core.domain.model.SessionPauseReason
+import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.session.FastSessionEvent
@@ -23,6 +24,7 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.chrome.DialogAdvanceHold
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
@@ -32,10 +34,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -79,19 +78,15 @@ class FastStudySessionViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<FastStudySessionMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<FastStudySessionMessage> = _messages.asSharedFlow()
 
-    private val isExtendedContextDialogOpen: Boolean
-        get() = _state.value.activeDialog is CurrentCardExtendedContext
+    private val dialogAdvanceHold = DialogAdvanceHold(
+        scope = viewModelScope,
+        holdAdvance = coordinator::holdAdvance,
+        releaseAdvance = coordinator::releaseAdvance,
+        isHeldAtAdvancePoint = { (coordinator.sessionState.value as? Running)?.isHeldAtAdvancePoint == true },
+    )
 
-    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
-    // True only when the pause was caused by the dialog intercepting a natural between-card advance.
-    // Gates auto-advance on dialog dismiss and changes play-button behavior.
-    private var pausedDueToExtendedContext = false
-    private var advanceAfterExtendedContextJob: Job? = null
-    private var lastObservedCardIndex = NO_CARD_INDEX
-
-    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
-    // True only when opening voice settings paused an in-progress playback; gates resume on close.
-    private var pausedForVoiceSettings = false
+    // Identifies the report submission in flight, so a result closes only the dialog it was sent from.
+    private var reportSubmissionId = 0
 
     // Session-scoped like the rest of the routed config: a mid-session change updates only this
     // running session unless the user checks "keep as my default" (ADR-0030), so it lives in a
@@ -120,7 +115,6 @@ class FastStudySessionViewModel @Inject constructor(
         viewModelScope.launch {
             coordinator.sessionState.collect { snapshot ->
                 _state.update { it.fromSnapshot(snapshot) }
-                if (snapshot is Running) holdAdvanceForExtendedContext(snapshot)
             }
         }
     }
@@ -130,6 +124,7 @@ class FastStudySessionViewModel @Inject constructor(
             coordinator.events.collect { event ->
                 when (event) {
                     FastSessionEvent.VoicePlaybackUnavailable -> _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
+                    is FastSessionEvent.ExternalTransportCommand -> onExternalTransportCommand(event.command)
                     is FastSessionEvent.SessionEnded -> eventChannel.send(FastStudySessionDestination.Summary(event.result.toSummaryRoute()))
                 }
             }
@@ -149,7 +144,7 @@ class FastStudySessionViewModel @Inject constructor(
             isVoicePlaying = snapshot.playback.isPlaying,
             isReadAloudNextAvailable = snapshot.isReadAloudNextAvailable,
             speechRate = snapshot.playback.speechRate,
-            isVoiceEngineUnavailable = snapshot.pauseReason == SessionPauseReason.VoiceEngineUnavailable,
+            isVoiceEngineUnavailable = snapshot.pauseReason == FastPauseReason.EngineUnavailable,
         )
     }
 
@@ -161,18 +156,14 @@ class FastStudySessionViewModel @Inject constructor(
         _state.update { it.fromSnapshot(coordinator.sessionState.value) }
     }
 
-    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
-    private fun holdAdvanceForExtendedContext(snapshot: Running) {
-        val playback = snapshot.playback
-        if (!playback.isActive || playback.currentIndex != lastObservedCardIndex) {
-            lastObservedCardIndex = if (playback.isActive) playback.currentIndex else NO_CARD_INDEX
-            advanceAfterExtendedContextJob?.cancel()
-            pausedDueToExtendedContext = false
-        }
-        if (playback.isInBetweenPause && playback.isPlaying && isExtendedContextDialogOpen && !pausedDueToExtendedContext) {
-            pausedDueToExtendedContext = true
-            coordinator.pause()
-        }
+    /**
+     * A command from outside the app that resumed playback or changed the card dismisses the open
+     * dialog, dropping its draft. A pause keeps it open.
+     */
+    private fun onExternalTransportCommand(command: TransportCommand) {
+        val isPause = command == TransportCommand.Pause || command == TransportCommand.Stop
+        if (!isPause && _state.value.activeDialog != null) onDialogDismiss()
+        showSessionNow()
     }
 
     fun onShowAnswer() {
@@ -191,29 +182,16 @@ class FastStudySessionViewModel @Inject constructor(
     }
 
     fun onVoicePlayPause() {
-        when {
-            pausedDueToExtendedContext -> {
-                advanceAfterExtendedContextJob?.cancel()
-                pausedDueToExtendedContext = false
-                coordinator.next()
-                coordinator.play()
-            }
-            _state.value.isVoicePlaying -> coordinator.pause()
-            else -> coordinator.play()
-        }
+        if (_state.value.isVoicePlaying) coordinator.pause() else coordinator.play()
         showSessionNow()
     }
 
     fun onVoiceNext() {
-        advanceAfterExtendedContextJob?.cancel()
-        pausedDueToExtendedContext = false
         coordinator.next()
         showSessionNow()
     }
 
     fun onVoicePrevious() {
-        advanceAfterExtendedContextJob?.cancel()
-        pausedDueToExtendedContext = false
         coordinator.previous()
         showSessionNow()
     }
@@ -222,34 +200,9 @@ class FastStudySessionViewModel @Inject constructor(
         coordinator.setSpeechRate(rate)
     }
 
-    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
-    private fun onExtendedContextDialogOpen(dialog: CurrentCardExtendedContext) {
-        _state.update { it.copy(activeDialog = dialog) }
-        val playback = (coordinator.sessionState.value as? Running)?.playback ?: return
-        if (playback.isInBetweenPause && playback.isPlaying) {
-            pausedDueToExtendedContext = true
-            coordinator.pause()
-        }
-    }
-
-    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
-    private fun onExtendedContextDialogDismissed() {
-        if (pausedDueToExtendedContext) {
-            advanceAfterExtendedContextJob = viewModelScope.launch {
-                delay(EXTENDED_CONTEXT_ADVANCE_DELAY_MS.milliseconds)
-                pausedDueToExtendedContext = false
-                coordinator.next()
-                coordinator.play()
-            }
-        }
-    }
-
-    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
+    /** The one dialog that pauses: voice settings are previewed aloud, which would talk over the session. */
     private fun onVoiceSettingsOpen() {
-        if (_state.value.isVoicePlaying) {
-            pausedForVoiceSettings = true
-            coordinator.pause()
-        }
+        coordinator.pauseTemporarily()
         _state.update {
             it.copy(activeDialog = SessionVoiceSettings(voiceSettingsController.seedDraft(sessionVoiceSettings)))
         }
@@ -291,26 +244,12 @@ class FastStudySessionViewModel @Inject constructor(
             voiceSettingsController.stopPreview()
         }
         coordinator.applyVoiceSettings(settings)
-        _state.update { it.copy(activeDialog = null) }
-        resumeIfPausedForVoiceSettings()
-    }
-
-    private fun onVoiceSettingsDismiss() {
-        voiceSettingsController.stopPreview()
-        _state.update { it.copy(activeDialog = null) }
-        resumeIfPausedForVoiceSettings()
-    }
-
-    private fun resumeIfPausedForVoiceSettings() {
-        if (pausedForVoiceSettings) {
-            pausedForVoiceSettings = false
-            coordinator.play()
-        }
+        closeDialog()
     }
 
     /**
-     * Single entry point for every dialog on this screen. Exit-session confirmation is the one
-     * case with no ViewModel work behind it — the screen navigates and there is nothing to commit.
+     * Single entry point for every dialog on this screen. No dialog pauses the session except voice
+     * settings; while one is open the session holds at its auto-advance point instead.
      */
     fun onDialogEvent(event: StudySessionDialogEvent) {
         when (event) {
@@ -325,11 +264,10 @@ class FastStudySessionViewModel @Inject constructor(
      * The caller hands over the dialog it wants shown, already seeded from what it was rendering.
      */
     private fun onDialogOpen(dialog: StudySessionDialog) {
+        dialogAdvanceHold.onDialogOpen()
         when (dialog) {
-            is ReportCurrentCardProblem -> onReportProblemOpen(dialog)
-            is CurrentCardExtendedContext -> onExtendedContextDialogOpen(dialog)
             is SessionVoiceSettings -> onVoiceSettingsOpen()
-            ExitSession -> _state.update { it.copy(activeDialog = dialog) }
+            is ReportCurrentCardProblem, is CurrentCardExtendedContext, ExitSession -> _state.update { it.copy(activeDialog = dialog) }
         }
     }
 
@@ -348,8 +286,10 @@ class FastStudySessionViewModel @Inject constructor(
         when (_state.value.activeDialog) {
             is ReportCurrentCardProblem -> onReportProblemSubmit()
             is SessionVoiceSettings -> onVoiceSettingsSave()
+            // The session ends here, so the hold is never released: releasing it could still move on.
             ExitSession -> {
-                onDialogDismiss()
+                dialogAdvanceHold.cancel()
+                _state.update { it.copy(activeDialog = null) }
                 coordinator.end(abandoned = true)
             }
             // "Got it" and a scrim tap on the single-action Extended Context dialog are the same act.
@@ -359,47 +299,50 @@ class FastStudySessionViewModel @Inject constructor(
 
     /** Always the discard path: the draftState dies with the field. */
     private fun onDialogDismiss() {
+        if (_state.value.activeDialog is SessionVoiceSettings) voiceSettingsController.stopPreview()
+        closeDialog()
+    }
+
+    /** A held session moves on once the old card has lingered; voice settings end their pause first. */
+    private fun closeDialog() {
         val dialog = _state.value.activeDialog
         _state.update { it.copy(activeDialog = null) }
-        when (dialog) {
-            is CurrentCardExtendedContext -> onExtendedContextDialogDismissed()
-            is SessionVoiceSettings -> onVoiceSettingsDismiss()
-            else -> Unit
-        }
+        if (dialog is SessionVoiceSettings) coordinator.endTemporaryPause()
+        dialogAdvanceHold.onDialogClose()
+        showSessionNow()
     }
 
     /**
-     * Reporting pauses playback the way the old debug FAB did — the user stopped to read the card,
-     * not to be read over. Resuming is a deliberate tap (ADR-0017).
+     * The dialog stays open until the result, with Submit disabled meanwhile. A failure keeps it open
+     * and releases nothing; a dismissal meanwhile is an ordinary close, and a later failure still
+     * shows its message.
      */
-    private fun onReportProblemOpen(dialog: ReportCurrentCardProblem) {
-        if (_state.value.isVoicePlaying) coordinator.pause()
-        _state.update { it.copy(activeDialog = dialog) }
-    }
-
     private fun onReportProblemSubmit() {
         val dialog = _state.value.activeDialog as? ReportCurrentCardProblem ?: return
         if (!dialog.canSubmit) return
-        _state.update { it.copy(activeDialog = null) }
+        val submissionId = ++reportSubmissionId
+        _state.update { it.copy(activeDialog = dialog.copy(isSubmitting = true)) }
         viewModelScope.launch {
-            submitCurationReport(
+            val result = submitCurationReport(
                 SubmitCurationReportUseCase.Params(
                     cardId = dialog.cardId,
                     subcategoryId = dialog.subcategoryId,
                     actions = dialog.selectedActions,
                 )
-            ).onFailure {
-                _messages.tryEmit(FastStudySessionMessage.CurationReportFailed)
-            }
+            )
+            val submittingDialog = (_state.value.activeDialog as? ReportCurrentCardProblem)
+                ?.takeIf { it.isSubmitting && submissionId == reportSubmissionId }
+            result
+                .onSuccess { if (submittingDialog != null) closeDialog() }
+                .onFailure {
+                    if (submittingDialog != null) _state.update { it.copy(activeDialog = submittingDialog.copy(isSubmitting = false)) }
+                    _messages.tryEmit(FastStudySessionMessage.CurationReportFailed)
+                }
         }
     }
 
     public override fun onCleared() {
+        dialogAdvanceHold.cancel()
         coordinator.stop()
-    }
-
-    private companion object {
-        const val EXTENDED_CONTEXT_ADVANCE_DELAY_MS = 500L
-        const val NO_CARD_INDEX = -1
     }
 }

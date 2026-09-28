@@ -53,6 +53,12 @@ interface StudyVoicePlaybackGateway {
     /** Reads the question of the head card, or stops when there is none. */
     fun advanceAfterVoiceAnswer()
 
+    /**
+     * While [closed], the player stops on the current card at the end of the pause after its answer,
+     * instead of moving on, and reports [PlaybackEvent.AdvanceGateReached].
+     */
+    fun setAdvanceGate(closed: Boolean)
+
     /** In question-only mode the player stops after each question and reports [PlaybackEvent.QuestionFinished]. */
     fun setQuestionOnlyMode(enabled: Boolean)
     fun setSpeechRate(rate: Float)

@@ -82,6 +82,7 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
     private var pendingQuestionOnlyMode: Boolean? = null
+    private var pendingAdvanceGateClosed: Boolean? = null
     private var pendingVoiceAnswering: Boolean? = null
 
     private val serviceConnection = object : ServiceConnection {
@@ -102,6 +103,7 @@ class StudySessionVoiceGateway @Inject constructor(
             pendingSpeechRate?.let { binder.setSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
             pendingQuestionOnlyMode?.let { binder.setQuestionOnlyMode(it) }
+            pendingAdvanceGateClosed?.let { binder.setAdvanceGate(it) }
             pendingVoiceAnswering?.let { if (it) binder.startVoiceAnswering() }
         }
 
@@ -141,6 +143,7 @@ class StudySessionVoiceGateway @Inject constructor(
         unbind()
         _state.value = VoicePlaybackState()
         pendingQuestionOnlyMode = null
+        pendingAdvanceGateClosed = null
         pendingVoiceAnswering = null
     }
 
@@ -179,6 +182,11 @@ class StudySessionVoiceGateway @Inject constructor(
     override fun setQuestionOnlyMode(enabled: Boolean) {
         pendingQuestionOnlyMode = enabled
         voiceBinder.value?.setQuestionOnlyMode(enabled)
+    }
+
+    override fun setAdvanceGate(closed: Boolean) {
+        pendingAdvanceGateClosed = closed
+        voiceBinder.value?.setAdvanceGate(closed)
     }
 
     override fun setSpeechRate(rate: Float) {

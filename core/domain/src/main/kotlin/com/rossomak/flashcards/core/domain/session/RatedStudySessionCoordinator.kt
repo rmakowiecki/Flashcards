@@ -137,7 +137,9 @@ class RatedStudySessionCoordinator @Inject constructor(
         isVoiceStackStarted = false
     }
 
-    fun rate(rating: FlashcardAttemptRating) = dispatch(RatedSessionInput.AttemptRated(rating))
+    fun rate(rating: FlashcardAttemptRating) {
+        dispatch(RatedSessionInput.AttemptRated(rating))
+    }
 
     fun revealAnswer() {
         if (playback.isActive) playbackGateway.showAnswer()
@@ -145,14 +147,43 @@ class RatedStudySessionCoordinator @Inject constructor(
     }
 
     fun play() {
-        if (state?.pauseReason == SessionPauseReason.VoiceEngineUnavailable) resume() else dispatch(RatedSessionInput.PlayRequested)
+        applyPlay()
     }
 
-    fun pause() = dispatch(RatedSessionInput.PauseRequested)
+    fun pause() {
+        dispatch(RatedSessionInput.PauseRequested)
+    }
 
-    fun next() = dispatch(RatedSessionInput.CardSkipped)
+    fun next() {
+        dispatch(RatedSessionInput.CardSkipped)
+    }
 
-    fun previous() = dispatch(RatedSessionInput.PreviousRequested)
+    fun previous() {
+        dispatch(RatedSessionInput.PreviousRequested)
+    }
+
+    /**
+     * Keeps the session going, but stops it on the answered card at the auto-advance point until
+     * [releaseAdvance]. A hold is not a pause: a pause, play or skip resolves it.
+     */
+    fun holdAdvance() {
+        dispatch(RatedSessionInput.AdvanceHoldRequested)
+    }
+
+    /** Moves on and plays only when still held at the auto-advance point; otherwise it only drops the request. */
+    fun releaseAdvance() {
+        dispatch(RatedSessionInput.AdvanceHoldReleased)
+    }
+
+    /** Pauses a playing session until [endTemporaryPause]; a user pause or play in between replaces it. */
+    fun pauseTemporarily() {
+        dispatch(RatedSessionInput.TemporaryPauseRequested)
+    }
+
+    /** Plays again only when the session is still paused by [pauseTemporarily]. */
+    fun endTemporaryPause() {
+        dispatch(RatedSessionInput.TemporaryPauseEnded)
+    }
 
     /**
      * Resumes a paused session, with the microphone permission checked first (ADR-0052). After an
@@ -301,20 +332,32 @@ class RatedStudySessionCoordinator @Inject constructor(
             PlaybackEvent.EngineUnavailable -> dispatch(RatedSessionInput.PlaybackEngineUnavailable)
             // Question-only reads never reach the end; the queue decides when a Rated session is over.
             PlaybackEvent.EndReached -> Unit
-            // revealAnswer already dispatched the reveal before asking the player to read it.
-            is PlaybackEvent.AnswerRevealed -> Unit
+            // revealAnswer already dispatched the reveal before asking the player to read it; the
+            // advance gate is Fast's, and the Rated hold happens here at the notice tail instead.
+            is PlaybackEvent.AnswerRevealed, PlaybackEvent.AdvanceGateReached -> Unit
         }
     }
 
-    /** Applied exactly like the matching in-app command. A controller's stop only pauses. */
+    /**
+     * Applied exactly like the matching in-app command. A controller's stop only pauses. A command
+     * that changed the session is then reported, so the screen can react to it.
+     */
     private fun onExternalCommand(command: TransportCommand) {
-        when (command) {
-            TransportCommand.Play -> play()
-            TransportCommand.Pause, TransportCommand.Stop -> pause()
-            TransportCommand.Next -> next()
-            TransportCommand.Previous, TransportCommand.PreviousCard -> previous()
-            is TransportCommand.JumpTo -> Unit
+        val isChanged = when (command) {
+            TransportCommand.Play -> applyPlay()
+            TransportCommand.Pause, TransportCommand.Stop -> dispatch(RatedSessionInput.PauseRequested)
+            TransportCommand.Next -> dispatch(RatedSessionInput.CardSkipped)
+            TransportCommand.Previous, TransportCommand.PreviousCard -> dispatch(RatedSessionInput.PreviousRequested)
+            is TransportCommand.JumpTo -> false
         }
+        if (isChanged) eventChannel.trySend(RatedSessionEvent.ExternalTransportCommand(command))
+    }
+
+    /** Returns whether it changed the session; the restart after an engine failure always does. */
+    private fun applyPlay(): Boolean {
+        if (state?.pauseReason != SessionPauseReason.VoiceEngineUnavailable) return dispatch(RatedSessionInput.PlayRequested)
+        resume()
+        return true
     }
 
     private fun onCaptureEvent(event: CaptureEvent) {
@@ -327,23 +370,31 @@ class RatedStudySessionCoordinator @Inject constructor(
         dispatch(input)
     }
 
-    /** Runs one input at a time, in arrival order, even when an effect feeds another input back. */
-    private fun dispatch(input: RatedSessionInput) {
+    /**
+     * Runs one input at a time, in arrival order, even when an effect feeds another input back.
+     * Returns whether the inputs run changed the session: its state, or anything the coordinator had
+     * to do. An input queued behind one already running reports `false`.
+     */
+    private fun dispatch(input: RatedSessionInput): Boolean {
         pendingInputs.addLast(input)
-        if (isDispatching) return
+        if (isDispatching) return false
         isDispatching = true
+        val stateBefore = state
+        var hasEffects = false
         try {
             while (pendingInputs.isNotEmpty()) {
                 val next = pendingInputs.removeFirst()
                 val current = state ?: continue
                 val transition = reducer.reduce(current, next)
                 state = transition.state
+                hasEffects = hasEffects || transition.effects.isNotEmpty()
                 transition.effects.forEach(::run)
             }
         } finally {
             isDispatching = false
         }
         publish()
+        return hasEffects || state != stateBefore
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per effect, exhaustive over the sealed type.
@@ -462,6 +513,7 @@ class RatedStudySessionCoordinator @Inject constructor(
                 isVoiceAnsweringActive = isVoiceAnsweringActive,
                 voiceAnswerPauseReason = voiceAnswerPauseReason,
                 isPausedAtAdvancePoint = isPausedAtAdvancePoint,
+                isHeldAtAdvancePoint = isHeldAtAdvancePoint,
                 pauseReason = pauseReason,
             )
         }

@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.update
  * Records every command in [calls], in order, and moves [state] the way the real player would:
  * start plays from the start index, pause and play flip `isPlaying`, card moves change the index.
  * Like the real player, [showAnswer] reports the answer revealed. Tests drive what else the player
- * reports with [readAnswer], [finishQuestion], [finishNotice] and [emit].
+ * reports with [readAnswer], [finishQuestion], [finishNotice], [reachAdvancePoint] and [emit].
  */
 class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
@@ -34,6 +34,7 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
         data object ShowAnswer : Call
         data object AdvanceAfterVoiceAnswer : Call
         data class SetQuestionOnlyMode(val enabled: Boolean) : Call
+        data class SetAdvanceGate(val closed: Boolean) : Call
         data class SetSpeechRate(val rate: Float) : Call
         data class SetVoice(val voiceId: String?) : Call
         data class SpeakNotice(val notice: SpokenNotice) : Call
@@ -64,6 +65,10 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     val lastVoiceId: String? get() = calls.filterIsInstance<Call.SetVoice>().lastOrNull()?.voiceId
     val spokenNotices: List<SpokenNotice> get() = calls.filterIsInstance<Call.SpeakNotice>().map { it.notice }
 
+    /** The advance gate, as last set. */
+    var isAdvanceGateClosed: Boolean = false
+        private set
+
     fun emit(event: PlaybackEvent) {
         eventChannel.trySend(event)
     }
@@ -80,6 +85,26 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     /** Reports that the presented card's question has been read, as question-only mode does. */
     fun finishQuestion() {
         cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.QuestionFinished(it.id)) }
+    }
+
+    /**
+     * Finishes the pause after the presented card's answer, as the real player's loop does: with the
+     * gate closed it stops there and reports [PlaybackEvent.AdvanceGateReached]; otherwise it moves
+     * on to the next card, or reports [PlaybackEvent.EndReached] after the last one.
+     */
+    fun reachAdvancePoint() {
+        val current = state.value
+        when {
+            isAdvanceGateClosed -> {
+                state.update { it.copy(isPlaying = false) }
+                emit(PlaybackEvent.AdvanceGateReached)
+            }
+            current.currentIndex < cards.lastIndex -> state.update { it.copy(currentIndex = it.currentIndex + 1, phase = VoicePhase.Question) }
+            else -> {
+                state.update { it.copy(isPlaying = false, phase = VoicePhase.Question) }
+                emit(PlaybackEvent.EndReached)
+            }
+        }
     }
 
     /** Reports the oldest spoken notice as finished. */
@@ -110,6 +135,7 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     override fun stop() {
         calls += Call.Stop
         cards = emptyList()
+        isAdvanceGateClosed = false
         state.value = VoicePlaybackState()
     }
 
@@ -155,6 +181,11 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     override fun setQuestionOnlyMode(enabled: Boolean) {
         calls += Call.SetQuestionOnlyMode(enabled)
+    }
+
+    override fun setAdvanceGate(closed: Boolean) {
+        calls += Call.SetAdvanceGate(closed)
+        isAdvanceGateClosed = closed
     }
 
     override fun setSpeechRate(rate: Float) {

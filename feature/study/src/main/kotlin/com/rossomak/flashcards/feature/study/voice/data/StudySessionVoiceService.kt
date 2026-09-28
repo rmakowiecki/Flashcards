@@ -121,6 +121,8 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun setQuestionOnlyMode(enabled: Boolean) = player.setQuestionOnlyMode(enabled)
 
+        fun setAdvanceGate(closed: Boolean) = player.setAdvanceGate(closed)
+
         fun setSpeechRate(rate: Float) = player.setPlaybackSpeechRate(rate)
 
         fun setVoice(voiceId: String?) = player.setVoice(voiceId)

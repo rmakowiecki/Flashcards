@@ -321,6 +321,206 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.playCount shouldBe 0
     }
 
+    // The advance hold
+
+    @Test
+    fun `with a hold requested the session keeps playing and stops held at the auto-advance point`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.holdAdvance()
+        playbackGateway.pauseCount shouldBe 0
+        gradeAndReachAdvancePoint()
+
+        with(coordinator.runningSnapshot) {
+            isHeldAtAdvancePoint shouldBe true
+            cards.firstOrNull()?.id shouldBe "card-1"
+            completedCount shouldBe 1
+        }
+        playbackGateway.calls.filterIsInstance<Call.UpdateQueue>() shouldBe emptyList()
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.calls.last() shouldBe Call.Pause
+    }
+
+    @Test
+    fun `releasing a held session syncs the queue, reads the next question, and a second release changes nothing`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    @Test
+    fun `releasing a hold that never stopped the session changes nothing`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        val callCount = playbackGateway.calls.size
+
+        coordinator.releaseAdvance()
+        gradeAndReachAdvancePoint()
+
+        playbackGateway.calls.drop(callCount).filterIsInstance<Call.Pause>() shouldBe emptyList()
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    @Test
+    fun `an external pause at a hold turns it into a user pause, which the release does not resume`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+
+        coordinator.play()
+        runCurrent()
+
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    @Test
+    fun `external play at a hold moves on at once and is reported`() = runTest {
+        externalCommandAtHoldMovesOn(TransportCommand.Play)
+    }
+
+    @Test
+    fun `external next at a hold moves on at once and is reported`() = runTest {
+        externalCommandAtHoldMovesOn(TransportCommand.Next)
+    }
+
+    private fun TestScope.externalCommandAtHoldMovesOn(command: TransportCommand) {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+
+        playbackGateway.emitExternal(command)
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        events shouldContain RatedSessionEvent.ExternalTransportCommand(command)
+    }
+
+    @Test
+    fun `releasing a hold on the last card ends the session`() = runTest {
+        val coordinator = startCoordinator(setup.copy(cardIds = listOf("card-1")))
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe false
+    }
+
+    @Test
+    fun `a silence under a hold is counted, then holds, and the third one pauses voice answering instead`() = runTest {
+        val coordinator = startCoordinator()
+
+        // A dialog open over each of the three rounds.
+        repeat(2) {
+            coordinator.holdAdvance()
+            openListening()
+            advanceTimeBy(SILENCE_TIMEOUT)
+            runCurrent()
+            finishNotice()
+            advanceTimeBy(NOTICE_TAIL)
+            runCurrent()
+            coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
+            coordinator.releaseAdvance()
+            runCurrent()
+        }
+        coordinator.holdAdvance()
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+        val advanceCount = playbackGateway.advanceAfterVoiceAnswerCount
+
+        coordinator.releaseAdvance()
+        coordinator.endTemporaryPause()
+        runCurrent()
+
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe advanceCount
+        captureGateway.isVoiceAnsweringStarted shouldBe false
+    }
+
+    @Test
+    fun `a temporary pause plays again when it ends, unless the user paused meanwhile`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Pause
+        coordinator.endTemporaryPause()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Play
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        coordinator.pause()
+        runCurrent()
+        coordinator.endTemporaryPause()
+        runCurrent()
+
+        playbackGateway.calls.last() shouldBe Call.Pause
+    }
+
+    @Test
+    fun `the notice tail during a temporary pause waits at the advance point, and its end moves on`() = runTest {
+        val coordinator = startCoordinator()
+        gradingRepository.gradingFlow = gradedFlow()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        coordinator.pauseTemporarily()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+
+        coordinator.endTemporaryPause()
+        runCurrent()
+
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    private fun TestScope.gradeAndReachAdvancePoint() {
+        gradingRepository.gradingFlow = gradedFlow()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+    }
+
     // Resume
 
     @Test
@@ -479,6 +679,7 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
         playbackGateway.calls shouldNotContain Call.AdvanceAfterVoiceAnswer
+        events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 
     // Result

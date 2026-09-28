@@ -150,7 +150,12 @@ private fun RatedTransitionBuilder.pauseVoiceAnswering(reason: VoiceAnswerPauseR
     if (state.isPlaying) emit(RatedSessionEffect.PausePlayback)
     emit(RatedSessionEffect.StopVoiceAnswering)
     emit(CancelGrading)
-    state = state.copy(voiceAnswerPauseReason = reason, round = VoiceAnswerRound(), isPausedAtAdvancePoint = false)
+    state = state.copy(
+        voiceAnswerPauseReason = reason,
+        round = VoiceAnswerRound(),
+        isPausedAtAdvancePoint = false,
+        isHeldAtAdvancePoint = false,
+    )
 }
 
 private fun RatedTransitionBuilder.speakNotice(notice: SpokenNotice) {
@@ -175,12 +180,20 @@ internal fun RatedTransitionBuilder.onNoticeFinished(notice: SpokenNotice) {
 }
 
 /**
- * The tail after an advancing notice: the queue syncs first, then the next question is read, or the
- * session is held at the advance point when playback was paused meanwhile.
+ * The tail after an advancing notice ends at the auto-advance point. With a hold requested the
+ * session stops there, on the answered card, with its queue sync still pending. Otherwise the queue
+ * syncs first, then the next question is read, or the session waits at the advance point when
+ * playback was paused meanwhile.
  */
 internal fun RatedTransitionBuilder.onNoticeTailElapsed() {
+    val isAdvancePoint = state.isVoiceAnsweringActive && state.round.phase == SpeakingNotice
+    if (isAdvancePoint && state.isPlaying && state.isAdvanceHoldRequested) {
+        state = state.copy(isHeldAtAdvancePoint = true)
+        emit(RatedSessionEffect.PausePlayback)
+        return
+    }
     if (state.isSyncPending) syncQueue()
-    if (!state.isVoiceAnsweringActive || state.round.phase != SpeakingNotice) {
+    if (!isAdvancePoint) {
         if (state.isComplete) emit(SessionComplete)
         return
     }

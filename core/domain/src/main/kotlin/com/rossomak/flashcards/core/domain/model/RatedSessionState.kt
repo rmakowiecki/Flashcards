@@ -47,6 +47,13 @@ package com.rossomak.flashcards.core.domain.model
  * @param isPausedAtAdvancePoint the notice and its tail finished while playback was paused: the
  * next play reads the next question instead of re-reading the answered one.
  * @param isPlaying the voice player's playing state, as last reported.
+ * @param isAdvanceHoldRequested while set, the session stops at the auto-advance point instead of
+ * moving on.
+ * @param isHeldAtAdvancePoint the notice and its tail finished with a hold requested: the session
+ * stopped on the answered card, with its queue sync still pending. Not a user pause: releasing the
+ * hold moves on and plays.
+ * @param isPausedTemporarily playback is paused by a temporary pause, which plays again when it
+ * ends; a user pause or play in between replaces it.
  */
 data class RatedSessionState(
     val queue: List<RatedSessionCardRecord>,
@@ -65,6 +72,9 @@ data class RatedSessionState(
     val pauseReason: SessionPauseReason? = null,
     val isPausedAtAdvancePoint: Boolean = false,
     val isPlaying: Boolean = false,
+    val isAdvanceHoldRequested: Boolean = false,
+    val isHeldAtAdvancePoint: Boolean = false,
+    val isPausedTemporarily: Boolean = false,
 ) {
     /** How many distinct cards have resolved [FlashcardTerminalRating.Mastered] so far. */
     val masteredCount: Int get() = terminalStates.values.count { it.terminalState == FlashcardTerminalRating.Mastered }

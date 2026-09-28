@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
@@ -55,6 +56,7 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
@@ -766,14 +768,133 @@ class RatedStudySessionViewModelTest {
         playbackGateway.lastSpeechRate shouldBe rate
     }
 
+    // Dialogs hold at the auto-advance point
+
     @Test
-    fun `ReportProblemOpen pauses playback when voice is playing`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `opening report, learn more or exit session never pauses playback`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createVoiceViewModel()
 
-        viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+        listOf(openReportProblem(viewModel), CurrentCardExtendedContext(EXTENDED_CONTEXT), ExitSession).forEach { dialog ->
+            viewModel.onDialogEvent(Open(dialog))
+            runCurrent()
+
+            playbackGateway.pauseCount shouldBe 0
+            viewModel.onDialogEvent(Dismiss)
+            runCurrent()
+        }
+    }
+
+    @Test
+    fun `a dialog opened while listening holds after the silence notice, and closing it plays the next question after 500 ms`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            finishQuestion()
+            viewModel.onDialogEvent(Open(CurrentCardExtendedContext(EXTENDED_CONTEXT)))
+
+            viewModel.messages.test {
+                advanceTimeBy(SILENCE_TIMEOUT)
+                runCurrent()
+                awaitItem() shouldBe VoiceAnswerSilenceSkip
+            }
+            finishNotice()
+            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+
+            viewModel.onDialogEvent(Dismiss)
+            advanceTimeBy(CLOSED_DIALOG_LINGER - 1.milliseconds)
+            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            advanceTimeBy(2.milliseconds)
+
+            viewModel.state.value.currentCard?.id shouldBe "card-2"
+            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+            viewModel.state.value.isVoicePlaying shouldBe true
+        }
+
+    @Test
+    fun `a dialog opened during the grading feedback holds after it, and closing it plays the next card after 500 ms`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
+            viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+
+            finishNotice()
+            viewModel.state.value.currentCard?.id shouldBe "card-1"
+            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+
+            viewModel.onDialogEvent(Dismiss)
+            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+
+            viewModel.state.value.currentCard?.id shouldBe "card-2"
+            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        }
+
+    @Test
+    fun `closing a dialog without a hold changes nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+        viewModel.onDialogEvent(Open(ExitSession))
+
+        viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
-        playbackGateway.pauseCount shouldBe 1
+        viewModel.state.value.currentCard?.id shouldBe "card-1"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+    }
+
+    @Test
+    fun `an external play at a hold dismisses the dialog, drops its draft and plays the next card at once`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
+            viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+            viewModel.onDialogEvent(DraftChange(reportDraft(viewModel).withAction(CurationAction.Delete, isChecked = true)))
+            finishNotice()
+
+            playbackGateway.emitExternal(TransportCommand.Play)
+            runCurrent()
+
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.currentCard?.id shouldBe "card-2"
+            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        }
+
+    @Test
+    fun `an external pause keeps the dialog open`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+        viewModel.onDialogEvent(Open(ExitSession))
+
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+
+        viewModel.state.value.activeDialog shouldBe ExitSession
+    }
+
+    @Test
+    fun `an external next ignored while listening leaves the dialog open`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+        finishQuestion()
+        viewModel.onDialogEvent(Open(ExitSession))
+
+        playbackGateway.emitExternal(TransportCommand.Next)
+        runCurrent()
+
+        viewModel.state.value.activeDialog shouldBe ExitSession
+        viewModel.state.value.currentCard?.id shouldBe "card-1"
+    }
+
+    @Test
+    fun `confirming exit session while held ends the session abandoned without moving on`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+        emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
+        viewModel.onDialogEvent(Open(ExitSession))
+        finishNotice()
+
+        viewModel.events.test {
+            viewModel.onDialogEvent(Confirm)
+            runCurrent()
+
+            awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>().route.abandoned shouldBe true
+        }
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
     }
 
     @Test
@@ -1846,6 +1967,7 @@ class RatedStudySessionViewModelTest {
 
             awaitItem() shouldBe CurationSubmissionFailed
         }
+        reportDraft(viewModel).isSubmitting shouldBe false
     }
 
     @Test
@@ -1991,6 +2113,8 @@ class RatedStudySessionViewModelTest {
 
     private companion object {
         const val FIXED_SEED = 42L
+        const val EXTENDED_CONTEXT = "More about this card."
+        val CLOSED_DIALOG_LINGER = 500.milliseconds
         val TRANSCRIPT_DELAY = 200.milliseconds
         const val MAX_CARDS_BEFORE_REAPPEARING = 10
         const val CORRECT_GRADE_PERCENT = 95
