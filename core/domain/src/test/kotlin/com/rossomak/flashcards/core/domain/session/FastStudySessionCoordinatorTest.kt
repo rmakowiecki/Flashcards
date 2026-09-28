@@ -21,6 +21,7 @@ import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -198,14 +199,17 @@ class FastStudySessionCoordinatorTest {
     // Studied set and result
 
     @Test
-    fun `the last card's answer read in full ends the session with every Seen card`() = runTest {
+    fun `the player reaching the end ends the session with every Seen card`() = runTest {
         startCoordinator()
         (0..2).forEach { index ->
             playbackGateway.state.update { it.copy(currentIndex = index, phase = VoicePhase.Answer) }
             runCurrent()
         }
-
         playbackGateway.state.update { it.copy(isPlaying = false, phase = VoicePhase.Question) }
+        runCurrent()
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+
+        playbackGateway.emit(PlaybackEvent.EndReached)
         runCurrent()
 
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()

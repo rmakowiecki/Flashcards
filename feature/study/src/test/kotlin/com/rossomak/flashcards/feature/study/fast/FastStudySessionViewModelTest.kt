@@ -490,7 +490,7 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `read-aloud natural end fires once the queue settles back on the last card's question, not when its answer starts`() =
+    fun `read-aloud ends when the player reports the end, not when it settles back on the last card's question`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createReadAloudViewModel()
             // Each card's answer phase is reached in turn as read-aloud progresses through the deck.
@@ -504,6 +504,10 @@ class FastStudySessionViewModelTest {
                 playbackGateway.state.value =
                     VoicePlaybackState(isActive = true, isPlaying = false, currentIndex = 2, totalCards = 3, phase = VoicePhase.Question)
                 advanceUntilIdle()
+                expectNoEvents()
+
+                playbackGateway.emit(PlaybackEvent.EndReached)
+                advanceUntilIdle()
                 val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
                 destination.route.abandoned shouldBe false
@@ -512,7 +516,7 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `the terminal navigation event fires exactly once even if voice state re-settles after natural end`() =
+    fun `the terminal navigation event fires exactly once even if the player reports the end twice`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createReadAloudViewModel()
             playbackGateway.state.value =
@@ -520,21 +524,12 @@ class FastStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.events.test {
-                playbackGateway.state.value =
-                    VoicePlaybackState(isActive = true, isPlaying = false, currentIndex = 2, totalCards = 3, phase = VoicePhase.Question)
+                playbackGateway.emit(PlaybackEvent.EndReached)
                 advanceUntilIdle()
                 awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
-                // A distinct value (speechRate) so the StateFlow actually re-emits, still matching
-                // the same natural-end condition — the coordinator's end must guard this second pass.
-                playbackGateway.state.value = VoicePlaybackState(
-                    isActive = true,
-                    isPlaying = false,
-                    currentIndex = 2,
-                    totalCards = 3,
-                    phase = VoicePhase.Question,
-                    speechRate = 1.5f,
-                )
+                // The coordinator's end must guard a second report.
+                playbackGateway.emit(PlaybackEvent.EndReached)
                 advanceUntilIdle()
                 expectNoEvents()
             }

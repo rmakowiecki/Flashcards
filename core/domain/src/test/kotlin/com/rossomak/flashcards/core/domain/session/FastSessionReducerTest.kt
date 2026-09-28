@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextCardRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackChanged
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEndReached
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEngineUnavailable
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.VoiceStackRestarted
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -90,18 +91,19 @@ class FastSessionReducerTest {
     }
 
     @Test
-    fun `read-aloud ends naturally once the last card's answer was read and the player settles on its question`() {
+    fun `read-aloud ends when the player reports it played past the last card`() {
+        val answered = session.after(PlaybackChanged(playback(index = CARD_COUNT - 1, phase = VoicePhase.Answer)))
+
+        reducer.reduce(answered, PlaybackEndReached).effects shouldBe listOf(FastSessionEffect.SessionComplete)
+    }
+
+    @Test
+    fun `a paused player back on the last card's question after its answer does not end the session`() {
+        // A rewind, a speed change or an utterance error while paused all leave the player like this.
         val lastIndex = CARD_COUNT - 1
         val answered = session.after(PlaybackChanged(playback(index = lastIndex, phase = VoicePhase.Answer)))
 
         val transition = reducer.reduce(answered, PlaybackChanged(playback(index = lastIndex, phase = VoicePhase.Question, isPlaying = false)))
-
-        transition.effects shouldBe listOf(FastSessionEffect.SessionComplete)
-    }
-
-    @Test
-    fun `a paused last card whose answer was never read is not a natural end`() {
-        val transition = reducer.reduce(session, PlaybackChanged(playback(index = CARD_COUNT - 1, phase = VoicePhase.Question, isPlaying = false)))
 
         transition.effects.shouldBeEmpty()
     }

@@ -295,6 +295,8 @@ class RatedStudySessionCoordinator @Inject constructor(
             is PlaybackEvent.QuestionFinished -> dispatch(RatedSessionInput.QuestionFinished(event.cardId))
             is PlaybackEvent.NoticeFinished -> dispatch(RatedSessionInput.NoticeFinished(event.notice))
             PlaybackEvent.EngineUnavailable -> dispatch(RatedSessionInput.PlaybackEngineUnavailable)
+            // Question-only reads never reach the end; the queue decides when a Rated session is over.
+            PlaybackEvent.EndReached -> Unit
         }
     }
 

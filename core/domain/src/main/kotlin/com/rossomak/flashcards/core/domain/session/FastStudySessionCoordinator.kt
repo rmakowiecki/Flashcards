@@ -229,6 +229,7 @@ class FastStudySessionCoordinator @Inject constructor(
         when (event) {
             is PlaybackEvent.ExternalCommand -> onExternalCommand(event.command)
             PlaybackEvent.EngineUnavailable -> dispatch(FastSessionInput.PlaybackEngineUnavailable)
+            PlaybackEvent.EndReached -> dispatch(FastSessionInput.PlaybackEndReached)
             // Fast reads answers and speaks no notices.
             is PlaybackEvent.QuestionFinished, is PlaybackEvent.NoticeFinished -> Unit
         }

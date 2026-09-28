@@ -406,6 +406,7 @@ class TtsPlayer(
                 VoicePhase.Question // reset so tapping Play re-reads last card from the question
             isPlaying = false
             publishState()
+            onEvent(PlaybackEvent.EndReached)
         }
     }
 

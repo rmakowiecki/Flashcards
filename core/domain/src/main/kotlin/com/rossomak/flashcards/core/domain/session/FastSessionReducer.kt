@@ -9,6 +9,7 @@ import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextCardRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackChanged
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEndReached
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEngineUnavailable
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.VoiceStackRestarted
 import javax.inject.Inject
@@ -22,6 +23,9 @@ sealed interface FastSessionInput {
     /** The manual "next card", with read-aloud off. */
     data object NextCardRequested : FastSessionInput
     data class PlaybackChanged(val playback: VoicePlaybackState) : FastSessionInput
+
+    /** Read-aloud played past the last card's answer by itself. */
+    data object PlaybackEndReached : FastSessionInput
     data object PlaybackEngineUnavailable : FastSessionInput
 
     /** The voice stack started again after a text-to-speech engine failure. */
@@ -33,7 +37,7 @@ sealed interface FastSessionEffect {
     data object StopVoiceStack : FastSessionEffect
     data class Emit(val event: FastSessionEvent) : FastSessionEffect
 
-    /** The last card's answer has been shown; the session is over. */
+    /** The last card's answer has been shown or read in full; the session is over. */
     data object SessionComplete : FastSessionEffect
 }
 
@@ -63,6 +67,7 @@ class FastSessionReducer @Inject constructor() {
         AnswerRevealed -> FastSessionTransition(state.markSeen(state.currentIndex).copy(isAnswerRevealed = true))
         NextCardRequested -> onNextCardRequested(state)
         is PlaybackChanged -> onPlaybackChanged(state, input.playback)
+        PlaybackEndReached -> FastSessionTransition(state, listOf(FastSessionEffect.SessionComplete))
         PlaybackEngineUnavailable -> onPlaybackEngineUnavailable(state)
         VoiceStackRestarted -> FastSessionTransition(state.copy(pauseReason = null))
     }
@@ -76,15 +81,14 @@ class FastSessionReducer @Inject constructor() {
         }
 
     /**
-     * The answer phase for the current index is Studied, recorded before the natural-end check,
-     * which relies on the last card already being Seen.
+     * The answer phase for the current index is Studied. Playback state never ends the session:
+     * a pause, a seek or a speed change can leave the player looking exactly like it finished, so
+     * only [PlaybackEndReached] does.
      */
     private fun onPlaybackChanged(state: FastSessionState, playback: VoicePlaybackState): FastSessionTransition {
         if (!playback.isActive) return FastSessionTransition(state)
-        var next = state.copy(currentIndex = playback.currentIndex, isAnswerRevealed = playback.phase == VoicePhase.Answer)
-        if (playback.phase == VoicePhase.Answer) next = next.markSeen(playback.currentIndex)
-        val effects = if (next.isReadAloudNaturalEnd(playback)) listOf(FastSessionEffect.SessionComplete) else emptyList()
-        return FastSessionTransition(next, effects)
+        val next = state.copy(currentIndex = playback.currentIndex, isAnswerRevealed = playback.phase == VoicePhase.Answer)
+        return FastSessionTransition(if (playback.phase == VoicePhase.Answer) next.markSeen(playback.currentIndex) else next)
     }
 
     private fun onPlaybackEngineUnavailable(state: FastSessionState): FastSessionTransition {
@@ -99,17 +103,4 @@ class FastSessionReducer @Inject constructor() {
         val cardId = cards.getOrNull(cardIndex)?.id ?: return this
         return if (cardId in seenCardIds) this else copy(seenCardIds = seenCardIds + cardId)
     }
-
-    /**
-     * The player settling back on [VoicePhase.Question], not playing, at the last card is unique to
-     * its own natural-end branch — a user pause never resets the phase back to Question this way,
-     * and requiring the last card to already be Seen rules out the otherwise-identical "never
-     * started playing" resting state.
-     */
-    private fun FastSessionState.isReadAloudNaturalEnd(playback: VoicePlaybackState): Boolean =
-        !playback.isPlaying &&
-            playback.phase == VoicePhase.Question &&
-            playback.totalCards > 0 &&
-            playback.currentIndex == playback.totalCards - 1 &&
-            cards.getOrNull(playback.currentIndex)?.id in seenCardIds
 }
