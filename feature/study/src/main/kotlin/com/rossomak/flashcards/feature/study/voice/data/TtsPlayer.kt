@@ -45,7 +45,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * [Player] state cannot express.
  *
  * It makes no session decision. Audio-focus auto-pause and auto-resume are the one behavior it
- * still runs by itself.
+ * still runs by itself. Each utterance starts with a [PlaybackPreroll], so headset buttons reach this
+ * session and Bluetooth speech starts unclipped.
  */
 @UnstableApi
 class TtsPlayer(
@@ -57,6 +58,7 @@ class TtsPlayer(
     val voiceState: StateFlow<VoicePlaybackState> = _voiceState.asStateFlow()
 
     private val handler = Handler(Looper.getMainLooper())
+    private val playbackPreroll = PlaybackPreroll()
 
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -411,6 +413,7 @@ class TtsPlayer(
         val generationId = ++generation
         requestAudioFocus()
         publishState()
+        playbackPreroll.play()
         tts.speak(
             card.spokenQuestion.ifBlank { " " },
             TextToSpeech.QUEUE_FLUSH,
@@ -427,6 +430,7 @@ class TtsPlayer(
         requestAudioFocus()
         publishState()
         onEvent(PlaybackEvent.AnswerRevealed(card.cardId))
+        playbackPreroll.play()
         tts.speak(
             card.spokenAnswer.ifBlank { " " },
             TextToSpeech.QUEUE_FLUSH,
@@ -523,6 +527,7 @@ class TtsPlayer(
         generation++
         handler.removeCallbacksAndMessages(null)
         abandonAudioFocus()
+        playbackPreroll.release()
         runCatching {
             tts.stop()
             tts.shutdown()
