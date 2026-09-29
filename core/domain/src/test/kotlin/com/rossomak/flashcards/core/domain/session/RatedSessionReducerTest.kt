@@ -20,11 +20,13 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Grade
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.OpenListeningWindow
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PlayListeningCue
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartSilenceTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopListening
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopVoiceAnswering
@@ -36,6 +38,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.FeedbackSkipRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.MicrophoneOpened
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeTailElapsed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PauseRequested
@@ -156,12 +159,61 @@ class RatedSessionReducerTest {
     }
 
     @Test
-    fun `a finished question while listening restarts the window and the silence timer`() {
+    fun `a finished question opens the window with the microphone still being prepared`() {
         val listening = voiceSession().listening()
+
+        listening.round.phase shouldBe VoiceAnswerPhase.Listening
+        listening.round.isMicrophoneOpen shouldBe false
+    }
+
+    @Test
+    fun `the microphone opening starts the silence timer and plays the listening cue`() {
+        val transition = reducer.reduce(voiceSession().listening(), MicrophoneOpened)
+
+        transition.state.round.isMicrophoneOpen shouldBe true
+        transition.effects shouldBe listOf(StartSilenceTimer, PlayListeningCue)
+    }
+
+    @Test
+    fun `the microphone opening again in the same window changes nothing`() {
+        val open = voiceSession().listening().after(MicrophoneOpened)
+
+        val transition = reducer.reduce(open, MicrophoneOpened)
+
+        transition.state shouldBe open
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `the microphone opening outside a listening window changes nothing`() {
+        val grading = voiceSession().grading()
+
+        val transition = reducer.reduce(grading, MicrophoneOpened)
+
+        transition.state shouldBe grading
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a finished question while listening closes the window and opens a fresh one`() {
+        val listening = voiceSession().listening().after(MicrophoneOpened)
 
         val transition = reducer.reduce(listening, QuestionFinished(listening.head()))
 
-        transition.effects shouldBe listOf(CancelSilenceTimer, OpenListeningWindow(listening.head()))
+        transition.effects shouldBe listOf(StopListening, OpenListeningWindow(listening.head()))
+        transition.state.round.isMicrophoneOpen shouldBe false
+    }
+
+    @Test
+    fun `the player stopping on its own while listening closes the window, and the question read again opens a fresh one`() {
+        val listening = voiceSession().listening().after(MicrophoneOpened)
+
+        val stopped = reducer.reduce(listening, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
+
+        stopped.effects shouldBe listOf(StopListening)
+        stopped.state.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+        val replaying = stopped.state.after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+        reducer.reduce(replaying, QuestionFinished(listening.head())).effects shouldBe listOf(OpenListeningWindow(listening.head()))
     }
 
     @Test
@@ -667,10 +719,10 @@ class RatedSessionReducerTest {
 
     @Test
     fun `a voice-answer pause pauses the player even when it already is, dropping a pending auto-resume`() {
-        val twoSilences = voiceSession().silence().noticesOver().silence().noticesOver()
-        val listeningWhilePaused = twoSilences.listening().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
+        val twoFailures = voiceSession().gradingFailure().noticesOver().gradingFailure().noticesOver()
+        val gradingWhilePaused = twoFailures.grading().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
 
-        reducer.reduce(listeningWhilePaused, SilenceTimedOut).effects shouldContain PausePlayback
+        reducer.reduce(gradingWhilePaused, GradingFailed(GradingFailureReason.NoConnection)).effects shouldContain PausePlayback
     }
 
     // Temporary pause

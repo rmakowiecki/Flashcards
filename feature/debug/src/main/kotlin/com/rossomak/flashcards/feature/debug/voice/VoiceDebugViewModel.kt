@@ -21,6 +21,7 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,14 +65,16 @@ class VoiceDebugViewModel @Inject constructor(
     private var obfuscatedClip: ShortArray = ShortArray(0)
     private var capturedUtterance: ShortArray = ShortArray(0)
 
+    private var vadListeningJob: Job? = null
+
     private var lastLoggedMicRouteLabel: String? = null
     private var lastLoggedPlaybackRouteLabel: String? = null
 
     init {
-        // Capture (startListening/recordRawClip) reads AudioRouteManager.route, which defaults to
-        // NONE (not capturable) until a session route is acquired — without this the debug screen's
-        // capture loop fails immediately with "Bluetooth microphone unavailable", BT state aside.
-        viewModelScope.launch { audioRouteManager.acquireSessionRoute() }
+        // Capture (startListening/recordRawClip) reads AudioRouteManager.route, which stays NONE (not
+        // capturable) until a recording activates it. Like a study session, each recording activates
+        // the route and releases it when done, so this screen exercises the real per-recording routing.
+        audioRouteManager.startSession()
         viewModelScope.launch {
             voiceCaptureEngine.isSpeechDetected.collect { isSpeech ->
                 _state.update { it.copy(isSpeechDetected = isSpeech) }
@@ -128,11 +131,17 @@ class VoiceDebugViewModel @Inject constructor(
     @SuppressLint("MissingPermission")
     fun onVadToggle() {
         if (_state.value.isVadListening) {
+            vadListeningJob?.cancel()
+            vadListeningJob = null
             voiceCaptureEngine.stopListening()
             _state.update { it.copy(isVadListening = false) }
+            if (!_state.value.isRecordingClip) audioRouteManager.deactivateRoute()
         } else {
-            voiceCaptureEngine.startListening()
             _state.update { it.copy(isVadListening = true) }
+            vadListeningJob = viewModelScope.launch {
+                audioRouteManager.activateRoute()
+                voiceCaptureEngine.startListening()
+            }
         }
     }
 
@@ -142,6 +151,7 @@ class VoiceDebugViewModel @Inject constructor(
         _state.update { it.copy(isRecordingClip = true) }
         viewModelScope.launch {
             try {
+                audioRouteManager.activateRoute()
                 rawClip = voiceCaptureEngine.recordRawClip(RAW_CLIP_DURATION_MS)
                 obfuscatedClip = ShortArray(0)
                 _state.update {
@@ -153,6 +163,7 @@ class VoiceDebugViewModel @Inject constructor(
                 }
             } finally {
                 _state.update { it.copy(isRecordingClip = false) }
+                if (!_state.value.isVadListening) audioRouteManager.deactivateRoute()
             }
         }
     }
@@ -230,6 +241,7 @@ class VoiceDebugViewModel @Inject constructor(
 
     private fun logVadEvent(event: VoiceCaptureEvent) {
         val label = when (event) {
+            is VoiceCaptureEvent.MicrophoneOpened -> "microphone open"
             is VoiceCaptureEvent.SpeechStarted -> "speech start"
             is VoiceCaptureEvent.SpeechEnded -> "speech end"
             is VoiceCaptureEvent.UtteranceCaptured ->
@@ -256,7 +268,7 @@ class VoiceDebugViewModel @Inject constructor(
     override fun onCleared() {
         voiceCaptureEngine.stopListening()
         pcmPlayer.stop()
-        audioRouteManager.releaseSessionRoute()
+        audioRouteManager.releaseSession()
     }
 
     private fun CaptureRouteType.toRouteLabel(): String = when (this) {
@@ -264,7 +276,7 @@ class VoiceDebugViewModel @Inject constructor(
         CaptureRouteType.BluetoothLe -> "Bluetooth (LE Audio)"
         CaptureRouteType.BluetoothSco -> "Bluetooth (SCO)"
         CaptureRouteType.Waiting -> "Waiting for Bluetooth link"
-        CaptureRouteType.None -> "No capturable mic"
+        CaptureRouteType.None -> "Not active"
     }
 
     private fun AudioDeviceInfo.toRouteLabel(): String {

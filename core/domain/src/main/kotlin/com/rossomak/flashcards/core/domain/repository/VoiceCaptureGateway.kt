@@ -18,16 +18,27 @@ interface VoiceCaptureGateway {
      */
     val rawVoiceLevel: Flow<Float>
 
-    /** Holds the wake lock and the session's microphone route until [stopVoiceAnswering]. */
+    /** Holds the wake lock and watches the audio devices until [stopVoiceAnswering]. */
     fun startVoiceAnswering()
 
-    /** Stops capture and releases the route and the wake lock. */
+    /** Stops capture and releases everything, including what [prepareListening] prepared, and the wake lock. */
     fun stopVoiceAnswering()
 
-    /** Suspends until the microphone route can capture, for example while a Bluetooth headset reconnects. */
-    suspend fun awaitRouteReady()
+    /**
+     * Prepares the microphone for one answer and suspends until it can capture, for example while a
+     * Bluetooth headset connects or reconnects.
+     */
+    suspend fun prepareListening()
 
-    /** Opens the microphone for one answer. */
+    /**
+     * Opens the microphone for one answer. [CaptureEvent.MicrophoneOpened] reports when it really
+     * records.
+     */
     fun startListening()
+
+    /** Closes the microphone and releases what [prepareListening] prepared. */
     fun stopListening()
+
+    /** Plays the short sound that tells the user the microphone records. */
+    fun playListeningCue()
 }

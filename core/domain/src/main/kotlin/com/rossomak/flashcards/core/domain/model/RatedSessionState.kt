@@ -142,6 +142,8 @@ sealed interface QueueMove {
  * One Voice Answering round: the card it listens for, what was heard and how it was graded.
  *
  * @param cardId the card the listening window opened for; `null` before it opens.
+ * @param isMicrophoneOpen the microphone is recording for this round's listening window; until
+ * then the window is still being prepared.
  * @param hasUtterance an answer was captured and handed to grading.
  * @param transcript the sanitized transcript, as soon as it streams in, ahead of [grade].
  * @param gradingFailure why this round's grading failed; `null` unless it did.
@@ -149,6 +151,7 @@ sealed interface QueueMove {
 data class VoiceAnswerRound(
     val phase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
     val cardId: String? = null,
+    val isMicrophoneOpen: Boolean = false,
     val hasUtterance: Boolean = false,
     val transcript: String? = null,
     val grade: VoiceAnswerGrade? = null,

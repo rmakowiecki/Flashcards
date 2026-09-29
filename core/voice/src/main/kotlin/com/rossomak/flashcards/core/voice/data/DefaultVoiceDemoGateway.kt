@@ -21,6 +21,7 @@ import com.rossomak.flashcards.core.voice.PcmPlayer
 import com.rossomak.flashcards.core.voice.VoiceCaptureEngine
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.CaptureFailed
+import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.MicrophoneOpened
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechEnded
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.SpeechStarted
 import com.rossomak.flashcards.core.voice.VoiceCaptureEvent.UtteranceCaptured
@@ -52,8 +53,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * visit: no foreground service. [stop] is a hard cut; [finishRecording] is the graceful early end,
  * keeping what was already said.
  *
- * Each attempt holds the session audio route only while listening: it is released as soon as an
- * utterance is captured, before playback starts.
+ * Each attempt activates the audio route only while listening: it is released as soon as an
+ * utterance is captured, before playback starts. No listening cue plays.
  *
  * ViewModel-scoped: it stops itself and cancels its own scope when the owning ViewModel is cleared,
  * so the ViewModel needs no teardown call.
@@ -77,7 +78,7 @@ class DefaultVoiceDemoGateway @Inject constructor(
     // thread and a late capture event can't race stop().
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private var captureEventsJob: Job? = null
-    private var sessionAudioRouteAcquireJob: Job? = null
+    private var routeActivationJob: Job? = null
     private var listenJob: Job? = null
     private var noSpeechTimeoutJob: Job? = null
     private var playbackResetJob: Job? = null
@@ -102,7 +103,8 @@ class DefaultVoiceDemoGateway @Inject constructor(
         captureEventsJob = scope.launch {
             voiceCaptureEngine.events.collect { event -> handleCaptureEvent(event) }
         }
-        sessionAudioRouteAcquireJob = scope.launch { audioRouteManager.acquireSessionRoute() }
+        audioRouteManager.startSession()
+        routeActivationJob = scope.launch { audioRouteManager.activateRoute() }
         listenJob = scope.launch {
             val routeReady = withTimeoutOrNull(ROUTE_READY_TIMEOUT_MS.milliseconds) {
                 audioRouteManager.awaitRouteReady()
@@ -188,11 +190,11 @@ class DefaultVoiceDemoGateway @Inject constructor(
         listenJob?.cancel()
         listenJob = null
         voiceCaptureEngine.stopListening()
-        // Cancel before releasing: acquireSessionRoute() can still be mid-handshake here, and a
-        // stale resume after releaseSessionRoute() would re-apply routing on a dead attempt.
-        sessionAudioRouteAcquireJob?.cancel()
-        sessionAudioRouteAcquireJob = null
-        audioRouteManager.releaseSessionRoute()
+        // Cancel before releasing: activateRoute() can still be mid-handshake here, and a stale
+        // resume after releaseSession() would re-apply routing on a dead attempt.
+        routeActivationJob?.cancel()
+        routeActivationJob = null
+        audioRouteManager.releaseSession()
         captureEventsJob?.cancel()
         captureEventsJob = null
     }
@@ -204,7 +206,7 @@ class DefaultVoiceDemoGateway @Inject constructor(
                 // Never step back out of Processing: a speech start can still be in flight when the user stops.
                 if (_state.value == Listening) _state.value = SpeechDetected
             }
-            is SpeechEnded -> Unit
+            is MicrophoneOpened, is SpeechEnded -> Unit
             is UtteranceCaptured -> {
                 capturedUtterance = event.utterance
                 _state.value = Ready

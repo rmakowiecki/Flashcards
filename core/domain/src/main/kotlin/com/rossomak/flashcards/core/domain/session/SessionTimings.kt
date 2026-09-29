@@ -3,11 +3,17 @@ package com.rossomak.flashcards.core.domain.session
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/** How long a listening window waits for speech before the round counts as a silence. */
+/** How long a listening window waits for speech, from the moment the microphone records, before the round counts as a silence. */
 val SILENCE_TIMEOUT: Duration = 8.seconds
 
-/** How long a listening window waits for the capture route, such as a Bluetooth microphone, to become ready. */
+/** How long a listening window waits for the microphone to be prepared, such as a Bluetooth headset connecting. */
 val ROUTE_READY_TIMEOUT: Duration = 5.seconds
+
+/**
+ * How long a listening window waits, once the capture route is ready, for the microphone to report
+ * it records. A guard only: the capture normally opens well within it or reports its own failure.
+ */
+val MICROPHONE_OPEN_TIMEOUT: Duration = 3.seconds
 
 /** The pause after an advancing notice finishes, before the next question is read (ADR-0025). */
 val NOTICE_TAIL: Duration = 1.seconds

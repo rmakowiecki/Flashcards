@@ -2,6 +2,9 @@ package com.rossomak.flashcards.core.domain.model
 
 /** Something the microphone capture reports while voice answering is started. */
 sealed interface CaptureEvent {
+
+    /** The microphone is recording for the current listening window. */
+    data object MicrophoneOpened : CaptureEvent
     data object SpeechStarted : CaptureEvent
     data object SpeechEnded : CaptureEvent
 

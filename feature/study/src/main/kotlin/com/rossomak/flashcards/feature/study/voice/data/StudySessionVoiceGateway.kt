@@ -245,8 +245,8 @@ class StudySessionVoiceGateway @Inject constructor(
         voiceBinder.value?.stopVoiceAnswering()
     }
 
-    override suspend fun awaitRouteReady() {
-        voiceBinder.filterNotNull().first().awaitRouteReady()
+    override suspend fun prepareListening() {
+        voiceBinder.filterNotNull().first().prepareListening()
     }
 
     override fun startListening() {
@@ -255,6 +255,10 @@ class StudySessionVoiceGateway @Inject constructor(
 
     override fun stopListening() {
         voiceBinder.value?.stopListening()
+    }
+
+    override fun playListeningCue() {
+        voiceBinder.value?.playListeningCue()
     }
 
     private fun observe(binder: StudySessionVoiceService.LocalBinder) {

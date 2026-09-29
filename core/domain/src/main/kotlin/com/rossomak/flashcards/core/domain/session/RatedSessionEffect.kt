@@ -10,8 +10,14 @@ sealed interface RatedSessionEffect {
     data class SyncQueue(val cards: List<Flashcard>) : RatedSessionEffect
     data object AdvanceAfterVoiceAnswer : RatedSessionEffect
 
-    /** Wait for a capturable route, open the microphone, then start the silence timer. */
+    /** Prepare the microphone, then open it; [RatedSessionInput.MicrophoneOpened] reports it recording. */
     data class OpenListeningWindow(val cardId: String) : RatedSessionEffect
+
+    /** The microphone records: start the silence timer. */
+    data object StartSilenceTimer : RatedSessionEffect
+
+    /** Tell the user, by sound, that the microphone now records. */
+    data object PlayListeningCue : RatedSessionEffect
     data object StopListening : RatedSessionEffect
     data object CancelSilenceTimer : RatedSessionEffect
 
