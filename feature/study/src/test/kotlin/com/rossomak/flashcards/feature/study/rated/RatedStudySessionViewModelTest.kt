@@ -859,6 +859,22 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
+    fun `an external play while voice answering is paused dismisses the dialog and resumes voice answering`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            repeat(3) { emitSilenceTimeout() }
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+            viewModel.onDialogEvent(Open(ExitSession))
+
+            playbackGateway.emitExternal(TransportCommand.Play)
+            runCurrent()
+
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.isVoiceAnswerPaused shouldBe false
+            captureGateway.isVoiceAnsweringStarted shouldBe true
+        }
+
+    @Test
     fun `an external pause keeps the dialog open`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createVoiceViewModel()
         viewModel.onDialogEvent(Open(ExitSession))

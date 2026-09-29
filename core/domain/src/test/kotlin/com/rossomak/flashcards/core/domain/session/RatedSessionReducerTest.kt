@@ -659,6 +659,14 @@ class RatedSessionReducerTest {
             .isPausedAtAdvancePoint shouldBe true
     }
 
+    @Test
+    fun `a voice-answer pause pauses the player even when it already is, dropping a pending auto-resume`() {
+        val twoSilences = voiceSession().silence().noticesOver().silence().noticesOver()
+        val listeningWhilePaused = twoSilences.listening().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
+
+        reducer.reduce(listeningWhilePaused, SilenceTimedOut).effects shouldContain PausePlayback
+    }
+
     // Feedback skip
 
     @Test

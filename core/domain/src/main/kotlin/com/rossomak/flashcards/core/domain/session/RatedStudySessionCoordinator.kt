@@ -369,9 +369,17 @@ class RatedStudySessionCoordinator @Inject constructor(
         if (isChanged) eventChannel.trySend(RatedSessionEvent.ExternalTransportCommand(command))
     }
 
-    /** Returns whether it changed the session; the restart after an engine failure always does. */
+    /**
+     * One play for every source (the app, a headset, the notification): after an engine failure or
+     * a voice-answer pause it resumes, otherwise the voice round plays by its phase. A Rated
+     * voice-answering session never plays with Voice Answering off.
+     *
+     * Returns whether it changed the session; a resume always does.
+     */
     private fun applyPlay(): Boolean {
-        if (state?.pauseReason != SessionPauseReason.VoiceEngineUnavailable) return dispatch(RatedSessionInput.PlayRequested)
+        val current = state ?: return false
+        val isResume = current.pauseReason == SessionPauseReason.VoiceEngineUnavailable || current.voiceAnswerPauseReason != null
+        if (!isResume) return dispatch(RatedSessionInput.PlayRequested)
         resume()
         return true
     }

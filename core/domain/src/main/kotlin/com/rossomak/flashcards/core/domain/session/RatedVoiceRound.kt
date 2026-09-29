@@ -165,9 +165,13 @@ internal fun RatedTransitionBuilder.onCaptureFailed() {
     emit(Emit(VoiceAnswerCaptureUnavailable))
 }
 
-/** The notice being spoken keeps speaking; everything else of the round stops. */
+/**
+ * The notice being spoken keeps speaking; everything else of the round stops. The player is paused
+ * even when it already is, which drops an auto-resume it has pending from a lost audio focus: only
+ * a play through the session may resume, and it resumes voice answering.
+ */
 private fun RatedTransitionBuilder.pauseVoiceAnswering(reason: VoiceAnswerPauseReason) {
-    if (state.isPlaying) emit(RatedSessionEffect.PausePlayback)
+    emit(RatedSessionEffect.PausePlayback)
     emit(RatedSessionEffect.StopVoiceAnswering)
     emit(CancelGrading)
     state = state.copy(

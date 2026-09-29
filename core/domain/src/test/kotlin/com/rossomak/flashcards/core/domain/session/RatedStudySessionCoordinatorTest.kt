@@ -761,6 +761,108 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
+    fun `an external play after three silences resumes voice answering, with the silence count reset`() = runTest {
+        val coordinator = startCoordinator()
+        repeat(3) { silenceToAdvancePoint() }
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+
+        externalPlayResumesVoiceAnswering(coordinator)
+
+        silenceToAdvancePoint()
+        playbackGateway.spokenNotices.last() shouldBe SpokenNotice.SilenceSkip
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+    }
+
+    @Test
+    fun `an external play after a capture failure resumes voice answering`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+        captureGateway.emit(CaptureEvent.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
+        runCurrent()
+        finishNotice()
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
+
+        externalPlayResumesVoiceAnswering(coordinator)
+    }
+
+    @Test
+    fun `an external play after three grading failures resumes voice answering, with the failure count reset`() = runTest {
+        gradingRepository.gradingFlow = flow {
+            emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
+            emit(VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection))
+        }
+        val coordinator = startCoordinator()
+        repeat(3) { gradingFailureToAdvancePoint() }
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.GradingFailures
+
+        externalPlayResumesVoiceAnswering(coordinator)
+
+        gradingFailureToAdvancePoint()
+        playbackGateway.spokenNotices.last() shouldBe SpokenNotice.GradingFailed(GradingFailureReason.NoConnection)
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+    }
+
+    @Test
+    fun `an external play during a voice-answer pause checks the microphone permission first`() = runTest {
+        val coordinator = startCoordinator()
+        repeat(3) { silenceToAdvancePoint() }
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Denied)
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        events shouldContain RatedSessionEvent.MicPermissionRevoked
+        captureGateway.isVoiceAnsweringStarted shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+    }
+
+    @Test
+    fun `next and previous are not offered while voice answering is paused, and are ignored`() = runTest {
+        val coordinator = startCoordinator()
+        repeat(3) { silenceToAdvancePoint() }
+        val callsBefore = playbackGateway.calls.size
+
+        playbackGateway.availableCommandsUpdates.last() shouldBe setOf(TransportCommandType.Play)
+        playbackGateway.emitExternal(TransportCommand.Next)
+        playbackGateway.emitExternal(TransportCommand.Previous)
+        runCurrent()
+
+        playbackGateway.calls.size shouldBe callsBefore
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+    }
+
+    private fun TestScope.externalPlayResumesVoiceAnswering(coordinator: RatedStudySessionCoordinator) {
+        events.clear()
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+        captureGateway.isVoiceAnsweringStarted shouldBe true
+        playbackGateway.calls.last() shouldBe Call.Play
+        events shouldBe listOf(RatedSessionEvent.ExternalTransportCommand(TransportCommand.Play))
+    }
+
+    private fun TestScope.silenceToAdvancePoint() {
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+    }
+
+    private fun TestScope.gradingFailureToAdvancePoint() {
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+    }
+
+    @Test
     fun `play during an engine pause resumes`() = runTest {
         val coordinator = startCoordinator()
         playbackGateway.emit(PlaybackEvent.EngineUnavailable)
