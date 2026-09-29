@@ -180,10 +180,16 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         emit(PausePlayback)
     }
 
-    /** Only pauses a session that is playing; a paused or held one stays as it is. */
+    /**
+     * Only pauses a session that is playing; a paused or held one stays as it is. The voice round
+     * reacts by its phase exactly as to a user pause ([pauseVoiceRound]): a request that lands just
+     * after the question finished closes the microphone, and the end of the temporary pause reads the
+     * question again.
+     */
     private fun RatedTransitionBuilder.onTemporaryPauseRequested() {
         if (!state.isPlaying || state.isHeldAtAdvancePoint || state.isPausedTemporarily) return
         state = state.copy(isPausedTemporarily = true)
+        pauseVoiceRound()
         emit(PausePlayback)
     }
 

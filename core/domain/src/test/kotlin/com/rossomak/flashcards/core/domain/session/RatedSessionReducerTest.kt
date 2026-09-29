@@ -47,6 +47,8 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.QuestionFin
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SilenceTimedOut
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseEnded
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnsweringResumed
@@ -109,6 +111,10 @@ class RatedSessionReducerTest {
     /** A user pause, with the player reporting it paused. */
     private fun RatedSessionState.paused(): RatedSessionState =
         after(PauseRequested, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
+
+    /** A temporary pause, with the player reporting it paused. */
+    private fun RatedSessionState.temporarilyPaused(): RatedSessionState =
+        after(TemporaryPauseRequested, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
 
     /** Finishes every spoken notice and, for an advancing one, its tail. */
     private fun RatedSessionState.noticesOver(): RatedSessionState {
@@ -665,6 +671,20 @@ class RatedSessionReducerTest {
         val listeningWhilePaused = twoSilences.listening().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
 
         reducer.reduce(listeningWhilePaused, SilenceTimedOut).effects shouldContain PausePlayback
+    }
+
+    // Temporary pause
+
+    @Test
+    fun `a temporary pause while listening cancels the round, and its end reads the question again`() {
+        val listening = voiceSession().listening()
+
+        val transition = reducer.reduce(listening, TemporaryPauseRequested)
+
+        transition.effects shouldBe listOf(StopListening, PausePlayback)
+        transition.state.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+        transition.state.queue shouldBe listening.queue
+        reducer.reduce(listening.temporarilyPaused(), TemporaryPauseEnded).effects shouldBe listOf(Play)
     }
 
     // Feedback skip

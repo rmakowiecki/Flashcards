@@ -671,13 +671,35 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `the notice tail during a temporary pause waits at the advance point, and its end moves on`() = runTest {
+    fun `a temporary pause while listening closes the microphone, and its end reads the question again`() = runTest {
         val coordinator = startCoordinator()
-        gradingRepository.gradingFlow = gradedFlow()
-        captureAnswer()
-        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
-        runCurrent()
+        openListening()
+
         coordinator.pauseTemporarily()
+        advanceTimeBy(SILENCE_TIMEOUT * 2)
+        runCurrent()
+
+        captureGateway.isListening shouldBe false
+        playbackGateway.spokenNotices shouldBe emptyList()
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+
+        coordinator.endTemporaryPause()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Play
+        openListening()
+        captureGateway.isListening shouldBe true
+    }
+
+    @Test
+    fun `a temporary pause during a short notice lets it finish, and its end moves on`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        playbackGateway.calls shouldNotContain Call.StopFeedback
         finishNotice()
         advanceTimeBy(NOTICE_TAIL)
         runCurrent()
