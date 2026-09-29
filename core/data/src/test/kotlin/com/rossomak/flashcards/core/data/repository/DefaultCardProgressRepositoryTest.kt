@@ -11,6 +11,7 @@ import com.rossomak.flashcards.core.data.model.SubcategoryProgressSummaryDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.ProgressSummaryRemoteDataSource
+import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
@@ -22,6 +23,7 @@ import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -45,11 +47,11 @@ class DefaultCardProgressRepositoryTest {
     private val progressSummaryRemoteDataSource: ProgressSummaryRemoteDataSource = mockk()
     private val authRepository = FakeAuthRepository().apply { userToReturn = authUser(USER_ID) }
     private val pendingSessionQueue = FakePendingSessionSubmissionLocalDataSource()
+    private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk()
 
     private fun createRepository(): DefaultCardProgressRepository = DefaultCardProgressRepository(
-        remoteDataSource,
         progressSummaryRemoteDataSource,
-        PendingSessionProjector(authRepository, pendingSessionQueue),
+        PendingSessionProjector(authRepository, pendingSessionQueue, remoteDataSource, scoringStateRemoteDataSource, FakeXpConfigRepository()),
     )
 
     @Test

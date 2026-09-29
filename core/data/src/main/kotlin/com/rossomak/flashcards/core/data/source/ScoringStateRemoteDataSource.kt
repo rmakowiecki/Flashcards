@@ -13,8 +13,8 @@ import kotlinx.coroutines.tasks.await
  * Read-only: the server-authoritative `submitStudySession` Cloud Function
  * is the sole writer of this document now — it recomputes and overwrites the whole
  * [com.rossomak.flashcards.core.domain.model.ScoringState] itself, so this client never composes a
- * write for it; [getScoringState] only ever feeds
- * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s optimistic preview.
+ * write for it. [com.rossomak.flashcards.core.data.repository.PendingSessionProjector] reads it as the
+ * baseline it replays Pending Sessions over.
  *
  * [Source.SERVER] skips the local cache and, on success, refreshes it:
  * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] reads that way after each

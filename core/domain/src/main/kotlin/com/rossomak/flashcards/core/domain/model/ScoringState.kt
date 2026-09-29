@@ -1,18 +1,17 @@
 package com.rossomak.flashcards.core.domain.model
 
 /**
- * The User's account-wide scoring state: a client-owned per-user singleton,
- * `users/{uid}/progress/user-stats`, alongside the progress summary (`progress/summary`) and the
- * packed per-Subcategory documents already living under `progress/` (ADR-0014, ADR-0016). Read once,
- * on arrival at the Session Summary, by [com.rossomak.flashcards.core.domain.repository.ScoringStateRepository],
- * never mid-session, and updated by
- * [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp] into the state this same
- * commit writes back, in the same batch as everything else.
+ * The User's account-wide scoring state: the per-user singleton `users/{uid}/progress/user-stats`,
+ * alongside the progress summary (`progress/summary`) and the packed per-Subcategory documents under
+ * `progress/` (ADR-0014, ADR-0016). The server-authoritative `submitStudySession` Cloud Function is its
+ * only writer. The client reads it through
+ * [com.rossomak.flashcards.core.domain.repository.ScoringStateRepository], with its Pending Sessions
+ * replayed on top by [com.rossomak.flashcards.core.domain.scoring.scoreSession], for the Session
+ * Summary's fallback preview.
  *
- * [currentStreak], [bestStreak], [lastStudyDate] and [goalMetDate] exist already but stay at
- * their defaults until a later change makes them move — declaring them now means this document's
- * shape never has to change later. The two dates are calendar days in the device's local zone
- * (`yyyy-MM-dd`), not instants; an empty string means "no study day recorded yet".
+ * [currentStreak], [bestStreak], [lastStudyDate] and [goalMetDate] are advanced by the server only; the
+ * client carries them over unchanged when it scores. The two dates are calendar days in the device's
+ * local zone (`yyyy-MM-dd`), not instants; an empty string means "no study day recorded yet".
  *
  * @param xp total points currently held.
  * @param level denormalized from [xp] via the configured curve ([XpConfig.levelThreshold]); never

@@ -31,7 +31,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Order of work:
  * 1. Reads the local preview's baseline: the account's [ScoringState] and the prior Card Progress of
- *    every touched Subcategory, all in parallel. This happens **before** submitting, so the baseline can
+ *    every touched Subcategory, all in parallel. Both repositories include the User's other Pending
+ *    Sessions, so the preview builds on them. This happens **before** submitting, so the baseline can
  *    never already include this session.
  * 2. Submits the session through [SessionSubmissionRepository] and waits at most [SERVER_RESULT_BUDGET]
  *    for a final delivery status. The budget covers only this wait, not the baseline read before it.
