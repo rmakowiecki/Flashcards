@@ -1,16 +1,29 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionState
 import com.rossomak.flashcards.core.domain.model.Flashcard
-import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.MoveToNextCard
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Pause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Play
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SetAdvanceGate
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceGateReached
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldReleased
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextCardRequested
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextRequested
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.PauseRequested
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlayRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackChanged
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEndReached
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEngineUnavailable
-import com.rossomak.flashcards.core.domain.session.FastSessionInput.VoiceStackRestarted
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.PreviousRequested
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseEnded
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseRequested
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.Test
@@ -143,15 +156,187 @@ class FastSessionReducerTest {
     fun `an unavailable engine pauses the session and stops the voice stack`() {
         val transition = reducer.reduce(session, PlaybackEngineUnavailable)
 
-        transition.state.pauseReason shouldBe SessionPauseReason.VoiceEngineUnavailable
+        transition.state.pauseReason shouldBe FastPauseReason.EngineUnavailable
         transition.effects shouldBe listOf(FastSessionEffect.StopVoiceStack, FastSessionEffect.Emit(FastSessionEvent.VoicePlaybackUnavailable))
         reducer.reduce(transition.state, PlaybackEngineUnavailable).effects.shouldBeEmpty()
     }
 
     @Test
-    fun `a restarted voice stack clears the pause`() {
-        session.after(PlaybackEngineUnavailable, VoiceStackRestarted).pauseReason shouldBe null
+    fun `play after an engine failure clears the pause and restarts the voice stack at the presented card`() {
+        val paused = session.after(PlaybackChanged(playback(index = 1, phase = VoicePhase.Question)), PlaybackEngineUnavailable)
+
+        val transition = reducer.reduce(paused, PlayRequested)
+
+        transition.state.pauseReason shouldBe null
+        transition.effects shouldBe listOf(FastSessionEffect.RestartVoiceStack(startIndex = 1))
     }
+
+    // Pause and play
+
+    @Test
+    fun `a pause is a user pause and always reaches the player, and play clears it`() {
+        val paused = reducer.reduce(playing, PauseRequested)
+
+        paused.state.pauseReason shouldBe FastPauseReason.User
+        paused.effects shouldBe listOf(Pause)
+        reducer.reduce(paused.state.after(PlaybackChanged(playback(0, VoicePhase.Question, isPlaying = false))), PauseRequested).effects shouldBe listOf(Pause)
+
+        val resumed = reducer.reduce(paused.state, PlayRequested)
+        resumed.state.pauseReason shouldBe null
+        resumed.effects shouldBe listOf(Play)
+    }
+
+    @Test
+    fun `play on a playing session changes nothing`() {
+        val transition = reducer.reduce(playing, PlayRequested)
+
+        transition.state shouldBe playing
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a temporary pause plays again when it ends, only while still paused by it`() {
+        val paused = reducer.reduce(playing, TemporaryPauseRequested)
+        paused.state.pauseReason shouldBe FastPauseReason.Temporary
+        paused.effects shouldBe listOf(Pause)
+        reducer.reduce(paused.state, TemporaryPauseEnded).effects shouldBe listOf(Play)
+
+        val userPaused = paused.state.after(PauseRequested)
+        userPaused.pauseReason shouldBe FastPauseReason.User
+        reducer.reduce(userPaused, TemporaryPauseEnded).effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a temporary pause leaves a paused session alone`() {
+        val userPaused = playing.after(PauseRequested)
+
+        val transition = reducer.reduce(userPaused, TemporaryPauseRequested)
+
+        transition.state shouldBe userPaused
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `the player starting to play ends a user pause`() {
+        val paused = playing.after(PauseRequested, PlaybackChanged(playback(0, VoicePhase.Question, isPlaying = false)))
+
+        paused.after(PlaybackChanged(playback(0, VoicePhase.Question))).pauseReason shouldBe null
+    }
+
+    // The advance hold
+
+    @Test
+    fun `a hold closes the advance gate once, and the gate stops the session held on the current card`() {
+        val requested = reducer.reduce(answering, AdvanceHoldRequested)
+        requested.effects shouldBe listOf(SetAdvanceGate(closed = true))
+        reducer.reduce(requested.state, AdvanceHoldRequested).effects.shouldBeEmpty()
+
+        val held = reducer.reduce(requested.state, AdvanceGateReached)
+
+        held.state.isHeldAtAdvancePoint shouldBe true
+        held.state.pauseReason shouldBe null
+        held.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `releasing a held session opens the gate, moves on and plays`() {
+        val transition = reducer.reduce(heldOnFirstCard, AdvanceHoldReleased)
+
+        transition.state.isHeldAtAdvancePoint shouldBe false
+        transition.state.isAdvanceHoldRequested shouldBe false
+        transition.effects shouldBe listOf(SetAdvanceGate(closed = false), MoveToNextCard, Play)
+    }
+
+    @Test
+    fun `releasing a hold that never stopped the session only opens the gate`() {
+        val requested = answering.after(AdvanceHoldRequested)
+
+        reducer.reduce(requested, AdvanceHoldReleased).effects shouldBe listOf(SetAdvanceGate(closed = false))
+        reducer.reduce(session, AdvanceHoldReleased).effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `releasing a hold on the last card ends the session`() {
+        val heldOnLast = session.after(
+            PlaybackChanged(playback(index = CARD_COUNT - 1, phase = VoicePhase.Answer)),
+            AdvanceHoldRequested,
+            AdvanceGateReached,
+        )
+
+        reducer.reduce(heldOnLast, AdvanceHoldReleased).effects shouldBe listOf(SetAdvanceGate(closed = false), SessionComplete)
+    }
+
+    @Test
+    fun `a pause at a hold turns it into a user pause, and the release then only opens the gate`() {
+        val paused = heldOnFirstCard.after(PauseRequested)
+
+        paused.isHeldAtAdvancePoint shouldBe false
+        paused.pauseReason shouldBe FastPauseReason.User
+        reducer.reduce(paused, AdvanceHoldReleased).effects shouldBe listOf(SetAdvanceGate(closed = false))
+        reducer.reduce(paused, PlayRequested).effects shouldBe listOf(MoveToNextCard, Play)
+    }
+
+    @Test
+    fun `play or next at a hold moves on at once`() {
+        reducer.reduce(heldOnFirstCard, PlayRequested).effects shouldBe listOf(MoveToNextCard, Play)
+        reducer.reduce(heldOnFirstCard, NextRequested).effects shouldBe listOf(MoveToNextCard, Play)
+    }
+
+    @Test
+    fun `previous at a hold restarts the card and plays`() {
+        val transition = reducer.reduce(heldOnFirstCard, PreviousRequested(restartsCard = true))
+
+        transition.state.isHeldAtAdvancePoint shouldBe false
+        transition.effects shouldBe listOf(FastSessionEffect.RestartCurrentCard, Play)
+    }
+
+    @Test
+    fun `previous card on the first card is ignored`() {
+        val transition = reducer.reduce(playing, PreviousRequested(restartsCard = false))
+
+        transition.state shouldBe playing
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `the gate reached after the hold was released moves on at once`() {
+        val released = answering.after(AdvanceHoldRequested, AdvanceHoldReleased)
+
+        reducer.reduce(released, AdvanceGateReached).effects shouldBe listOf(MoveToNextCard, Play)
+    }
+
+    @Test
+    fun `the gate reached after a user pause stays paused at the advance point`() {
+        val paused = answering.after(AdvanceHoldRequested, PauseRequested)
+
+        val state = paused.after(AdvanceGateReached)
+
+        state.isHeldAtAdvancePoint shouldBe false
+        state.isPausedAtAdvancePoint shouldBe true
+    }
+
+    @Test
+    fun `next at the last card's answer is ignored, even at a hold`() {
+        val heldOnLast = session.after(
+            PlaybackChanged(playback(index = CARD_COUNT - 1, phase = VoicePhase.Answer)),
+            AdvanceHoldRequested,
+            AdvanceGateReached,
+        )
+
+        val transition = reducer.reduce(heldOnLast, NextRequested)
+
+        transition.state shouldBe heldOnLast
+        transition.effects.shouldBeEmpty()
+    }
+
+    private val playing: FastSessionState
+        get() = session.after(PlaybackChanged(playback(index = 0, phase = VoicePhase.Question)))
+
+    private val answering: FastSessionState
+        get() = session.after(PlaybackChanged(playback(index = 0, phase = VoicePhase.Answer)))
+
+    private val heldOnFirstCard: FastSessionState
+        get() = answering.after(AdvanceHoldRequested, AdvanceGateReached)
 
     private companion object {
         const val CARD_COUNT = 3

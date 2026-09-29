@@ -4,6 +4,7 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -21,6 +22,12 @@ internal interface NoticeEngine {
     /** Cuts what is speaking and drops everything queued; each one is reported ended. */
     fun stop()
     fun shutdown()
+
+    /** Applies from the next utterance; one already speaking keeps its voice. */
+    fun setVoice(voiceId: String?)
+
+    /** Applies from the next utterance; one already speaking keeps its rate. */
+    fun setSpeechRate(rate: Float)
 }
 
 /** What a [NoticeEngine] reports, on any thread. */
@@ -36,7 +43,8 @@ internal interface NoticeEngineListener {
  * Speaks [SpokenNotice]s on a text-to-speech engine of their own, separate from [TtsPlayer]'s, so a
  * notice callback never touches the player's utterance state machine (ADR-0031). It makes no
  * session decision; it only guarantees [onNoticeFinished]:
- * - exactly once per [speak] call, in call order, even when a later notice is given up on first;
+ * - exactly once per [speak] call, in call order, even when a later notice is given up on first,
+ *   except for a feedback cut by [stopFeedback], which never reports finished;
  * - a short notice is given up on [WATCHDOG_TIMEOUT] after [speak] at the latest;
  * - [SpokenNotice.Feedback] is given up on if the engine has not started it within
  *   [WATCHDOG_TIMEOUT]; once it speaks, it is cut off [STARTED_FEEDBACK_TIMEOUT] later, a bound
@@ -44,6 +52,10 @@ internal interface NoticeEngineListener {
  * - a notice spoken while the engine is not ready, or after it failed, finishes at once.
  *
  * A late engine callback for a notice already given up on is dropped. Everything runs on [scope].
+ *
+ * Relies on the session speaking one notice at a time, each only after the previous one finished:
+ * [stopFeedback] and the started-feedback cutoff stop the whole engine, which would also drop a
+ * notice queued behind the feedback and report it finished unspoken.
  */
 internal class NoticeSpeaker(
     private val scope: CoroutineScope,
@@ -94,6 +106,27 @@ internal class NoticeSpeaker(
         }
     }
 
+    /**
+     * Cuts the [SpokenNotice.Feedback] being spoken and forgets it: no [onNoticeFinished] for it,
+     * and the engine's late callback for it is dropped. The one exception to the guarantee above.
+     * Text-to-speech cannot pause mid-utterance and a finish carries no id, so a stopped feedback
+     * that still reported finished could be taken for the end of a replay started right after it.
+     * Short notices are never cut.
+     */
+    fun stopFeedback() {
+        val feedback = pendingNotices.filter { it.notice is SpokenNotice.Feedback && !it.isFinished }
+        if (feedback.isEmpty()) return
+        feedback.forEach { it.watchdog?.cancel() }
+        // Forgotten before the stop, so the stop's own callback finds nothing to finish.
+        pendingNotices.removeAll(feedback)
+        engine.stop()
+        deliverFinished()
+    }
+
+    fun setVoice(voiceId: String?) = engine.setVoice(voiceId)
+
+    fun setSpeechRate(rate: Float) = engine.setSpeechRate(rate)
+
     fun release() {
         pendingNotices.forEach { it.watchdog?.cancel() }
         pendingNotices.clear()
@@ -138,14 +171,24 @@ internal class NoticeSpeaker(
     }
 }
 
-/** A [NoticeEngine] on the system [TextToSpeech], always in English: the app's content is English only. */
+/**
+ * A [NoticeEngine] on the system [TextToSpeech], always in English: the app's content is English
+ * only. Speaks with the session voice and speech rate, like the questions; a voice or rate set
+ * before the engine is ready applies once it is.
+ */
 internal class TextToSpeechNoticeEngine(context: Context, private val listener: NoticeEngineListener) : NoticeEngine {
 
+    private var isReady = false
+    private var voiceId: String? = null
+    private var speechRate = VoicePlaybackState.DEFAULT_SPEECH_RATE
+
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
-        val isReady = status == TextToSpeech.SUCCESS
+        isReady = status == TextToSpeech.SUCCESS
         if (isReady) {
             // Never the device's system locale (e.g. Polish), which garbles English notice text.
             tts.language = Locale.US
+            tts.applySessionVoice(voiceId)
+            tts.setSpeechRate(speechRate)
             tts.setOnUtteranceProgressListener(progressListener)
         }
         listener.onInitialized(isReady)
@@ -184,5 +227,15 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
 
     override fun shutdown() {
         runCatching { tts.shutdown() }
+    }
+
+    override fun setVoice(voiceId: String?) {
+        this.voiceId = voiceId
+        if (isReady) tts.applySessionVoice(voiceId)
+    }
+
+    override fun setSpeechRate(rate: Float) {
+        speechRate = rate.coerceIn(VoicePlaybackState.MIN_SPEECH_RATE, VoicePlaybackState.MAX_SPEECH_RATE)
+        if (isReady) tts.setSpeechRate(speechRate)
     }
 }

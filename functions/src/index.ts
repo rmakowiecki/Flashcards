@@ -4,6 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import { isPremiumUser } from "./lib/entitlement";
 import { transcribeWithElevenLabsScribe } from "./lib/elevenlabs";
 import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
+import { RequestDeadline } from "./lib/requestDeadline";
 import {
   SubmitStudySessionResult,
   requireOwnerMatchesCaller,
@@ -25,6 +26,15 @@ const RUNTIME_OPTIONS = {
 // A base64 string is ~4/3 the byte size it decodes to, so this caps decoded audio at ~10 MiB —
 // comfortably above any legitimate short spoken answer.
 const MAX_AUDIO_BASE64_LENGTH = 14_000_000;
+
+// The client gives the whole voice-grading call 20 s. Each step has its own limit, and the steps
+// together stop at 19 s, so a slow service ends in an error the client reads as a service failure
+// just before the client's own timeout would call it a lost connection. A cold start is outside
+// this budget but inside the client's.
+const TRANSCRIPTION_TIMEOUT_MS = 15_000;
+const LLM_CALL_TIMEOUT_MS = 15_000;
+const VOICE_GRADING_DEADLINE_MS = 19_000;
+const VOICE_GRADING_TIMEOUT_SECONDS = 20;
 
 interface EntitlementResult {
   is_premium: boolean;
@@ -81,8 +91,9 @@ export const transcribeAndGradeSpokenAnswer = onCall<
   Promise<TranscribeAndGradeResult>,
   TranscribeAndGradeChunk
 >(
-  { ...RUNTIME_OPTIONS, secrets: [elevenLabsApiKey] },
+  { ...RUNTIME_OPTIONS, timeoutSeconds: VOICE_GRADING_TIMEOUT_SECONDS, secrets: [elevenLabsApiKey] },
   async (request, response) => {
+    const deadline = new RequestDeadline(VOICE_GRADING_DEADLINE_MS);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Missing Firebase ID token");
     if (!(await isPremiumUser(uid))) {
@@ -119,14 +130,26 @@ export const transcribeAndGradeSpokenAnswer = onCall<
     if (wavBuffer.length === 0) {
       throw new HttpsError("invalid-argument", "audio_base64 did not decode to any audio");
     }
-    const rawTranscript = await transcribeWithElevenLabsScribe(wavBuffer, elevenLabsApiKey.value());
-    const sanitizedTranscript = await sanitizeTranscript(rawTranscript);
+    const rawTranscript = await transcribeWithElevenLabsScribe(
+      wavBuffer,
+      elevenLabsApiKey.value(),
+      deadline.stepTimeoutMs(TRANSCRIPTION_TIMEOUT_MS),
+    );
+    const sanitizedTranscript = await sanitizeTranscript(
+      rawTranscript,
+      deadline.stepTimeoutMs(LLM_CALL_TIMEOUT_MS),
+    );
     await response?.sendChunk({ sanitized_transcript: sanitizedTranscript });
 
     if (!hasQuestion) {
       return {};
     }
-    const grade = await gradeSanitizedTranscript(question!, expectedAnswer!, sanitizedTranscript);
+    const grade = await gradeSanitizedTranscript(
+      question!,
+      expectedAnswer!,
+      sanitizedTranscript,
+      deadline.stepTimeoutMs(LLM_CALL_TIMEOUT_MS),
+    );
     return { grade: grade.gradePercent, feedback: grade.feedback };
   },
 );

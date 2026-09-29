@@ -6,6 +6,9 @@ import kotlin.time.Duration.Companion.seconds
 /** How long a listening window waits for speech before the round counts as a silence. */
 val SILENCE_TIMEOUT: Duration = 8.seconds
 
+/** How long a listening window waits for the capture route, such as a Bluetooth microphone, to become ready. */
+val ROUTE_READY_TIMEOUT: Duration = 5.seconds
+
 /** The pause after an advancing notice finishes, before the next question is read (ADR-0025). */
 val NOTICE_TAIL: Duration = 1.seconds
 

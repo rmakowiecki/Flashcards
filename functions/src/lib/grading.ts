@@ -76,14 +76,17 @@ function getVertexAi(): VertexAI {
   return vertexAi;
 }
 
-async function generateJson<T>(prompt: string, schema: object): Promise<T> {
-  const model = getVertexAi().getGenerativeModel({
-    model: GEMINI_MODEL,
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: schema,
+async function generateJson<T>(prompt: string, schema: object, timeoutMs: number): Promise<T> {
+  const model = getVertexAi().getGenerativeModel(
+    {
+      model: GEMINI_MODEL,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
     },
-  });
+    { timeout: timeoutMs },
+  );
 
   const result = await model.generateContent(prompt);
   const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -103,10 +106,11 @@ async function generateJson<T>(prompt: string, schema: object): Promise<T> {
  * grading judgment yet. Must complete before the client sees any transcript, since the sanitized
  * (not raw) transcript is what gets displayed on screen.
  */
-export async function sanitizeTranscript(rawTranscript: string): Promise<string> {
+export async function sanitizeTranscript(rawTranscript: string, timeoutMs: number): Promise<string> {
   const parsed = await generateJson<SanitizeJson>(
     buildSanitizePrompt(rawTranscript),
     SANITIZE_RESPONSE_SCHEMA,
+    timeoutMs,
   );
   if (typeof parsed.sanitized_transcript !== "string" || parsed.sanitized_transcript.length === 0) {
     throw new HttpError(502, "Sanitize LLM returned an empty transcript");
@@ -123,10 +127,12 @@ export async function gradeSanitizedTranscript(
   question: string,
   expectedAnswer: string,
   sanitizedTranscript: string,
+  timeoutMs: number,
 ): Promise<GradeResult> {
   const parsed = await generateJson<GradeJson>(
     buildGradePrompt(question, expectedAnswer, sanitizedTranscript),
     GRADE_RESPONSE_SCHEMA,
+    timeoutMs,
   );
   if (typeof parsed.grade !== "number" || !Number.isFinite(parsed.grade)) {
     throw new HttpError(502, "Grading LLM returned an invalid grade");

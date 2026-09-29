@@ -19,6 +19,9 @@ sealed interface RatedSessionInput {
     /** "Next", from the app or from outside it: skip the presented card. */
     data object CardSkipped : RatedSessionInput
 
+    /** A tap on the grading feedback: skip it and move on. Acts only while the feedback plays. */
+    data object FeedbackSkipRequested : RatedSessionInput
+
     /** "Previous", from the app or from outside it: restart the presented card's question. */
     data object PreviousRequested : RatedSessionInput
     data class QuestionFinished(val cardId: String) : RatedSessionInput
@@ -36,6 +39,10 @@ sealed interface RatedSessionInput {
     data object NoticeTailElapsed : RatedSessionInput
     data object PlayRequested : RatedSessionInput
     data object PauseRequested : RatedSessionInput
+    data object TemporaryPauseRequested : RatedSessionInput
+    data object TemporaryPauseEnded : RatedSessionInput
+    data object AdvanceHoldRequested : RatedSessionInput
+    data object AdvanceHoldReleased : RatedSessionInput
 
     /** Voice answering resumes after a pause of its own. The microphone permission is already confirmed. */
     data object VoiceAnsweringResumed : RatedSessionInput

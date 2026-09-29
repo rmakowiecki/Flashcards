@@ -27,6 +27,7 @@
     <string name="study_session_voice_playback_unavailable_message">Voice playback unavailable on this device</string>
     <string name="study_session_open_tts_settings_button">Open Settings</string>
     <string name="study_session_voice_settings_cd">Voice settings</string>
+    <string name="study_session_voice_feedback_skip_cd">Skip feedback</string>
     <string name="study_session_previous_card_cd">Previous card</string>
     <string name="study_session_voice_play_cd">Play</string>
     <string name="study_session_voice_pause_cd">Pause</string>

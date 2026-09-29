@@ -137,10 +137,12 @@ fun RatedStudySessionScreen(
         onVoicePlayPause = viewModel::onVoicePlayPause,
         onVoiceNext = viewModel::onVoiceNext,
         onVoicePrevious = viewModel::onVoicePrevious,
+        onVoiceFeedbackSkip = viewModel::onVoiceFeedbackSkip,
         onDialogEvent = viewModel::onDialogEvent,
     )
 }
 
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RatedStudySessionContent(
@@ -153,6 +155,7 @@ fun RatedStudySessionContent(
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
+    onVoiceFeedbackSkip: () -> Unit,
     onDialogEvent: (StudySessionDialogEvent) -> Unit,
 ) {
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -205,6 +208,7 @@ fun RatedStudySessionContent(
                         onVoicePlayPause = onVoicePlayPause,
                         onVoiceNext = onVoiceNext,
                         onVoicePrevious = onVoicePrevious,
+                        onVoiceFeedbackSkip = onVoiceFeedbackSkip,
                         onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
                     )
                 } else {
@@ -325,6 +329,7 @@ private fun RatedStudySessionManualPreview() {
         onVoicePlayPause = {},
         onVoiceNext = {},
         onVoicePrevious = {},
+        onVoiceFeedbackSkip = {},
         onDialogEvent = {},
     )
 }

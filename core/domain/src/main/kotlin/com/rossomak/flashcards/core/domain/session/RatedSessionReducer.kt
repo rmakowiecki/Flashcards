@@ -8,13 +8,17 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerRound
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldReleased
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AttemptRated
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.FeedbackSkipRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
@@ -28,6 +32,8 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.QuestionFin
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SilenceTimedOut
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseEnded
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnsweringResumed
@@ -86,6 +92,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
                 is AttemptRated -> onAttemptRated(input)
                 AnswerRevealed -> this.state = this.state.copy(isAnswerRevealed = true)
                 CardSkipped -> onCardSkipped()
+                FeedbackSkipRequested -> if (this.state.isFeedbackPlaying) skipFeedback()
                 PreviousRequested -> if (acceptsCardCommand()) emit(RestartCurrentCard)
                 is QuestionFinished -> onQuestionFinished(input.cardId)
                 SpeechStarted -> onSpeechStarted()
@@ -99,7 +106,11 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
                 is NoticeFinished -> onNoticeFinished(input.notice)
                 NoticeTailElapsed -> onNoticeTailElapsed()
                 PlayRequested -> onPlayRequested()
-                PauseRequested -> emit(RatedSessionEffect.PausePlayback)
+                PauseRequested -> onPauseRequested()
+                TemporaryPauseRequested -> onTemporaryPauseRequested()
+                TemporaryPauseEnded -> if (this.state.isPausedTemporarily) onPlayRequested()
+                AdvanceHoldRequested -> this.state = this.state.copy(isAdvanceHoldRequested = true)
+                AdvanceHoldReleased -> onAdvanceHoldReleased()
                 VoiceAnsweringResumed -> onVoiceAnsweringResumed()
                 VoiceStackRestarted -> onVoiceStackRestarted()
                 PlaybackEngineUnavailable -> onPlaybackEngineUnavailable()
@@ -117,21 +128,75 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         if (state.isComplete) emit(SessionComplete)
     }
 
-    /** Rated "next": the presented card goes back into the queue unanswered, as after a silence. */
+    /**
+     * Rated "next". At the question, the presented card goes back into the queue unanswered, as
+     * after a silence. During the grading feedback it skips the feedback. At the auto-advance point
+     * and after a paused feedback the card is already answered, so it moves on instead: playing
+     * from the auto-advance point, still paused after the feedback.
+     */
     private fun RatedTransitionBuilder.onCardSkipped() {
-        if (!acceptsCardCommand()) return
-        state = recordSilence(state, random).copy(round = state.idleRound())
-        syncQueue()
-        if (state.isPlaying) emit(AdvanceAfterVoiceAnswer)
+        when {
+            state.isHeldAtAdvancePoint || state.isPausedAtAdvancePoint -> moveOnFromAdvancePoint()
+            state.isFeedbackPlaying -> skipFeedback()
+            state.isPausedAfterFeedback -> moveOnWhilePaused()
+            acceptsCardCommand() -> {
+                state = recordSilence(state, random).copy(round = state.idleRound())
+                syncQueue()
+                if (state.isPlaying) emit(AdvanceAfterVoiceAnswer)
+            }
+        }
     }
 
+    /**
+     * Play by what it resumes: the auto-advance point moves on, a paused feedback is read again from
+     * the start, and a pause while grading goes back to waiting for the grade, without reading.
+     */
     private fun RatedTransitionBuilder.onPlayRequested() {
-        if (state.isPausedAtAdvancePoint) {
-            state = state.copy(isPausedAtAdvancePoint = false)
-            emit(AdvanceAfterVoiceAnswer)
-        } else if (!state.isPlaying) {
-            emit(Play)
+        state = state.copy(isPausedTemporarily = false)
+        when {
+            state.isHeldAtAdvancePoint || state.isPausedAtAdvancePoint -> moveOnFromAdvancePoint()
+            state.isPausedAfterFeedback -> replayFeedback()
+            state.isPausedWhileGrading -> {
+                state = state.copy(isPausedWhileGrading = false)
+                emit(RatedSessionEffect.ResumeWithoutReading)
+            }
+            !state.isPlaying -> emit(Play)
         }
+    }
+
+    /**
+     * A pause always reaches the player, so it also drops an auto-resume the player has pending. A
+     * pause at a hold turns it into a user pause at the auto-advance point, still on the answered
+     * card. Anywhere else the voice round reacts by its phase ([pauseVoiceRound]).
+     */
+    private fun RatedTransitionBuilder.onPauseRequested() {
+        val wasHeld = state.isHeldAtAdvancePoint
+        state = state.copy(
+            isPausedTemporarily = false,
+            isPausedAtAdvancePoint = state.isPausedAtAdvancePoint || wasHeld,
+            isHeldAtAdvancePoint = false,
+        )
+        if (!wasHeld) pauseVoiceRound()
+        emit(PausePlayback)
+    }
+
+    /**
+     * Only pauses a session that is playing; a paused or held one stays as it is. The voice round
+     * reacts by its phase exactly as to a user pause ([pauseVoiceRound]): a request that lands just
+     * after the question finished closes the microphone, and the end of the temporary pause reads the
+     * question again.
+     */
+    private fun RatedTransitionBuilder.onTemporaryPauseRequested() {
+        if (!state.isPlaying || state.isHeldAtAdvancePoint || state.isPausedTemporarily) return
+        state = state.copy(isPausedTemporarily = true)
+        pauseVoiceRound()
+        emit(PausePlayback)
+    }
+
+    /** Moves on only from a hold still in place; a pause, play or skip already resolved any other. */
+    private fun RatedTransitionBuilder.onAdvanceHoldReleased() {
+        state = state.copy(isAdvanceHoldRequested = false)
+        if (state.isHeldAtAdvancePoint) moveOnFromAdvancePoint()
     }
 
     private fun RatedTransitionBuilder.onPlaybackChanged(input: PlaybackChanged) {
@@ -140,6 +205,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         state = state.copy(
             isPlaying = playback.isPlaying,
             isPausedAtAdvancePoint = state.isPausedAtAdvancePoint && !startedPlaying,
+            isPausedTemporarily = state.isPausedTemporarily && !startedPlaying,
         )
         if (playback.isActive && playback.phase == VoicePhase.Answer) {
             state = state.copy(isAnswerRevealed = true)
@@ -154,6 +220,9 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             consecutiveSilenceCount = 0,
             consecutiveGradingFailureCount = 0,
             isPausedAtAdvancePoint = false,
+            isPausedTemporarily = false,
+            isPausedWhileGrading = false,
+            isPausedAfterFeedback = false,
         )
         state = state.copy(round = state.idleRound())
         emit(RatedSessionEffect.StartVoiceAnswering)
@@ -169,6 +238,8 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             consecutiveSilenceCount = 0,
             consecutiveGradingFailureCount = 0,
             isPausedAtAdvancePoint = false,
+            isPausedWhileGrading = false,
+            isPausedAfterFeedback = false,
         )
         state = state.copy(round = state.idleRound())
         if (state.isVoiceAnsweringSession) emit(RatedSessionEffect.StartVoiceAnswering)
@@ -189,6 +260,10 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             round = VoiceAnswerRound(),
             speakingNotices = emptyList(),
             isPausedAtAdvancePoint = false,
+            isHeldAtAdvancePoint = false,
+            isPausedTemporarily = false,
+            isPausedWhileGrading = false,
+            isPausedAfterFeedback = false,
             isPlaying = false,
         )
         if (state.isSyncPending) {
@@ -212,19 +287,48 @@ internal class RatedTransitionBuilder(var state: RatedSessionState, val random: 
 
 /**
  * Card commands ("next", "previous") act only at the question, or while paused at it: never
- * while the microphone is open, an answer is being graded, or a notice is being spoken.
+ * while the microphone is open, an answer is being graded, a notice is being spoken, the session
+ * waits at or before the auto-advance point, or voice answering is paused.
  */
 internal fun RatedTransitionBuilder.acceptsCardCommand(): Boolean = with(state) {
     !isComplete &&
         (round.phase == VoiceAnswerPhase.Idle || round.phase == VoiceAnswerPhase.WaitingForQuestion) &&
         speakingNotices.isEmpty() &&
-        !isSyncPending
+        !isSyncPending &&
+        !isPausedAtAdvancePoint &&
+        !isHeldAtAdvancePoint &&
+        !isPausedAfterFeedback &&
+        voiceAnswerPauseReason == null
 }
 
 /** Moves the head as the pending move says, hides the answer and hands the queue to the voice player. */
 internal fun RatedTransitionBuilder.syncQueue() {
     state = applyPendingMove(state).copy(isAnswerRevealed = false)
     emit(RatedSessionEffect.SyncQueue(state.remainingCards))
+}
+
+/**
+ * From the auto-advance point: the queue sync still pending runs, then the next question is read,
+ * or the session ends when the queue is complete.
+ */
+internal fun RatedTransitionBuilder.moveOnFromAdvancePoint() {
+    state = state.copy(
+        isHeldAtAdvancePoint = false,
+        isPausedAtAdvancePoint = false,
+        isPausedTemporarily = false,
+        isPausedAfterFeedback = false,
+    )
+    if (state.isSyncPending) syncQueue()
+    state = state.copy(round = state.idleRound())
+    emit(if (state.isComplete) SessionComplete else AdvanceAfterVoiceAnswer)
+}
+
+/** Paused after the feedback, "next" moves the head on and shows the next card, still paused. */
+private fun RatedTransitionBuilder.moveOnWhilePaused() {
+    state = state.copy(isPausedAfterFeedback = false)
+    if (state.isSyncPending) syncQueue()
+    state = state.copy(round = state.idleRound())
+    if (state.isComplete) emit(SessionComplete)
 }
 
 /** The round between answers: waiting for the next question while voice answering is on, idle otherwise. */

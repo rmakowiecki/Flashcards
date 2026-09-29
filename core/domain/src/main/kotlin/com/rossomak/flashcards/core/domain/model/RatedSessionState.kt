@@ -47,6 +47,18 @@ package com.rossomak.flashcards.core.domain.model
  * @param isPausedAtAdvancePoint the notice and its tail finished while playback was paused: the
  * next play reads the next question instead of re-reading the answered one.
  * @param isPlaying the voice player's playing state, as last reported.
+ * @param isAdvanceHoldRequested while set, the session stops at the auto-advance point instead of
+ * moving on.
+ * @param isHeldAtAdvancePoint the notice and its tail finished with a hold requested: the session
+ * stopped on the answered card, with its queue sync still pending. Not a user pause: releasing the
+ * hold moves on and plays.
+ * @param isPausedTemporarily playback is paused by a temporary pause, which plays again when it
+ * ends; a user pause or play in between replaces it.
+ * @param isPausedWhileGrading the user paused while the answer was being graded. Grading goes on;
+ * a grade that arrives meanwhile is recorded without speaking its feedback.
+ * @param isPausedAfterFeedback the user paused the grading feedback, or it arrived while paused: the
+ * session waits on the graded card, before the auto-advance point. Play reads the feedback again
+ * from the start; next moves on without playing.
  */
 data class RatedSessionState(
     val queue: List<RatedSessionCardRecord>,
@@ -65,6 +77,11 @@ data class RatedSessionState(
     val pauseReason: SessionPauseReason? = null,
     val isPausedAtAdvancePoint: Boolean = false,
     val isPlaying: Boolean = false,
+    val isAdvanceHoldRequested: Boolean = false,
+    val isHeldAtAdvancePoint: Boolean = false,
+    val isPausedTemporarily: Boolean = false,
+    val isPausedWhileGrading: Boolean = false,
+    val isPausedAfterFeedback: Boolean = false,
 ) {
     /** How many distinct cards have resolved [FlashcardTerminalRating.Mastered] so far. */
     val masteredCount: Int get() = terminalStates.values.count { it.terminalState == FlashcardTerminalRating.Mastered }
@@ -96,6 +113,20 @@ data class RatedSessionState(
     /** Voice answering is on for this session and nothing has paused it. */
     val isVoiceAnsweringActive: Boolean
         get() = isVoiceAnsweringSession && voiceAnswerPauseReason == null && pauseReason == null
+
+    /**
+     * The grading feedback is being read, or its tail is running: the round has a grade, and
+     * nothing has paused or held it.
+     */
+    val isFeedbackPlaying: Boolean
+        get() = isVoiceAnsweringActive &&
+            round.phase == VoiceAnswerPhase.SpeakingNotice &&
+            round.grade != null &&
+            !isPausedAfterFeedback &&
+            !isHeldAtAdvancePoint
+
+    /** A notice other than the grading feedback is still being spoken. */
+    val isShortNoticeSpeaking: Boolean get() = speakingNotices.any { it.isShort }
 }
 
 /** How the head of a [RatedSessionState.queue] moves at the next queue sync. */

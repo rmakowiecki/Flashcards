@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
@@ -23,6 +24,8 @@ private fun RatedStudySessionVoicePreview(state: RatedStudySessionScreenState, v
             isVoiceMode = true,
             isVoiceActive = true,
             isVoiceAnswerEnabled = true,
+            // Every control enabled unless a preview says otherwise.
+            availableTransportCommands = state.availableTransportCommands.ifEmpty { TransportCommandType.entries.toSet() },
         ),
         voiceBarsLevels = remember { MutableStateFlow(voiceBarsLevels) },
         snackbarHostState = remember { SnackbarHostState() },
@@ -31,6 +34,7 @@ private fun RatedStudySessionVoicePreview(state: RatedStudySessionScreenState, v
         onVoicePlayPause = {},
         onVoiceNext = {},
         onVoicePrevious = {},
+        onVoiceFeedbackSkip = {},
         onDialogEvent = {},
     )
 }

@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import kotlinx.coroutines.channels.Channel
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.update
  * Records every command in [calls], in order, and moves [state] the way the real player would:
  * start plays from the start index, pause and play flip `isPlaying`, card moves change the index.
  * Like the real player, [showAnswer] reports the answer revealed. Tests drive what else the player
- * reports with [readAnswer], [finishQuestion], [finishNotice] and [emit].
+ * reports with [readAnswer], [finishQuestion], [finishNotice], [reachAdvancePoint] and [emit].
  */
 class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
@@ -34,10 +35,16 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
         data object ShowAnswer : Call
         data object AdvanceAfterVoiceAnswer : Call
         data class SetQuestionOnlyMode(val enabled: Boolean) : Call
+        data class SetAdvanceGate(val closed: Boolean) : Call
         data class SetSpeechRate(val rate: Float) : Call
         data class SetVoice(val voiceId: String?) : Call
         data class SpeakNotice(val notice: SpokenNotice) : Call
+        data object StopFeedback : Call
+        data object ResumeWithoutReading : Call
     }
+
+    /** One [setSessionProgress] call. */
+    data class SessionProgress(val completedCount: Int, val totalCount: Int)
 
     override val state = MutableStateFlow(VoicePlaybackState())
 
@@ -64,6 +71,17 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     val lastVoiceId: String? get() = calls.filterIsInstance<Call.SetVoice>().lastOrNull()?.voiceId
     val spokenNotices: List<SpokenNotice> get() = calls.filterIsInstance<Call.SpeakNotice>().map { it.notice }
 
+    // Kept apart from [calls]: they follow every state change, and would crowd the command order.
+    /** Every [setAvailableCommands] call, in order. */
+    val availableCommandsUpdates = mutableListOf<Set<TransportCommandType>>()
+
+    /** Every [setSessionProgress] call, in order. */
+    val sessionProgressUpdates = mutableListOf<SessionProgress>()
+
+    /** The advance gate, as last set. */
+    var isAdvanceGateClosed: Boolean = false
+        private set
+
     fun emit(event: PlaybackEvent) {
         eventChannel.trySend(event)
     }
@@ -80,6 +98,26 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     /** Reports that the presented card's question has been read, as question-only mode does. */
     fun finishQuestion() {
         cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.QuestionFinished(it.id)) }
+    }
+
+    /**
+     * Finishes the pause after the presented card's answer, as the real player's loop does: with the
+     * gate closed it stops there and reports [PlaybackEvent.AdvanceGateReached]; otherwise it moves
+     * on to the next card, or reports [PlaybackEvent.EndReached] after the last one.
+     */
+    fun reachAdvancePoint() {
+        val current = state.value
+        when {
+            isAdvanceGateClosed -> {
+                state.update { it.copy(isPlaying = false) }
+                emit(PlaybackEvent.AdvanceGateReached)
+            }
+            current.currentIndex < cards.lastIndex -> state.update { it.copy(currentIndex = it.currentIndex + 1, phase = VoicePhase.Question) }
+            else -> {
+                state.update { it.copy(isPlaying = false, phase = VoicePhase.Question) }
+                emit(PlaybackEvent.EndReached)
+            }
+        }
     }
 
     /** Reports the oldest spoken notice as finished. */
@@ -110,6 +148,7 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     override fun stop() {
         calls += Call.Stop
         cards = emptyList()
+        isAdvanceGateClosed = false
         state.value = VoicePlaybackState()
     }
 
@@ -157,6 +196,11 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
         calls += Call.SetQuestionOnlyMode(enabled)
     }
 
+    override fun setAdvanceGate(closed: Boolean) {
+        calls += Call.SetAdvanceGate(closed)
+        isAdvanceGateClosed = closed
+    }
+
     override fun setSpeechRate(rate: Float) {
         calls += Call.SetSpeechRate(rate)
         state.update { it.copy(speechRate = rate) }
@@ -169,5 +213,24 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     override fun speakNotice(notice: SpokenNotice) {
         calls += Call.SpeakNotice(notice)
         speakingNotices += notice
+    }
+
+    /** Like the real player, a stopped feedback never reports finished. */
+    override fun stopFeedback() {
+        calls += Call.StopFeedback
+        speakingNotices.removeAll { it is SpokenNotice.Feedback }
+    }
+
+    override fun resumeWithoutReading() {
+        calls += Call.ResumeWithoutReading
+        state.update { it.copy(isPlaying = it.isActive) }
+    }
+
+    override fun setAvailableCommands(commands: Set<TransportCommandType>) {
+        availableCommandsUpdates += commands
+    }
+
+    override fun setSessionProgress(completedCount: Int, totalCount: Int) {
+        sessionProgressUpdates += SessionProgress(completedCount, totalCount)
     }
 }

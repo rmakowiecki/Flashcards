@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
@@ -210,7 +211,7 @@ class RatedStudySessionCoordinatorTest {
         val coordinator = startCoordinator()
         openListening()
 
-        advanceTimeBy(SILENCE_TIMEOUT * 2)
+        advanceTimeBy(ROUTE_READY_TIMEOUT - 1.milliseconds)
         captureGateway.isListening shouldBe false
         routeReady.complete(Unit)
         runCurrent()
@@ -218,6 +219,22 @@ class RatedStudySessionCoordinatorTest {
         advanceTimeBy(SILENCE_TIMEOUT - 1.milliseconds)
 
         coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.Listening
+    }
+
+    @Test
+    fun `a route that is not ready within 5 seconds pauses voice answering as a capture failure`() = runTest {
+        captureGateway.routeReadyGate = CompletableDeferred()
+        val coordinator = startCoordinator()
+        openListening()
+
+        advanceTimeBy(ROUTE_READY_TIMEOUT - 1.milliseconds)
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+
+        advanceTimeBy(2.milliseconds)
+        captureGateway.isListening shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
+        playbackGateway.spokenNotices shouldBe listOf(SpokenNotice.CaptureFailed)
+        events shouldBe listOf(RatedSessionEvent.VoiceAnswerCaptureUnavailable)
     }
 
     @Test
@@ -301,11 +318,33 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `a pause before the tail ends holds the session, and the next play advances`() = runTest {
+    fun `a pause before the feedback tail ends waits after the feedback, and the next play reads it again`() = runTest {
         gradingRepository.gradingFlow = gradedFlow()
         val coordinator = startCoordinator()
         captureAnswer()
         advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        coordinator.pause()
+        runCurrent()
+
+        advanceTimeBy(NOTICE_TAIL * 2)
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        coordinator.runningSnapshot.isPausedAfterFeedback shouldBe true
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+
+        coordinator.play()
+
+        playbackGateway.spokenNotices shouldBe List(2) { SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE) }
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.playCount shouldBe 0
+    }
+
+    @Test
+    fun `a pause before a short notice's tail ends holds the session, and the next play advances`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
         runCurrent()
         finishNotice()
         coordinator.pause()
@@ -319,6 +358,367 @@ class RatedStudySessionCoordinatorTest {
 
         playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
         playbackGateway.playCount shouldBe 0
+    }
+
+    // Pause in every phase
+
+    @Test
+    fun `a pause while listening closes the microphone and stops the silence timer, counting nothing`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.pause()
+        advanceTimeBy(SILENCE_TIMEOUT * 2)
+        runCurrent()
+
+        captureGateway.isListening shouldBe false
+        playbackGateway.spokenNotices shouldBe emptyList()
+        events shouldBe emptyList()
+        with(coordinator.runningSnapshot) {
+            round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+            cards.firstOrNull()?.id shouldBe "card-1"
+        }
+    }
+
+    @Test
+    fun `a grade that arrives while paused is recorded silently, and play reads its feedback`() = runTest {
+        val gradeGate = CompletableDeferred<Unit>()
+        gradingRepository.gradingFlow = flow {
+            emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
+            gradeGate.await()
+            emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
+        }
+        val coordinator = startCoordinator()
+        captureAnswer()
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+
+        gradeGate.complete(Unit)
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        playbackGateway.spokenNotices shouldBe emptyList()
+        coordinator.runningSnapshot.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+        coordinator.runningSnapshot.isPausedAfterFeedback shouldBe true
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        playbackGateway.spokenNotices shouldBe listOf(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
+        playbackGateway.calls shouldContain Call.ResumeWithoutReading
+        coordinator.runningSnapshot.currentCardRatings shouldBe listOf(FlashcardAttemptRating.Correct)
+    }
+
+    @Test
+    fun `a pause during the feedback then an immediate play reads it again, and only its own end advances`() = runTest {
+        gradingRepository.gradingFlow = gradedFlow()
+        val coordinator = startCoordinator()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        coordinator.pause()
+        coordinator.play()
+        runCurrent()
+        advanceTimeBy(NOTICE_TAIL * 2)
+
+        playbackGateway.calls shouldContain Call.StopFeedback
+        playbackGateway.speakingNotices shouldBe listOf(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL + 1.milliseconds)
+
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
+    }
+
+    @Test
+    fun `skipping the feedback syncs the queue once and reads the next question`() = runTest {
+        gradingRepository.gradingFlow = gradedFlow()
+        val coordinator = startCoordinator()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        coordinator.skipFeedback()
+        advanceTimeBy(NOTICE_TAIL * 2)
+
+        playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        coordinator.runningSnapshot.currentCardRatings shouldBe emptyList()
+    }
+
+    @Test
+    fun `external next during the feedback skips it and is reported`() = runTest {
+        gradingRepository.gradingFlow = gradedFlow()
+        val coordinator = startCoordinator()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+
+        playbackGateway.emitExternal(TransportCommand.Next)
+        runCurrent()
+
+        playbackGateway.calls shouldContain Call.StopFeedback
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        events shouldContain RatedSessionEvent.ExternalTransportCommand(TransportCommand.Next)
+    }
+
+    // Available commands
+
+    @Test
+    fun `the system controls get the live commands and the session's own counter`() = runTest {
+        startCoordinator()
+        playbackGateway.availableCommandsUpdates.last() shouldBe setOf(
+            TransportCommandType.Pause,
+            TransportCommandType.Stop,
+            TransportCommandType.Next,
+            TransportCommandType.Previous,
+            TransportCommandType.PreviousCard,
+        )
+        playbackGateway.sessionProgressUpdates.last() shouldBe FakeStudyVoicePlaybackGateway.SessionProgress(completedCount = 0, totalCount = 3)
+
+        openListening()
+
+        playbackGateway.availableCommandsUpdates.last() shouldBe setOf(TransportCommandType.Pause, TransportCommandType.Stop)
+    }
+
+    @Test
+    fun `an external play while only pause is offered is ignored`() = runTest {
+        startCoordinator()
+        openListening()
+        val callsBefore = playbackGateway.calls.size
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        playbackGateway.calls.size shouldBe callsBefore
+        events shouldBe emptyList()
+    }
+
+    // The advance hold
+
+    @Test
+    fun `with a hold requested the session keeps playing and stops held at the auto-advance point`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.holdAdvance()
+        playbackGateway.pauseCount shouldBe 0
+        gradeAndReachAdvancePoint()
+
+        with(coordinator.runningSnapshot) {
+            isHeldAtAdvancePoint shouldBe true
+            cards.firstOrNull()?.id shouldBe "card-1"
+            completedCount shouldBe 1
+        }
+        playbackGateway.calls.filterIsInstance<Call.UpdateQueue>() shouldBe emptyList()
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.calls.last() shouldBe Call.Pause
+    }
+
+    @Test
+    fun `releasing a held session syncs the queue, reads the next question, and a second release changes nothing`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    @Test
+    fun `releasing a hold that never stopped the session changes nothing`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        val callCount = playbackGateway.calls.size
+
+        coordinator.releaseAdvance()
+        gradeAndReachAdvancePoint()
+
+        playbackGateway.calls.drop(callCount).filterIsInstance<Call.Pause>() shouldBe emptyList()
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    @Test
+    fun `an external pause at a hold turns it into a user pause, which the release does not resume`() = runTest {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+
+        coordinator.play()
+        runCurrent()
+
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    @Test
+    fun `external play at a hold moves on at once and is reported`() = runTest {
+        externalCommandAtHoldMovesOn(TransportCommand.Play)
+    }
+
+    @Test
+    fun `external next at a hold moves on at once and is reported`() = runTest {
+        externalCommandAtHoldMovesOn(TransportCommand.Next)
+    }
+
+    private fun TestScope.externalCommandAtHoldMovesOn(command: TransportCommand) {
+        val coordinator = startCoordinator()
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+
+        playbackGateway.emitExternal(command)
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        events shouldContain RatedSessionEvent.ExternalTransportCommand(command)
+    }
+
+    @Test
+    fun `releasing a hold on the last card ends the session`() = runTest {
+        val coordinator = startCoordinator(setup.copy(cardIds = listOf("card-1")))
+        coordinator.holdAdvance()
+        gradeAndReachAdvancePoint()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+
+        coordinator.releaseAdvance()
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe false
+    }
+
+    @Test
+    fun `a silence under a hold is counted, then holds, and the third one pauses voice answering instead`() = runTest {
+        val coordinator = startCoordinator()
+
+        // A dialog open over each of the three rounds.
+        repeat(2) {
+            coordinator.holdAdvance()
+            openListening()
+            advanceTimeBy(SILENCE_TIMEOUT)
+            runCurrent()
+            finishNotice()
+            advanceTimeBy(NOTICE_TAIL)
+            runCurrent()
+            coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
+            coordinator.releaseAdvance()
+            runCurrent()
+        }
+        coordinator.holdAdvance()
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+        val advanceCount = playbackGateway.advanceAfterVoiceAnswerCount
+
+        coordinator.releaseAdvance()
+        coordinator.endTemporaryPause()
+        runCurrent()
+
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe advanceCount
+        captureGateway.isVoiceAnsweringStarted shouldBe false
+    }
+
+    @Test
+    fun `a temporary pause plays again when it ends, unless the user paused meanwhile`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Pause
+        coordinator.endTemporaryPause()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Play
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        coordinator.pause()
+        runCurrent()
+        coordinator.endTemporaryPause()
+        runCurrent()
+
+        playbackGateway.calls.last() shouldBe Call.Pause
+    }
+
+    @Test
+    fun `a temporary pause while listening closes the microphone, and its end reads the question again`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.pauseTemporarily()
+        advanceTimeBy(SILENCE_TIMEOUT * 2)
+        runCurrent()
+
+        captureGateway.isListening shouldBe false
+        playbackGateway.spokenNotices shouldBe emptyList()
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+
+        coordinator.endTemporaryPause()
+        runCurrent()
+        playbackGateway.calls.last() shouldBe Call.Play
+        openListening()
+        captureGateway.isListening shouldBe true
+    }
+
+    @Test
+    fun `a temporary pause during a short notice lets it finish, and its end moves on`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+
+        coordinator.pauseTemporarily()
+        runCurrent()
+        playbackGateway.calls shouldNotContain Call.StopFeedback
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+
+        coordinator.endTemporaryPause()
+        runCurrent()
+
+        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+    }
+
+    private fun TestScope.gradeAndReachAdvancePoint() {
+        gradingRepository.gradingFlow = gradedFlow()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
     }
 
     // Resume
@@ -380,6 +780,108 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.startCalls.last().startIndex shouldBe 0
         captureGateway.isVoiceAnsweringStarted shouldBe true
         coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+    }
+
+    @Test
+    fun `an external play after three silences resumes voice answering, with the silence count reset`() = runTest {
+        val coordinator = startCoordinator()
+        repeat(3) { silenceToAdvancePoint() }
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+
+        externalPlayResumesVoiceAnswering(coordinator)
+
+        silenceToAdvancePoint()
+        playbackGateway.spokenNotices.last() shouldBe SpokenNotice.SilenceSkip
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+    }
+
+    @Test
+    fun `an external play after a capture failure resumes voice answering`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+        captureGateway.emit(CaptureEvent.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
+        runCurrent()
+        finishNotice()
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
+
+        externalPlayResumesVoiceAnswering(coordinator)
+    }
+
+    @Test
+    fun `an external play after three grading failures resumes voice answering, with the failure count reset`() = runTest {
+        gradingRepository.gradingFlow = flow {
+            emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
+            emit(VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection))
+        }
+        val coordinator = startCoordinator()
+        repeat(3) { gradingFailureToAdvancePoint() }
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.GradingFailures
+
+        externalPlayResumesVoiceAnswering(coordinator)
+
+        gradingFailureToAdvancePoint()
+        playbackGateway.spokenNotices.last() shouldBe SpokenNotice.GradingFailed(GradingFailureReason.NoConnection)
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+    }
+
+    @Test
+    fun `an external play during a voice-answer pause checks the microphone permission first`() = runTest {
+        val coordinator = startCoordinator()
+        repeat(3) { silenceToAdvancePoint() }
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Denied)
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        events shouldContain RatedSessionEvent.MicPermissionRevoked
+        captureGateway.isVoiceAnsweringStarted shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
+    }
+
+    @Test
+    fun `next and previous are not offered while voice answering is paused, and are ignored`() = runTest {
+        val coordinator = startCoordinator()
+        repeat(3) { silenceToAdvancePoint() }
+        val callsBefore = playbackGateway.calls.size
+
+        playbackGateway.availableCommandsUpdates.last() shouldBe setOf(TransportCommandType.Play)
+        playbackGateway.emitExternal(TransportCommand.Next)
+        playbackGateway.emitExternal(TransportCommand.Previous)
+        runCurrent()
+
+        playbackGateway.calls.size shouldBe callsBefore
+        coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
+    }
+
+    private fun TestScope.externalPlayResumesVoiceAnswering(coordinator: RatedStudySessionCoordinator) {
+        events.clear()
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+        captureGateway.isVoiceAnsweringStarted shouldBe true
+        playbackGateway.calls.last() shouldBe Call.Play
+        events shouldBe listOf(RatedSessionEvent.ExternalTransportCommand(TransportCommand.Play))
+    }
+
+    private fun TestScope.silenceToAdvancePoint() {
+        openListening()
+        advanceTimeBy(SILENCE_TIMEOUT)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
+    }
+
+    private fun TestScope.gradingFailureToAdvancePoint() {
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
+        runCurrent()
     }
 
     @Test
@@ -479,6 +981,7 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
         playbackGateway.calls shouldNotContain Call.AdvanceAfterVoiceAnswer
+        events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 
     // Result
@@ -537,6 +1040,22 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.priorProgressByCardId shouldBe emptyMap()
         coordinator.runningSnapshot.cards.size shouldBe 3
+    }
+
+    @Test
+    fun `ending the session stops the voice stack and ignores later external commands`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.end(abandoned = true)
+        val callsAfterEnd = playbackGateway.calls.size
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+
+        playbackGateway.stopCount shouldBe 1
+        captureGateway.isVoiceAnsweringStarted shouldBe false
+        playbackGateway.calls.size shouldBe callsAfterEnd
+        events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 
     @Test

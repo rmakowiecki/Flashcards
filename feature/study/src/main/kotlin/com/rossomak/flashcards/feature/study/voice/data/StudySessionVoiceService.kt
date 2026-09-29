@@ -18,6 +18,7 @@ import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import dagger.hilt.android.AndroidEntryPoint
@@ -121,11 +122,28 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun setQuestionOnlyMode(enabled: Boolean) = player.setQuestionOnlyMode(enabled)
 
-        fun setSpeechRate(rate: Float) = player.setPlaybackSpeechRate(rate)
+        fun setAdvanceGate(closed: Boolean) = player.setAdvanceGate(closed)
 
-        fun setVoice(voiceId: String?) = player.setVoice(voiceId)
+        // Notices and feedback speak with the same voice and rate as the questions.
+        fun setSpeechRate(rate: Float) {
+            player.setPlaybackSpeechRate(rate)
+            noticeSpeaker.setSpeechRate(rate)
+        }
+
+        fun setVoice(voiceId: String?) {
+            player.setVoice(voiceId)
+            noticeSpeaker.setVoice(voiceId)
+        }
 
         fun speakNotice(notice: SpokenNotice) = noticeSpeaker.speak(notice)
+
+        fun stopFeedback() = noticeSpeaker.stopFeedback()
+
+        fun resumeWithoutReading() = player.resumeWithoutReading()
+
+        fun setAvailableCommands(commands: Set<TransportCommandType>) = player.setTransportCommands(commands)
+
+        fun setSessionProgress(completedCount: Int, totalCount: Int) = player.setSessionProgress(completedCount, totalCount)
 
         fun startVoiceAnswering() {
             voiceCaptureSession.start()
