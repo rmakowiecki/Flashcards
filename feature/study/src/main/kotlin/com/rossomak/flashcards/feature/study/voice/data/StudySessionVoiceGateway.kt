@@ -82,8 +82,6 @@ class StudySessionVoiceGateway @Inject constructor(
     private var pendingIsVoiceAnsweringSession: Boolean = false
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
-    private var pendingQuestionOnlyMode: Boolean? = null
-    private var pendingAdvanceGateClosed: Boolean? = null
     private var pendingVoiceAnswering: Boolean? = null
 
     // Kept across stop(): a restarted voice stack binds again and gets them replayed.
@@ -107,8 +105,6 @@ class StudySessionVoiceGateway @Inject constructor(
             // replay whatever was requested in the meantime.
             pendingSpeechRate?.let { binder.setSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
-            pendingQuestionOnlyMode?.let { binder.setQuestionOnlyMode(it) }
-            pendingAdvanceGateClosed?.let { binder.setAdvanceGate(it) }
             pendingVoiceAnswering?.let { if (it) binder.startVoiceAnswering() }
             pendingTransportCommands?.let { binder.setAvailableCommands(it) }
             pendingSessionProgress?.let { (completedCount, totalCount) -> binder.setSessionProgress(completedCount, totalCount) }
@@ -149,8 +145,6 @@ class StudySessionVoiceGateway @Inject constructor(
         voiceBinder.value?.stopPlayback()
         unbind()
         _state.value = VoicePlaybackState()
-        pendingQuestionOnlyMode = null
-        pendingAdvanceGateClosed = null
         pendingVoiceAnswering = null
     }
 
@@ -162,38 +156,12 @@ class StudySessionVoiceGateway @Inject constructor(
         voiceBinder.value?.pause()
     }
 
-    override fun moveToNextCard() {
-        voiceBinder.value?.moveToNextCard()
+    override fun presentQuestion(index: Int) {
+        voiceBinder.value?.presentQuestion(index)
     }
 
-    override fun moveToPreviousCard() {
-        voiceBinder.value?.moveToPreviousCard()
-    }
-
-    override fun jumpTo(index: Int) {
-        voiceBinder.value?.jumpTo(index)
-    }
-
-    override fun restartCurrentCard() {
-        voiceBinder.value?.restartCurrentCard()
-    }
-
-    override fun showAnswer() {
-        voiceBinder.value?.showAnswer()
-    }
-
-    override fun advanceAfterVoiceAnswer() {
-        voiceBinder.value?.advanceAfterVoiceAnswer()
-    }
-
-    override fun setQuestionOnlyMode(enabled: Boolean) {
-        pendingQuestionOnlyMode = enabled
-        voiceBinder.value?.setQuestionOnlyMode(enabled)
-    }
-
-    override fun setAdvanceGate(closed: Boolean) {
-        pendingAdvanceGateClosed = closed
-        voiceBinder.value?.setAdvanceGate(closed)
+    override fun presentAnswer(index: Int) {
+        voiceBinder.value?.presentAnswer(index)
     }
 
     override fun setSpeechRate(rate: Float) {

@@ -196,10 +196,6 @@ class FastStudySessionViewModel @Inject constructor(
         showSessionNow()
     }
 
-    fun onVoiceSpeedChange(rate: Float) {
-        coordinator.setSpeechRate(rate)
-    }
-
     /** The one dialog that pauses: voice settings are previewed aloud, which would talk over the session. */
     private fun onVoiceSettingsOpen() {
         coordinator.pauseTemporarily()

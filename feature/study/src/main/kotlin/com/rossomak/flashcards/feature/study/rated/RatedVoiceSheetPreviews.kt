@@ -23,7 +23,6 @@ private fun RatedStudySessionVoicePreview(state: RatedStudySessionScreenState, v
             subcategoryNameById = mapOf("compose" to "Compose"),
             isVoiceMode = true,
             isVoiceActive = true,
-            isVoiceAnswerEnabled = true,
             // Every control enabled unless a preview says otherwise.
             availableTransportCommands = state.availableTransportCommands.ifEmpty { TransportCommandType.entries.toSet() },
         ),

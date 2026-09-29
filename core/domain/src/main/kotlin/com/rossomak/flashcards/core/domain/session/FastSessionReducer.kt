@@ -3,18 +3,22 @@ package com.rossomak.flashcards.core.domain.session
 import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionState
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.ReadAloudStep
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.TransportCommand
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
-import com.rossomak.flashcards.core.domain.session.FastSessionEffect.MoveToNextCard
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Pause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Play
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentAnswer
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQuestion
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
-import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SetAdvanceGate
-import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceGateReached
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartAdvancePause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartQuestionPause
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldReleased
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldRequested
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvancePauseElapsed
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerFinished
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.JumpRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextCardRequested
@@ -22,9 +26,10 @@ import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextRequeste
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PauseRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlayRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackChanged
-import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEndReached
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEngineUnavailable
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PreviousRequested
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.QuestionFinished
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.QuestionPauseElapsed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseEnded
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseRequested
 import javax.inject.Inject
@@ -32,18 +37,27 @@ import javax.inject.Inject
 /** Everything that can happen to a Fast Study Session, as [FastSessionReducer] takes it in. */
 sealed interface FastSessionInput {
 
-    /** The answer of [cardId] was revealed: by hand, or by the player reading it. */
+    /** The answer of [cardId] was revealed: by hand, or by the player presenting it. */
     data class AnswerRevealed(val cardId: String) : FastSessionInput
 
     /** The manual "next card", with read-aloud off. Ignored until the answer shows. */
     data object NextCardRequested : FastSessionInput
 
-    /** The voice player's transport state changed. What the screen shows; it never decides a pause. */
+    /** The voice player's transport state changed. Only whether it plays is read from it. */
     data class PlaybackChanged(val playback: VoicePlaybackState) : FastSessionInput
-
-    /** Read-aloud played past the last card's answer by itself. */
-    data object PlaybackEndReached : FastSessionInput
     data object PlaybackEngineUnavailable : FastSessionInput
+
+    /** The player read the question of [cardId] in full. */
+    data class QuestionFinished(val cardId: String) : FastSessionInput
+
+    /** The player read the answer of [cardId] in full. */
+    data class AnswerFinished(val cardId: String) : FastSessionInput
+
+    /** The pause between the presented card's question and its answer is over. */
+    data object QuestionPauseElapsed : FastSessionInput
+
+    /** The pause after the presented card's answer is over: the auto-advance point. */
+    data object AdvancePauseElapsed : FastSessionInput
 
     /** Play, from the app or from outside it. Also restarts the voice stack after an engine failure. */
     data object PlayRequested : FastSessionInput
@@ -63,23 +77,27 @@ sealed interface FastSessionInput {
     data object TemporaryPauseEnded : FastSessionInput
     data object AdvanceHoldRequested : FastSessionInput
     data object AdvanceHoldReleased : FastSessionInput
-
-    /** The player stopped at the closed advance gate, on the presented card. */
-    data object AdvanceGateReached : FastSessionInput
 }
 
 /** What [FastStudySessionCoordinator] must do after a [FastSessionReducer] transition, in order. */
 sealed interface FastSessionEffect {
     data object Play : FastSessionEffect
     data object Pause : FastSessionEffect
-    data object ShowAnswer : FastSessionEffect
-    data object MoveToNextCard : FastSessionEffect
-    data object MoveToPreviousCard : FastSessionEffect
-    data object RestartCurrentCard : FastSessionEffect
-    data class JumpTo(val index: Int) : FastSessionEffect
 
-    /** Close or open the player's gate at the auto-advance point. */
-    data class SetAdvanceGate(val closed: Boolean) : FastSessionEffect
+    /** Present the question of the card at [index]; the player reads it while playing. */
+    data class PresentQuestion(val index: Int) : FastSessionEffect
+
+    /** Present the answer of the card at [index]; the player reads it while playing. */
+    data class PresentAnswer(val index: Int) : FastSessionEffect
+
+    /** Start the pause between a question and its answer; it ends in [FastSessionInput.QuestionPauseElapsed]. */
+    data object StartQuestionPause : FastSessionEffect
+
+    /** Start the pause after an answer; it ends in [FastSessionInput.AdvancePauseElapsed]. */
+    data object StartAdvancePause : FastSessionEffect
+
+    /** Stop the running read-aloud pause, if any, without it elapsing. */
+    data object CancelReadAloudPause : FastSessionEffect
 
     /** Start the voice stack again at [startIndex], after a text-to-speech engine failure. */
     data class RestartVoiceStack(val startIndex: Int) : FastSessionEffect
@@ -111,10 +129,13 @@ data class FastSessionTransition(val state: FastSessionState, val effects: List<
 
 /**
  * Every rule of a Fast Study Session, as a pure function. A card becomes Studied once its answer
- * shows, read aloud or revealed by hand. With read-aloud on, the player runs its own fixed-list
- * loop; this decides every transport command, who paused the session, and whether the loop stops at
- * the auto-advance point (the end of the pause after an answer) while a hold is requested.
+ * shows, read aloud or revealed by hand. With read-aloud on, this runs the question, pause, answer,
+ * pause, next card loop: it tells the player which part of which card to present, starts the two
+ * pauses, and decides at the auto-advance point (the end of the pause after an answer) whether to
+ * move on or stop there while a hold is requested. It also decides every transport command and who
+ * paused the session.
  */
+@Suppress("TooManyFunctions") // one handler per input.
 class FastSessionReducer @Inject constructor() {
 
     fun seed(cards: List<Flashcard>): FastSessionState = FastSessionState(cards = cards)
@@ -124,40 +145,40 @@ class FastSessionReducer @Inject constructor() {
         is AnswerRevealed -> onAnswerRevealed(state, input.cardId)
         NextCardRequested -> onNextCardRequested(state)
         is PlaybackChanged -> onPlaybackChanged(state, input.playback)
-        PlaybackEndReached -> FastSessionTransition(state, listOf(SessionComplete))
         PlaybackEngineUnavailable -> onPlaybackEngineUnavailable(state)
+        is QuestionFinished -> onPartFinished(state, input.cardId, ReadAloudStep.Question)
+        is AnswerFinished -> onPartFinished(state, input.cardId, ReadAloudStep.Answer)
+        QuestionPauseElapsed -> if (state.readAloudStep == ReadAloudStep.QuestionPause && state.isReading) {
+            presentAnswer(state, cancelsPause = false, plays = false)
+        } else {
+            FastSessionTransition(state)
+        }
+        AdvancePauseElapsed -> onAdvancePoint(state)
         PlayRequested -> onPlayRequested(state)
         PauseRequested -> onPauseRequested(state)
         NextRequested -> onNextRequested(state)
         is PreviousRequested -> onCardChangeRequested(
             state = state,
+            targetIndex = if (input.restartsCard) state.currentIndex else state.currentIndex - 1,
             isIgnored = !input.restartsCard && state.currentIndex == 0,
-            effect = if (input.restartsCard) FastSessionEffect.RestartCurrentCard else FastSessionEffect.MoveToPreviousCard,
         )
-        is JumpRequested -> onCardChangeRequested(state, isIgnored = input.index == state.currentIndex, effect = FastSessionEffect.JumpTo(input.index))
+        is JumpRequested -> {
+            val targetIndex = input.index.coerceIn(0, maxOf(0, state.cards.lastIndex))
+            onCardChangeRequested(state, targetIndex, isIgnored = targetIndex == state.currentIndex)
+        }
         TemporaryPauseRequested -> onTemporaryPauseRequested(state)
-        TemporaryPauseEnded -> if (state.pauseReason == FastPauseReason.Temporary) {
-            FastSessionTransition(state.copy(pauseReason = null), listOf(Play))
-        } else {
-            FastSessionTransition(state)
-        }
-        AdvanceHoldRequested -> if (state.isAdvanceHoldRequested) {
-            FastSessionTransition(state)
-        } else {
-            FastSessionTransition(state.copy(isAdvanceHoldRequested = true), listOf(SetAdvanceGate(closed = true)))
-        }
+        TemporaryPauseEnded -> if (state.pauseReason == FastPauseReason.Temporary) resume(state) else FastSessionTransition(state)
+        AdvanceHoldRequested -> FastSessionTransition(state.copy(isAdvanceHoldRequested = true))
         AdvanceHoldReleased -> onAdvanceHoldReleased(state)
-        AdvanceGateReached -> onAdvanceGateReached(state)
     }
 
     /**
-     * Revealing an answer is what makes a card Studied. The player reports the card it read, which
-     * can already be behind the presented one after a quick skip; it still counts.
+     * Revealing an answer is what makes a card Studied. The player reports the card it presented,
+     * which can already be behind the presented one after a quick skip; it still counts.
      */
     private fun onAnswerRevealed(state: FastSessionState, cardId: String): FastSessionTransition {
         val seen = state.markSeen(cardId)
-        val isPresentedCard = state.cards.getOrNull(state.currentIndex)?.id == cardId
-        return FastSessionTransition(if (isPresentedCard) seen.copy(isAnswerRevealed = true) else seen)
+        return FastSessionTransition(if (state.isPresented(cardId)) seen.copy(isAnswerRevealed = true) else seen)
     }
 
     /** Ignored until the answer shows, so the last card is always Studied before this ends the session. */
@@ -171,43 +192,66 @@ class FastSessionReducer @Inject constructor() {
         }
 
     /**
-     * Only what the screen shows, plus whether the player is playing. Playback state marks nothing
-     * Studied, since a quick skip can replace an answer phase before it is observed ([AnswerRevealed]
-     * does that), and never ends the session, since a pause, a seek or a speed change can leave the
-     * player looking exactly like it finished ([PlaybackEndReached] does that). The player starting
-     * to play ends any pause or hold, whatever started it.
+     * Only whether the player plays. The player starting to play ends any pause or hold, whatever
+     * started it, and inside a read-aloud pause it goes on to the next step (an audio-focus gain
+     * resumes the player without reading). The player stopping by itself inside a pause stops the
+     * pause, which the next resume then skips.
      */
     private fun onPlaybackChanged(state: FastSessionState, playback: VoicePlaybackState): FastSessionTransition {
         if (!playback.isActive) return FastSessionTransition(state.copy(isPlaying = false))
         val startedPlaying = playback.isPlaying && !state.isPlaying
-        val resumed = if (startedPlaying && state.pauseReason != FastPauseReason.EngineUnavailable) {
-            state.copy(pauseReason = null, isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = false)
-        } else {
-            state
+        val stoppedPlaying = !playback.isPlaying && state.isPlaying
+        val updated = state.copy(isPlaying = playback.isPlaying)
+        return when {
+            startedPlaying && state.pauseReason != FastPauseReason.EngineUnavailable -> {
+                val playing = updated.copy(pauseReason = null, isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = false)
+                if (state.readAloudStep.isPause) resume(playing) else FastSessionTransition(playing)
+            }
+            stoppedPlaying && state.readAloudStep.isPause -> FastSessionTransition(updated, listOf(CancelReadAloudPause))
+            else -> FastSessionTransition(updated)
         }
-        return FastSessionTransition(
-            resumed.copy(
-                currentIndex = playback.currentIndex,
-                isAnswerRevealed = playback.phase == VoicePhase.Answer,
-                isPlaying = playback.isPlaying,
-            ),
-        )
     }
 
-    /** Play also moves on from the auto-advance point, and restarts the voice stack after an engine failure. */
+    /** A part read in full starts the pause after it. A stale report (another card or part, or a paused session) does nothing. */
+    private fun onPartFinished(state: FastSessionState, cardId: String, step: ReadAloudStep): FastSessionTransition {
+        if (state.readAloudStep != step || !state.isPresented(cardId) || !state.isReading) return FastSessionTransition(state)
+        return if (step == ReadAloudStep.Question) {
+            FastSessionTransition(state.copy(readAloudStep = ReadAloudStep.QuestionPause), listOf(StartQuestionPause))
+        } else {
+            FastSessionTransition(state.copy(readAloudStep = ReadAloudStep.AdvancePause), listOf(StartAdvancePause))
+        }
+    }
+
+    /** Play also restarts the voice stack after an engine failure; see [resume] for the rest. */
     private fun onPlayRequested(state: FastSessionState): FastSessionTransition = when {
         state.pauseReason == FastPauseReason.EngineUnavailable -> FastSessionTransition(
-            state.copy(pauseReason = null),
+            state.copy(pauseReason = null, readAloudStep = ReadAloudStep.Question, isAnswerRevealed = false),
             listOf(FastSessionEffect.RestartVoiceStack(startIndex = state.currentIndex)),
         )
-        state.isHeldAtAdvancePoint || state.isPausedAtAdvancePoint -> moveOn(state)
-        state.pauseReason != null || !state.isPlaying -> FastSessionTransition(state.copy(pauseReason = null), listOf(Play))
-        else -> FastSessionTransition(state)
+        state.isReading -> FastSessionTransition(state)
+        else -> resume(state)
     }
 
     /**
-     * A pause always reaches the player, so it also drops an auto-resume the player has pending.
-     * A pause at a hold turns it into a user pause at the auto-advance point.
+     * Every resume goes through here: play, a temporary pause ending, and the player playing again by
+     * itself. Inside a read-aloud pause it goes on to the next step, and the rest of the pause is
+     * dropped: the answer after the question pause, the next card (or the end) after the advance
+     * pause. Inside a part, the player reads that part again from its start.
+     */
+    private fun resume(state: FastSessionState): FastSessionTransition {
+        val plays = !state.isReading
+        val resumed = state.copy(pauseReason = null, isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = false)
+        return when (state.readAloudStep) {
+            ReadAloudStep.QuestionPause -> presentAnswer(resumed, cancelsPause = false, plays = plays)
+            ReadAloudStep.AdvancePause -> moveOn(state)
+            ReadAloudStep.Question, ReadAloudStep.Answer -> FastSessionTransition(resumed, if (plays) listOf(Play) else emptyList())
+        }
+    }
+
+    /**
+     * A pause always reaches the player, so it also drops an auto-resume the player has pending, and
+     * stops a running read-aloud pause. A pause at a hold turns it into a user pause at the
+     * auto-advance point.
      */
     private fun onPauseRequested(state: FastSessionState): FastSessionTransition = when {
         state.pauseReason == FastPauseReason.EngineUnavailable -> FastSessionTransition(state)
@@ -215,28 +259,36 @@ class FastSessionReducer @Inject constructor() {
             state.copy(pauseReason = FastPauseReason.User, isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = true),
             listOf(Pause),
         )
-        else -> FastSessionTransition(state.copy(pauseReason = FastPauseReason.User), listOf(Pause))
+        else -> FastSessionTransition(state.copy(pauseReason = FastPauseReason.User), state.cancelPauseEffects() + Pause)
     }
 
-    /** At a question it reveals that card's answer; at an answer, or held at the advance point, it moves on. */
+    /**
+     * At a question, or in the pause after it, it presents that card's answer; at an answer, in the
+     * pause after it, or held at the advance point, it moves on.
+     */
     private fun onNextRequested(state: FastSessionState): FastSessionTransition = when {
         !state.isReadAloudNextAvailable -> FastSessionTransition(state)
         state.isHeldAtAdvancePoint -> moveOn(state)
-        !state.isAnswerRevealed -> FastSessionTransition(state, listOf(FastSessionEffect.ShowAnswer))
-        else -> FastSessionTransition(state.copy(isPausedAtAdvancePoint = false), listOf(MoveToNextCard))
+        state.readAloudStep == ReadAloudStep.Question || state.readAloudStep == ReadAloudStep.QuestionPause ->
+            presentAnswer(state, cancelsPause = true, plays = false)
+        else -> presentQuestion(state.copy(isPausedAtAdvancePoint = false), state.currentIndex + 1, cancelsPause = true, plays = false)
     }
 
     /** A card change ends a hold, and plays on as the hold would have. A user pause stays paused. */
-    private fun onCardChangeRequested(state: FastSessionState, isIgnored: Boolean, effect: FastSessionEffect): FastSessionTransition {
+    private fun onCardChangeRequested(state: FastSessionState, targetIndex: Int, isIgnored: Boolean): FastSessionTransition {
         if (isIgnored) return FastSessionTransition(state)
-        val effects = if (state.isHeldAtAdvancePoint) listOf(effect, Play) else listOf(effect)
-        return FastSessionTransition(state.copy(isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = false), effects)
+        return presentQuestion(
+            state = state.copy(isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = false),
+            index = targetIndex,
+            cancelsPause = true,
+            plays = state.isHeldAtAdvancePoint,
+        )
     }
 
     /** Only pauses a session that is playing; a paused one stays paused by whoever paused it. */
     private fun onTemporaryPauseRequested(state: FastSessionState): FastSessionTransition =
         if (state.pauseReason == null && state.isPlaying) {
-            FastSessionTransition(state.copy(pauseReason = FastPauseReason.Temporary), listOf(Pause))
+            FastSessionTransition(state.copy(pauseReason = FastPauseReason.Temporary), state.cancelPauseEffects() + Pause)
         } else {
             FastSessionTransition(state)
         }
@@ -245,19 +297,17 @@ class FastSessionReducer @Inject constructor() {
     private fun onAdvanceHoldReleased(state: FastSessionState): FastSessionTransition {
         if (!state.isAdvanceHoldRequested && !state.isHeldAtAdvancePoint) return FastSessionTransition(state)
         val released = state.copy(isAdvanceHoldRequested = false)
-        val gate = listOf(SetAdvanceGate(closed = false))
-        if (!state.isHeldAtAdvancePoint) return FastSessionTransition(released, gate)
-        val movedOn = moveOn(released)
-        return movedOn.copy(effects = gate + movedOn.effects)
+        return if (state.isHeldAtAdvancePoint) moveOn(released) else FastSessionTransition(released)
     }
 
     /**
-     * The player stopped at the gate. A user pause that got there first wins; a hold released
-     * meanwhile moves on at once.
+     * The pause after an answer is over. A pause that got there first wins; a requested hold stops
+     * the session on the presented card, paused; otherwise it moves on.
      */
-    private fun onAdvanceGateReached(state: FastSessionState): FastSessionTransition = when {
+    private fun onAdvancePoint(state: FastSessionState): FastSessionTransition = when {
+        state.readAloudStep != ReadAloudStep.AdvancePause || state.isHeldAtAdvancePoint -> FastSessionTransition(state)
         state.pauseReason != null -> FastSessionTransition(state.copy(isPausedAtAdvancePoint = true))
-        state.isAdvanceHoldRequested -> FastSessionTransition(state.copy(isHeldAtAdvancePoint = true))
+        state.isAdvanceHoldRequested -> FastSessionTransition(state.copy(isHeldAtAdvancePoint = true), listOf(Pause))
         else -> moveOn(state)
     }
 
@@ -267,8 +317,26 @@ class FastSessionReducer @Inject constructor() {
         return if (state.currentIndex >= state.cards.lastIndex) {
             FastSessionTransition(moved, listOf(SessionComplete))
         } else {
-            FastSessionTransition(moved, listOf(MoveToNextCard, Play))
+            presentQuestion(moved, state.currentIndex + 1, cancelsPause = false, plays = !state.isReading)
         }
+    }
+
+    private fun presentQuestion(state: FastSessionState, index: Int, cancelsPause: Boolean, plays: Boolean): FastSessionTransition {
+        val effects = buildList {
+            if (cancelsPause) addAll(state.cancelPauseEffects())
+            add(PresentQuestion(index))
+            if (plays) add(Play)
+        }
+        return FastSessionTransition(state.copy(currentIndex = index, readAloudStep = ReadAloudStep.Question, isAnswerRevealed = false), effects)
+    }
+
+    private fun presentAnswer(state: FastSessionState, cancelsPause: Boolean, plays: Boolean): FastSessionTransition {
+        val effects = buildList {
+            if (cancelsPause) addAll(state.cancelPauseEffects())
+            add(PresentAnswer(state.currentIndex))
+            if (plays) add(Play)
+        }
+        return FastSessionTransition(state.copy(readAloudStep = ReadAloudStep.Answer, isAnswerRevealed = true), effects)
     }
 
     private fun onPlaybackEngineUnavailable(state: FastSessionState): FastSessionTransition {
@@ -280,9 +348,18 @@ class FastSessionReducer @Inject constructor() {
                 isHeldAtAdvancePoint = false,
                 isPausedAtAdvancePoint = false,
             ),
-            listOf(FastSessionEffect.StopVoiceStack, FastSessionEffect.Emit(FastSessionEvent.VoicePlaybackUnavailable)),
+            state.cancelPauseEffects() + listOf(FastSessionEffect.StopVoiceStack, FastSessionEffect.Emit(FastSessionEvent.VoicePlaybackUnavailable)),
         )
     }
+
+    /** The player plays and nothing paused or held the session. */
+    private val FastSessionState.isReading: Boolean
+        get() = isPlaying && pauseReason == null && !isHeldAtAdvancePoint && !isPausedAtAdvancePoint
+
+    private fun FastSessionState.isPresented(cardId: String): Boolean = cards.getOrNull(currentIndex)?.id == cardId
+
+    private fun FastSessionState.cancelPauseEffects(): List<FastSessionEffect> =
+        if (readAloudStep.isPause) listOf(CancelReadAloudPause) else emptyList()
 
     private fun FastSessionState.markSeen(cardId: String): FastSessionState =
         if (cardId in seenCardIds || cards.none { it.id == cardId }) this else copy(seenCardIds = seenCardIds + cardId)

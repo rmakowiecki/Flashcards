@@ -32,8 +32,11 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Media3 [SimpleBasePlayer] that reads flashcards aloud with the system [TextToSpeech] engine and
  * surfaces playback to a `MediaSession` (lock screen / Bluetooth / notification transport controls,
- * audio focus). It owns the TTS engine and the per-card sequence:
- * speak question -> pause -> speak answer -> pause -> next card.
+ * audio focus). It presents one part of one card when told to ([presentQuestion], [presentAnswer]),
+ * reads it aloud while playing, and reports when it was read in full. It never starts another part
+ * or card by itself: the pauses between parts and the card position belong to the study session
+ * coordinator. After a part finishes it stays playing and idle, so the system controls keep showing
+ * playing through the coordinator's pause.
  *
  * Only the study session coordinators drive it, through [StudySessionVoiceService.LocalBinder]. System
  * transport controls reach Media3's `handle*` overrides, which never act: they report a
@@ -41,8 +44,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * matching in-app command. Every change calls [publishState] to refresh both the Media3 state and
  * the [voiceState] side-channel.
  *
- * [voiceState] carries TTS-specific fields ([VoicePhase], between-card pause) that the standard
- * [Player] state cannot express.
+ * [voiceState] carries the [VoicePhase], which the standard [Player] state cannot express.
  *
  * It makes no session decision. Audio-focus auto-pause and auto-resume are the one behavior it
  * still runs by itself. Each utterance starts with a [PlaybackPreroll], so headset buttons reach this
@@ -64,6 +66,9 @@ class TtsPlayer(
     private var audioFocusRequest: AudioFocusRequest? = null
     private var wasPlayingBeforeFocusLoss = false
 
+    // Whether the transient focus loss came while playing between parts, with nothing being read.
+    private var wasIdleBeforeFocusLoss = false
+
     private var ttsReady = false
     private var startWhenReady = false
 
@@ -71,19 +76,12 @@ class TtsPlayer(
     private var index = 0
     private var phase = VoicePhase.Question
     private var isPlaying = false
-    private var isBetweenPause = false
+
+    // An utterance is in flight; false while playing between parts.
+    private var isSpeaking = false
     private var speechRate = VoicePlaybackState.DEFAULT_SPEECH_RATE
     private var pendingVoiceId: String? = null
     private var subcategoryName = ""
-
-    // Rated voice answering (ADR-0025): stops after each question instead of going on to the
-    // answer, and reports QuestionFinished so the coordinator can open the listening window.
-    // Distinct from Fast mode's continuous question->pause->answer->next loop.
-    private var isQuestionOnlyMode = false
-
-    // While closed, Fast's loop stops on the current card at the end of the pause after its answer
-    // and reports AdvanceGateReached; the coordinator decides when to move on.
-    private var isAdvanceGateClosed = false
 
     // What the system controls offer, as the coordinator last set it. Every command until then.
     private var transportCommands: Set<TransportCommandType> = TransportCommandType.entries.toSet()
@@ -124,14 +122,15 @@ class TtsPlayer(
      *
      * A permanent [AudioManager.AUDIOFOCUS_LOSS] is the exception: the system drops our request from
      * the focus stack, so it is forgotten here and the next play requests focus again. It never
-     * auto-resumes.
+     * auto-resumes. A gain after a loss between parts resumes without reading, so the coordinator
+     * decides the next step; a loss mid-part reads that part again.
      */
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 if (wasPlayingBeforeFocusLoss) {
                     wasPlayingBeforeFocusLoss = false
-                    doPlay()
+                    if (wasIdleBeforeFocusLoss) resumeWithoutReading() else doPlay()
                 }
             }
 
@@ -145,6 +144,7 @@ class TtsPlayer(
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 if (isPlaying) {
                     wasPlayingBeforeFocusLoss = true
+                    wasIdleBeforeFocusLoss = !isSpeaking
                     doPause() // stay registered — AUDIOFOCUS_GAIN fires when the other app releases
                 }
             }
@@ -242,7 +242,6 @@ class TtsPlayer(
         this.subcategoryName = subcategoryName
         this.index = if (cards.isEmpty()) 0 else startIndex.coerceIn(0, cards.lastIndex)
         this.phase = VoicePhase.Question
-        this.isBetweenPause = false
         if (cards.isEmpty()) {
             publishState()
             return
@@ -261,36 +260,10 @@ class TtsPlayer(
         publishState()
     }
 
-    /** Toggles between Fast's continuous auto-advance and Rated voice answering's stop-after-question shape. */
-    fun setQuestionOnlyMode(enabled: Boolean) {
-        isQuestionOnlyMode = enabled
-        publishState()
-    }
-
-    /** Closes or opens the gate at the end of the pause after an answer; see [isAdvanceGateClosed]. */
-    fun setAdvanceGate(closed: Boolean) {
-        isAdvanceGateClosed = closed
-    }
-
     /**
-     * Reads the question of `cards[0]`, or stops when the queue is empty. The coordinator always
-     * hands over the reordered queue first, so `cards[0]` is already the next card to ask; unlike
-     * Fast's fixed-list advance, this never increments [index].
-     */
-    fun advanceAfterVoiceAnswer() {
-        if (cards.isNotEmpty()) {
-            index = 0
-            speakQuestion()
-        } else {
-            isPlaying = false
-            publishState()
-        }
-    }
-
-    /**
-     * Starts or resumes reading. Named apart from [Player.play], which the Media3 session routes to
-     * [handleSetPlayWhenReady]. Clears an auto-resume pending from a transient focus loss: the user
-     * decided.
+     * Starts or resumes reading the part being presented, from its start. Named apart from
+     * [Player.play], which the Media3 session routes to [handleSetPlayWhenReady]. Clears an
+     * auto-resume pending from a transient focus loss: the user decided.
      */
     fun startReading() {
         wasPlayingBeforeFocusLoss = false
@@ -303,22 +276,31 @@ class TtsPlayer(
         doPause()
     }
 
-    fun moveToNextCard() {
-        if (index >= cards.lastIndex) return
-        index++
-        moveToQuestion()
+    /**
+     * Presents the question of card [targetIndex]: reads it while playing, only shows it while
+     * paused. An index outside the list stops playing.
+     */
+    fun presentQuestion(targetIndex: Int) {
+        if (targetIndex !in cards.indices) {
+            isPlaying = false
+            stopUtterance()
+            publishState()
+            return
+        }
+        index = targetIndex
+        phase = VoicePhase.Question
+        if (isPlaying) {
+            speakQuestion()
+        } else {
+            stopUtterance()
+            publishState()
+        }
     }
 
-    fun moveToPreviousCard() {
-        if (index <= 0) return
-        index--
-        moveToQuestion()
-    }
-
-    fun restartCurrentCardPlayback() = moveToQuestion()
-
-    fun skipToCardAnswerPlayback() {
-        if (cards.isEmpty()) return
+    /** Presents the answer of card [targetIndex] and reports it revealed: reads it while playing, only shows it while paused. */
+    fun presentAnswer(targetIndex: Int) {
+        if (targetIndex !in cards.indices) return
+        index = targetIndex
         phase = VoicePhase.Answer
         if (isPlaying) {
             speakAnswer()
@@ -329,33 +311,20 @@ class TtsPlayer(
         }
     }
 
+    /** Applies from the next utterance; nothing is read again. */
     fun setVoice(voiceId: String?) {
         pendingVoiceId = voiceId
-        if (ttsReady) {
-            applyVoice(voiceId)
-            if (isPlaying) {
-                when (phase) {
-                    VoicePhase.Question -> speakQuestion()
-                    VoicePhase.Answer -> speakAnswer()
-                }
-            }
-        }
+        if (ttsReady) applyVoice(voiceId)
     }
 
     private fun applyVoice(voiceId: String?) = tts.applySessionVoice(voiceId)
 
+    /** Applies from the next utterance; nothing is read again. */
     fun setPlaybackSpeechRate(rate: Float) {
         speechRate =
             rate.coerceIn(VoicePlaybackState.MIN_SPEECH_RATE, VoicePlaybackState.MAX_SPEECH_RATE)
         if (ttsReady) tts.setSpeechRate(speechRate)
-        if (isPlaying) {
-            when (phase) {
-                VoicePhase.Question -> speakQuestion()
-                VoicePhase.Answer -> speakAnswer()
-            }
-        } else {
-            publishState()
-        }
+        publishState()
     }
 
     fun stopPlayback() {
@@ -366,8 +335,6 @@ class TtsPlayer(
         abandonAudioFocus()
         cards = emptyList()
         index = 0
-        isBetweenPause = false
-        isAdvanceGateClosed = false
         transportCommands = TransportCommandType.entries.toSet()
         sessionProgress = null
         _voiceState.value = VoicePlaybackState(isActive = false)
@@ -388,28 +355,11 @@ class TtsPlayer(
         publishState()
     }
 
-    fun jumpTo(targetIndex: Int) {
-        if (cards.isEmpty()) return
-        index = targetIndex.coerceIn(0, cards.lastIndex)
-        moveToQuestion()
-    }
-
-    /** Move to the question of the current [index]; keep playing if we were, else just show it. */
-    private fun moveToQuestion() {
-        phase = VoicePhase.Question
-        isBetweenPause = false
-        if (isPlaying) {
-            speakQuestion()
-        } else {
-            stopUtterance()
-            publishState()
-        }
-    }
-
     private fun speakQuestion() {
         val card = cards.getOrNull(index) ?: return
         phase = VoicePhase.Question
         isPlaying = true
+        isSpeaking = true
         val generationId = ++generation
         requestAudioFocus()
         publishState()
@@ -426,6 +376,7 @@ class TtsPlayer(
         val card = cards.getOrNull(index) ?: return
         phase = VoicePhase.Answer
         isPlaying = true
+        isSpeaking = true
         val generationId = ++generation
         requestAudioFocus()
         publishState()
@@ -437,36 +388,6 @@ class TtsPlayer(
             null,
             utteranceId(TAG_ANSWER, generationId),
         )
-    }
-
-    private fun silence(durationMs: Long, tag: String) {
-        val generationId = ++generation
-        tts.playSilentUtterance(
-            durationMs,
-            TextToSpeech.QUEUE_FLUSH,
-            utteranceId(tag, generationId)
-        )
-    }
-
-    private fun advanceAfterCard() {
-        if (index < cards.lastIndex) {
-            index++
-            isBetweenPause = false
-            speakQuestion()
-        } else {
-            phase =
-                VoicePhase.Question // reset so tapping Play re-reads last card from the question
-            isPlaying = false
-            publishState()
-            onEvent(PlaybackEvent.EndReached)
-        }
-    }
-
-    /** Stays on the current card's answer, paused, and leaves moving on to the coordinator. */
-    private fun stopAtAdvanceGate() {
-        isPlaying = false
-        publishState()
-        onEvent(PlaybackEvent.AdvanceGateReached)
     }
 
     private val utteranceListener = object : UtteranceProgressListener() {
@@ -490,6 +411,7 @@ class TtsPlayer(
         val generationId = utteranceId.substringAfterLast(SEPARATOR).toIntOrNull() ?: return
         if (generationId != generation) return
         generation++
+        isSpeaking = false
         isPlaying = false
         publishState()
     }
@@ -497,29 +419,17 @@ class TtsPlayer(
     private fun onUtteranceDone(utteranceId: String) {
         val generationId = utteranceId.substringAfterLast(SEPARATOR).toIntOrNull() ?: return
         if (generationId != generation) return // superseded by a newer command/utterance
+        isSpeaking = false
+        val card = cards.getOrNull(index) ?: return
         when (utteranceId.substringBefore(SEPARATOR)) {
-            TAG_QUESTION ->
-                if (isQuestionOnlyMode) {
-                    cards.getOrNull(index)?.let { card -> onEvent(PlaybackEvent.QuestionFinished(card.cardId)) }
-                } else {
-                    silence(QUESTION_TO_ANSWER_PAUSE_MS, TAG_PAUSE)
-                }
-            TAG_PAUSE -> speakAnswer()
-            TAG_ANSWER -> {
-                isBetweenPause = true
-                publishState()
-                silence(ANSWER_TO_NEXT_PAUSE_MS, TAG_BETWEEN)
-            }
-
-            TAG_BETWEEN -> {
-                isBetweenPause = false
-                if (isAdvanceGateClosed) stopAtAdvanceGate() else advanceAfterCard()
-            }
+            TAG_QUESTION -> onEvent(PlaybackEvent.QuestionFinished(card.cardId))
+            TAG_ANSWER -> onEvent(PlaybackEvent.AnswerFinished(card.cardId))
         }
     }
 
     private fun stopUtterance() {
         generation++ // invalidate the in-flight utterance callback
+        isSpeaking = false
         if (ttsReady) tts.stop()
     }
 
@@ -542,7 +452,6 @@ class TtsPlayer(
             currentIndex = index,
             totalCards = cards.size,
             phase = phase,
-            isInBetweenPause = isBetweenPause,
             speechRate = speechRate,
         )
         invalidateState()
@@ -588,14 +497,9 @@ class TtsPlayer(
     private companion object {
         const val DEFAULT_TITLE = "Study session"
 
-        const val QUESTION_TO_ANSWER_PAUSE_MS = 1_500L
-        const val ANSWER_TO_NEXT_PAUSE_MS = 2_500L
-
         const val SEPARATOR = ":"
         const val TAG_QUESTION = "question"
-        const val TAG_PAUSE = "pause"
         const val TAG_ANSWER = "answer"
-        const val TAG_BETWEEN = "between"
 
         fun utteranceId(tag: String, generation: Int): String = "$tag$SEPARATOR$generation"
     }

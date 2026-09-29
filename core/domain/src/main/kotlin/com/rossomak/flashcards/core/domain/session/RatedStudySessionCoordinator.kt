@@ -151,8 +151,8 @@ class RatedStudySessionCoordinator @Inject constructor(
         dispatch(RatedSessionInput.AttemptRated(rating))
     }
 
+    /** The manual reveal: only a session without voice answering offers it. */
     fun revealAnswer() {
-        if (playback.isActive) playbackGateway.showAnswer()
         dispatch(RatedSessionInput.AnswerRevealed)
     }
 
@@ -226,11 +226,6 @@ class RatedStudySessionCoordinator @Inject constructor(
                 dispatch(RatedSessionInput.VoiceAnsweringResumed)
             }
         }
-    }
-
-    fun setSpeechRate(rate: Float) {
-        voiceSettings = voiceSettings.copy(speechRate = rate)
-        playbackGateway.setSpeechRate(rate)
     }
 
     /** Applies to the rest of this session, including a voice stack restarted later. */
@@ -308,8 +303,8 @@ class RatedStudySessionCoordinator @Inject constructor(
     }
 
     /**
-     * Question-only mode is fixed for the whole session: a play while voice answering is paused
-     * reads the question and stops, and never falls back to reading answers.
+     * The player never reads on by itself: a play while voice answering is paused reads the
+     * question and stops, and never falls back to reading answers.
      */
     private fun startVoiceStack(startVoiceAnswering: Boolean) {
         val current = state ?: return
@@ -323,7 +318,6 @@ class RatedStudySessionCoordinator @Inject constructor(
         )
         playbackGateway.setSpeechRate(voiceSettings.speechRate)
         playbackGateway.setVoice(voiceSettings.voiceId)
-        playbackGateway.setQuestionOnlyMode(true)
         if (startVoiceAnswering) captureGateway.startVoiceAnswering()
     }
 
@@ -347,11 +341,8 @@ class RatedStudySessionCoordinator @Inject constructor(
             is PlaybackEvent.QuestionFinished -> dispatch(RatedSessionInput.QuestionFinished(event.cardId))
             is PlaybackEvent.NoticeFinished -> dispatch(RatedSessionInput.NoticeFinished(event.notice))
             PlaybackEvent.EngineUnavailable -> dispatch(RatedSessionInput.PlaybackEngineUnavailable)
-            // Question-only reads never reach the end; the queue decides when a Rated session is over.
-            PlaybackEvent.EndReached -> Unit
-            // revealAnswer already dispatched the reveal before asking the player to read it; the
-            // advance gate is Fast's, and the Rated hold happens here at the notice tail instead.
-            is PlaybackEvent.AnswerRevealed, PlaybackEvent.AdvanceGateReached -> Unit
+            // A Rated session never asks the player to present an answer.
+            is PlaybackEvent.AnswerRevealed, is PlaybackEvent.AnswerFinished -> Unit
         }
     }
 
@@ -433,7 +424,12 @@ class RatedStudySessionCoordinator @Inject constructor(
         val scope = requireNotNull(scope)
         when (effect) {
             is SyncQueue -> if (isVoiceStackStarted) playbackGateway.updateQueue(effect.cards)
-            AdvanceAfterVoiceAnswer -> playbackGateway.advanceAfterVoiceAnswer()
+            // The queue head, after any SyncQueue. Moving on from a hold or a paused advance point
+            // also plays: the player only reads a presented question while playing.
+            AdvanceAfterVoiceAnswer -> {
+                playbackGateway.presentQuestion(0)
+                if (state?.isPlaying != true) playbackGateway.play()
+            }
             // A microphone that cannot be prepared, or never reports it records, fails the round
             // like a microphone that dropped out. The silence timer waits for the microphone to open.
             is OpenListeningWindow -> {
@@ -479,7 +475,7 @@ class RatedStudySessionCoordinator @Inject constructor(
             PausePlayback -> playbackGateway.pause()
             Play -> playbackGateway.play()
             ResumeWithoutReading -> playbackGateway.resumeWithoutReading()
-            RestartCurrentCard -> playbackGateway.restartCurrentCard()
+            RestartCurrentCard -> playbackGateway.presentQuestion(0)
             StopVoiceAnswering -> {
                 listeningJob?.cancel()
                 captureGateway.stopVoiceAnswering()
@@ -575,7 +571,6 @@ class RatedStudySessionCoordinator @Inject constructor(
                 round = round,
                 speakingNotice = speakingNotices.firstOrNull(),
                 isShortNoticeSpeaking = isShortNoticeSpeaking,
-                isVoiceAnsweringActive = isVoiceAnsweringActive,
                 voiceAnswerPauseReason = voiceAnswerPauseReason,
                 isPausedAtAdvancePoint = isPausedAtAdvancePoint,
                 isHeldAtAdvancePoint = isHeldAtAdvancePoint,

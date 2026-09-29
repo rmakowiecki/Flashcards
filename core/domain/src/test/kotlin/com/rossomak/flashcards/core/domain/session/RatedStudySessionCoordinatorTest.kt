@@ -157,14 +157,13 @@ class RatedStudySessionCoordinatorTest {
     // Start
 
     @Test
-    fun `a voice-answering session starts the voice stack in question-only mode with the session's voice settings`() = runTest {
+    fun `a voice-answering session starts the voice stack with the session's voice settings`() = runTest {
         startCoordinator()
 
         playbackGateway.calls shouldContainInOrder listOf(
             Call.Start(listOf("card-1", "card-2", "card-3"), 0, "Compose", true),
             Call.SetSpeechRate(SPEECH_RATE),
             Call.SetVoice(VOICE_ID),
-            Call.SetQuestionOnlyMode(true),
         )
         captureGateway.isVoiceAnsweringStarted shouldBe true
     }
@@ -359,12 +358,12 @@ class RatedStudySessionCoordinatorTest {
         finishNotice()
 
         advanceTimeBy(NOTICE_TAIL - 1.milliseconds)
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
 
         advanceTimeBy(2.milliseconds)
         val syncIndex = playbackGateway.calls.indexOfLast { it is Call.UpdateQueue }
-        val advanceIndex = playbackGateway.calls.indexOf(Call.AdvanceAfterVoiceAnswer)
+        val advanceIndex = playbackGateway.calls.indexOf(Call.PresentQuestion(0))
         (syncIndex in 0 until advanceIndex) shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
     }
@@ -381,14 +380,14 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         advanceTimeBy(NOTICE_TAIL * 2)
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.isPausedAfterFeedback shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
 
         coordinator.play()
 
         playbackGateway.spokenNotices shouldBe List(2) { SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE) }
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         playbackGateway.playCount shouldBe 0
     }
 
@@ -403,13 +402,13 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         advanceTimeBy(NOTICE_TAIL * 2)
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
 
         coordinator.play()
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
-        playbackGateway.playCount shouldBe 0
+        // The player only reads a presented question while playing, so moving on from a pause also plays.
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentQuestion(0), Call.Play)
     }
 
     // Pause in every phase
@@ -476,13 +475,13 @@ class RatedStudySessionCoordinatorTest {
 
         playbackGateway.calls shouldContain Call.StopFeedback
         playbackGateway.speakingNotices shouldBe listOf(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
 
         finishNotice()
         advanceTimeBy(NOTICE_TAIL + 1.milliseconds)
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
     }
 
@@ -498,7 +497,7 @@ class RatedStudySessionCoordinatorTest {
         advanceTimeBy(NOTICE_TAIL * 2)
 
         playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
         coordinator.runningSnapshot.currentCardRatings shouldBe emptyList()
     }
@@ -567,7 +566,7 @@ class RatedStudySessionCoordinatorTest {
             completedCount shouldBe 1
         }
         playbackGateway.calls.filterIsInstance<Call.UpdateQueue>() shouldBe emptyList()
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         playbackGateway.calls.last() shouldBe Call.Pause
     }
 
@@ -582,12 +581,12 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
 
         coordinator.releaseAdvance()
         runCurrent()
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -600,7 +599,7 @@ class RatedStudySessionCoordinatorTest {
         gradeAndReachAdvancePoint()
 
         playbackGateway.calls.drop(callCount).filterIsInstance<Call.Pause>() shouldBe emptyList()
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -617,13 +616,13 @@ class RatedStudySessionCoordinatorTest {
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
 
         coordinator.play()
         runCurrent()
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -646,7 +645,7 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         events shouldContain RatedSessionEvent.ExternalTransportCommand(command)
     }
 
@@ -690,14 +689,14 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
-        val advanceCount = playbackGateway.advanceAfterVoiceAnswerCount
+        val advanceCount = playbackGateway.presentedQuestions.size
 
         coordinator.releaseAdvance()
         coordinator.endTemporaryPause()
         runCurrent()
 
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe advanceCount
+        playbackGateway.presentedQuestions.size shouldBe advanceCount
         captureGateway.isVoiceAnsweringStarted shouldBe false
     }
 
@@ -760,7 +759,7 @@ class RatedStudySessionCoordinatorTest {
         coordinator.endTemporaryPause()
         runCurrent()
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     private fun TestScope.gradeAndReachAdvancePoint() {
@@ -998,7 +997,7 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.calls.last() shouldBe Call.AdvanceAfterVoiceAnswer
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(0)
     }
 
     @Test
@@ -1009,7 +1008,7 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.emitExternal(TransportCommand.PreviousCard)
         runCurrent()
 
-        playbackGateway.restartCurrentCardCount shouldBe 2
+        playbackGateway.presentedQuestions.size shouldBe 2
     }
 
     @Test
@@ -1032,7 +1031,7 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
-        playbackGateway.calls shouldNotContain Call.AdvanceAfterVoiceAnswer
+        playbackGateway.calls shouldNotContain Call.PresentQuestion(0)
         events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 

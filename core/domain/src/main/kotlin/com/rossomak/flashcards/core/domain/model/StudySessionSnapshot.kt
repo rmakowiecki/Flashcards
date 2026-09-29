@@ -23,7 +23,6 @@ sealed interface RatedSessionStateSnapshot {
      * @param round the current Voice Answering round.
      * @param speakingNotice the notice being spoken, `null` when none is.
      * @param isShortNoticeSpeaking a notice other than [SpokenNotice.Feedback] is still being spoken.
-     * @param isVoiceAnsweringActive voice answering is on for this session and nothing has paused it.
      * @param isHeldAtAdvancePoint a requested hold stopped the session at the auto-advance point, on
      * the card it just finished.
      * @param isPausedWhileGrading the user paused while the answer was being graded.
@@ -43,7 +42,6 @@ sealed interface RatedSessionStateSnapshot {
         val round: VoiceAnswerRound = VoiceAnswerRound(),
         val speakingNotice: SpokenNotice? = null,
         val isShortNoticeSpeaking: Boolean = false,
-        val isVoiceAnsweringActive: Boolean = false,
         val voiceAnswerPauseReason: VoiceAnswerPauseReason? = null,
         val isPausedAtAdvancePoint: Boolean = false,
         val isHeldAtAdvancePoint: Boolean = false,

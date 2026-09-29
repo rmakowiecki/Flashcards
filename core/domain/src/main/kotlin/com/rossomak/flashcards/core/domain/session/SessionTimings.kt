@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.domain.session
 
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** How long a listening window waits for speech, from the moment the microphone records, before the round counts as a silence. */
@@ -17,6 +18,12 @@ val MICROPHONE_OPEN_TIMEOUT: Duration = 3.seconds
 
 /** The pause after an advancing notice finishes, before the next question is read (ADR-0025). */
 val NOTICE_TAIL: Duration = 1.seconds
+
+/** The read-aloud pause between a card's question, read in full, and its answer. */
+val QUESTION_TO_ANSWER_PAUSE: Duration = 1500.milliseconds
+
+/** The read-aloud pause between a card's answer, read in full, and the next card. */
+val ANSWER_TO_NEXT_PAUSE: Duration = 2500.milliseconds
 
 /** Shortest time the recognized answer stays on screen before the grade or a failure replaces it. */
 val MIN_TRANSCRIPT_DISPLAY: Duration = 1.seconds

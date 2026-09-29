@@ -436,23 +436,14 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `onShowAnswer reveals answer when voice inactive`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `onShowAnswer reveals the answer`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         viewModel.onShowAnswer()
 
         viewModel.state.value.isAnswerRevealed shouldBe true
-        playbackGateway.showAnswerCount shouldBe 0
-    }
-
-    @Test
-    fun `onShowAnswer delegates to gateway when voice active`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createVoiceViewModel()
-
-        viewModel.onShowAnswer()
-
-        playbackGateway.showAnswerCount shouldBe 1
+        playbackGateway.presentedAnswers shouldBe emptyList()
     }
 
     @Test
@@ -736,7 +727,7 @@ class RatedStudySessionViewModelTest {
 
         viewModel.state.value.currentCard?.id shouldBe "card-2"
         viewModel.state.value.currentCardRatings shouldBe emptyList()
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -745,7 +736,7 @@ class RatedStudySessionViewModelTest {
 
         viewModel.onVoicePrevious()
 
-        playbackGateway.restartCurrentCardCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         viewModel.state.value.currentCard?.id shouldBe "card-1"
     }
 
@@ -757,19 +748,6 @@ class RatedStudySessionViewModelTest {
 
         playbackGateway.pauseCount shouldBe 1
     }
-
-    @Test
-    fun `onVoiceSpeedChange forwards the rate to the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
-        val rate = 1.75f
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onVoiceSpeedChange(rate)
-
-        playbackGateway.lastSpeechRate shouldBe rate
-    }
-
-    // Dialogs hold at the auto-advance point
 
     @Test
     fun `opening report, learn more or exit session never pauses playback`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -799,7 +777,7 @@ class RatedStudySessionViewModelTest {
             }
             finishNotice()
             viewModel.state.value.currentCard?.id shouldBe "card-1"
-            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+            playbackGateway.presentedQuestions.size shouldBe 0
 
             viewModel.onDialogEvent(Dismiss)
             advanceTimeBy(CLOSED_DIALOG_LINGER - 1.milliseconds)
@@ -807,7 +785,7 @@ class RatedStudySessionViewModelTest {
             advanceTimeBy(2.milliseconds)
 
             viewModel.state.value.currentCard?.id shouldBe "card-2"
-            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+            playbackGateway.presentedQuestions.size shouldBe 1
             viewModel.state.value.isVoicePlaying shouldBe true
         }
 
@@ -820,13 +798,13 @@ class RatedStudySessionViewModelTest {
 
             finishNotice()
             viewModel.state.value.currentCard?.id shouldBe "card-1"
-            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+            playbackGateway.presentedQuestions.size shouldBe 0
 
             viewModel.onDialogEvent(Dismiss)
             advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
 
             viewModel.state.value.currentCard?.id shouldBe "card-2"
-            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+            playbackGateway.presentedQuestions.size shouldBe 1
         }
 
     @Test
@@ -838,7 +816,7 @@ class RatedStudySessionViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.value.currentCard?.id shouldBe "card-1"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
     }
 
     @Test
@@ -855,7 +833,7 @@ class RatedStudySessionViewModelTest {
 
             viewModel.state.value.activeDialog shouldBe null
             viewModel.state.value.currentCard?.id shouldBe "card-2"
-            playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+            playbackGateway.presentedQuestions.size shouldBe 1
         }
 
     @Test
@@ -911,7 +889,7 @@ class RatedStudySessionViewModelTest {
 
             awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>().route.abandoned shouldBe true
         }
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
     }
 
     @Test
@@ -1134,7 +1112,6 @@ class RatedStudySessionViewModelTest {
 
         emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
 
-        viewModel.state.value.isVoiceAnswerEnabled shouldBe true
         viewModel.state.value.lastVoiceAnswerGrade shouldBe VoiceAnswerGrade(SPOKEN_TRANSCRIPT, CORRECT_GRADE_PERCENT, GRADE_RATIONALE)
     }
 
@@ -1147,7 +1124,7 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `voice sheet mode is Transport before voice answering is enabled`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `voice sheet mode is Transport before any voice round`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
@@ -1183,7 +1160,6 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `voiceSheetModeOf shows Pending while listening with the microphone not yet open`() {
         voiceSheetModeOf(
-            isVoiceAnswerEnabled = true,
             voiceAnswerPhase = VoiceAnswerPhase.Listening,
             isMicrophoneOpen = false,
             isVoiceAnswerPaused = false,
@@ -1196,7 +1172,6 @@ class RatedStudySessionViewModelTest {
     @Test
     fun `voiceSheetModeOf shows Listening while listening with the microphone open`() {
         voiceSheetModeOf(
-            isVoiceAnswerEnabled = true,
             voiceAnswerPhase = VoiceAnswerPhase.Listening,
             isMicrophoneOpen = true,
             isVoiceAnswerPaused = false,
@@ -1419,7 +1394,7 @@ class RatedStudySessionViewModelTest {
 
         viewModel.state.value.currentCard?.id shouldNotBe "card-1"
         viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Transport
-        playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.AdvanceAfterVoiceAnswer
+        playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.PresentQuestion(0)
     }
 
     @Test
@@ -1450,7 +1425,7 @@ class RatedStudySessionViewModelTest {
         viewModel.state.value.availableTransportCommands shouldContain TransportCommandType.Previous
         viewModel.onVoicePrevious()
 
-        playbackGateway.restartCurrentCardCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -2035,7 +2010,7 @@ class RatedStudySessionViewModelTest {
             viewModel.events.test { expectNoEvents() }
             viewModel.state.value.isVoiceAnswerPaused shouldBe true
             captureGateway.isVoiceAnsweringStarted shouldBe false
-            playbackGateway.restartCurrentCardCount shouldBe 1
+            playbackGateway.presentedQuestions.size shouldBe 1
         }
 
     @Test

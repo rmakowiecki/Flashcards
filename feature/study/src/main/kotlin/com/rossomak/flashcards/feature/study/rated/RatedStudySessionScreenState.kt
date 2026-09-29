@@ -44,7 +44,6 @@ data class RatedStudySessionScreenState(
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
-    val isVoiceAnswerEnabled: Boolean = false,
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
     // The listening window's microphone records; until then the window is still being prepared.
     val isVoiceMicrophoneOpen: Boolean = false,
@@ -93,7 +92,6 @@ data class RatedStudySessionScreenState(
 
     val voiceSheetMode: RatedVoiceSheetMode
         get() = voiceSheetModeOf(
-            isVoiceAnswerEnabled = isVoiceAnswerEnabled,
             voiceAnswerPhase = voiceAnswerPhase,
             isMicrophoneOpen = isVoiceMicrophoneOpen,
             isVoiceAnswerPaused = isVoiceAnswerPaused || isVoiceRoundPaused,

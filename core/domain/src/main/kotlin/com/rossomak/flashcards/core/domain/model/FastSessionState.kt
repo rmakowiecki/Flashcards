@@ -5,8 +5,12 @@ package com.rossomak.flashcards.core.domain.model
  * returns the next one of.
  *
  * @param cards the session's cards, in routed order. Fixed for the whole session.
+ * @param currentIndex the presented card. Owned here in both deliveries: with read-aloud on, the
+ * voice player is told which card to present and never moves on by itself.
  * @param seenCardIds every card whose answer was shown, in first-seen order: Fast's Studied
  * criterion. A revisited card is not added twice.
+ * @param isAnswerRevealed whether the presented card shows its answer.
+ * @param readAloudStep where read-aloud is in the presented card. Only meaningful with read-aloud on.
  * @param pauseReason who paused the session; `null` while nothing did. A player that stopped by
  * itself (an audio-focus loss, a failed utterance) has no pause reason.
  * @param isPlaying the voice player's playing state, as last reported.
@@ -22,6 +26,7 @@ data class FastSessionState(
     val currentIndex: Int = 0,
     val seenCardIds: List<String> = emptyList(),
     val isAnswerRevealed: Boolean = false,
+    val readAloudStep: ReadAloudStep = ReadAloudStep.Question,
     val pauseReason: FastPauseReason? = null,
     val isPlaying: Boolean = false,
     val isAdvanceHoldRequested: Boolean = false,
@@ -35,6 +40,21 @@ data class FastSessionState(
      */
     val isReadAloudNextAvailable: Boolean
         get() = !isAnswerRevealed || currentIndex < cards.lastIndex
+}
+
+/**
+ * Where read-aloud is in the presented card. [Question] and [Answer] mean that part is presented:
+ * being read, read in full a moment ago, or paused mid-read. The two pauses mean the coordinator's
+ * timer runs, or ran and was stopped by a pause.
+ */
+enum class ReadAloudStep {
+    Question,
+    QuestionPause,
+    Answer,
+    AdvancePause,
+    ;
+
+    val isPause: Boolean get() = this == QuestionPause || this == AdvancePause
 }
 
 /** Who paused a Fast Study Session. */

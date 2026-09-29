@@ -43,10 +43,9 @@ sealed interface RatedVoiceSheetMode {
 
 /**
  * A short notice still being spoken wins over everything, including a pause that landed before it
- * finished; otherwise a pause, or voice answering not (yet) running, wins over the phase.
+ * finished; otherwise a pause wins over the phase, and no voice round yet shows the transport row.
  */
 fun voiceSheetModeOf(
-    isVoiceAnswerEnabled: Boolean,
     voiceAnswerPhase: VoiceAnswerPhase,
     isMicrophoneOpen: Boolean,
     isVoiceAnswerPaused: Boolean,
@@ -55,7 +54,7 @@ fun voiceSheetModeOf(
     lastGrade: VoiceAnswerGrade?,
 ): RatedVoiceSheetMode = when {
     isShortNoticeSpeaking -> Pending
-    isVoiceAnswerPaused || !isVoiceAnswerEnabled -> Transport
+    isVoiceAnswerPaused -> Transport
     else -> when (voiceAnswerPhase) {
         VoiceAnswerPhase.Idle, VoiceAnswerPhase.WaitingForQuestion -> Transport
         VoiceAnswerPhase.Listening -> if (isMicrophoneOpen) Listening else Pending

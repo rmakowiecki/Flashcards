@@ -98,9 +98,28 @@ class FastStudySessionCoordinatorTest {
         return coordinator
     }
 
-    private fun TestScope.moveToCard(index: Int) {
-        playbackGateway.state.update { it.copy(currentIndex = index, phase = VoicePhase.Question) }
+    /** The player reads the presented question in full, and the pause after it runs out: the answer is presented. */
+    private fun TestScope.reachAnswer() {
+        playbackGateway.finishQuestion()
         runCurrent()
+        advanceTimeBy(QUESTION_TO_ANSWER_PAUSE)
+        runCurrent()
+    }
+
+    /** The player reads the presented answer in full, and the pause after it runs out. */
+    private fun TestScope.finishCard() {
+        playbackGateway.finishAnswer()
+        runCurrent()
+        advanceTimeBy(ANSWER_TO_NEXT_PAUSE)
+        runCurrent()
+    }
+
+    /** Reads aloud from the first card to the question of card [index]. */
+    private fun TestScope.moveToCard(index: Int) {
+        repeat(index) {
+            reachAnswer()
+            finishCard()
+        }
     }
 
     @Test
@@ -128,7 +147,7 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.emitExternal(TransportCommand.Previous)
         runCurrent()
 
-        playbackGateway.calls.last() shouldBe Call.MoveToPreviousCard
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(0)
     }
 
     @Test
@@ -138,7 +157,7 @@ class FastStudySessionCoordinatorTest {
 
         coordinator.previous()
 
-        playbackGateway.calls.last() shouldBe Call.RestartCurrentCard
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(1)
     }
 
     @Test
@@ -147,7 +166,7 @@ class FastStudySessionCoordinatorTest {
 
         coordinator.previous()
 
-        playbackGateway.calls.last() shouldBe Call.RestartCurrentCard
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(0)
     }
 
     // External commands
@@ -161,7 +180,7 @@ class FastStudySessionCoordinatorTest {
             TransportCommand.Play,
             TransportCommand.Next,
             TransportCommand.PreviousCard,
-            TransportCommand.JumpTo(0),
+            TransportCommand.JumpTo(2),
             TransportCommand.Stop,
         ).forEach(playbackGateway::emitExternal)
         runCurrent()
@@ -169,9 +188,9 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.calls.takeLast(6) shouldBe listOf(
             Call.Pause,
             Call.Play,
-            Call.ShowAnswer,
-            Call.MoveToPreviousCard,
-            Call.JumpTo(0),
+            Call.PresentAnswer(1),
+            Call.PresentQuestion(0),
+            Call.PresentQuestion(2),
             Call.Pause,
         )
         playbackGateway.stopCount shouldBe 0
@@ -180,8 +199,7 @@ class FastStudySessionCoordinatorTest {
     @Test
     fun `an external command that changed the session is reported, and an ignored one is not`() = runTest {
         startCoordinator().also { moveToCard(2) }
-        playbackGateway.readAnswer()
-        runCurrent()
+        reachAnswer()
 
         playbackGateway.emitExternal(TransportCommand.Next)
         playbackGateway.emitExternal(TransportCommand.Play)
@@ -199,14 +217,13 @@ class FastStudySessionCoordinatorTest {
         val coordinator = startCoordinator()
 
         coordinator.holdAdvance()
-        playbackGateway.isAdvanceGateClosed shouldBe true
+        reachAnswer()
         playbackGateway.pauseCount shouldBe 0
-        playbackGateway.readAnswer()
-        playbackGateway.reachAdvancePoint()
-        runCurrent()
+        finishCard()
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
         coordinator.runningSnapshot.currentIndex shouldBe 0
+        playbackGateway.calls.last() shouldBe Call.Pause
     }
 
     @Test
@@ -216,7 +233,7 @@ class FastStudySessionCoordinatorTest {
         coordinator.releaseAdvance()
         runCurrent()
 
-        playbackGateway.calls.takeLast(3) shouldBe listOf(Call.SetAdvanceGate(closed = false), Call.MoveToNextCard, Call.Play)
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentQuestion(1), Call.Play)
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.currentIndex shouldBe 1
         val callCount = playbackGateway.calls.size
@@ -237,7 +254,7 @@ class FastStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.User
         coordinator.runningSnapshot.currentIndex shouldBe 0
-        playbackGateway.calls.last() shouldBe Call.SetAdvanceGate(closed = false)
+        playbackGateway.calls.last() shouldBe Call.Pause
     }
 
     @Test
@@ -256,7 +273,7 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.emitExternal(command)
         runCurrent()
 
-        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.MoveToNextCard, Call.Play)
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentQuestion(1), Call.Play)
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.currentIndex shouldBe 1
         events shouldContain FastSessionEvent.ExternalTransportCommand(command)
@@ -334,37 +351,35 @@ class FastStudySessionCoordinatorTest {
 
     private fun TestScope.holdAtAdvancePoint(coordinator: FastStudySessionCoordinator) {
         coordinator.holdAdvance()
-        playbackGateway.readAnswer()
-        playbackGateway.reachAdvancePoint()
-        runCurrent()
+        reachAnswer()
+        finishCard()
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
     }
 
     // Read-aloud next
 
     @Test
-    fun `next at a question reveals that card's answer, and next at an answer moves on`() = runTest {
+    fun `next at a question presents that card's answer, and next at an answer moves on`() = runTest {
         val coordinator = startCoordinator()
 
         playbackGateway.emitExternal(TransportCommand.Next)
         runCurrent()
 
-        playbackGateway.calls.last() shouldBe Call.ShowAnswer
+        playbackGateway.calls.last() shouldBe Call.PresentAnswer(0)
         coordinator.runningSnapshot.currentIndex shouldBe 0
         coordinator.runningSnapshot.isAnswerRevealed shouldBe true
 
         coordinator.next()
         runCurrent()
 
-        playbackGateway.calls.last() shouldBe Call.MoveToNextCard
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(1)
         coordinator.runningSnapshot.currentIndex shouldBe 1
     }
 
     @Test
-    fun `next at the last card's answer does nothing, and the session ends only when the player reaches the end`() = runTest {
+    fun `next at the last card's answer does nothing, and the session ends only after that answer's pause`() = runTest {
         val coordinator = startCoordinator().also { moveToCard(2) }
-        playbackGateway.readAnswer()
-        runCurrent()
+        reachAnswer()
         val callCount = playbackGateway.calls.size
 
         coordinator.runningSnapshot.isReadAloudNextAvailable shouldBe false
@@ -374,6 +389,10 @@ class FastStudySessionCoordinatorTest {
 
         playbackGateway.calls.size shouldBe callCount
         events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+
+        finishCard()
+
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.abandoned shouldBe false
     }
 
     @Test
@@ -381,12 +400,12 @@ class FastStudySessionCoordinatorTest {
         val coordinator = startCoordinator().also { moveToCard(2) }
         playbackGateway.availableCommandsUpdates.last() shouldBe TransportCommandType.entries.toSet()
 
-        playbackGateway.readAnswer()
-        runCurrent()
+        reachAnswer()
         playbackGateway.availableCommandsUpdates.last() shouldBe TransportCommandType.entries.toSet() - TransportCommandType.Next
         coordinator.runningSnapshot.availableTransportCommands shouldBe playbackGateway.availableCommandsUpdates.last()
 
-        moveToCard(2)
+        advanceTimeBy(REWIND_THRESHOLD)
+        coordinator.previous()
 
         playbackGateway.availableCommandsUpdates.last() shouldBe TransportCommandType.entries.toSet()
     }
@@ -398,16 +417,68 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.availableCommandsUpdates shouldBe emptyList()
     }
 
+    // The read-aloud pauses
+
     @Test
-    fun `the manual next card is ignored while read-aloud runs`() = runTest {
+    fun `the answer is presented once the question pause has run in full, not before`() = runTest {
         val coordinator = startCoordinator()
-        playbackGateway.readAnswer()
+        playbackGateway.finishQuestion()
         runCurrent()
 
-        coordinator.nextCard()
+        advanceTimeBy(QUESTION_TO_ANSWER_PAUSE - 1.milliseconds)
+        runCurrent()
+        playbackGateway.presentedAnswers.shouldBeEmpty()
 
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+        playbackGateway.presentedAnswers shouldBe listOf(0)
+        coordinator.runningSnapshot.isAnswerRevealed shouldBe true
+    }
+
+    @Test
+    fun `the next question is presented once the advance pause has run in full`() = runTest {
+        val coordinator = startCoordinator()
+        reachAnswer()
+        playbackGateway.finishAnswer()
+        runCurrent()
+
+        advanceTimeBy(ANSWER_TO_NEXT_PAUSE - 1.milliseconds)
+        runCurrent()
         coordinator.runningSnapshot.currentIndex shouldBe 0
-        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+        coordinator.runningSnapshot.currentIndex shouldBe 1
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(1)
+    }
+
+    @Test
+    fun `a pause during the question pause cancels it, and play then presents the answer`() = runTest {
+        val coordinator = startCoordinator()
+        playbackGateway.finishQuestion()
+        runCurrent()
+
+        coordinator.pause()
+        advanceTimeBy(QUESTION_TO_ANSWER_PAUSE * 2)
+        runCurrent()
+        playbackGateway.presentedAnswers.shouldBeEmpty()
+
+        coordinator.play()
+        runCurrent()
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentAnswer(0), Call.Play)
+    }
+
+    @Test
+    fun `ending the session cancels a running pause`() = runTest {
+        val coordinator = startCoordinator()
+        playbackGateway.finishQuestion()
+        runCurrent()
+
+        coordinator.end(abandoned = true)
+        advanceTimeBy(QUESTION_TO_ANSWER_PAUSE * 2)
+        runCurrent()
+
+        playbackGateway.presentedAnswers.shouldBeEmpty()
     }
 
     // Engine unavailable
@@ -433,18 +504,17 @@ class FastStudySessionCoordinatorTest {
     // Studied set and result
 
     @Test
-    fun `the player reaching the end ends the session with every Seen card`() = runTest {
-        startCoordinator()
-        (0..2).forEach { index ->
-            moveToCard(index)
-            playbackGateway.readAnswer()
-            runCurrent()
-        }
-        playbackGateway.state.update { it.copy(isPlaying = false, phase = VoicePhase.Question) }
+    fun `the pause after the last card's answer ends the session with every Seen card`() = runTest {
+        startCoordinator().also { moveToCard(2) }
+        reachAnswer()
+        playbackGateway.finishAnswer()
+        runCurrent()
+
+        advanceTimeBy(ANSWER_TO_NEXT_PAUSE - 1.milliseconds)
         runCurrent()
         events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
 
-        playbackGateway.emit(PlaybackEvent.EndReached)
+        advanceTimeBy(1.milliseconds)
         runCurrent()
 
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
@@ -471,7 +541,7 @@ class FastStudySessionCoordinatorTest {
     fun `an answer revealed just before a quick skip still counts as Seen`() = runTest {
         val coordinator = startCoordinator()
         // The skip lands before the player's answer report is handled.
-        moveToCard(1)
+        playbackGateway.emitExternal(TransportCommand.JumpTo(1))
         playbackGateway.emit(PlaybackEvent.AnswerRevealed("card-1"))
         runCurrent()
 

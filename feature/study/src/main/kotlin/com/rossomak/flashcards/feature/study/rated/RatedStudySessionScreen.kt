@@ -204,7 +204,6 @@ fun RatedStudySessionContent(
                     RatedVoiceSheetContent(
                         state = state,
                         voiceBarsLevels = voiceBarsLevels,
-                        onShowAnswer = onShowAnswer,
                         onVoicePlayPause = onVoicePlayPause,
                         onVoiceNext = onVoiceNext,
                         onVoicePrevious = onVoicePrevious,

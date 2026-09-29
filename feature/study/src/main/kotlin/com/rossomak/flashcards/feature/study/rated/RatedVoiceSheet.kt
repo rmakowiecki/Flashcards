@@ -83,7 +83,6 @@ private val RatedVoiceSheetMode.group: RatedVoiceSheetGroup
 internal fun RatedVoiceSheetContent(
     state: RatedStudySessionScreenState,
     voiceBarsLevels: StateFlow<ImmutableList<Float>>,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
@@ -107,7 +106,6 @@ internal fun RatedVoiceSheetContent(
         when (group) {
             RatedVoiceSheetGroup.Transport -> RatedVoiceTransportSheet(
                 state = state,
-                onShowAnswer = onShowAnswer,
                 onVoicePlayPause = onVoicePlayPause,
                 onVoiceNext = onVoiceNext,
                 onVoicePrevious = onVoicePrevious,
@@ -127,7 +125,6 @@ internal fun RatedVoiceSheetContent(
 @Composable
 private fun RatedVoiceTransportSheet(
     state: RatedStudySessionScreenState,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
@@ -136,7 +133,6 @@ private fun RatedVoiceTransportSheet(
     Box(modifier = Modifier.fillMaxSize()) {
         RatedVoiceTransportRow(
             state = state,
-            onShowAnswer = onShowAnswer,
             onVoicePlayPause = onVoicePlayPause,
             onVoiceNext = onVoiceNext,
             onVoicePrevious = onVoicePrevious,
@@ -377,7 +373,6 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDe
 @Composable
 private fun RatedVoiceTransportRow(
     state: RatedStudySessionScreenState,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
@@ -409,14 +404,12 @@ private fun RatedVoiceTransportRow(
         )
         Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
         IconButton(
-            onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
+            onClick = onVoiceNext,
             enabled = state.isVoiceActive && TransportCommandType.Next in commands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,
-                contentDescription = stringResource(
-                    if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
-                )
+                contentDescription = stringResource(R.string.study_session_next_flashcard_cd),
             )
         }
     }

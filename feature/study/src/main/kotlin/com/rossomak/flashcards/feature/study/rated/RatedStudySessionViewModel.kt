@@ -206,7 +206,6 @@ class RatedStudySessionViewModel @Inject constructor(
         isVoiceActive = snapshot.playback.isActive,
         isVoicePlaying = snapshot.playback.isPlaying,
         speechRate = snapshot.playback.speechRate,
-        isVoiceAnswerEnabled = snapshot.isVoiceAnsweringActive,
         voiceAnswerPhase = snapshot.round.phase,
         isVoiceMicrophoneOpen = snapshot.round.isMicrophoneOpen,
         voiceAnswerSanitizedTranscript = snapshot.round.transcript,
@@ -275,10 +274,6 @@ class RatedStudySessionViewModel @Inject constructor(
     fun onVoiceFeedbackSkip() {
         coordinator.skipFeedback()
         showSessionNow()
-    }
-
-    fun onVoiceSpeedChange(rate: Float) {
-        coordinator.setSpeechRate(rate)
     }
 
     /** The one dialog that pauses: voice settings are previewed aloud, which would talk over the session. */
