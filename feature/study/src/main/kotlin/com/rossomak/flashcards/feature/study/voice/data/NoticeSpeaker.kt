@@ -52,6 +52,10 @@ internal interface NoticeEngineListener {
  * - a notice spoken while the engine is not ready, or after it failed, finishes at once.
  *
  * A late engine callback for a notice already given up on is dropped. Everything runs on [scope].
+ *
+ * Relies on the session speaking one notice at a time, each only after the previous one finished:
+ * [stopFeedback] and the started-feedback cutoff stop the whole engine, which would also drop a
+ * notice queued behind the feedback and report it finished unspoken.
  */
 internal class NoticeSpeaker(
     private val scope: CoroutineScope,

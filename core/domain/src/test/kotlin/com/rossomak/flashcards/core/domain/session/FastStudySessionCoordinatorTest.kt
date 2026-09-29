@@ -453,6 +453,21 @@ class FastStudySessionCoordinatorTest {
     }
 
     @Test
+    fun `ending the session stops the player and ignores later external commands`() = runTest {
+        val coordinator = startCoordinator().also { moveToCard(1) }
+
+        coordinator.end(abandoned = true)
+        val callsAfterEnd = playbackGateway.calls.size
+        playbackGateway.emitExternal(TransportCommand.Next)
+        playbackGateway.emitExternal(TransportCommand.JumpTo(0))
+        runCurrent()
+
+        playbackGateway.stopCount shouldBe 1
+        playbackGateway.calls.size shouldBe callsAfterEnd
+        events.filterIsInstance<FastSessionEvent.ExternalTransportCommand>().shouldBeEmpty()
+    }
+
+    @Test
     fun `an answer revealed just before a quick skip still counts as Seen`() = runTest {
         val coordinator = startCoordinator()
         // The skip lands before the player's answer report is handled.

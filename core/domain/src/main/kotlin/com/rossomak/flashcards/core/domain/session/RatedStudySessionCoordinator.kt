@@ -243,11 +243,13 @@ class RatedStudySessionCoordinator @Inject constructor(
     /**
      * Seals the result exactly once and reports it as [RatedSessionEvent.SessionEnded], whether the
      * last card finished or the user left. Leaving before the cards load seals empty card results
-     * with zero duration.
+     * with zero duration. The voice stack stops here, not at `onCleared`, so nothing is read or heard
+     * while the screen navigates away.
      */
     fun end(abandoned: Boolean) {
         if (hasEnded) return
         hasEnded = true
+        stop()
         val cardResults = state?.let { sealRatedCardResults(it, abandoned) } ?: emptyList()
         val result = timekeeper.seal { at ->
             SessionResult.Rated(
@@ -355,8 +357,10 @@ class RatedStudySessionCoordinator @Inject constructor(
      * Applied exactly like the matching in-app command. A controller's stop only pauses. A command
      * the session does not offer right now is ignored: a controller can race the update of the
      * offered set. A command that changed the session is then reported, so the screen can react to it.
+     * An ended session ignores them.
      */
     private fun onExternalCommand(command: TransportCommand) {
+        if (hasEnded) return
         val current = state ?: return
         if (command.type !in current.availableTransportCommands) return
         val isChanged = when (command) {

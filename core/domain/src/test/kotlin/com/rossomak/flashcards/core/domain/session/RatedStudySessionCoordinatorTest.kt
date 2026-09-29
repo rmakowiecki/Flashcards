@@ -1043,6 +1043,22 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
+    fun `ending the session stops the voice stack and ignores later external commands`() = runTest {
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.end(abandoned = true)
+        val callsAfterEnd = playbackGateway.calls.size
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+
+        playbackGateway.stopCount shouldBe 1
+        captureGateway.isVoiceAnsweringStarted shouldBe false
+        playbackGateway.calls.size shouldBe callsAfterEnd
+        events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
+    }
+
+    @Test
     fun `stop stops the whole voice stack synchronously`() = runTest {
         val coordinator = startCoordinator()
 

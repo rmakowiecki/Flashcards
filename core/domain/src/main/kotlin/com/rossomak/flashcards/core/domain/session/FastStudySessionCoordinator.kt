@@ -173,11 +173,13 @@ class FastStudySessionCoordinator @Inject constructor(
     /**
      * Seals the result exactly once and reports it as [FastSessionEvent.SessionEnded]. One
      * [FlashcardResult.Fast] per Studied card, in first-seen order; leaving before the cards load
-     * seals empty card results with zero duration.
+     * seals empty card results with zero duration. Playback stops here, not at `onCleared`, so nothing
+     * is read while the screen navigates away.
      */
     fun end(abandoned: Boolean) {
         if (hasEnded) return
         hasEnded = true
+        stop()
         val cardResults = state?.let(::sealFastCardResults) ?: emptyList()
         val result = timekeeper.seal { at ->
             SessionResult.Fast(
@@ -269,9 +271,11 @@ class FastStudySessionCoordinator @Inject constructor(
 
     /**
      * Applied exactly like the matching in-app command. A controller's stop only pauses. A command
-     * that changed the session is then reported, so the screen can react to it.
+     * that changed the session is then reported, so the screen can react to it. An ended session
+     * ignores them.
      */
     private fun onExternalCommand(command: TransportCommand) {
+        if (hasEnded) return
         val input = when (command) {
             TransportCommand.Play -> FastSessionInput.PlayRequested
             TransportCommand.Pause, TransportCommand.Stop -> FastSessionInput.PauseRequested
