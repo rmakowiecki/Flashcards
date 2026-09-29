@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
@@ -80,6 +81,11 @@ data class RatedStudySessionScreenState(
     // A voice engine could not start. The session keeps its voice sheet, never falling back to the
     // manual one, and the play control stays enabled to resume.
     val isVoiceEngineUnavailable: Boolean = false,
+    // The voice round is paused mid-way: while grading, after the grading feedback, or held at the
+    // auto-advance point. The sheet shows the paused transport row, whatever the phase.
+    val isVoiceRoundPaused: Boolean = false,
+    // What the transport row may offer: the same set the notification and a headset get.
+    val availableTransportCommands: Set<TransportCommandType> = emptySet(),
 ) {
     val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)
 
@@ -87,7 +93,7 @@ data class RatedStudySessionScreenState(
         get() = voiceSheetModeOf(
             isVoiceAnswerEnabled = isVoiceAnswerEnabled,
             voiceAnswerPhase = voiceAnswerPhase,
-            isVoiceAnswerPaused = isVoiceAnswerPaused,
+            isVoiceAnswerPaused = isVoiceAnswerPaused || isVoiceRoundPaused,
             isShortNoticeSpeaking = isVoiceShortNoticeSpeaking,
             sanitizedTranscript = voiceAnswerSanitizedTranscript,
             lastGrade = lastVoiceAnswerGrade,

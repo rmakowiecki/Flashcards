@@ -10,7 +10,9 @@ import com.rossomak.flashcards.core.data.model.CurationActionEntryDto
 import com.rossomak.flashcards.core.data.model.CurationRequestDto
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val WHEREIN_BATCH_SIZE = 30
 
@@ -59,9 +61,19 @@ class FirestoreCurationRemoteDataSource @Inject constructor(
      * Firestore merges nested maps key-by-key, leaving untouched actions on the document intact. A
      * difficulty action additionally deletes its opposite's key, keeping the pair mutually
      * exclusive in storage as well as in the draft.
+     *
+     * Offline, Firestore applies the write to its local cache at once but only completes the task
+     * when the server acknowledges it, so an unbounded `await()` would never return. A timeout
+     * returns [CurationWriteResult.Queued]: the write syncs later, but its eventual fate is unknown
+     * here, so the caller must not treat it as confirmed. A real failure (e.g. permission-denied)
+     * still throws before the timeout.
      */
-    override suspend fun upsertCurationActions(cardId: String, subcategoryId: String, actions: Set<CurationAction>) {
-        if (actions.isEmpty()) return // unreachable via SubmitCurationReportUseCase's additive design (ADR-0017)
+    override suspend fun upsertCurationActions(
+        cardId: String,
+        subcategoryId: String,
+        actions: Set<CurationAction>,
+    ): CurationWriteResult {
+        if (actions.isEmpty()) return CurationWriteResult.Confirmed // unreachable via SubmitCurationReportUseCase's additive design (ADR-0017)
         val actionUpdates = mutableMapOf<String, Any>()
         actions.forEach { action ->
             actionUpdates[action.name] = mapOf(FIELD_FLAGGED_AT to FieldValue.serverTimestamp())
@@ -71,7 +83,11 @@ class FirestoreCurationRemoteDataSource @Inject constructor(
             if (opposite !in actions) actionUpdates[opposite.name] = FieldValue.delete()
         }
         val updates = mapOf(FIELD_SUBCATEGORY_ID to subcategoryId, FIELD_ACTIONS to actionUpdates)
-        collection().document(cardId).set(updates, SetOptions.merge()).await()
+        val acknowledged = withTimeoutOrNull(OFFLINE_WRITE_TIMEOUT) {
+            collection().document(cardId).set(updates, SetOptions.merge()).await()
+            true
+        }
+        return if (acknowledged == true) CurationWriteResult.Confirmed else CurationWriteResult.Queued
     }
 
     private companion object {
@@ -79,5 +95,6 @@ class FirestoreCurationRemoteDataSource @Inject constructor(
         const val FIELD_SUBCATEGORY_ID = "subcategoryId"
         const val FIELD_ACTIONS = "actions"
         const val FIELD_FLAGGED_AT = "flaggedAt"
+        val OFFLINE_WRITE_TIMEOUT = 5.seconds
     }
 }

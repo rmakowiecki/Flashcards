@@ -14,7 +14,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import java.io.IOException
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -33,8 +37,8 @@ class DefaultVoiceAnswerGradingRepositoryTest {
         feedback = "Mostly right",
     )
 
-    private fun createRepository(): DefaultVoiceAnswerGradingRepository =
-        DefaultVoiceAnswerGradingRepository(voiceGradingRemoteDataSource)
+    private fun TestScope.createRepository(): DefaultVoiceAnswerGradingRepository =
+        DefaultVoiceAnswerGradingRepository(voiceGradingRemoteDataSource, StandardTestDispatcher(testScheduler))
 
     private fun successfulStream() = flow {
         emit(VoiceGradingStreamEventDto.TranscriptChunk(sanitizedTranscript))
@@ -55,39 +59,7 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     }
 
     @Test
-    fun `transcribeAndGradeSpokenAnswer retries the whole call on transient io failures before succeeding`() = runTest {
-        every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
-        } returns flow<VoiceGradingStreamEventDto> {
-            throw IOException("flaky")
-        } andThen flow<VoiceGradingStreamEventDto> {
-            throw IOException("flaky again")
-        } andThen successfulStream()
-
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
-            awaitItem() shouldBe VoiceAnswerGradingEvent.TranscriptReady(sanitizedTranscript)
-            awaitItem() shouldBe VoiceAnswerGradingEvent.Graded(expectedGrade)
-            awaitComplete()
-        }
-    }
-
-    @Test
-    fun `transcribeAndGradeSpokenAnswer retries an io failure the SDK wrapped in its own exception`() = runTest {
-        every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
-        } returns flow<VoiceGradingStreamEventDto> {
-            throw IllegalStateException("request failed", IOException("timeout"))
-        } andThen successfulStream()
-
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
-            awaitItem() shouldBe VoiceAnswerGradingEvent.TranscriptReady(sanitizedTranscript)
-            awaitItem() shouldBe VoiceAnswerGradingEvent.Graded(expectedGrade)
-            awaitComplete()
-        }
-    }
-
-    @Test
-    fun `transcribeAndGradeSpokenAnswer gives up after exhausting retries and ends with a no-connection failure`() = runTest {
+    fun `transcribeAndGradeSpokenAnswer ends an io failure with a no-connection failure after one call`() = runTest {
         every {
             voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> { throw IOException("network down") }
@@ -96,9 +68,38 @@ class DefaultVoiceAnswerGradingRepositoryTest {
             awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
             awaitComplete()
         }
-        coVerify(exactly = MAX_UPLOAD_ATTEMPTS) {
+        coVerify(exactly = 1) {
             voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
         }
+    }
+
+    @Test
+    fun `transcribeAndGradeSpokenAnswer ends an io failure the SDK wrapped in its own exception with a no-connection failure`() = runTest {
+        every {
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+        } returns flow<VoiceGradingStreamEventDto> { throw IllegalStateException("request failed", IOException("timeout")) }
+
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+            awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun `transcribeAndGradeSpokenAnswer ends a call still running after 20 seconds with a no-connection failure`() = runTest {
+        every {
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+        } returns flow {
+            emit(VoiceGradingStreamEventDto.TranscriptChunk(sanitizedTranscript))
+            awaitCancellation()
+        }
+
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+            awaitItem() shouldBe VoiceAnswerGradingEvent.TranscriptReady(sanitizedTranscript)
+            awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
+            awaitComplete()
+        }
+        currentTime shouldBe DefaultVoiceAnswerGradingRepository.GRADING_TIME_BUDGET.inWholeMilliseconds
     }
 
     @Test
@@ -171,9 +172,5 @@ class DefaultVoiceAnswerGradingRepositoryTest {
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { voiceGradingRemoteDataSource.checkEntitlement() }
-    }
-
-    private companion object {
-        const val MAX_UPLOAD_ATTEMPTS = 3
     }
 }

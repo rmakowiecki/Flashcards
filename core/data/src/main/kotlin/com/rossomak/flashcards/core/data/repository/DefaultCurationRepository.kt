@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.source.CurationRemoteDataSource
+import com.rossomak.flashcards.core.data.source.CurationWriteResult
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import com.rossomak.flashcards.core.domain.model.CurationRequest
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
@@ -13,7 +14,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * [knownActions] is a process-lifetime, best-effort cache of what each card was last known to have
- * flagged. It is filled lazily: a card's first [upsertCurationActions] call fetches its current
+ * flagged. Only server-confirmed writes update it: a write left in Firestore's offline queue
+ * ([CurationWriteResult.Queued]) may still be rejected later, so a resubmit must write again. It is filled lazily: a card's first [upsertCurationActions] call fetches its current
  * state from Firestore before deciding whether to write, then every write after that keeps the
  * cache in sync directly. This lazy fetch is presently the only caller of [getCurationRequests] —
  * that method itself does not touch the cache.
@@ -45,9 +47,11 @@ class DefaultCurationRepository @Inject constructor(
         try {
             val known = knownActions[cardId] ?: fetchKnownActions(cardId).also { knownActions[cardId] = it }
             if (!known.containsAll(actions)) {
-                remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions)
-                knownActions[cardId] = known + actions -
-                    actions.mapNotNull { it.difficultyOpposite() }.filterNot { it in actions }.toSet()
+                val writeResult = remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions)
+                if (writeResult == CurationWriteResult.Confirmed) {
+                    knownActions[cardId] = known + actions -
+                        actions.mapNotNull { it.difficultyOpposite() }.filterNot { it in actions }.toSet()
+                }
             }
             Result.success(Unit)
         } catch (exception: CancellationException) {

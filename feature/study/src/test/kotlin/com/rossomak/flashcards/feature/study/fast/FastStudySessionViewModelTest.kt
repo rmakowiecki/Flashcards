@@ -7,6 +7,7 @@ import com.rossomak.flashcards.core.domain.model.CurationAction
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
@@ -16,6 +17,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
+import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway.Call
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.session.FastSessionReducer
 import com.rossomak.flashcards.core.domain.session.FastStudySessionCoordinator
@@ -33,6 +35,8 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
+import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings as VoiceSettingsDialog
@@ -50,9 +54,14 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -706,14 +715,277 @@ class FastStudySessionViewModelTest {
         playbackGateway.lastSpeechRate shouldBe rate
     }
 
+    // Dialogs hold at the auto-advance point
+
     @Test
-    fun `ReportProblemOpen pauses playback when voice is playing`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `opening report, learn more or exit session never pauses playback`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
 
-        viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+        listOf(openReportProblem(viewModel), CurrentCardExtendedContext(EXTENDED_CONTEXT), ExitSession).forEach { dialog ->
+            viewModel.onDialogEvent(Open(dialog))
+            runCurrent()
+
+            playbackGateway.pauseCount shouldBe 0
+            viewModel.state.value.isVoicePlaying shouldBe true
+            viewModel.onDialogEvent(Dismiss)
+            runCurrent()
+        }
+    }
+
+    @Test
+    fun `closing report after a hold keeps the old card for 500 ms, then shows and plays the next card`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            closingAfterHoldLingersThenMovesOn { viewModel -> openReportProblem(viewModel) }
+        }
+
+    @Test
+    fun `closing learn more after a hold keeps the old card for 500 ms, then shows and plays the next card`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            closingAfterHoldLingersThenMovesOn { CurrentCardExtendedContext(EXTENDED_CONTEXT) }
+        }
+
+    @Test
+    fun `dismissing exit session after a hold keeps the old card for 500 ms, then shows and plays the next card`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            closingAfterHoldLingersThenMovesOn { ExitSession }
+        }
+
+    private fun TestScope.closingAfterHoldLingersThenMovesOn(dialog: (FastStudySessionViewModel) -> StudySessionDialog) {
+        val viewModel = createReadAloudViewModel()
+        viewModel.onDialogEvent(Open(dialog(viewModel)))
+        holdAtAdvancePoint(viewModel)
+
+        viewModel.onDialogEvent(Dismiss)
+        advanceTimeBy(CLOSED_DIALOG_LINGER - 1.milliseconds)
+        viewModel.state.value.currentCardIndex shouldBe 0
+
+        advanceTimeBy(2.milliseconds)
+        viewModel.state.value.currentCardIndex shouldBe 1
+        viewModel.state.value.isVoicePlaying shouldBe true
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.MoveToNextCard, Call.Play)
+    }
+
+    @Test
+    fun `closing a dialog without a hold changes nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+        viewModel.onDialogEvent(Open(CurrentCardExtendedContext(EXTENDED_CONTEXT)))
+        runCurrent()
+
+        viewModel.onDialogEvent(Dismiss)
         advanceUntilIdle()
 
-        playbackGateway.pauseCount shouldBe 1
+        viewModel.state.value.currentCardIndex shouldBe 0
+        viewModel.state.value.isVoicePlaying shouldBe true
+        playbackGateway.calls shouldNotContain Call.MoveToNextCard
+        playbackGateway.isAdvanceGateClosed shouldBe false
+    }
+
+    @Test
+    fun `an external play dismisses the open dialog and drops its draft`() = runTest(mainDispatcherRule.testDispatcher) {
+        externalCommandDismissesDialog(TransportCommand.Play)
+    }
+
+    @Test
+    fun `an external next dismisses the open dialog and drops its draft`() = runTest(mainDispatcherRule.testDispatcher) {
+        externalCommandDismissesDialog(TransportCommand.Next)
+    }
+
+    private fun TestScope.externalCommandDismissesDialog(command: TransportCommand) {
+        val viewModel = createReadAloudViewModel()
+        viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+        viewModel.onDialogEvent(DraftChange(reportDraft(viewModel).withAction(CurationAction.Delete, isChecked = true)))
+        holdAtAdvancePoint(viewModel)
+
+        playbackGateway.emitExternal(command)
+        runCurrent()
+
+        viewModel.state.value.activeDialog shouldBe null
+        viewModel.state.value.currentCardIndex shouldBe 1
+        viewModel.state.value.isVoicePlaying shouldBe true
+        viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+        reportDraft(viewModel).selectedActions shouldBe emptySet()
+    }
+
+    @Test
+    fun `an external pause keeps the open dialog, and closing it then does not resume`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+        viewModel.onDialogEvent(Open(CurrentCardExtendedContext(EXTENDED_CONTEXT)))
+        holdAtAdvancePoint(viewModel)
+
+        playbackGateway.emitExternal(TransportCommand.Pause)
+        runCurrent()
+        viewModel.state.value.activeDialog shouldBe CurrentCardExtendedContext(EXTENDED_CONTEXT)
+
+        viewModel.onDialogEvent(Dismiss)
+        advanceUntilIdle()
+
+        viewModel.state.value.currentCardIndex shouldBe 0
+        viewModel.state.value.isVoicePlaying shouldBe false
+    }
+
+    @Test
+    fun `a dialog opened within 500 ms of another closing keeps the session held until it closes`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createReadAloudViewModel()
+            viewModel.onDialogEvent(Open(CurrentCardExtendedContext(EXTENDED_CONTEXT)))
+            holdAtAdvancePoint(viewModel)
+
+            viewModel.onDialogEvent(Dismiss)
+            advanceTimeBy(CLOSED_DIALOG_LINGER / 2)
+            viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+            advanceTimeBy(CLOSED_DIALOG_LINGER * 2)
+
+            viewModel.state.value.currentCardIndex shouldBe 0
+            playbackGateway.calls shouldNotContain Call.MoveToNextCard
+
+            viewModel.onDialogEvent(Dismiss)
+            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+
+            viewModel.state.value.currentCardIndex shouldBe 1
+        }
+
+    @Test
+    fun `an ignored external next leaves the dialog open`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+        playbackGateway.state.update { it.copy(currentIndex = 2) }
+        playbackGateway.readAnswer()
+        runCurrent()
+        viewModel.onDialogEvent(Open(ExitSession))
+
+        playbackGateway.emitExternal(TransportCommand.Next)
+        runCurrent()
+
+        viewModel.state.value.activeDialog shouldBe ExitSession
+    }
+
+    @Test
+    fun `an external play while held on the last card ends the session`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+        playbackGateway.state.update { it.copy(currentIndex = 2) }
+        runCurrent()
+        viewModel.onDialogEvent(Open(ExitSession))
+        holdAtAdvancePoint(viewModel)
+
+        viewModel.events.test {
+            playbackGateway.emitExternal(TransportCommand.Play)
+            runCurrent()
+
+            awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>().route.abandoned shouldBe false
+        }
+    }
+
+    @Test
+    fun `an external play while voice settings are open dismisses them, and playback continues`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createReadAloudViewModel()
+            viewModel.onDialogEvent(Open(VoiceSettingsDialog()))
+            runCurrent()
+            viewModel.state.value.isVoicePlaying shouldBe false
+
+            playbackGateway.emitExternal(TransportCommand.Play)
+            runCurrent()
+
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.isVoicePlaying shouldBe true
+            verify(exactly = 1) { voiceSettingsController.stopPreview() }
+            playbackGateway.calls.last { it == Call.Play || it == Call.Pause } shouldBe Call.Play
+        }
+
+    @Test
+    fun `voice settings pause on open and play again on close`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+
+        viewModel.onDialogEvent(Open(VoiceSettingsDialog()))
+        runCurrent()
+        viewModel.state.value.isVoicePlaying shouldBe false
+        viewModel.onDialogEvent(Dismiss)
+        runCurrent()
+
+        viewModel.state.value.isVoicePlaying shouldBe true
+    }
+
+    // Report submission
+
+    @Test
+    fun `a report stays open with Submit disabled while it is sent, and success closes it and releases the hold`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val curationRepository = FakeCurationRepository().apply { pendingUpsert = CompletableDeferred() }
+            stubRoute(route.copy(readAloudEnabled = true))
+            loadThreeCards()
+            val viewModel = createViewModel(curationRepository).also { advanceUntilIdle() }
+            viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+            viewModel.onDialogEvent(DraftChange(reportDraft(viewModel).withAction(CurationAction.Delete, isChecked = true)))
+            holdAtAdvancePoint(viewModel)
+
+            viewModel.onDialogEvent(Confirm)
+            runCurrent()
+            reportDraft(viewModel).isSubmitting shouldBe true
+            reportDraft(viewModel).canSubmit shouldBe false
+
+            curationRepository.pendingUpsert?.complete(Unit)
+            runCurrent()
+            viewModel.state.value.activeDialog shouldBe null
+            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+
+            viewModel.state.value.currentCardIndex shouldBe 1
+        }
+
+    @Test
+    fun `a failed report stays open, shows the failure and releases nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        val curationRepository = FakeCurationRepository().apply { upsertResultToReturn = Result.failure(IllegalStateException("offline")) }
+        stubRoute(route.copy(readAloudEnabled = true))
+        loadThreeCards()
+        val viewModel = createViewModel(curationRepository).also { advanceUntilIdle() }
+        viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+        viewModel.onDialogEvent(DraftChange(reportDraft(viewModel).withAction(CurationAction.Delete, isChecked = true)))
+        holdAtAdvancePoint(viewModel)
+
+        viewModel.messages.test {
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionMessage.CurationReportFailed
+        }
+        reportDraft(viewModel).isSubmitting shouldBe false
+        reportDraft(viewModel).canSubmit shouldBe true
+        viewModel.state.value.currentCardIndex shouldBe 0
+    }
+
+    @Test
+    fun `a report dismissed while it is sent releases at once, and its later failure still shows`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val curationRepository = FakeCurationRepository().apply {
+                pendingUpsert = CompletableDeferred()
+                upsertResultToReturn = Result.failure(IllegalStateException("offline"))
+            }
+            stubRoute(route.copy(readAloudEnabled = true))
+            loadThreeCards()
+            val viewModel = createViewModel(curationRepository).also { advanceUntilIdle() }
+            viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
+            viewModel.onDialogEvent(DraftChange(reportDraft(viewModel).withAction(CurationAction.Delete, isChecked = true)))
+            holdAtAdvancePoint(viewModel)
+            viewModel.onDialogEvent(Confirm)
+            runCurrent()
+
+            viewModel.onDialogEvent(Dismiss)
+            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            viewModel.state.value.currentCardIndex shouldBe 1
+
+            viewModel.messages.test {
+                curationRepository.pendingUpsert?.complete(Unit)
+                runCurrent()
+
+                awaitItem() shouldBe FastStudySessionMessage.CurationReportFailed
+            }
+            viewModel.state.value.activeDialog shouldBe null
+        }
+
+    /** Reads the presented card's answer and finishes the pause after it, with a dialog already holding. */
+    private fun TestScope.holdAtAdvancePoint(viewModel: FastStudySessionViewModel) {
+        playbackGateway.readAnswer()
+        playbackGateway.reachAdvancePoint()
+        runCurrent()
+        viewModel.state.value.isVoicePlaying shouldBe false
     }
 
     @Test
@@ -911,6 +1183,8 @@ class FastStudySessionViewModelTest {
     }
 
     private companion object {
+        const val EXTENDED_CONTEXT = "More about this card."
+        val CLOSED_DIALOG_LINGER = 500.milliseconds
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value

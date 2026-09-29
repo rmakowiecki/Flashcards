@@ -7,14 +7,26 @@ package com.rossomak.flashcards.core.domain.model
  * @param cards the session's cards, in routed order. Fixed for the whole session.
  * @param seenCardIds every card whose answer was shown, in first-seen order: Fast's Studied
  * criterion. A revisited card is not added twice.
- * @param pauseReason why the session is paused; `null` while it is not.
+ * @param pauseReason who paused the session; `null` while nothing did. A player that stopped by
+ * itself (an audio-focus loss, a failed utterance) has no pause reason.
+ * @param isPlaying the voice player's playing state, as last reported.
+ * @param isAdvanceHoldRequested while set, read-aloud stops on the current card at the auto-advance
+ * point instead of moving on.
+ * @param isHeldAtAdvancePoint read-aloud reached the auto-advance point with a hold requested and
+ * stopped there. Not a user pause: releasing the hold moves on and plays.
+ * @param isPausedAtAdvancePoint a user pause replaced a hold at the auto-advance point: the next play
+ * moves on instead of re-reading the answer.
  */
 data class FastSessionState(
     val cards: List<Flashcard>,
     val currentIndex: Int = 0,
     val seenCardIds: List<String> = emptyList(),
     val isAnswerRevealed: Boolean = false,
-    val pauseReason: SessionPauseReason? = null,
+    val pauseReason: FastPauseReason? = null,
+    val isPlaying: Boolean = false,
+    val isAdvanceHoldRequested: Boolean = false,
+    val isHeldAtAdvancePoint: Boolean = false,
+    val isPausedAtAdvancePoint: Boolean = false,
 ) {
     /**
      * Whether the read-aloud Next does anything: at a question it reveals that card's answer, at an
@@ -23,4 +35,19 @@ data class FastSessionState(
      */
     val isReadAloudNextAvailable: Boolean
         get() = !isAnswerRevealed || currentIndex < cards.lastIndex
+}
+
+/** Who paused a Fast Study Session. */
+enum class FastPauseReason {
+    /** The user paused, in the app or from outside it. */
+    User,
+
+    /** A temporary pause, ended by the same caller; a user pause or play in between replaces it. */
+    Temporary,
+
+    /**
+     * A text-to-speech engine could not start. The session stays in read-aloud and waits for a
+     * play, which restarts the voice stack.
+     */
+    EngineUnavailable,
 }

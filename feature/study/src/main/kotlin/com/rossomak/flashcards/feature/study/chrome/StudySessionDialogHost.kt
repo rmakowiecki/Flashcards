@@ -28,6 +28,8 @@ internal fun StudySessionDialogHost(
         null -> Unit
         is ReportCurrentCardProblem -> ReportProblemDialog(
             selectedActions = activeDialog.selectedActions,
+            isSubmitEnabled = activeDialog.canSubmit,
+            areActionsEnabled = !activeDialog.isSubmitting,
             onActionCheckedChange = { action, isChecked ->
                 onDialogEvent(DraftChange(activeDialog.withAction(action, isChecked)))
             },

@@ -3,40 +3,64 @@ package com.rossomak.flashcards.core.data.repository
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
-import java.io.IOException
 import javax.inject.Inject
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Never writes to Firestore per answer (ADR-0014): grades are handed back to the caller only.
  * Batch persistence at session end belongs to the not-yet-built Rating/Attempt/Terminal-State
  * pipeline (ADR-0016/ADR-0026).
  */
-class DefaultVoiceAnswerGradingRepository @Inject constructor(
+class DefaultVoiceAnswerGradingRepository internal constructor(
     private val voiceGradingRemoteDataSource: VoiceGradingRemoteDataSource,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : VoiceAnswerGradingRepository {
+
+    @Inject
+    constructor(voiceGradingRemoteDataSource: VoiceGradingRemoteDataSource) : this(voiceGradingRemoteDataSource, Dispatchers.IO)
 
     /**
      * Collects the single streamed call (ADR-0028), re-emitting each wire event as a domain
-     * [VoiceAnswerGradingEvent]. A transient [IOException], bare or wrapped by the SDK, retries
-     * the *whole* call from scratch with backoff — the server has no partial-progress concept to
-     * resume, so a retry after the transcript chunk already arrived simply re-emits a fresh
-     * [VoiceAnswerGradingEvent.TranscriptReady] to the collector. Any other failure, and an
-     * [IOException] once the retries run out, ends the flow with [VoiceAnswerGradingEvent.Failed]
+     * [VoiceAnswerGradingEvent]. Any failure ends the flow with [VoiceAnswerGradingEvent.Failed]
      * rather than throwing; only cancellation propagates.
+     *
+     * The whole call, transcript and grade, has [GRADING_TIME_BUDGET]. A call still running then
+     * ends with [GradingFailureReason.NoConnection]. The server gives up just before this budget
+     * with an error of its own, so a slow service reads as a service error instead. There is no
+     * retry: a retry would re-upload the answer and restart the transcript dwell inside the same
+     * budget.
      */
     override fun transcribeAndGradeSpokenAnswer(
+        cardId: String,
+        question: String,
+        expectedAnswer: String,
+        obfuscatedAnswerWav: ByteArray,
+    ): Flow<VoiceAnswerGradingEvent> = flow {
+        val completed = withTimeoutOrNull(GRADING_TIME_BUDGET) {
+            emitAll(streamGradingEvents(cardId, question, expectedAnswer, obfuscatedAnswerWav))
+        }
+        if (completed == null) {
+            loge { "Voice answer grading exceeded $GRADING_TIME_BUDGET" }
+            emit(VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection))
+        }
+    }
+
+    private fun streamGradingEvents(
         cardId: String,
         question: String,
         expectedAnswer: String,
@@ -67,19 +91,14 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
                 }
             }
     }
-        .retryWhen { cause, attempt ->
-            val shouldRetry = cause.isConnectionFailure() && attempt + 1 < MAX_UPLOAD_ATTEMPTS
-            if (shouldRetry) delay(BASE_RETRY_DELAY_MS * (1L shl attempt.toInt()))
-            shouldRetry
-        }
         .catch { exception ->
             loge(exception) { "Voice answer grading failed" }
             emit(VoiceAnswerGradingEvent.Failed(exception.toGradingFailureReason()))
         }
-        .flowOn(Dispatchers.IO)
+        .flowOn(ioDispatcher)
 
     override suspend fun transcribeAndSanitize(obfuscatedAnswerWav: ByteArray): Result<String> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             try {
                 voiceGradingRemoteDataSource.transcribeAndSanitize(obfuscatedAnswerWav)
             } catch (exception: CancellationException) {
@@ -89,7 +108,7 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
             }
         }
 
-    override suspend fun checkEntitlement(): Result<Boolean> = withContext(Dispatchers.IO) {
+    override suspend fun checkEntitlement(): Result<Boolean> = withContext(ioDispatcher) {
         try {
             Result.success(voiceGradingRemoteDataSource.checkEntitlement().isPremium)
         } catch (exception: CancellationException) {
@@ -99,8 +118,8 @@ class DefaultVoiceAnswerGradingRepository @Inject constructor(
         }
     }
 
-    private companion object {
-        const val MAX_UPLOAD_ATTEMPTS = 3
-        const val BASE_RETRY_DELAY_MS = 500L
+    companion object {
+        /** How long the whole streamed call may take before it fails as [GradingFailureReason.NoConnection]. */
+        val GRADING_TIME_BUDGET: Duration = 20.seconds
     }
 }

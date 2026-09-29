@@ -4,12 +4,11 @@ import com.google.firebase.Timestamp
 import com.rossomak.flashcards.core.data.model.CurationActionEntryDto
 import com.rossomak.flashcards.core.data.model.CurationRequestDto
 import com.rossomak.flashcards.core.data.source.CurationRemoteDataSource
+import com.rossomak.flashcards.core.data.source.CurationWriteResult
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import io.kotest.matchers.shouldBe
-import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.just
 import io.mockk.mockk
 import java.util.Date
 import kotlinx.coroutines.CancellationException
@@ -76,7 +75,7 @@ class DefaultCurationRepositoryTest {
         val subcategoryId = "sub-1"
         val actions = setOf(CurationAction.DifficultyTooHard, CurationAction.WrongTags)
         coEvery { remoteDataSource.getCurationRequests(listOf(cardId)) } returns emptyMap()
-        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions) } just Runs
+        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions) } returns CurationWriteResult.Confirmed
 
         val result = createRepository().upsertCurationActions(cardId, subcategoryId, actions)
 
@@ -120,7 +119,7 @@ class DefaultCurationRepositoryTest {
         val subcategoryId = "sub-1"
         val actions = setOf(CurationAction.DifficultyTooHard, CurationAction.WrongTags)
         coEvery { remoteDataSource.getCurationRequests(listOf(cardId)) } returns emptyMap()
-        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions) } just Runs
+        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions) } returns CurationWriteResult.Confirmed
         val repository = createRepository()
         repository.upsertCurationActions(cardId, subcategoryId, actions)
 
@@ -154,8 +153,8 @@ class DefaultCurationRepositoryTest {
         val known = setOf(CurationAction.WrongTags)
         val requested = setOf(CurationAction.WrongTags, CurationAction.NeedsCodeExample)
         coEvery { remoteDataSource.getCurationRequests(listOf(cardId)) } returns emptyMap()
-        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, known) } just Runs
-        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, requested) } just Runs
+        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, known) } returns CurationWriteResult.Confirmed
+        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, requested) } returns CurationWriteResult.Confirmed
         val repository = createRepository()
         repository.upsertCurationActions(cardId, subcategoryId, known)
 
@@ -164,5 +163,21 @@ class DefaultCurationRepositoryTest {
         result.isSuccess shouldBe true
         coVerify(exactly = 1) { remoteDataSource.getCurationRequests(listOf(cardId)) }
         coVerify(exactly = 1) { remoteDataSource.upsertCurationActions(cardId, subcategoryId, requested) }
+    }
+
+    @Test
+    fun `upsertCurationActions writes again when the previous write was only queued`() = runTest {
+        val cardId = "card-1"
+        val subcategoryId = "sub-1"
+        val actions = setOf(CurationAction.WrongTags)
+        coEvery { remoteDataSource.getCurationRequests(listOf(cardId)) } returns emptyMap()
+        coEvery { remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions) } returns CurationWriteResult.Queued
+        val repository = createRepository()
+        repository.upsertCurationActions(cardId, subcategoryId, actions)
+
+        val result = repository.upsertCurationActions(cardId, subcategoryId, actions)
+
+        result.isSuccess shouldBe true
+        coVerify(exactly = 2) { remoteDataSource.upsertCurationActions(cardId, subcategoryId, actions) }
     }
 }
