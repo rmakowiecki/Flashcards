@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.lifecycle.SavedStateHandle
+import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
@@ -8,6 +9,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
@@ -15,7 +17,6 @@ import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
-import com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
@@ -61,7 +62,7 @@ class StudySessionSummaryViewModelTest {
     private fun createViewModel(): StudySessionSummaryViewModel = StudySessionSummaryViewModel(
         savedStateHandle,
         ObserveUserPreferencesUseCase(userPreferencesRepository),
-        SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, CalculateSessionXpUseCase(), sessionSubmissionRepository),
+        SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, sessionSubmissionRepository),
     )
 
     @Before
@@ -392,6 +393,32 @@ class StudySessionSummaryViewModelTest {
                 xpForNextLevel shouldBe config.levelThreshold(1)
                 isLoading shouldBe false
             }
+        }
+
+    @Test
+    fun `the local preview's line counts come from the score, so a card Mastered before the session shows as defended`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // The route says card-0 was not previously Mastered; the prior Card Progress says it was.
+            cardProgressRepository.seed(
+                SubcategoryProgress(
+                    subcategoryId = "sub-1",
+                    categoryId = "cat-1",
+                    cards = mapOf("card-0" to CardProgressEntry(FlashcardStudyProgressState.Mastered, firstStudiedAt = Instant.EPOCH, masteredAt = Instant.EPOCH)),
+                ),
+            )
+            stubRoute(ratedRoute())
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.xpLines shouldBe listOf(
+                XpBreakdownLine(XpAwardSource.NewCards, count = 3, rate = 10, amount = 30),
+                XpBreakdownLine(XpAwardSource.Mastered, count = 1, rate = 100, amount = 100),
+                XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
+                XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
+                XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
+                XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
+            )
         }
 
     @Test

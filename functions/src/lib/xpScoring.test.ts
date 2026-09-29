@@ -1,5 +1,5 @@
 // Runs the XP scoring cases shared with the Kotlin client (`testdata/xp-scoring/` at the repo root)
-// against this module. The Kotlin `CalculateSessionXpUseCase` runs the same file, so the two
+// against this module. The Kotlin `XpScoringCasesTest` runs the same file, so the two
 // implementations are checked against one set of expectations. Add new scenarios to that file, not here.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";

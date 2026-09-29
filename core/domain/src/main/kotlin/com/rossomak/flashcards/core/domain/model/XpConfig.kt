@@ -65,7 +65,7 @@ data class XpConfig(
 /**
  * The total points needed to complete [level] and advance to the next one, per the curve
  * shape: `ceil(base × level^exponent / 1000) × 1000`. A free function on [XpConfig] rather than a
- * member, so [com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase]'s level-up loop
+ * member, so [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp]'s level-up loop
  * and the Session Summary's own progress-within-level display read the exact same formula — the one
  * place a tuning change to the curve's shape, not just its parameters, would need to happen.
  */

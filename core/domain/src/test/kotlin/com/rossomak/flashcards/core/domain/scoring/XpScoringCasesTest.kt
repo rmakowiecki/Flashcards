@@ -1,19 +1,12 @@
-package com.rossomak.flashcards.core.domain.usecase
+package com.rossomak.flashcards.core.domain.scoring
 
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
-import com.rossomak.flashcards.core.domain.xpscoring.ExpectedLevelThreshold
-import com.rossomak.flashcards.core.domain.xpscoring.ExpectedSessionXp
-import com.rossomak.flashcards.core.domain.xpscoring.XpScoringCase
-import com.rossomak.flashcards.core.domain.xpscoring.XpScoringCaseSession
-import com.rossomak.flashcards.core.domain.xpscoring.XpScoringCases
 import io.kotest.matchers.shouldBe
 import java.time.Instant
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.junit.Assume.assumeTrue
@@ -22,21 +15,19 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Runs every XP scoring case shared with the Cloud Functions test suite through
- * [CalculateSessionXpUseCase] (and [levelThreshold], which the use case's level-up loop reads), so this
- * preview calculation and the server's authoritative one are checked against the same expectations.
- * Add new scenarios to the shared file (see [XpScoringCases]), not here.
+ * Runs every XP scoring case shared with the Cloud Functions test suite through [calculateSessionXp]
+ * (and [levelThreshold], which its level-up loop reads), with the same inputs the TypeScript runner
+ * gives `computeSessionXp`, so the client's calculation and the server's authoritative one are checked
+ * against the same expectations. Add new scenarios to the shared file (see [XpScoringCases]), not here.
  */
 @RunWith(Parameterized::class)
-class CalculateSessionXpUseCaseTest(
+class XpScoringCasesTest(
     @Suppress("UNUSED_PARAMETER") caseName: String,
     private val scoringCase: XpScoringCase,
 ) {
 
-    private val useCase = CalculateSessionXpUseCase()
-
     @Test
-    fun `matches the shared expectation`() = runTest {
+    fun `matches the shared expectation`() {
         val skipReason = scoringCase.skip[XpScoringCases.RUNNER]
         assumeTrue(skipReason.orEmpty(), skipReason == null)
 
@@ -47,13 +38,12 @@ class CalculateSessionXpUseCaseTest(
         }
     }
 
-    private suspend fun assertSessionXp() = with(scoringCase.input) {
+    private fun assertSessionXp() = with(scoringCase.input) {
         val expected = Json.decodeFromJsonElement<ExpectedSessionXp>(scoringCase.expected)
-        val sessionResult = requireNotNull(session) { "a ${scoringCase.kind} case needs a session" }
-            .toSessionResult(XpScoringCases.resolveConfig(this))
+        val sessionResult = requireNotNull(session) { "a ${scoringCase.kind} case needs a session" }.toSessionResult()
         val currentState = priorState?.toDomain() ?: ScoringState()
 
-        val xpResult = useCase(CalculateSessionXpUseCase.Params(sessionResult, newCardsStudied, currentState))
+        val xpResult = calculateSessionXp(sessionResult, newCardsStudied, currentState, XpScoringCases.resolveConfig(this))
 
         xpResult.breakdown shouldBe expected.breakdown.toDomain()
         xpResult.breakdown.xpTotal shouldBe expected.breakdown.xpTotal
@@ -68,7 +58,7 @@ class CalculateSessionXpUseCaseTest(
         config.levelThreshold(requireNotNull(level) { "a ${scoringCase.kind} case needs a level" }) shouldBe expected.threshold
     }
 
-    private fun XpScoringCaseSession.toSessionResult(config: XpConfig): SessionResult = when (studyMode) {
+    private fun XpScoringCaseSession.toSessionResult(): SessionResult = when (studyMode) {
         RATED_MODE -> SessionResult.Rated(
             id = SESSION_ID,
             startedAt = STARTED_AT,
@@ -90,7 +80,6 @@ class CalculateSessionXpUseCaseTest(
             studyDate = STUDY_DATE,
             studyDateUtcOffsetMinutes = 0,
             dailyGoalMinutes = DAILY_GOAL_MINUTES,
-            xpConfig = config,
         )
         FAST_MODE -> SessionResult.Fast(
             id = SESSION_ID,
@@ -111,7 +100,6 @@ class CalculateSessionXpUseCaseTest(
             studyDate = STUDY_DATE,
             studyDateUtcOffsetMinutes = 0,
             dailyGoalMinutes = DAILY_GOAL_MINUTES,
-            xpConfig = config,
         )
         else -> error("unknown study mode \"$studyMode\"")
     }

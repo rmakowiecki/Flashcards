@@ -5,18 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.SessionResult.Fast
 import com.rossomak.flashcards.core.domain.model.SessionResult.Rated
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
-import com.rossomak.flashcards.core.domain.model.SessionXpResult
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
-import com.rossomak.flashcards.core.domain.model.XpConfig
-import com.rossomak.flashcards.core.domain.model.levelThreshold
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
@@ -122,21 +118,17 @@ class StudySessionSummaryViewModel @Inject constructor(
             val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
 
             submitStudySession(result)
-                .onSuccess { submissionResult ->
-                    when (submissionResult) {
-                        is ServerScored -> applyServerScore(result, submissionResult.score)
-                        is LocalPreview -> applyLocalPreview(result, submissionResult.sessionXpResult)
-                    }
-                }
+                .onSuccess { submissionResult -> applyScore(result, submissionResult.score) }
                 .onFailure { onPreviewFailed() }
         }
     }
 
     /**
-     * Every line's count, rate and amount come from [score]. A server answer missing its counts or its
-     * rates shows each line's amount only: no client-side value is mixed into the server's lines.
+     * Every line's count, rate and amount come from [score], whether the server or the local preview
+     * scored it. A server answer missing its counts or its rates shows each line's amount only: no
+     * client-side value is mixed into the server's lines.
      */
-    private fun applyServerScore(result: SessionResult, score: SessionScore) {
+    private fun applyScore(result: SessionResult, score: SessionScore) {
         _state.update {
             it.copy(
                 xpLines = buildXpBreakdownLines(result, score.breakdown, score.counts, score.rates),
@@ -146,26 +138,6 @@ class StudySessionSummaryViewModel @Inject constructor(
                 xpIntoCurrentLevel = score.xpIntoCurrentLevel,
                 xpForNextLevel = score.xpForNextLevel,
                 levelsCrossed = score.levelsCrossed,
-            )
-        }
-    }
-
-    private fun applyLocalPreview(result: SessionResult, xpResult: SessionXpResult) {
-        val config = result.xpConfig
-        _state.update {
-            it.copy(
-                xpLines = buildXpBreakdownLines(
-                    result = result,
-                    breakdown = xpResult.breakdown,
-                    counts = sessionFlagCounts(result, newCardsStudied = xpResult.newCardsStudied),
-                    rates = config.toLineRates(),
-                ),
-                isLoading = false,
-                xpTotal = xpResult.breakdown.xpTotal,
-                level = xpResult.newScoringState.level,
-                xpIntoCurrentLevel = xpResult.newScoringState.xpIntoCurrentLevel,
-                xpForNextLevel = config.levelThreshold(xpResult.newScoringState.level),
-                levelsCrossed = xpResult.levelsCrossed,
             )
         }
     }
@@ -215,30 +187,3 @@ private fun buildXpBreakdownLines(
     lines += XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = breakdown.streakBonus)
     return lines.filter { it.amount != 0 }
 }
-
-/**
- * The line counts read off the session's own card results, mirroring
- * [CalculateSessionXpUseCase][com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase]'s
- * split between a fresh mastery and a defended one: a defended card (Mastered again after already being
- * Mastered) earns the defense award instead of the mastery one, not in addition.
- */
-private fun sessionFlagCounts(result: SessionResult, newCardsStudied: Int): SessionScoreCounts = when (result) {
-    is Rated -> SessionScoreCounts(
-        newCardsStudied = newCardsStudied,
-        newlyMastered = result.cardResults.count { it.state == FlashcardStudyProgressState.Mastered && !it.wasPreviouslyMastered },
-        partial = result.partialCount,
-        defended = result.cardResults.count { it.state == FlashcardStudyProgressState.Mastered && it.wasPreviouslyMastered },
-        demastered = result.cardResults.count { it.state == FlashcardStudyProgressState.Failed && it.wasPreviouslyMastered },
-    )
-    is Fast -> SessionScoreCounts(newCardsStudied = newCardsStudied, newlyMastered = null, partial = null, defended = null, demastered = null)
-}
-
-private fun XpConfig.toLineRates(): SessionScoreRates = SessionScoreRates(
-    newCardStudied = newCardStudied,
-    cardMastered = cardMastered,
-    cardPartial = cardPartial,
-    masteryDefended = masteryDefended,
-    cardDemastered = cardDemastered,
-    minuteStudied = minuteStudied,
-    sessionCompleted = sessionCompleted,
-)

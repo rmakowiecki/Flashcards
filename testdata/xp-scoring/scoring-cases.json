@@ -1,5 +1,5 @@
 {
-  "description": "Shared XP scoring cases, run by both the TypeScript submitStudySession scoring module and the Kotlin CalculateSessionXpUseCase. See README.md in this directory for the schema.",
+  "description": "Shared XP scoring cases, run by both the TypeScript submitStudySession scoring module and the Kotlin calculateSessionXp. See README.md in this directory for the schema.",
   "configs": {
     "test": {
       "newCardStudied": 10,

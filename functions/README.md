@@ -30,7 +30,7 @@ functions/
   src/lib/elevenlabs.ts             — ElevenLabs Scribe STT call
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
   src/lib/httpError.ts              — HttpError(statusCode, message) thrown by elevenlabs/grading libs
-  src/lib/xpScoring.ts              — pure XP/level calculation, ported from CalculateSessionXpUseCase.kt
+  src/lib/xpScoring.ts              — pure XP/level calculation, mirrored by the client's SessionXpCalculation.kt
   src/lib/submitStudySession.ts     — validation + the session-commit transaction
   src/lib/*.test.ts                 — emulator-backed tests for the above (see "Local iteration" below)
 ```
@@ -81,8 +81,8 @@ the client submits what happened during a session, and this function alone compu
 XP, level and progress. Named "submit", not "report" — this codebase's curation feature already owns
 "report" for a flagged-content signal, so a finished session is submitted, never reported. `index.ts`
 only checks auth and delegates; the real logic lives in `src/lib/submitStudySession.ts` (the
-transaction) and `src/lib/xpScoring.ts` (the pure XP/level calculation, ported from
-`CalculateSessionXpUseCase.kt`).
+transaction) and `src/lib/xpScoring.ts` (the pure XP/level calculation, mirrored by the
+client's `calculateSessionXp` in `SessionXpCalculation.kt`).
 
 Everything happens in one Firestore transaction, keyed for idempotency on the client-generated
 `sessionId`: if `sessions/{sessionId}` already exists, the call is a no-op that returns the same

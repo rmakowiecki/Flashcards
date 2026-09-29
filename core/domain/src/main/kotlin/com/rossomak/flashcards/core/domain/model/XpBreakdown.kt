@@ -10,11 +10,9 @@ package com.rossomak.flashcards.core.domain.model
  * [SessionResult.Fast] card: an award this session simply did not produce is honestly zero, whichever
  * mode ran, so a Fast session's document carries `mastered: 0` rather than omitting the field.
  *
- * [dailyGoalBonus] and [streakBonus] split by *where* an [XpBreakdown] came
- * from: a **server-computed** one — what the `submitStudySession` Cloud Function actually persists —
- * is non-zero once earned; a **client-computed** one — [CalculateSessionXpUseCase]'s optimistic
- * preview — stays zero permanently, by design (that use case never computes either award; see its own
- * KDoc). This type carries both shapes identically; only the source of the values differs.
+ * [dailyGoalBonus] and [streakBonus] are non-zero only on a **server-computed** breakdown for now: the
+ * client's [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp] does not compute either
+ * award yet (see its KDoc). This type carries both shapes identically.
  *
  * @param newCards [XpConfig.newCardStudied] × cards studied for the first time ever. Both modes.
  * @param mastered [XpConfig.cardMastered] × cards ending Mastered this session for the first time —

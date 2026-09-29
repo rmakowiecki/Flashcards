@@ -1,7 +1,7 @@
 /**
  * Server-authoritative XP and level scoring. A TypeScript port of
  * `core/domain/.../model/XpConfig.kt`, `ScoringState.kt`, `XpBreakdown.kt` and
- * `CalculateSessionXpUseCase.kt` — kept field-for-field and rule-for-rule identical to that Kotlin
+ * `scoring/SessionXpCalculation.kt` — kept field-for-field and rule-for-rule identical to that Kotlin
  * source. Both test suites run the shared scoring cases in `testdata/xp-scoring/` at the repo root, and
  * both bundled defaults are checked against the default configuration file there.
  *
@@ -133,7 +133,7 @@ interface RatedCardAwards {
 }
 
 /**
- * Mirrors `CalculateSessionXpUseCase.calculateRatedCardAwards`: a card ending Mastered that was
+ * Mirrors Kotlin `calculateRatedCardAwards` (`SessionXpCalculation.kt`): a card ending Mastered that was
  * already Mastered earns [XpConfig.masteryDefended] **instead of** [XpConfig.cardMastered] — a
  * smaller, distinct reward, not a bonus stacked on a fresh mastery.
  */
@@ -256,7 +256,7 @@ function daysBetween(earlier: string, later: string): number {
 }
 
 /**
- * Mirrors `CalculateSessionXpUseCase.applyDelta`: a positive delta climbs [ScoringState.level] one
+ * Mirrors Kotlin `applyDelta` (`SessionXpCalculation.kt`): a positive delta climbs [ScoringState.level] one
  * [levelThreshold] at a time, reporting each crossing in ascending order, with no burst awarded for
  * reaching one. A negative delta is clamped to `max(delta, -xpIntoCurrentLevel)` — never enough to
  * push points-into-level below zero or the level below where it already stood.
@@ -286,7 +286,7 @@ export interface SessionXpResult {
 }
 
 /**
- * Mirrors `CalculateSessionXpUseCase.invoke`: computes the breakdown, then applies its total to
+ * Mirrors Kotlin `calculateSessionXp`: computes the breakdown, then applies its total to
  * `currentState`. The streak/goal result's `currentStreak`/`bestStreak`/`lastStudyDate`/`goalMetDate`
  * are merged onto the returned `newScoringState` after `applyDelta` — independent of whether
  * `applyDelta`'s own XP-delta clamping had anything to do with this session's XP total.

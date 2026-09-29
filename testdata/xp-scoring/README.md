@@ -1,13 +1,14 @@
 # Shared XP scoring cases
 
 XP scoring is implemented twice: authoritatively in the `submitStudySession` Cloud Function
-(`functions/src/lib/xpScoring.ts`), and as the client's local preview in `CalculateSessionXpUseCase`
-(`:core:domain`). Both test suites run every case in this directory, so a change to one
+(`functions/src/lib/xpScoring.ts`), and on the client in `calculateSessionXp`
+(`:core:domain`, `core.domain.scoring`), which scores the Session Summary's fallback preview and the
+projection of Pending Sessions. Both test suites run every case in this directory, so a change to one
 implementation that the other does not match fails a test. Add a scenario here, not as a hand-written
 test in either suite.
 
 - TypeScript runner: `functions/src/lib/xpScoring.test.ts` (`npm test` in `functions/`).
-- Kotlin runner: `CalculateSessionXpUseCaseTest` and `XpConfigTest` in `:core:domain`, loading the
+- Kotlin runner: `XpScoringCasesTest` and `XpConfigTest` in `:core:domain`, loading the
   files through `XpScoringCases` in the module's test fixtures, which carry this directory as
   resources.
 

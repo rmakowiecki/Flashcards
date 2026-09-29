@@ -6,7 +6,7 @@ package com.rossomak.flashcards.core.domain.model
  * packed per-Subcategory documents already living under `progress/` (ADR-0014, ADR-0016). Read once,
  * on arrival at the Session Summary, by [com.rossomak.flashcards.core.domain.repository.ScoringStateRepository] —
  * never mid-session, same reasoning as [SessionResult.xpConfig]'s own snapshot rule — and updated by
- * [com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase] into the state this same
+ * [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp] into the state this same
  * commit writes back, in the same batch as everything else.
  *
  * [currentStreak], [bestStreak], [lastStudyDate] and [goalMetDate] exist already but stay at

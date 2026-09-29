@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.domain.xpscoring
+package com.rossomak.flashcards.core.domain.scoring
 
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.XpBreakdown

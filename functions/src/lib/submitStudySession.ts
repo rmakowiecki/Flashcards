@@ -498,7 +498,7 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  *    sessions committed since would have moved it on.
  * 2. Otherwise, reads every touched Subcategory's prior progress and the account's prior
  *    [ScoringState], computes the new progress writes, the [XpBreakdown] and the new [ScoringState]
- *    (mirroring `CommitStudySessionUseCase`/`CalculateSessionXpUseCase`) with the server-owned XP
+ *    (mirrored by the client's `scoreSession`) with the server-owned XP
  *    configuration (`config/xp`, see `xpConfig.ts`), and writes all four
  *    documents — the session document, every touched Subcategory's progress, the progress summary's
  *    increments, and the full scoring-state overwrite — before answering from the session document
