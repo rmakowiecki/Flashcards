@@ -40,15 +40,16 @@ Common input fields:
 - `config`: a key of `configs`, or `"default"` for `default-xp-config.json`.
 - `configOverrides` (optional): fields replacing the named configuration's values.
 - `priorState` (optional): the scoring state before the calculation; missing fields take the
-  starting state (`xp` 0, `level` 1, `xpIntoCurrentLevel` 0, streaks 0, dates `""`).
+  starting state (`xp` 0, `level` 1, `xpIntoCurrentLevel` 0, streaks 0, dates `""`,
+  `studiedSecondsOnLastStudyDate` 0).
 
 Per kind:
 
 | Kind | Input | Expected |
 |---|---|---|
-| `sessionXp` | `session` (`studyMode` `Rated`/`Fast`, `durationSeconds`, `abandoned`, `cardResults` of `{ state, wasPreviouslyMastered? }`), `newCardsStudied`, `priorState` | `breakdown` (every line and `xpTotal`), `newScoringState`, `levelsCrossed` |
+| `sessionXp` | `session` (`studyMode` `Rated`/`Fast`, `durationSeconds`, `abandoned`, `cardResults` of `{ state, wasPreviouslyMastered? }`), `newCardsStudied`, `priorState`, `streakAndGoal` (optional, as below) | `breakdown` (every line and `xpTotal`), `newScoringState`, `levelsCrossed` |
 | `levelThreshold` | `level` | `threshold` |
-| `streakAndGoal` | `streakAndGoal` (`studyDate`, `dailyGoalMinutes`, `todayTotalMinutes`), `priorState` | `streakBonus`, `dailyGoalBonus`, `currentStreak`, `bestStreak`, `lastStudyDate`, `goalMetDate` |
+| `streakAndGoal` | `streakAndGoal` (`studyDate`, `dailyGoalMinutes`, `todayTotalSeconds`), `priorState` | `streakBonus`, `dailyGoalBonus`, `currentStreak`, `bestStreak`, `lastStudyDate`, `goalMetDate`, `studiedSecondsOnLastStudyDate` |
 
-`sessionXp` cases score with no Streak or Daily Goal award (an empty study date that never advances
-either). A runner fails on a kind it does not know, unless the case skips that runner.
+A `sessionXp` case without a `streakAndGoal` input scores with no Streak or Daily Goal award (an
+empty study date that never advances either). A runner fails on a kind it does not know, unless the case skips that runner.

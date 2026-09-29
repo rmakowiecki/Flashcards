@@ -11,4 +11,5 @@ fun ScoringStateDto.toDomain(): ScoringState = ScoringState(
     bestStreak = bestStreak,
     lastStudyDate = lastStudyDate,
     goalMetDate = goalMetDate,
+    studiedSecondsOnLastStudyDate = studiedSecondsOnLastStudyDate,
 )

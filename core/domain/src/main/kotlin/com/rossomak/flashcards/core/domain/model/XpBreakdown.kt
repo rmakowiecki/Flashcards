@@ -10,10 +10,6 @@ package com.rossomak.flashcards.core.domain.model
  * [SessionResult.Fast] card: an award this session simply did not produce is honestly zero, whichever
  * mode ran, so a Fast session's document carries `mastered: 0` rather than omitting the field.
  *
- * [dailyGoalBonus] and [streakBonus] are non-zero only on a **server-computed** breakdown for now: the
- * client's [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp] does not compute either
- * award yet (see its KDoc). This type carries both shapes identically.
- *
  * @param newCards [XpConfig.newCardStudied] × cards studied for the first time ever. Both modes.
  * @param mastered [XpConfig.cardMastered] × cards ending Mastered this session for the first time —
  * excludes a defended card, which earns [masteryDefenseBonus] instead, not in addition. Rated only.

@@ -121,6 +121,55 @@ class SessionScoringTest {
         scoreSession(prior, ScoringState(), session, CONFIG).cardProgressMerge shouldBe mergeSessionIntoCardProgress(prior, session)
     }
 
+    @Test
+    fun `a session the day after the last study date pays the Streak award`() {
+        val priorState = ScoringState(currentStreak = 2, bestStreak = 2, lastStudyDate = PREVIOUS_STUDY_DATE)
+
+        val scoring = scoreSession(emptyMap(), priorState, ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG)
+
+        scoring.score.breakdown.streakBonus shouldBe 3 * CONFIG.streakPerDay
+        scoring.newScoringState.currentStreak shouldBe 3
+        scoring.newScoringState.lastStudyDate shouldBe STUDY_DATE
+    }
+
+    @Test
+    fun `a session reaching the Daily Goal pays the Daily Goal award`() {
+        val session = ratedSession(RatedCard(CARD_ID, Mastered)).copy(dailyGoalMinutes = DURATION_MINUTES)
+
+        val scoring = scoreSession(emptyMap(), ScoringState(), session, CONFIG)
+
+        scoring.score.breakdown.dailyGoalBonus shouldBe CONFIG.dailyGoalMet
+        scoring.newScoringState.goalMetDate shouldBe STUDY_DATE
+    }
+
+    @Test
+    fun `a second session the same day does not pay the Daily Goal twice`() {
+        val priorState = ScoringState(lastStudyDate = STUDY_DATE, goalMetDate = STUDY_DATE, studiedSecondsOnLastStudyDate = DURATION_SECONDS.toLong())
+        val session = ratedSession(RatedCard(CARD_ID, Mastered)).copy(dailyGoalMinutes = DURATION_MINUTES)
+
+        scoreSession(emptyMap(), priorState, session, CONFIG).score.breakdown.dailyGoalBonus shouldBe 0
+    }
+
+    @Test
+    fun `earlier seconds on the same day count toward the Daily Goal`() {
+        val priorState = ScoringState(lastStudyDate = STUDY_DATE, studiedSecondsOnLastStudyDate = EARLIER_SECONDS)
+
+        val scoring = scoreSession(emptyMap(), priorState, ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG)
+
+        scoring.score.breakdown.dailyGoalBonus shouldBe CONFIG.dailyGoalMet
+        scoring.newScoringState.studiedSecondsOnLastStudyDate shouldBe EARLIER_SECONDS + DURATION_SECONDS
+    }
+
+    @Test
+    fun `seconds studied on another day do not count toward the Daily Goal`() {
+        val priorState = ScoringState(lastStudyDate = PREVIOUS_STUDY_DATE, studiedSecondsOnLastStudyDate = EARLIER_SECONDS)
+
+        val scoring = scoreSession(emptyMap(), priorState, ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG)
+
+        scoring.score.breakdown.dailyGoalBonus shouldBe 0
+        scoring.newScoringState.studiedSecondsOnLastStudyDate shouldBe DURATION_SECONDS.toLong()
+    }
+
     private data class RatedCard(val cardId: String, val state: FlashcardStudyProgressState, val wasPreviouslyMastered: Boolean = false)
 
     private fun priorStates(vararg cards: Pair<String, FlashcardStudyProgressState>) = mapOf(SUBCATEGORY_ID to cards.toMap())
@@ -173,8 +222,13 @@ class SessionScoringTest {
         const val PARTIAL_CARD_ID = "card-partial"
         const val DEMASTERED_CARD_ID = "card-demastered"
         const val DURATION_SECONDS = 300
+        const val DURATION_MINUTES = 5
         const val DAILY_GOAL_MINUTES = 20
+
+        // With the session's 5 minutes, exactly the 20-minute Daily Goal.
+        const val EARLIER_SECONDS = 900L
         const val STUDY_DATE = "2026-09-06"
+        const val PREVIOUS_STUDY_DATE = "2026-09-05"
         const val STARTING_XP = 600L
         val STARTED_AT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
@@ -188,6 +242,8 @@ class SessionScoringTest {
             cardDemastered = -79,
             sessionCompleted = 503,
             minuteStudied = 7,
+            dailyGoalMet = 31,
+            streakPerDay = 29,
             levelCurveBase = 400.0,
             levelCurveExponent = 1.0,
         )

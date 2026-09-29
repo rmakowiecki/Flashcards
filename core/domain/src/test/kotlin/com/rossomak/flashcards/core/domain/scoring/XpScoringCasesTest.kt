@@ -15,9 +15,9 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Runs every XP scoring case shared with the Cloud Functions test suite through [calculateSessionXp]
- * (and [levelThreshold], which its level-up loop reads), with the same inputs the TypeScript runner
- * gives `computeSessionXp`, so the client's calculation and the server's authoritative one are checked
+ * Runs every XP scoring case shared with the Cloud Functions test suite through [calculateSessionXp],
+ * [calculateStreakAndGoalAwards] and [levelThreshold], with the same inputs the TypeScript runner
+ * gives its counterparts, so the client's calculation and the server's authoritative one are checked
  * against the same expectations. Add new scenarios to the shared file (see [XpScoringCases]), not here.
  */
 @RunWith(Parameterized::class)
@@ -34,6 +34,7 @@ class XpScoringCasesTest(
         when (scoringCase.kind) {
             SESSION_XP_KIND -> assertSessionXp()
             LEVEL_THRESHOLD_KIND -> assertLevelThreshold()
+            STREAK_AND_GOAL_KIND -> assertStreakAndGoal()
             else -> error("unknown case kind \"${scoringCase.kind}\"")
         }
     }
@@ -43,12 +44,21 @@ class XpScoringCasesTest(
         val sessionResult = requireNotNull(session) { "a ${scoringCase.kind} case needs a session" }.toSessionResult()
         val currentState = priorState?.toDomain() ?: ScoringState()
 
-        val xpResult = calculateSessionXp(sessionResult, newCardsStudied, currentState, XpScoringCases.resolveConfig(this))
+        val streakAndGoalInput = streakAndGoal?.toDomain() ?: NO_STREAK_OR_GOAL
+
+        val xpResult = calculateSessionXp(sessionResult, newCardsStudied, currentState, XpScoringCases.resolveConfig(this), streakAndGoalInput)
 
         xpResult.breakdown shouldBe expected.breakdown.toDomain()
         xpResult.breakdown.xpTotal shouldBe expected.breakdown.xpTotal
         xpResult.newScoringState shouldBe expected.newScoringState.toDomain()
         xpResult.levelsCrossed shouldBe expected.levelsCrossed
+    }
+
+    private fun assertStreakAndGoal() = with(scoringCase.input) {
+        val expected = Json.decodeFromJsonElement<ExpectedStreakAndGoal>(scoringCase.expected)
+        val input = requireNotNull(streakAndGoal) { "a ${scoringCase.kind} case needs a streakAndGoal input" }.toDomain()
+
+        calculateStreakAndGoalAwards(priorState?.toDomain() ?: ScoringState(), input, XpScoringCases.resolveConfig(this)) shouldBe expected.toDomain()
     }
 
     private fun assertLevelThreshold() = with(scoringCase.input) {
@@ -107,8 +117,12 @@ class XpScoringCasesTest(
     companion object {
         private const val SESSION_XP_KIND = "sessionXp"
         private const val LEVEL_THRESHOLD_KIND = "levelThreshold"
+        private const val STREAK_AND_GOAL_KIND = "streakAndGoal"
         private const val RATED_MODE = "Rated"
         private const val FAST_MODE = "Fast"
+
+        // Scores without either award: an empty study date is never later than a stored one.
+        private val NO_STREAK_OR_GOAL = StreakAndGoalInput(studyDate = "", dailyGoalMinutes = 0, todayTotalSeconds = 0)
 
         // Identity and calendar fields the calculation never reads; the shared cases leave them out.
         private const val SESSION_ID = "session-1"

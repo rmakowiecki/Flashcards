@@ -380,7 +380,8 @@ class StudySessionSummaryViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // 4 new cards × 10 + 2 mastered × 100 + 1 partial × 25 + 2 minutes × 10 + 500 completion = 785.
+            // 4 new cards × 10 + 2 mastered × 100 + 1 partial × 25 + 2 minutes × 10 + 500 completion + the
+            // first day of a Streak × 250 = 1035, which crosses Level 1's threshold of 1000.
             val config = XpConfig()
             with(viewModel.state.value) {
                 xpLines shouldBe listOf(
@@ -389,11 +390,12 @@ class StudySessionSummaryViewModelTest {
                     XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
                     XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
                     XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
+                    XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
                 )
-                xpTotal shouldBe 785
-                level shouldBe 1
-                xpIntoCurrentLevel shouldBe 785L
-                xpForNextLevel shouldBe config.levelThreshold(1)
+                xpTotal shouldBe 1035
+                level shouldBe 2
+                xpIntoCurrentLevel shouldBe 35L
+                xpForNextLevel shouldBe config.levelThreshold(2)
                 isLoading shouldBe false
             }
         }
@@ -421,6 +423,7 @@ class StudySessionSummaryViewModelTest {
                 XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
                 XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
                 XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
+                XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
             )
         }
 

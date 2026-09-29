@@ -29,16 +29,31 @@ data class SessionXpCalculation(
  * already replaced it with the flag the Card Progress merge derived, as the server does before calling
  * its own copy.
  *
- * The Streak and Daily Goal awards ([XpBreakdown.streakBonus], [XpBreakdown.dailyGoalBonus]) are not
- * computed on the client yet: both stay zero, and the Streak fields of [scoringState] carry over
- * unchanged.
+ * The Streak and Daily Goal awards come from [calculateStreakAndGoalAwards] over
+ * [streakAndGoalInput], and count toward the level delta like every other line. Their Streak fields
+ * replace those of [scoringState] in the new state.
  *
  * @param newCardsStudied cards with no Card Progress record before the session.
  * @param scoringState the account's state before this session.
  */
-fun calculateSessionXp(session: SessionResult, newCardsStudied: Int, scoringState: ScoringState, config: XpConfig): SessionXpCalculation {
+fun calculateSessionXp(
+    session: SessionResult,
+    newCardsStudied: Int,
+    scoringState: ScoringState,
+    config: XpConfig,
+    streakAndGoalInput: StreakAndGoalInput,
+): SessionXpCalculation {
+    val streakAndGoal = calculateStreakAndGoalAwards(scoringState, streakAndGoalInput, config)
     val breakdown = calculateBreakdown(session, newCardsStudied, config)
-    val (newScoringState, levelsCrossed) = applyDelta(scoringState, breakdown.xpTotal, config)
+        .copy(dailyGoalBonus = streakAndGoal.dailyGoalBonus, streakBonus = streakAndGoal.streakBonus)
+    val (appliedState, levelsCrossed) = applyDelta(scoringState, breakdown.xpTotal, config)
+    val newScoringState = appliedState.copy(
+        currentStreak = streakAndGoal.currentStreak,
+        bestStreak = streakAndGoal.bestStreak,
+        lastStudyDate = streakAndGoal.lastStudyDate,
+        goalMetDate = streakAndGoal.goalMetDate,
+        studiedSecondsOnLastStudyDate = streakAndGoal.studiedSecondsOnLastStudyDate,
+    )
     return SessionXpCalculation(breakdown = breakdown, newScoringState = newScoringState, levelsCrossed = levelsCrossed)
 }
 

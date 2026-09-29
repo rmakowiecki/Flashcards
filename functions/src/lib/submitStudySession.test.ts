@@ -534,6 +534,9 @@ describe("submitStudySession — streak and daily goal", () => {
 
     const sessionBDoc = await admin.firestore().doc(`users/${uid}/sessions/${sessionB.sessionId}`).get();
     assert.equal(sessionBDoc.data()?.studyDate, DEFAULT_STUDY_DATE);
+
+    const scoringDoc = await admin.firestore().doc(`users/${uid}/progress/user-stats`).get();
+    assert.equal(scoringDoc.data()?.studiedSecondsOnLastStudyDate, 600, "both same-day sessions' seconds are stored");
   });
 });
 

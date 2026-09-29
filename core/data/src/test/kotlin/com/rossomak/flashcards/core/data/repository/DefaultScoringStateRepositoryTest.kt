@@ -51,6 +51,7 @@ class DefaultScoringStateRepositoryTest {
         val bestStreak = 5
         val lastStudyDate = "2026-09-06"
         val goalMetDate = "2026-09-06"
+        val studiedSecondsOnLastStudyDate = 1500L
         val dto = ScoringStateDto(
             xp = xp,
             level = level,
@@ -59,6 +60,7 @@ class DefaultScoringStateRepositoryTest {
             bestStreak = bestStreak,
             lastStudyDate = lastStudyDate,
             goalMetDate = goalMetDate,
+            studiedSecondsOnLastStudyDate = studiedSecondsOnLastStudyDate,
         )
         coEvery { remoteDataSource.getScoringState() } returns dto
 
@@ -73,6 +75,7 @@ class DefaultScoringStateRepositoryTest {
         state?.bestStreak shouldBe bestStreak
         state?.lastStudyDate shouldBe lastStudyDate
         state?.goalMetDate shouldBe goalMetDate
+        state?.studiedSecondsOnLastStudyDate shouldBe studiedSecondsOnLastStudyDate
         coVerify(exactly = 1) { remoteDataSource.getScoringState() }
     }
 
@@ -118,10 +121,18 @@ class DefaultScoringStateRepositoryTest {
 
         val state = createRepository().getScoringState().getOrThrow()
 
-        // Session 1: 1 new card × 10 + 1 mastered × 100 + 1 minute × 10 + 500 completion = 620.
-        // Session 2: card-1 is neither new nor freshly Mastered, so 1 defended × 50 + 10 + 500 = 560.
-        // 1180 crosses Level 1's threshold of 1000.
-        state shouldBe ScoringState(xp = 1180, level = 2, xpIntoCurrentLevel = 180)
+        // Session 1: 1 new card × 10 + 1 mastered × 100 + 1 minute × 10 + 500 completion + a Streak of
+        // 1 × 20 = 640. Session 2, the same day: card-1 is neither new nor freshly Mastered, so 1
+        // defended × 50 + 10 + 500 = 560. 1200 crosses Level 1's threshold of 1000.
+        state shouldBe ScoringState(
+            xp = 1200,
+            level = 2,
+            xpIntoCurrentLevel = 200,
+            currentStreak = 1,
+            bestStreak = 1,
+            lastStudyDate = STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 120,
+        )
     }
 
     @Test
@@ -133,36 +144,85 @@ class DefaultScoringStateRepositoryTest {
 
         val state = createRepository().getScoringState().getOrThrow()
 
-        // (1 new × 10 + 10 + 500) + (0 new + 10 + 500).
-        state?.xp shouldBe 1030L
+        // (1 new × 10 + 10 + 500 + a Streak of 1 × 20) + (0 new + 10 + 500).
+        state?.xp shouldBe 1050L
     }
 
     @Test
-    fun `pending sessions replay over the remote scoring state and Card Progress, carrying the Streak fields over`() = runTest {
+    fun `pending sessions replay over the remote scoring state and Card Progress, advancing the Streak fields`() = runTest {
         coEvery { remoteDataSource.getScoringState() } returns ScoringStateDto(
             xp = 300,
             level = 1,
             xpIntoCurrentLevel = 300,
             currentStreak = 4,
             bestStreak = 7,
-            lastStudyDate = "2026-09-05",
-            goalMetDate = "2026-09-05",
+            lastStudyDate = PREVIOUS_STUDY_DATE,
+            goalMetDate = PREVIOUS_STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 1800,
         )
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns remoteProgress(CARD_ID to Mastered)
         queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
 
         val state = createRepository().getScoringState().getOrThrow()
 
-        // 300 + 1 defended × 50 + 10 + 500.
+        // 300 + 1 defended × 50 + 10 + 500 + a Streak of 5 × 20. The previous day's seconds do not
+        // count toward today's goal.
         state shouldBe ScoringState(
-            xp = 860,
+            xp = 960,
             level = 1,
-            xpIntoCurrentLevel = 860,
-            currentStreak = 4,
+            xpIntoCurrentLevel = 960,
+            currentStreak = 5,
             bestStreak = 7,
-            lastStudyDate = "2026-09-05",
-            goalMetDate = "2026-09-05",
+            lastStudyDate = STUDY_DATE,
+            goalMetDate = PREVIOUS_STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 60,
         )
+    }
+
+    @Test
+    fun `two pending sessions on consecutive days advance the projected Streak by two`() = runTest {
+        coEvery { remoteDataSource.getScoringState() } returns ScoringStateDto(currentStreak = 1, bestStreak = 1, lastStudyDate = PREVIOUS_STUDY_DATE)
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession("session-1", SESSION_ONE_START, CARD_ID))
+        queue(fastSession("session-2", NEXT_DAY_START, CARD_ID).copy(studyDate = NEXT_STUDY_DATE))
+
+        val state = createRepository().getScoringState().getOrThrow()
+
+        state?.currentStreak shouldBe 3
+        state?.bestStreak shouldBe 3
+        state?.lastStudyDate shouldBe NEXT_STUDY_DATE
+    }
+
+    @Test
+    fun `two short pending sessions on the same day reach the Daily Goal together, on the second`() = runTest {
+        coEvery { remoteDataSource.getScoringState() } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession("session-1", SESSION_ONE_START, CARD_ID).copy(dailyGoalMinutes = 2))
+
+        createRepository().getScoringState().getOrThrow()?.goalMetDate shouldBe ""
+
+        queue(fastSession("session-2", SESSION_TWO_START, CARD_ID).copy(dailyGoalMinutes = 2))
+
+        val state = createRepository().getScoringState().getOrThrow()
+        state?.goalMetDate shouldBe STUDY_DATE
+        state?.studiedSecondsOnLastStudyDate shouldBe 120L
+    }
+
+    @Test
+    fun `a pending session from yesterday is judged against yesterday, not today`() = runTest {
+        coEvery { remoteDataSource.getScoringState() } returns ScoringStateDto(currentStreak = 1, bestStreak = 1, lastStudyDate = PREVIOUS_STUDY_DATE)
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession("session-1", PREVIOUS_DAY_START, CARD_ID).copy(studyDate = PREVIOUS_STUDY_DATE, dailyGoalMinutes = 1))
+        queue(fastSession("session-2", SESSION_ONE_START, CARD_ID).copy(dailyGoalMinutes = 2))
+
+        val state = createRepository().getScoringState().getOrThrow()
+
+        // Yesterday's session keeps the Streak and meets yesterday's 1-minute goal; today's advances the
+        // Streak once and, with only its own minute, misses today's 2-minute goal.
+        state?.currentStreak shouldBe 2
+        state?.goalMetDate shouldBe PREVIOUS_STUDY_DATE
+        state?.lastStudyDate shouldBe STUDY_DATE
+        state?.studiedSecondsOnLastStudyDate shouldBe 60L
     }
 
     @Test
@@ -172,7 +232,7 @@ class DefaultScoringStateRepositoryTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         queue(fastSession("session-1", SESSION_ONE_START, CARD_ID))
 
-        createRepository().getScoringState().getOrThrow()?.xp shouldBe 27L
+        createRepository().getScoringState().getOrThrow()?.xp shouldBe 47L
     }
 
     @Test
@@ -199,7 +259,15 @@ class DefaultScoringStateRepositoryTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         queue(fastSession("session-1", SESSION_ONE_START, CARD_ID))
 
-        createRepository().getScoringState().getOrThrow() shouldBe ScoringState(xp = 520, level = 1, xpIntoCurrentLevel = 520)
+        createRepository().getScoringState().getOrThrow() shouldBe ScoringState(
+            xp = 540,
+            level = 1,
+            xpIntoCurrentLevel = 540,
+            currentStreak = 1,
+            bestStreak = 1,
+            lastStudyDate = STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 60,
+        )
     }
 
     @Test
@@ -208,7 +276,7 @@ class DefaultScoringStateRepositoryTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } throws IllegalStateException("offline, not cached")
         queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
 
-        createRepository().getScoringState().getOrThrow()?.xp shouldBe 620L
+        createRepository().getScoringState().getOrThrow()?.xp shouldBe 640L
     }
 
     private fun queue(sessionResult: SessionResult, uid: String = USER_ID) {
@@ -232,7 +300,7 @@ class DefaultScoringStateRepositoryTest {
         cardResults = cardStates.map { (cardId, state) ->
             FlashcardResult.Rated(cardId = cardId, subcategoryId = SUBCATEGORY_ID, state = state, attemptsUsed = 1, wasPreviouslyMastered = false)
         },
-        studyDate = "2026-09-06",
+        studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = 20,
     )
@@ -247,7 +315,7 @@ class DefaultScoringStateRepositoryTest {
         subcategoryIds = listOf(SUBCATEGORY_ID),
         subcategoryNames = listOf("Subcategory"),
         cardResults = cardIds.map { cardId -> FlashcardResult.Fast(cardId = cardId, subcategoryId = SUBCATEGORY_ID, state = Seen) },
-        studyDate = "2026-09-06",
+        studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = 20,
     )
@@ -260,16 +328,24 @@ class DefaultScoringStateRepositoryTest {
         const val CATEGORY_ID = "cat-1"
         const val SUBCATEGORY_ID = "sub-1"
         const val CARD_ID = "card-1"
+        const val PREVIOUS_STUDY_DATE = "2026-09-05"
+        const val STUDY_DATE = "2026-09-06"
+        const val NEXT_STUDY_DATE = "2026-09-07"
+        val PREVIOUS_DAY_START: Instant = Instant.parse("2026-09-05T10:00:00Z")
         val SESSION_ONE_START: Instant = Instant.parse("2026-09-06T10:00:00Z")
         val SESSION_TWO_START: Instant = Instant.parse("2026-09-06T11:00:00Z")
+        val NEXT_DAY_START: Instant = Instant.parse("2026-09-07T10:00:00Z")
 
-        // The bundled defaults, spelled out so the arithmetic in each test reads against known rates.
+        // The bundled defaults, spelled out so the arithmetic in each test reads against known rates,
+        // except a small Streak rate, so a Streak award stays inside Level 1.
         val CONFIG = XpConfig(
             newCardStudied = 10,
             cardMastered = 100,
             masteryDefended = 50,
             minuteStudied = 10,
             sessionCompleted = 500,
+            streakPerDay = 20,
+            dailyGoalMet = 1000,
             levelCurveBase = 1000.0,
             levelCurveExponent = 2.5,
         )

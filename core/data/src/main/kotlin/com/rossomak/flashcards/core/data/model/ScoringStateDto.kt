@@ -10,4 +10,5 @@ data class ScoringStateDto(
     val bestStreak: Int = 0,
     val lastStudyDate: String = "",
     val goalMetDate: String = "",
+    val studiedSecondsOnLastStudyDate: Long = 0,
 )

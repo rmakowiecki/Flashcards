@@ -71,8 +71,17 @@ data class XpScoringCaseInput(
     val session: XpScoringCaseSession? = null,
     val newCardsStudied: Int = 0,
     val level: Int? = null,
-    val streakAndGoal: JsonObject? = null,
+    val streakAndGoal: XpScoringCaseStreakAndGoal? = null,
 )
+
+@Serializable
+data class XpScoringCaseStreakAndGoal(
+    val studyDate: String,
+    val dailyGoalMinutes: Int,
+    val todayTotalSeconds: Long,
+) {
+    fun toDomain(): StreakAndGoalInput = StreakAndGoalInput(studyDate = studyDate, dailyGoalMinutes = dailyGoalMinutes, todayTotalSeconds = todayTotalSeconds)
+}
 
 /** Every field required, so the default configuration file cannot silently drop one. */
 @Serializable
@@ -116,6 +125,7 @@ data class XpScoringCasePriorState(
     val bestStreak: Int? = null,
     val lastStudyDate: String? = null,
     val goalMetDate: String? = null,
+    val studiedSecondsOnLastStudyDate: Long? = null,
 ) {
     fun toDomain(): ScoringState {
         val startingState = ScoringState()
@@ -127,6 +137,7 @@ data class XpScoringCasePriorState(
             bestStreak = bestStreak ?: startingState.bestStreak,
             lastStudyDate = lastStudyDate ?: startingState.lastStudyDate,
             goalMetDate = goalMetDate ?: startingState.goalMetDate,
+            studiedSecondsOnLastStudyDate = studiedSecondsOnLastStudyDate ?: startingState.studiedSecondsOnLastStudyDate,
         )
     }
 }
@@ -187,6 +198,7 @@ data class ExpectedScoringState(
     val bestStreak: Int,
     val lastStudyDate: String,
     val goalMetDate: String,
+    val studiedSecondsOnLastStudyDate: Long,
 ) {
     fun toDomain(): ScoringState = ScoringState(
         xp = xp,
@@ -196,6 +208,28 @@ data class ExpectedScoringState(
         bestStreak = bestStreak,
         lastStudyDate = lastStudyDate,
         goalMetDate = goalMetDate,
+        studiedSecondsOnLastStudyDate = studiedSecondsOnLastStudyDate,
+    )
+}
+
+@Serializable
+data class ExpectedStreakAndGoal(
+    val streakBonus: Int,
+    val dailyGoalBonus: Int,
+    val currentStreak: Int,
+    val bestStreak: Int,
+    val lastStudyDate: String,
+    val goalMetDate: String,
+    val studiedSecondsOnLastStudyDate: Long,
+) {
+    fun toDomain(): StreakAndGoalAwards = StreakAndGoalAwards(
+        streakBonus = streakBonus,
+        dailyGoalBonus = dailyGoalBonus,
+        currentStreak = currentStreak,
+        bestStreak = bestStreak,
+        lastStudyDate = lastStudyDate,
+        goalMetDate = goalMetDate,
+        studiedSecondsOnLastStudyDate = studiedSecondsOnLastStudyDate,
     )
 }
 

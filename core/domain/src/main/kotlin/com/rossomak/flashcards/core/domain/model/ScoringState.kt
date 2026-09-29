@@ -9,14 +9,18 @@ package com.rossomak.flashcards.core.domain.model
  * replayed on top by [com.rossomak.flashcards.core.domain.scoring.scoreSession], for the Session
  * Summary's fallback preview.
  *
- * [currentStreak], [bestStreak], [lastStudyDate] and [goalMetDate] are advanced by the server only; the
- * client carries them over unchanged when it scores. The two dates are calendar days in the device's
- * local zone (`yyyy-MM-dd`), not instants; an empty string means "no study day recorded yet".
+ * [currentStreak], [bestStreak], [lastStudyDate], [goalMetDate] and [studiedSecondsOnLastStudyDate]
+ * advance by the Streak and Daily Goal rules
+ * ([com.rossomak.flashcards.core.domain.scoring.calculateStreakAndGoalAwards]): the server applies
+ * them when it records a session, and the client applies the same rules when it replays a Pending
+ * Session. The two dates are calendar days in the device's local zone (`yyyy-MM-dd`), not instants; an
+ * empty string means "no study day recorded yet".
  *
  * @param xp total points currently held.
  * @param level denormalized from [xp] via the configured curve ([XpConfig.levelThreshold]); never
  * decreases, even when [xp] drops.
  * @param xpIntoCurrentLevel points earned since [level] was last reached; never negative.
+ * @param studiedSecondsOnLastStudyDate every recorded session's duration summed for [lastStudyDate].
  */
 data class ScoringState(
     val xp: Long = 0,
@@ -26,6 +30,7 @@ data class ScoringState(
     val bestStreak: Int = 0,
     val lastStudyDate: String = "",
     val goalMetDate: String = "",
+    val studiedSecondsOnLastStudyDate: Long = 0,
 ) {
     companion object {
         /** Every account starts here: level 1, no points into it, before a session has ever committed. */
