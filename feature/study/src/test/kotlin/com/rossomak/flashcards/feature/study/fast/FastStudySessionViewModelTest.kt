@@ -11,20 +11,17 @@ import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway.Call
-import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.session.FastSessionReducer
 import com.rossomak.flashcards.core.domain.session.FastStudySessionCoordinator
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -84,9 +81,7 @@ class FastStudySessionViewModelTest {
     private val getFlashcards = GetFlashcardsUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
     private val getSubcategoryProgress = GetSubcategoryProgressUseCase(cardProgressRepository)
-    private val xpConfigRepository = FakeXpConfigRepository()
-    private val getXpConfig = GetXpConfigUseCase(xpConfigRepository)
-    private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress, getXpConfig)
+    private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress)
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val clock = MutableClock(FIXED_INSTANT)
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
@@ -229,61 +224,6 @@ class FastStudySessionViewModelTest {
 
             viewModel.state.value.error shouldBe null
             viewModel.state.value.isLoading shouldBe false
-        }
-
-    @Test
-    fun `the xp configuration is fetched at session start and appears in the session result`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            xpConfigRepository.resultToReturn = Result.success(CUSTOM_XP_CONFIG)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            viewModel.onDialogEvent(Open(ExitSession))
-
-            viewModel.events.test {
-                viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
-
-                destination.route.xpConfig shouldBe CUSTOM_XP_CONFIG
-            }
-        }
-
-    @Test
-    fun `an xp configuration change after the session has started does not change what the result carries`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            xpConfigRepository.resultToReturn = Result.success(CUSTOM_XP_CONFIG)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            xpConfigRepository.resultToReturn = Result.success(CUSTOM_XP_CONFIG.copy(newCardStudied = 12345))
-            viewModel.onDialogEvent(Open(ExitSession))
-
-            viewModel.events.test {
-                viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
-
-                destination.route.xpConfig shouldBe CUSTOM_XP_CONFIG
-            }
-        }
-
-    @Test
-    fun `a failed xp configuration fetch still starts the session, carrying defaults, with no error shown`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            loadThreeCards()
-            xpConfigRepository.resultToReturn = Result.failure(IllegalStateException("offline"))
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.state.value.error shouldBe null
-            viewModel.state.value.isLoading shouldBe false
-            viewModel.onDialogEvent(Open(ExitSession))
-
-            viewModel.events.test {
-                viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
-
-                destination.route.xpConfig shouldBe XpConfig()
-            }
         }
 
     @Test
@@ -1186,22 +1126,5 @@ class FastStudySessionViewModelTest {
         const val EXTENDED_CONTEXT = "More about this card."
         val CLOSED_DIALOG_LINGER = 500.milliseconds
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
-
-        // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value
-        // landed can't accidentally pass against the untouched default instead.
-        val CUSTOM_XP_CONFIG = XpConfig(
-            newCardStudied = 1,
-            cardMastered = 2,
-            cardPartial = 3,
-            masteryDefended = 4,
-            cardDemastered = -5,
-            sessionCompleted = 6,
-            dailyGoalMet = 7,
-            streakPerDay = 8,
-            streakMaxPerDay = 9,
-            minuteStudied = 11,
-            levelCurveBase = 13.0,
-            levelCurveExponent = 14.0,
-        )
     }
 }

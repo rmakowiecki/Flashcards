@@ -3,7 +3,6 @@ package com.rossomak.flashcards.feature.study
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 import org.junit.Test
@@ -94,16 +93,5 @@ class SessionResultRouteMappingTest {
         route.cardAttemptsUsed shouldBe null
         route.cardWasPreviouslyMastered shouldBe null
         route.toSessionResult(dailyGoalMinutes) shouldBe fastResult
-    }
-
-    @Test
-    fun `a non-default xpConfig survives the round trip unchanged`() {
-        val customConfig = XpConfig(newCardStudied = 1, cardMastered = 2, levelCurveBase = 3.0, levelCurveExponent = 4.0)
-        val withCustomConfig = ratedResult.copy(xpConfig = customConfig)
-
-        val route = withCustomConfig.toSummaryRoute()
-
-        route.xpConfig shouldBe customConfig
-        route.toSessionResult(dailyGoalMinutes) shouldBe withCustomConfig
     }
 }

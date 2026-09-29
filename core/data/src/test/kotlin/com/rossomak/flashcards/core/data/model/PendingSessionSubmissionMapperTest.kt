@@ -6,7 +6,6 @@ import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import java.time.Instant
@@ -36,7 +35,6 @@ class PendingSessionSubmissionMapperTest {
         studyDate = "2026-09-08",
         studyDateUtcOffsetMinutes = -300,
         dailyGoalMinutes = 20,
-        xpConfig = XpConfig(newCardStudied = 42),
     )
 
     private fun fastSessionResult(): SessionResult.Fast = SessionResult.Fast(
@@ -55,7 +53,7 @@ class PendingSessionSubmissionMapperTest {
     )
 
     @Test
-    fun `toDto then toDomain round-trips a Rated session losslessly, including xpConfig`() {
+    fun `toDto then toDomain round-trips a Rated session losslessly`() {
         val original = ratedSessionResult()
 
         val roundTripped = original.toDto(UID).toDomain()

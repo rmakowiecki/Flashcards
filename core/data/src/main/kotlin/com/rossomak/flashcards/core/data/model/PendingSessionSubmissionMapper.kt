@@ -5,7 +5,6 @@ import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.StudyMode
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import java.time.Instant
 import java.time.ZoneId
 
@@ -27,7 +26,6 @@ object PendingSessionSubmissionMapper {
         studyDate = studyDate,
         dailyGoalMinutes = dailyGoalMinutes,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
-        xpConfig = xpConfig.toDto(),
     )
 
     /**
@@ -63,7 +61,6 @@ object PendingSessionSubmissionMapper {
             studyDate = migratedStudyDate(),
             dailyGoalMinutes = migratedDailyGoalMinutes(),
             studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
-            xpConfig = xpConfig.toDomain(),
         )
         StudyMode.Fast -> SessionResult.Fast(
             id = id,
@@ -78,7 +75,6 @@ object PendingSessionSubmissionMapper {
             studyDate = migratedStudyDate(),
             dailyGoalMinutes = migratedDailyGoalMinutes(),
             studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
-            xpConfig = xpConfig.toDomain(),
         )
     }
 
@@ -111,35 +107,5 @@ object PendingSessionSubmissionMapper {
         cardId = cardId,
         subcategoryId = subcategoryId,
         state = FlashcardStudyProgressState.valueOf(state),
-    )
-
-    private fun XpConfig.toDto(): PendingXpConfigDto = PendingXpConfigDto(
-        newCardStudied = newCardStudied,
-        cardMastered = cardMastered,
-        cardPartial = cardPartial,
-        masteryDefended = masteryDefended,
-        cardDemastered = cardDemastered,
-        sessionCompleted = sessionCompleted,
-        dailyGoalMet = dailyGoalMet,
-        streakPerDay = streakPerDay,
-        streakMaxPerDay = streakMaxPerDay,
-        minuteStudied = minuteStudied,
-        levelCurveBase = levelCurveBase,
-        levelCurveExponent = levelCurveExponent,
-    )
-
-    private fun PendingXpConfigDto.toDomain(): XpConfig = XpConfig(
-        newCardStudied = newCardStudied,
-        cardMastered = cardMastered,
-        cardPartial = cardPartial,
-        masteryDefended = masteryDefended,
-        cardDemastered = cardDemastered,
-        sessionCompleted = sessionCompleted,
-        dailyGoalMet = dailyGoalMet,
-        streakPerDay = streakPerDay,
-        streakMaxPerDay = streakMaxPerDay,
-        minuteStudied = minuteStudied,
-        levelCurveBase = levelCurveBase,
-        levelCurveExponent = levelCurveExponent,
     )
 }

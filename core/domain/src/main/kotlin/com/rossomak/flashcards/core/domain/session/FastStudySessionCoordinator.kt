@@ -12,7 +12,6 @@ import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import java.time.Clock
@@ -78,9 +77,6 @@ class FastStudySessionCoordinator @Inject constructor(
      */
     internal var priorProgressByCardId: Map<String, CardProgressEntry> = emptyMap()
         private set
-
-    // ADR-0047's snapshot rule, as in the Rated coordinator.
-    private var xpConfig = XpConfig()
 
     fun start(scope: CoroutineScope, setup: FastSessionSetup) {
         check(this.scope == null) { "A coordinator runs one session" }
@@ -196,7 +192,6 @@ class FastStudySessionCoordinator @Inject constructor(
                 studyDate = "",
                 studyDateUtcOffsetMinutes = timekeeper.utcOffsetMinutes,
                 dailyGoalMinutes = 0,
-                xpConfig = xpConfig,
             )
         }
         eventChannel.trySend(FastSessionEvent.SessionEnded(result))
@@ -209,7 +204,6 @@ class FastStudySessionCoordinator @Inject constructor(
             return
         }
         priorProgressByCardId = sessionStartData.priorProgressByCardId
-        xpConfig = sessionStartData.xpConfig
         val cardsById = flashcards.associateBy { it.id }
         val sessionCards = setup.cardIds.mapNotNull(cardsById::get)
         state = reducer.seed(sessionCards)

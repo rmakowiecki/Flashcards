@@ -112,15 +112,6 @@ sealed interface SessionResult {
      */
     val dailyGoalMinutes: Int
 
-    /**
-     * The XP configuration snapshot captured when this session started
-     * ([ADR-0047](../../../../../../../docs/adr/0047-xp-values-behind-a-config-repository.md)):
-     * fetched alongside [cardResults]' cards, never re-read here. It drives only this session's local
-     * XP preview: the server scores the submitted session with its own current configuration and never
-     * reads this snapshot. Defaults to [XpConfig]'s own defaults for call sites that never preview XP.
-     */
-    val xpConfig: XpConfig
-
     /** Derived from the sealed branch — see the type's own KDoc for why this is never a stored field. */
     val mode: StudyMode
         get() = when (this) {
@@ -144,7 +135,6 @@ sealed interface SessionResult {
         override val studyDate: String,
         override val studyDateUtcOffsetMinutes: Int,
         override val dailyGoalMinutes: Int,
-        override val xpConfig: XpConfig = XpConfig(),
     ) : SessionResult {
         /**
          * The three Terminal State counts below are *derived* from [cardResults] rather than stored
@@ -171,6 +161,5 @@ sealed interface SessionResult {
         override val studyDate: String,
         override val studyDateUtcOffsetMinutes: Int,
         override val dailyGoalMinutes: Int,
-        override val xpConfig: XpConfig = XpConfig(),
     ) : SessionResult
 }

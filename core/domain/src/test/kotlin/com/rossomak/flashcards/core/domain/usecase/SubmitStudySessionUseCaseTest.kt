@@ -19,6 +19,7 @@ import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
+import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.time.Instant
@@ -39,10 +40,12 @@ class SubmitStudySessionUseCaseTest {
     private val sessionSubmissionRepository = FakeSessionSubmissionRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
     private val scoringStateRepository = FakeScoringStateRepository()
+    private val xpConfigRepository = FakeXpConfigRepository()
 
     private fun createUseCase(): SubmitStudySessionUseCase = SubmitStudySessionUseCase(
         cardProgressRepository,
         scoringStateRepository,
+        GetXpConfigUseCase(xpConfigRepository),
         sessionSubmissionRepository,
     )
 
@@ -302,6 +305,27 @@ class SubmitStudySessionUseCaseTest {
     }
 
     @Test
+    fun `the preview is scored with the cached xp configuration`() = runTest {
+        xpConfigRepository.resultToReturn = Result.success(CUSTOM_CONFIG)
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        preview.breakdown.mastered shouldBe CUSTOM_CONFIG.cardMastered
+        preview.rates?.cardMastered shouldBe CUSTOM_CONFIG.cardMastered
+    }
+
+    @Test
+    fun `the preview falls back to the default xp configuration when the cached one is unreadable`() = runTest {
+        xpConfigRepository.resultToReturn = Result.failure(IllegalStateException("unreadable"))
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        preview.breakdown.mastered shouldBe XpConfig().cardMastered
+    }
+
+    @Test
     fun `a card Mastered in the prior Card Progress scores as defended, whatever the session's own flag says`() = runTest {
         cardProgressRepository.seed(
             SubcategoryProgress(subcategoryId = "sub-1", categoryId = "cat-1", cards = mapOf("card-1" to priorEntry(FlashcardStudyProgressState.Mastered))),
@@ -322,6 +346,7 @@ class SubmitStudySessionUseCaseTest {
     )
 
     private companion object {
+        val CUSTOM_CONFIG = XpConfig(cardMastered = 321)
         val SERVER_SCORE = SessionScore(
             breakdown = XpBreakdown(newCards = 10, mastered = 100, streakBonus = 250),
             level = 2,

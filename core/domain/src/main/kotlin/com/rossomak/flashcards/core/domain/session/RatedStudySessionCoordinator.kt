@@ -19,7 +19,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.sealRatedCardResults
 import com.rossomak.flashcards.core.domain.model.type
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
@@ -122,10 +121,6 @@ class RatedStudySessionCoordinator @Inject constructor(
      */
     internal var priorProgressByCardId: Map<String, CardProgressEntry> = emptyMap()
         private set
-
-    // ADR-0047's snapshot rule: fetched once at load and never re-read. Defaults until then, so an
-    // exit before the load finishes is scored against the defaults.
-    private var xpConfig = XpConfig()
 
     fun start(scope: CoroutineScope, setup: RatedSessionSetup) {
         check(this.scope == null) { "A coordinator runs one session" }
@@ -268,7 +263,6 @@ class RatedStudySessionCoordinator @Inject constructor(
                 studyDate = "",
                 studyDateUtcOffsetMinutes = timekeeper.utcOffsetMinutes,
                 dailyGoalMinutes = 0,
-                xpConfig = xpConfig,
             )
         }
         eventChannel.trySend(RatedSessionEvent.SessionEnded(result))
@@ -283,7 +277,6 @@ class RatedStudySessionCoordinator @Inject constructor(
             return
         }
         priorProgressByCardId = sessionStartData.priorProgressByCardId
-        xpConfig = sessionStartData.xpConfig
         val cardsById = flashcards.associateBy { it.id }
         val sessionCards = setup.cardIds.mapNotNull(cardsById::get)
         val previouslyMasteredCardIds = priorProgressByCardId

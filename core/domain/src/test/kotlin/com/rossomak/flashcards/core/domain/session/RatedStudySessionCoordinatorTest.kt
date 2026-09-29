@@ -23,7 +23,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
@@ -31,11 +30,9 @@ import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGate
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway.Call
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceAnswerGradingRepository
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
-import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainInOrder
 import io.kotest.matchers.collections.shouldNotContain
@@ -62,11 +59,9 @@ class RatedStudySessionCoordinatorTest {
 
     private val flashcardRepository = FakeFlashcardRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
-    private val xpConfigRepository = FakeXpConfigRepository()
     private val getSessionStartData = GetSessionStartDataUseCase(
         GetFlashcardsUseCase(flashcardRepository),
         GetSubcategoryProgressUseCase(cardProgressRepository),
-        GetXpConfigUseCase(xpConfigRepository),
     )
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val captureGateway = FakeVoiceCaptureGateway()
@@ -999,7 +994,6 @@ class RatedStudySessionCoordinatorTest {
         result.abandoned shouldBe true
         result.cardResults shouldBe emptyList()
         result.durationSeconds shouldBe 0
-        result.xpConfig shouldBe XpConfig()
     }
 
     @Test

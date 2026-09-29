@@ -36,8 +36,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * 2. Submits the session through [SessionSubmissionRepository] and waits at most [SERVER_RESULT_BUDGET]
  *    for a final delivery status. The budget covers only this wait, not the baseline read before it.
  * 3. [SessionDeliveryStatus.Scored] returns [ServerScored]. Any other final status, or the budget
- *    running out, returns [LocalPreview], scored by [scoreSession] from the baseline with the XP
- *    configuration captured when the session started ([SessionResult.xpConfig]).
+ *    running out, returns [LocalPreview], scored by [scoreSession] from the baseline with the cached
+ *    XP configuration ([GetXpConfigUseCase]).
  *
  * It returns exactly once and stops observing the delivery, so a server score arriving after the
  * fallback can never replace what the Summary already shows. The session stays queued either way.
@@ -48,6 +48,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class SubmitStudySessionUseCase @Inject constructor(
     private val cardProgressRepository: CardProgressRepository,
     private val scoringStateRepository: ScoringStateRepository,
+    private val getXpConfig: GetXpConfigUseCase,
     private val sessionSubmissionRepository: SessionSubmissionRepository,
 ) : UseCase<SessionResult, Result<SessionSubmissionResult>> {
 
@@ -57,7 +58,7 @@ class SubmitStudySessionUseCase @Inject constructor(
         val finalStatus = withTimeoutOrNull(SERVER_RESULT_BUDGET) { deliveryStatus.first { status -> status != InFlight } }
         if (finalStatus is Scored) return Result.success(ServerScored(finalStatus.score))
         return baseline.map { (priorCardStatesBySubcategory, scoringState) ->
-            LocalPreview(scoreSession(priorCardStatesBySubcategory, scoringState, params, params.xpConfig).score)
+            LocalPreview(scoreSession(priorCardStatesBySubcategory, scoringState, params, getXpConfig()).score)
         }
     }
 
