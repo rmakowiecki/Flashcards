@@ -1,5 +1,6 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent.Graded
@@ -37,6 +38,15 @@ class HoldGradedUntilTranscriptShownTest {
         val emissions = collectTimed(gradingFlow(transcriptReady, delayBeforeLast = 1_500.milliseconds, last = graded))
 
         emissions shouldBe listOf(transcriptReady to 0L, graded to 1_500L)
+    }
+
+    @Test
+    fun `failed 300 ms after transcript is held until 1000 ms`() = runTest {
+        val failed = VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
+
+        val emissions = collectTimed(gradingFlow(transcriptReady, delayBeforeLast = 300.milliseconds, last = failed))
+
+        emissions shouldBe listOf(transcriptReady to 0L, failed to 1_000L)
     }
 
     @Test

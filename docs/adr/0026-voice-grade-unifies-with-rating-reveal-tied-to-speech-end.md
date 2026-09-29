@@ -6,7 +6,7 @@ Within the Rating/Attempt/Terminal-State pipeline (ADR-0044 fixes Terminal State
 
 Answer-reveal in voice-on Rated is tied to the **end of the user's spoken answer** (the `LISTENING`/`SPEECH_DETECTED` → `GRADING` transition), not to the end of question-TTS. The user only sees the answer text once their own answer is already locked in. It stays revealed through the grade notice, and through a grading-failure notice, since that round also reached grading; a silence timeout never reveals it.
 
-Once `SPEAKING_NOTICE` begins with a grade, the bottom sheet shows the Rating and the grader's rationale alongside the spoken notice. A notice without a grade — the no-answer/silence skip (8s timeout, ADR-0031) or a grading failure — shows only a progress disc, and its cause is told by a snackbar and the spoken notice ([ADR-0053](0053-voice-answer-sheet-states-and-live-input-level.md)). Both cases share `VoiceAnswerPhase.SPEAKING_NOTICE`, distinguished by `VoiceAnswerState.lastGrade == null` (no grade) vs non-null (graded), with `VoiceAnswerState.error` separating a grading failure from a silence skip; no new phase enum value.
+Once `SPEAKING_NOTICE` begins with a grade, the bottom sheet shows the Rating and the grader's rationale alongside the spoken notice. A notice without a grade — the no-answer/silence skip (8s timeout, ADR-0031) or a grading failure — shows only a progress disc, and its cause is told by a snackbar and the spoken notice ([ADR-0053](0053-voice-answer-sheet-states-and-live-input-level.md)). Both cases share `VoiceAnswerPhase.SpeakingNotice`, distinguished by the round's `grade == null` (no grade) vs non-null (graded), with the round's `gradingFailure` separating a grading failure from a silence skip; no new phase enum value.
 
 ## Context
 
@@ -20,7 +20,7 @@ Separately, cross-referencing the shipped `feat/voice-answering` code against th
 
 **Auto-reveal on question-TTS-end**, mirroring Fast mode exactly — rejected. Fast mode has no rating step, so early reveal costs nothing there. Rated's grading premise is "graded on what you actually said" — revealing the reference answer while the user is still mid-utterance risks them adjusting their spoken answer having glimpsed it, defeating the point of capturing an unprompted response.
 
-**A dedicated phase enum value for the skip case** (e.g. `SPEAKING_SKIP_NOTICE` distinct from `SPEAKING_NOTICE`) — rejected. `VoiceAnswerState.lastGrade == null` already distinguishes the two cases losslessly; adding a parallel phase value duplicates that signal in the state machine for no gain.
+**A dedicated phase enum value for the skip case** (e.g. `SPEAKING_SKIP_NOTICE` distinct from `SPEAKING_NOTICE`) — rejected. The round's `grade == null` already distinguishes the two cases losslessly; adding a parallel phase value duplicates that signal in the state machine for no gain.
 
 ## Consequences
 

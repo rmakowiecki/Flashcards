@@ -1,14 +1,15 @@
 package com.rossomak.flashcards.feature.study.rated
 
+import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
+import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
-import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
 
 /**
  * Everything a Rated Study Session screen renders. No Study Mode field — the type itself is the
@@ -33,7 +34,7 @@ data class RatedStudySessionScreenState(
     val flashcards: List<Flashcard> = emptyList(),
     val currentCardIndex: Int = 0,
     val isAnswerRevealed: Boolean = false,
-    val error: String? = null,
+    @param:StringRes val error: Int? = null,
     // Routed at session start (RatedStudySessionRoute.voiceAnsweringEnabled) — known synchronously,
     // unlike isVoiceActive below, which only flips once the voice engine finishes binding. The
     // sheet must never show the manual-mode perspective for a voice session, even for the moment
@@ -50,8 +51,8 @@ data class RatedStudySessionScreenState(
     // (RatedVoiceSheetMode.Graded) rather than as a snackbar. One-shot voice-answering failures go
     // through RatedStudySessionMessage instead — see RatedStudySessionViewModel.messages.
     val lastVoiceAnswerGrade: VoiceAnswerGrade? = null,
-    // Mirrors VoiceAnswerState.isShortNoticeSpeaking: outlives the pause a short notice can trigger,
-    // so the sheet stays on its status disc until the notice has actually finished.
+    // A short notice is being spoken: outlives the pause a short notice can trigger, so the sheet
+    // stays on its status disc until the notice has actually finished.
     val isVoiceShortNoticeSpeaking: Boolean = false,
     // This round's grading failed: its notice keeps the card answer revealed, which grading already did.
     val isVoiceAnswerGradingFailed: Boolean = false,
@@ -71,11 +72,14 @@ data class RatedStudySessionScreenState(
     // The routed Attempts limit (RatedStudySessionRoute.ratedAttempts): the Attempt indicator's
     // total slot count, independent of how many attempts this card has used so far.
     val attemptsLimit: Int = StudySessionConfig.DEFAULT_RATED_ATTEMPTS,
-    // Three consecutive silence timeouts:
-    // playback and the microphone are stopped and only the resume affordance is live. Distinct
-    // from the transient Listening/SpeechDetected/Grading/SpeakingNotice disable windows below —
-    // those stay load-bearing and unchanged by this flag.
+    // Voice answering is paused (repeated silences or grading failures, a capture failure) or the
+    // whole session is, after a voice engine failure: playback and the microphone are stopped and
+    // only the resume affordance is live. Distinct from the transient Listening/SpeechDetected/
+    // Grading/SpeakingNotice disable windows — those stay load-bearing and unchanged by this flag.
     val isVoiceAnswerPaused: Boolean = false,
+    // A voice engine could not start. The session keeps its voice sheet, never falling back to the
+    // manual one, and the play control stays enabled to resume.
+    val isVoiceEngineUnavailable: Boolean = false,
 ) {
     val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)
 

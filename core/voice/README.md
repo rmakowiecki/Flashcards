@@ -15,19 +15,19 @@ networking. It knows nothing about cards, sessions, or grading — it only emits
 ## Where it sits in the full pipeline
 
 ```
-feature:study                         core:voice (THIS MODULE)            core:domain / core:data / functions
-─────────────                         ─────────────────────────           ───────────────────────────────────
-StudySessionViewModel
-  toggles voice answering (Rated only)
+core:domain + feature:study           core:voice (THIS MODULE)            core:domain / core:data / functions
+────────────────────────────          ─────────────────────────           ───────────────────────────────────
+RatedStudySessionCoordinator
+  starts voice answering (Rated only)
         │
         ▼
-StudySessionVoiceService  ──starts──► VoiceGateway / TtsPlayer
+StudySessionVoiceService  ──hosts──► TtsPlayer
   (foreground service)                  speaks the card question (Media3)
         │
-        │ question finished speaking
+        │ PlaybackEvent.QuestionFinished
         ▼
-VoiceAnswerController.onQuestionFinishedSpeaking()
-        │ startListening()
+RatedStudySessionCoordinator opens the listening window
+        │ VoiceCaptureSession.startListening()
         ▼
                               VoiceCaptureEngine.startListening()
                                 AudioRecord (MIC, 16kHz mono PCM16)
@@ -46,8 +46,8 @@ VoiceAnswerController.onQuestionFinishedSpeaking()
                               emits VoiceCaptureEvent.UtteranceCaptured(wavBytes)
         │  collected by
         ▼
-VoiceAnswerController.gradeUtterance(wavBytes)
-        │ GradeSpokenAnswerUseCase(question, expectedAnswer, obfuscatedWav)
+RatedStudySessionCoordinator (CaptureEvent.UtteranceCaptured)
+        │ transcribeAndGradeSpokenAnswer(question, expectedAnswer, obfuscatedWav)
         ▼
                                                                     VoiceAnswerGradingRepository
                                                                       → VoiceGradingApiRouter (fake/real per stage)
@@ -55,10 +55,10 @@ VoiceAnswerController.gradeUtterance(wavBytes)
                                                                           (STT transcription + transcript
                                                                            sanitization + LLM grading)
                                                                       → VoiceAnswerGrade { gradePercent, feedback }
-        │  onSuccess(grade)
+        │  Graded(grade)
         ▼
-VoiceAnswerController speaks the grade aloud (dedicated notice TTS),
-waits 1s, emits advanceRequests → next card.
+RatedStudySessionCoordinator has NoticeSpeaker speak the grade (dedicated notice TTS),
+waits 1s after it finishes, syncs the queue, then reads the next question.
 ```
 
 The UX is **phone-in-pocket / screen-off**: the question is spoken, the user answers out loud, and
@@ -308,23 +308,27 @@ anonymization — it will not defeat a determined speaker-identification model.
 
 ## How the study session drives it (`feature:study`)
 
-`VoiceAnswerController` is the session-scoped orchestrator (Rated mode only, ADR-0025). It lives
-inside `StudySessionVoiceService` so listening shares the study session's foreground-service
-lifecycle, and it holds a `PARTIAL_WAKE_LOCK` across each listening window so OEM battery managers
-can't starve the 20 ms frame loop.
+The round's rules live in `core:domain`: `RatedSessionReducer` decides, and
+`RatedStudySessionCoordinator` runs its effects and timers (Rated mode only, ADR-0025, ADR-0054).
+The platform side lives in `feature:study`'s `StudySessionVoiceService`, so listening shares the
+study session's foreground-service lifecycle: `VoiceCaptureSession` owns this module's
+`VoiceCaptureEngine`, the `AudioRouteManager` session route and a `PARTIAL_WAKE_LOCK` renewed for
+each listening window, so OEM battery managers can't starve the 20 ms frame loop.
 
-Its phase machine (`VoiceAnswerPhase`): `IDLE → WAITING_FOR_QUESTION → LISTENING → SPEECH_DETECTED →
-GRADING → SPEAKING_NOTICE → …`. Critically, **listening only runs between
-`onQuestionFinishedSpeaking()` and either a captured utterance or an 8 s silence timeout** — never
-while the question or a notice is being spoken, which closes the phone-speaker ↔ mic feedback overlap.
+The round's phases (`VoiceAnswerPhase`): `Idle → WaitingForQuestion → Listening → SpeechDetected →
+Grading → SpeakingNotice → …`. Critically, **listening only runs between the question finishing
+(`PlaybackEvent.QuestionFinished`) and either a captured utterance or an 8 s silence timeout** —
+never while the question or a notice is being spoken, which closes the phone-speaker ↔ mic feedback
+overlap.
 
-On `UtteranceCaptured` it calls `GradeSpokenAnswerUseCase` with the card's question/expected-answer
-and the obfuscated WAV. That resolves through `VoiceAnswerGradingRepository` →
-`VoiceGradingApiRouter` (which can route each stage to a fake or the real backend independently) →
-the Cloud Function, which does STT transcription, transcript sanitization, and LLM grading, returning
-a `VoiceAnswerGrade { gradePercent, feedback }`. The controller speaks the grade through a dedicated
-notice `TextToSpeech` channel (kept separate from `TtsPlayer`'s Media3 card playback so notices can't
-corrupt its state machine), waits 1 s, then emits `advanceRequests` to move to the next card.
+On `UtteranceCaptured` the coordinator calls `VoiceAnswerGradingRepository` with the card's
+question/expected-answer and the obfuscated WAV. That resolves through `VoiceGradingApiRouter`
+(which can route each stage to a fake or the real backend independently) → the Cloud Function, which
+does STT transcription, transcript sanitization, and LLM grading, returning a
+`VoiceAnswerGrade { gradePercent, feedback }`, or a terminal failure with its classified cause.
+`NoticeSpeaker` speaks the grade on a dedicated notice `TextToSpeech` engine (kept separate from
+`TtsPlayer`'s Media3 card playback so notices can't corrupt its state machine); 1 s after it
+finishes, the coordinator syncs the queue and reads the next question.
 
 `CaptureFailed` and grading failures both fall back to a **spoken** notice — silent-drop was
 explicitly rejected for this eyes-free UX.

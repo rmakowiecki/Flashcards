@@ -1,8 +1,8 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.core.data.repository
 
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason.NoConnection
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason.ServiceError
 import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.NoConnection
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.ServiceError
 import io.kotest.matchers.shouldBe
 import java.io.IOException
 import java.io.InterruptedIOException

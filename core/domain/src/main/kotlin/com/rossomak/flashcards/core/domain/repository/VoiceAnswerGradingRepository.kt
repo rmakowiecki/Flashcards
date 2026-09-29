@@ -14,10 +14,9 @@ interface VoiceAnswerGradingRepository {
      * Full pipeline for one spoken answer, streamed over a single connection (ADR-0028):
      * [VoiceAnswerGradingEvent.TranscriptReady] as soon as STT + sanitize finish, then
      * [VoiceAnswerGradingEvent.Graded] once grading finishes. No persistence happens here
-     * (ADR-0014: no per-card Firestore writes during a session) — the caller batches grades
-     * into the session-end write once that pipeline exists. Failures propagate as flow
-     * exceptions (collect with `.catch()`), not a wrapped [Result], per this project's Flow
-     * error convention.
+     * (ADR-0014: no per-card Firestore writes during a session). A failure ends the flow with a
+     * terminal [VoiceAnswerGradingEvent.Failed] carrying its classified cause, not an exception;
+     * only cancellation propagates.
      */
     fun transcribeAndGradeSpokenAnswer(
         cardId: String,

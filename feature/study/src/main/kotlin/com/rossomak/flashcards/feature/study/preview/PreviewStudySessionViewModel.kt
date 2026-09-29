@@ -26,6 +26,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
+import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
@@ -438,7 +439,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                     }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, error = "Could not load flashcards") }
+                    _state.update { it.copy(isLoading = false, error = R.string.study_session_load_error_message) }
                 }
         }
     }

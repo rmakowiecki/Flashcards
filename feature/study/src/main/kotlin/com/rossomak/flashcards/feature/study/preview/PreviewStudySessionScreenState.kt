@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.study.preview
 
+import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
@@ -9,7 +10,7 @@ data class PreviewStudySessionScreenState(
     val subcategoryNames: List<String> = emptyList(),
     val isQuickSession: Boolean = false,
     val isLoading: Boolean = true,
-    val error: String? = null,
+    @param:StringRes val error: Int? = null,
     val config: StudySessionConfig = StudySessionConfig(subcategoryIds = emptyList()),
     val selectedCardCount: Int = 0,
     val estimatedMinutes: Int = 0,

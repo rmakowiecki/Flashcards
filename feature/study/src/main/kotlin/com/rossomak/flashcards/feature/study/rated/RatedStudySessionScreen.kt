@@ -218,7 +218,7 @@ fun RatedStudySessionContent(
         ) { innerPadding ->
             StudySessionBody(
                 isLoading = state.isLoading,
-                error = state.error,
+                error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
                 currentCardIndex = state.currentCardIndex,
                 isAnswerRevealed = state.isAnswerRevealed,

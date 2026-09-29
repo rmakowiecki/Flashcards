@@ -2,7 +2,7 @@
 
 ## Decision
 
-Enabling voice answering in a Rated session auto-enables TTS question-reading, running through the **same** `VoiceGateway`/`TtsPlayer` engine Fast mode already uses (same bottom sheet: speed slider, voice picker, play/pause) — not a separate `TextToSpeech` instance. Unlike Fast mode, this engine must **stop after reading the question** and never auto-progress to reading the answer. Once the question finishes, `VoiceAnswerController` starts listening — never before, and never while any TTS (question or grade-feedback notice) is speaking.
+Enabling voice answering in a Rated session auto-enables TTS question-reading, running through the **same** `TtsPlayer` engine (behind `StudyVoicePlaybackGateway`) Fast mode already uses (same bottom sheet: speed slider, voice picker, play/pause) — not a separate `TextToSpeech` instance. Unlike Fast mode, this engine must **stop after reading the question** and never auto-progress to reading the answer. Once the question finishes, `RatedStudySessionCoordinator` opens the listening window — never before, and never while any TTS (question or grade-feedback notice) is speaking.
 
 When voice answering is on, the grade **replaces** the manual Failed/Partial/Correct self-rating entirely — no rating buttons are shown.
 
@@ -16,11 +16,11 @@ Grade-percent bands, used both for feedback tone and the Failed/Partial/Correct 
 
 Split out of ADR-0025, which was trimmed to cover only the Rated-vs-Fast scoping decision. This ADR holds the mechanics of *how* voice answering behaves once it's active in a Rated session.
 
-A bug surfaced during the original implementation: `VoiceAnswerController.start()` called `voiceCaptureEngine.startListening()` unconditionally with no coordination with any TTS playback state, so a phone playing its own TTS through a loudspeaker (no earphones) could have that audio picked up by the VAD as a spoken answer. Tying question-reading and answer-listening to one coordinated engine (this ADR's decision) closes that gap — the fix isn't a special case bolted onto the old wiring, it falls out of building the two capabilities on the same state machine from the start.
+A bug surfaced during the original implementation: the voice-answering controller's `start()` called `voiceCaptureEngine.startListening()` unconditionally with no coordination with any TTS playback state, so a phone playing its own TTS through a loudspeaker (no earphones) could have that audio picked up by the VAD as a spoken answer. Tying question-reading and answer-listening to one coordinated engine (this ADR's decision) closes that gap — the fix isn't a special case bolted onto the old wiring, it falls out of building the two capabilities on the same state machine from the start.
 
 ## Alternatives considered
 
-**A separate lightweight `TextToSpeech` instance for question-reading**, distinct from `VoiceGateway`/`TtsPlayer` (mirroring how `VoiceAnswerController` already handles its own grade/failure notices) — rejected once the shared-bottom-sheet requirement (speed slider, voice picker, play/pause, identical to Fast mode's) was set: that UI is hard-wired to `VoiceGateway`'s state (`isVoiceActive`/`isVoicePlaying` gate the whole `BottomSheetScaffold` in `StudySessionScreen.kt`), so a second TTS path would need a second bottom sheet. The grade/failure notice TTS stays a separate lightweight instance — it's a fire-and-forget announcement with no transport controls, genuinely different from question-reading.
+**A separate lightweight `TextToSpeech` instance for question-reading**, distinct from `TtsPlayer` (mirroring how the grade and failure notices get their own engine, owned by `NoticeSpeaker`) — rejected once the shared-bottom-sheet requirement (speed slider, voice picker, play/pause, identical to Fast mode's) was set: that UI is hard-wired to the voice player's state (`isVoiceActive`/`isVoicePlaying` gate the whole `BottomSheetScaffold` in `StudySessionScreen.kt`), so a second TTS path would need a second bottom sheet. The grade/failure notice TTS stays a separate lightweight instance, owned by `NoticeSpeaker` — it's a fire-and-forget announcement with no transport controls, genuinely different from question-reading, and its callbacks never touch the player's utterance state machine.
 
 **No silence timeout (listen indefinitely) or a re-prompt-before-skipping variant** — rejected for now in favor of a flat 8s timeout → audible skip. Indefinite listening risks a session hanging on one card with no recovery path in a mode that deliberately has no button fallback. Re-prompting once before skipping is a reasonable future refinement (see Consequences) but adds retry-count state this rework doesn't need yet.
 
@@ -28,8 +28,8 @@ A bug surfaced during the original implementation: `VoiceAnswerController.start(
 
 ## Consequences
 
-- `VoiceAnswerController`'s phase state machine needs states/handling for: waiting-for-question-TTS-to-finish before listening starts, the 8s silence timeout, and pausing/ignoring capture during the grade-feedback notice.
-- `VoiceGateway`/`TtsPlayer` needs a Rated-mode playback shape (stop after question, no auto-progress to answer) distinct from Fast mode's continuous auto-advance.
+- The voice round (`RatedSessionReducer`'s round, run by `RatedStudySessionCoordinator`) needs states/handling for: waiting-for-question-TTS-to-finish before listening starts, the 8s silence timeout, and pausing/ignoring capture during the grade-feedback notice.
+- `TtsPlayer` needs a Rated-mode playback shape (question-only mode: stop after the question and report `PlaybackEvent.QuestionFinished`, no auto-progress to answer) distinct from Fast mode's continuous auto-advance.
 - `StudySessionScreen.kt`'s `BottomSheetScaffold` content, gated only on `state.isVoiceActive`, needs to branch on Fast vs. Rated-voice-answering-on (different controls, different `sheetPeekHeight` semantics) — it can no longer assume "voice active" means "Fast mode."
 - `functions/src/lib/grading.ts`'s Gemini prompt needs updating to: instruct inclusion of the full acceptable answer in feedback when the grade is Failed/Partial, and keep Correct feedback to a short affirmation.
 - Grade-to-band mapping needs to live somewhere shared enough that both feedback-content logic and the rating-write logic (ADR-0026) reuse it without drift.

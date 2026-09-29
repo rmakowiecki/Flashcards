@@ -3,24 +3,27 @@ package com.rossomak.flashcards.feature.study.rated
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rossomak.flashcards.core.domain.annotation.ArchConventionExempt
-import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
-import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
-import com.rossomak.flashcards.core.domain.model.RatedSessionState
-import com.rossomak.flashcards.core.domain.model.SessionClock
-import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason
+import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
+import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.LoadFailed
+import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.Loading
+import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.Running
+import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
-import com.rossomak.flashcards.core.domain.model.XpConfig
-import com.rossomak.flashcards.core.domain.model.rate
-import com.rossomak.flashcards.core.domain.model.requeueAfterSilence
-import com.rossomak.flashcards.core.domain.model.sealRatedCardResults
-import com.rossomak.flashcards.core.domain.model.sealSessionResult
-import com.rossomak.flashcards.core.domain.model.startClock
-import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
-import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.MicPermissionRevoked
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.SessionEnded
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerCaptureUnavailable
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerGradingFailed
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerGradingPause
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerSilencePause
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerSilenceSkip
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoicePlaybackUnavailable
+import com.rossomak.flashcards.core.domain.session.RatedSessionSetup
+import com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator
+import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceAnswerLevelUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -30,6 +33,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
+import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -38,19 +42,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCur
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.NoConnection
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerFailureReason.GradingFailed.ServiceError
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
-import com.rossomak.flashcards.feature.study.voice.VoiceGateway
-import com.rossomak.flashcards.feature.study.voice.VoicePhase
-import com.rossomak.flashcards.feature.study.voice.VoicePlaybackState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Instant
-import java.time.ZoneId
-import java.util.UUID
 import javax.inject.Inject
-import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Job
@@ -62,38 +55,30 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Runs a Rated Study Session end to end — reveal, the Failed/Partial/Correct row, and the
- * session-entry microphone check for voice answering
- * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)).
- * Knows nothing about Read-aloud or auto-start playback — those are Fast concepts.
- *
- * The rating callback drives a [RatedSessionState]: a Correct rating finishes a card as Mastered,
- * Failed/Partial re-insert it further down the queue (or finish it, per
- * [RatedStudySessionRoute.partialRatingCardRequeueingEnabled] and the Attempts limit), and the
- * session's terminal navigation event fires once the queue empties. A voice grade drives the exact same [onAttemptRating] path as a manual tap; a
- * silence timeout instead consumes no Attempt, and three in a row pause the session rather than
- * finishing it.
+ * The screen of a Rated Study Session
+ * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)):
+ * dialogs, the mapping of [RatedStudySessionCoordinator]'s snapshot to screen state, messages,
+ * navigation and the microphone bar levels. Every session rule — the queue, Ratings, the Voice
+ * Answering round, transport commands, the clock and the result — lives in the coordinator
+ * ([ADR-0054](../../../../../../../../docs/adr/0054-study-session-rules-in-domain-coordinators.md)).
  */
 @HiltViewModel
-@ArchConventionExempt("Injects VoiceGateway directly, pending a use-case wrap (ADR-0051)")
 class RatedStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val getSessionStartData: GetSessionStartDataUseCase,
     private val submitCurationReport: SubmitCurationReportUseCase,
-    private val voiceGateway: VoiceGateway,
+    private val observeVoiceAnswerLevel: ObserveVoiceAnswerLevelUseCase,
+    private val coordinator: RatedStudySessionCoordinator,
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<RatedStudySessionRoute>()
-
-    // Distinct from the screen's own per-card title (chrome.studySessionCardTitle):
-    // this is the fixed name the voice gateway's notification shows for the whole session.
-    private val sessionTitle: String = route.sessionTitle
 
     private val _state = MutableStateFlow(
         RatedStudySessionScreenState(
@@ -105,49 +90,6 @@ class RatedStudySessionViewModel @Inject constructor(
     )
     val state: StateFlow<RatedStudySessionScreenState> = _state.asStateFlow()
 
-    // Tracks eagerly so rapid toggles don't race against isVoiceActive propagation.
-    private var voiceStarted = false
-
-    internal var rewindThresholdMs: Long = VoicePlaybackState.REWIND_THRESHOLD_MS
-
-    // Test-only seam for asserting a deterministic queue sequence (ADR-0046) — production leaves this as Random.Default and never seeds it.
-    internal var random: Random = Random.Default
-
-    // Test-only seam mirroring random above — production leaves this as Instant::now and never overrides it.
-    internal var now: () -> Instant = Instant::now
-
-    // Generated once per session and carried on the ViewModel rather than SavedStateHandle — the
-    // ViewModel instance itself already survives config changes, and there is nothing to restore it from
-    // after an app kill (no in-progress persistence, by design).
-    private val sessionId: String = UUID.randomUUID().toString()
-
-    // Started once, at first card shown, and never paused — v1 is deliberately simplistic: wall
-    // time from first card shown to termination, unconditional of backgrounding or playback state.
-    // Revisit if a richer policy (e.g. pausing on background) is needed later.
-    private var clock: SessionClock = SessionClock()
-
-    // The instant the clock started — carried separately because a session whose card load fails
-    // never starts it at all, and SessionResult.startedAt needs that distinction.
-    private var sessionStartedAt: Instant? = null
-
-    // The device's UTC offset at that same instant, captured once alongside sessionStartedAt rather
-    // than re-read from ZoneId.systemDefault() at submission time — a device timezone change mid-session
-    // must not shift the streak/daily-goal study date the server derives from this value.
-    private var sessionStartUtcOffsetMinutes: Int = 0
-
-    // Guards terminate() against firing twice — natural end (onAttemptRating) and a confirmed "Exit
-    // session?" can otherwise both fire if the dialog is already open the instant the last card
-    // resolves, sending a second Summary navigation event. Mirrors FastStudySessionViewModel's
-    // identical guard.
-    private var terminated = false
-
-    // Guards the mic-permission-revoked terminal path (observeVoiceAnswerState) against emitting
-    // its snackbar more than once — terminate() is separately idempotent, but the underlying
-    // VoiceAnswerState can keep repeating while this collector runs until the ViewModel clears.
-    private var micPermissionRevokedHandled = false
-
-    private var rewindJob: Job? = null
-    private var isPastRewindThreshold = false
     private val eventChannel = Channel<RatedStudySessionDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
@@ -158,542 +100,222 @@ class RatedStudySessionViewModel @Inject constructor(
      * Live microphone bar levels for the listening indicator. Kept out of [state] so the level
      * stream never recomposes the rest of the screen.
      */
-    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = voiceGateway.rawVoiceLevel.stateInVoiceBarsLevels(viewModelScope)
-
-    private var lastObservedCardIndex = -1
-
-    // Seeded once the routed cards resolve (loadFlashcards); null only during that initial load.
-    private var ratedSessionState: RatedSessionState? = null
-
-    // Session-start-only signal: one packed progress
-    // document read per Subcategory in the route's scope, merged into cardId -> CardProgressEntry.
-    // Its scope is the session's scope, decided before anything is studied — it can end up strictly
-    // larger than what SubmitStudySessionUseCase's own prior-state read later touches (an abandoned
-    // session, or a drawn Subcategory never reached), and that is not a bug to reconcile, just waste.
-    // A failed read (offline, permissions, ...) leaves this empty rather than blocking the session;
-    // every card is then simply not-previously-mastered / new — the server-authoritative
-    // `submitStudySession` Cloud Function never trusts this signal either, re-reading prior
-    // progress itself before deciding what actually gets written.
-    // Exposed internally only for test assertions — nothing in the UI reads it.
-    internal var priorProgressByCardId: Map<String, CardProgressEntry> = emptyMap()
-        private set
-
-    // The XP configuration as of this session's start, fetched alongside
-    // sessionStartData and never re-read — ADR-0047's snapshot rule. Defaults to XpConfig()'s own
-    // defaults for the brief window before loadFlashcards' fetch resolves; abandoning before then
-    // seals a placeholderResult scored against that same default, same as an empty cardResults list.
-    private var sessionXpConfig: XpConfig = XpConfig()
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> =
+        flow { emitAll(observeVoiceAnswerLevel()) }.stateInVoiceBarsLevels(viewModelScope)
 
     private val isExtendedContextDialogOpen: Boolean
         get() = _state.value.activeDialog is CurrentCardExtendedContext
 
+    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
     // True only when the pause was caused by the dialog intercepting a natural between-card advance.
     // Gates auto-advance on dialog dismiss and changes play-button behavior.
     private var pausedDueToExtendedContext = false
     private var advanceAfterExtendedContextJob: Job? = null
+    private var lastPresentedCardId: String? = null
 
+    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
     // True only when opening voice settings paused an in-progress playback; gates resume on close.
     private var pausedForVoiceSettings = false
 
-    // Edge-detects a fresh arrival at SpeakingNotice in observeVoiceAnswerState — the collector
-    // sees every VoiceAnswerState the gateway emits, but a grade/silence-timeout must apply exactly
-    // once per round, not once per equal-value re-collection.
-    private var previousVoiceAnswerPhase = VoiceAnswerPhase.Idle
-
-    // Holds the screen-visible half of a voice-graded rating or silence-timeout (queue reseed,
-    // currentCard/currentCardRatings, answer-reveal reset, terminal navigation) while the grade or
-    // skip notice is still being spoken. The queue reducer itself (ratedSessionState) still updates
-    // immediately — only what the user sees is held back — so the top of the screen keeps showing
-    // the card the feedback is actually about instead of jumping to the next question mid-notice.
-    // Runs once the phase has left SpeakingNotice and no short notice is still speaking (see
-    // observeVoiceAnswerState), whatever the reason (notice finished naturally, or voice answering
-    // was torn down mid-notice, e.g. by a pause whose notice is still being spoken).
-    private var pendingSessionSync: (() -> Unit)? = null
-
-    // Session-scoped, not per-card: counts consecutive silence timeouts, reset by any
-    // graded answer, and pauses the session on reaching CONSECUTIVE_SILENCE_PAUSE_THRESHOLD.
-    private var consecutiveSilenceCount = 0
-
-    // Session-scoped like consecutiveSilenceCount and independent of it: counts consecutive grading
-    // failures, reset only by a graded answer, and pauses the session on reaching
-    // CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD, so an offline session never cycles the deck forever.
-    private var consecutiveGradingFailureCount = 0
-
     // Session-scoped like the rest of the routed config: a mid-session change updates only this
     // running session unless the user checks "keep as my default" (ADR-0030), so it lives in a
-    // plain var rather than being re-read from the controller on every playback start.
+    // plain var rather than being re-read from the controller on every dialog open.
     private var sessionVoiceSettings: SavedVoiceSettings = route.voiceSettings
 
     init {
-        loadFlashcards()
-        observeVoiceState()
-        observeVoiceAnswerState()
-    }
-
-    // Card selection happens on the Preview Study Session screen (ADR-0004); the session only
-    // resolves the routed cardIds to full Flashcards, preserving the routed order.
-    private fun loadFlashcards() {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            val sessionStartData = getSessionStartData(route.subcategoryIds)
-            val flashcards = sessionStartData.flashcardsResult.getOrElse { _ ->
-                _state.update { state -> state.copy(isLoading = false, error = "Could not load flashcards") }
-                return@launch
-            }
-            // A failed Subcategory progress read and a never-studied one are already folded into
-            // "no entries" by GetSessionStartDataUseCase — never fatal, never surfaced, exactly the
-            // graceful degradation this design calls for.
-            priorProgressByCardId = sessionStartData.priorProgressByCardId
-            sessionXpConfig = sessionStartData.xpConfig
-
-            val cardsById = flashcards.associateBy { it.id }
-            val sessionCards = route.cardIds.mapNotNull(cardsById::get)
-            val previouslyMasteredCardIds = priorProgressByCardId
-                .filterValues { it.state == FlashcardStudyProgressState.Mastered }
-                .keys
-            ratedSessionState = RatedSessionState.seed(
-                cards = sessionCards,
+        observeSnapshot()
+        observeSessionEvents()
+        coordinator.start(
+            scope = viewModelScope,
+            setup = RatedSessionSetup(
+                categoryId = route.categoryId,
+                categoryName = route.categoryName,
+                subcategoryIds = route.subcategoryIds,
+                subcategoryNames = route.subcategoryNames,
+                cardIds = route.cardIds,
+                sessionTitle = route.sessionTitle,
+                voiceSettings = route.voiceSettings,
+                voiceAnsweringEnabled = route.voiceAnsweringEnabled,
                 attemptsLimit = route.ratedAttempts,
                 partialRatingCardRequeueingEnabled = route.partialRatingCardRequeueingEnabled,
-                random = random,
-                previouslyMasteredCardIds = previouslyMasteredCardIds,
-            )
-            _state.update { it.copy(isLoading = false) }
-            syncStateFromRatedSession()
-            // The clock starts here, once a card is actually on screen — never at route entry, so
-            // a session whose card load fails never banks time.
-            if (sessionCards.isNotEmpty()) startStudyClock()
-            // The Preview screen's voice-answering choice (ADR-0030) takes effect on entry. Preview only
-            // launches a voice-answering session with the microphone already granted; a session
-            // restored after the microphone was revoked is ended by observeVoiceAnswerState. Enabling
-            // voice answering is what bootstraps the gateway here (ADR-0025).
-            if (route.voiceAnsweringEnabled && sessionCards.isNotEmpty()) {
-                ensureVoiceGatewayStarted()
-                voiceGateway.setVoiceAnswering(true)
-            }
-        }
+            ),
+        )
     }
 
-    private fun startStudyClock() {
-        val instant = now()
-        sessionStartedAt = instant
-        sessionStartUtcOffsetMinutes = ZoneId.systemDefault().rules.getOffset(instant).totalSeconds / SECONDS_PER_MINUTE
-        clock = startClock(clock, instant)
-    }
-
-    /**
-     * Mirrors the machine's queue into screen state. [RatedStudySessionScreenState.currentCardIndex]
-     * always lands on 0 in this path — the current card is always the queue's head.
-     *
-     * Also re-seeds the voice engine's queue whenever voice is active: [VoiceGateway.updateQueue]
-     * swaps in [RatedSessionState.remainingCards] without touching the in-flight utterance, keeping
-     * the spoken card, displayed card, and reducer head from diverging once a rating or silence
-     * timeout reorders the queue (ADR-0046).
-     */
-    private fun syncStateFromRatedSession() {
-        val machine = ratedSessionState ?: return
-        _state.update {
-            it.copy(
-                flashcards = machine.remainingCards,
-                currentCardIndex = 0,
-                masteredCount = machine.masteredCount,
-                completedCount = machine.completedCount,
-                distinctCardCount = machine.distinctCardCount,
-                currentCardRatings = machine.currentCardRatings,
-            )
-        }
-        // voiceStarted, not just isVoiceActive: a rating can land after voiceGateway.start() was
-        // called but before the async bind actually completes (isVoiceActive still false at that
-        // point) — StudySessionVoiceGateway.updateQueue() unconditionally updates its pendingCards
-        // regardless of bind state, so this still reaches the gateway before onServiceConnected()
-        // loads it, rather than leaving it to load the stale pre-rating order.
-        if (_state.value.isVoiceActive || voiceStarted) {
-            voiceGateway.updateQueue(machine.remainingCards)
-        }
-    }
-
-    private fun observeVoiceState() {
+    private fun observeSnapshot() {
         viewModelScope.launch {
-            voiceGateway.state.collect { voice ->
-                if (voice.error != null) {
-                    voiceStarted = false
-                    // Falls back to the manual-mode sheet too — the engine isn't coming back for
-                    // this session, so there is no point leaving voice's controls up, greyed out.
-                    _state.update { it.copy(isVoiceMode = false, isVoiceActive = false, isVoicePlaying = false) }
-                    _messages.tryEmit(RatedStudySessionMessage.VoicePlaybackUnavailable)
-                    return@collect
-                }
-                _state.update {
-                    it.copy(
-                        isVoiceActive = voice.isActive,
-                        isVoicePlaying = voice.isPlaying,
-                        speechRate = voice.speechRate,
-                        currentCardIndex = if (voice.isActive) voice.currentIndex else it.currentCardIndex,
-                        // Grading/feedback also reveals the card (see observeVoiceAnswerState) —
-                        // don't let this collector's phase check stomp that back to false while
-                        // the TTS engine itself is still sitting on QUESTION. SpeakingNotice alone
-                        // is NOT enough to reveal — a silence-timeout skip lands there too with no
-                        // grade to show; only gate it open when this round actually reached
-                        // grading: it produced a grade, or its grading failed.
-                        isAnswerRevealed = if (voice.isActive) {
-                            voice.phase == VoicePhase.Answer ||
-                                it.voiceAnswerPhase == VoiceAnswerPhase.Grading ||
-                                (it.voiceAnswerPhase == VoiceAnswerPhase.SpeakingNotice && (it.lastVoiceAnswerGrade != null || it.isVoiceAnswerGradingFailed))
-                        } else {
-                            it.isAnswerRevealed
-                        },
-                    )
-                }
-                if (voice.isActive && voice.currentIndex != lastObservedCardIndex) {
-                    lastObservedCardIndex = voice.currentIndex
-                    advanceAfterExtendedContextJob?.cancel()
-                    pausedDueToExtendedContext = false
-                    startRewindThresholdTimer()
-                } else if (!voice.isActive) {
-                    voiceStarted = false
-                    lastObservedCardIndex = -1
-                    advanceAfterExtendedContextJob?.cancel()
-                    pausedDueToExtendedContext = false
-                    rewindJob?.cancel()
-                    isPastRewindThreshold = false
-                }
-                if (voice.isInBetweenPause && voice.isPlaying && isExtendedContextDialogOpen && !pausedDueToExtendedContext) {
-                    pausedDueToExtendedContext = true
-                    viewModelScope.launch { voiceGateway.togglePlayPause() }
-                }
+            coordinator.sessionState.collect { snapshot ->
+                _state.update { it.fromSnapshot(snapshot) }
+                if (snapshot is Running) holdAdvanceForExtendedContext(snapshot)
             }
         }
     }
 
-    private fun observeVoiceAnswerState() {
+    private fun observeSessionEvents() {
         viewModelScope.launch {
-            voiceGateway.voiceAnswerState.collect { voiceAnswer ->
-                // A voice-answering session restored after process death with the microphone
-                // revoked ends outright. Revoking in system Settings kills the process, so the
-                // revocation is never seen live: the restored route re-enables voice answering and
-                // VoiceAnswerController.start() reports the bare PermissionMissing. Checked
-                // unconditionally, before the phase handling below, since that state never reaches
-                // SpeakingNotice and the session would otherwise freeze on its card.
-                val error = voiceAnswer.error
-                if (error is VoiceAnswerFailureReason.PermissionMissing) {
-                    if (!micPermissionRevokedHandled) {
-                        micPermissionRevokedHandled = true
-                        voiceGateway.stop()
-                        _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
-                        // Deferred, not immediate: this delay gives the snackbar time to actually show
-                        viewModelScope.launch {
-                            delay(MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS.milliseconds)
-                            terminate(abandoned = true)
-                        }
-                    }
-                    return@collect
+            coordinator.events.collect { event -> onSessionEvent(event) }
+        }
+    }
+
+    private fun onSessionEvent(event: RatedSessionEvent) {
+        when (event) {
+            VoiceAnswerSilenceSkip -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilenceSkip)
+            VoiceAnswerSilencePause -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilencePause)
+            is VoiceAnswerGradingFailed -> _messages.tryEmit(event.reason.toMessage())
+            VoiceAnswerGradingPause -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerGradingPause)
+            VoiceAnswerCaptureUnavailable -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
+            VoicePlaybackUnavailable -> _messages.tryEmit(RatedStudySessionMessage.VoicePlaybackUnavailable)
+            // The session ends after a delay that gives the snackbar time to show.
+            MicPermissionRevoked -> {
+                _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
+                viewModelScope.launch {
+                    delay(MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS.milliseconds)
+                    coordinator.end(abandoned = true)
                 }
-                // A capture failure (Bluetooth mic dropped, capture-loop error, etc.) is recoverable —
-                // pause on the current card rather than ending the session
-                if (error is VoiceAnswerFailureReason.CaptureFailed) {
-                    if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
-                    voiceGateway.setVoiceAnswering(false)
-                    voiceGateway.restartCurrentCard()
-                    // The capture-failure notice starts with this same state, and keeps the sheet on its
-                    // status disc over the pause until the notice has finished.
-                    _state.update { it.copy(isVoiceAnswerPaused = true, isVoiceShortNoticeSpeaking = voiceAnswer.isShortNoticeSpeaking) }
-                    _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
-                    return@collect
-                }
-                // Edge-detected before the state update below, off the collector's own running
-                // previousVoiceAnswerPhase — SpeakingNotice is entered exactly once per graded or
-                // silence-timed-out round, never re-triggered by an equal-value re-collection.
-                val justEnteredSpeakingNotice = voiceAnswer.phase == VoiceAnswerPhase.SpeakingNotice &&
-                    previousVoiceAnswerPhase != VoiceAnswerPhase.SpeakingNotice
-                // The deferred sync below runs once the grade/skip notice is neither the active phase
-                // nor still being spoken — the natural WaitingForQuestion it flips to once the notice
-                // finishes, or voice answering torn down mid-notice. A pause tears it down while its
-                // own short notice keeps speaking, so the next card also waits for that notice.
-                val isNoticeOver = voiceAnswer.phase != VoiceAnswerPhase.SpeakingNotice &&
-                    !voiceAnswer.isShortNoticeSpeaking
-                previousVoiceAnswerPhase = voiceAnswer.phase
-                _state.update {
-                    it.copy(
-                        isVoiceAnswerEnabled = voiceAnswer.isEnabled,
-                        voiceAnswerPhase = voiceAnswer.phase,
-                        voiceAnswerSanitizedTranscript = voiceAnswer.sanitizedTranscript,
-                        lastVoiceAnswerGrade = voiceAnswer.lastGrade,
-                        isVoiceShortNoticeSpeaking = voiceAnswer.isShortNoticeSpeaking,
-                        isVoiceAnswerGradingFailed = voiceAnswer.error is VoiceAnswerFailureReason.GradingFailed,
-                        // Grading starts as soon as the utterance is captured, before the TTS
-                        // engine's own phase would flip to ANSWER — reveal the card now so the
-                        // user can check what they missed while grading/feedback plays out.
-                        isAnswerRevealed = it.isAnswerRevealed ||
-                            voiceAnswer.phase == VoiceAnswerPhase.Grading,
-                    )
-                }
-                if (isNoticeOver) {
-                    pendingSessionSync?.invoke()
-                    pendingSessionSync = null
-                }
-                if (!justEnteredSpeakingNotice) return@collect
-                // ADR-0026: lastGrade == null distinguishes a silence-timeout skip from a real
-                // graded result — both share SpeakingNotice, never a dedicated phase value. But a
-                // grading/transcription failure also lands in SpeakingNotice with lastGrade == null
-                // (VoiceAnswerController's catch block never sets a grade), so error must be ruled
-                // out first or a backend failure gets silently counted as silence.
-                val grade = voiceAnswer.lastGrade
-                when {
-                    grade != null -> onVoiceGraded(grade, voiceAnswer.lastGradedCardId)
-                    // A grading/transcription failure is not counted as a silence timeout: it has
-                    // its own counter and snackbar, though it requeues the card the same way.
-                    error is VoiceAnswerFailureReason.GradingFailed -> onVoiceGradingFailed(error)
-                    else -> onVoiceSilenceTimeout()
-                }
+            }
+            is SessionEnded -> viewModelScope.launch {
+                eventChannel.send(RatedStudySessionDestination.Summary(event.result.toSummaryRoute()))
             }
         }
     }
 
     /**
-     * The one path a voice grade applies a Rating through — [onAttemptRating] itself, exactly like a
-     * manual tap, using the fixed grade-band mapping. An actual graded utterance is the only proof someone is there, so this is also the
-     * one place [consecutiveSilenceCount] and [consecutiveGradingFailureCount] reset during play.
-     *
-     * [gradedCardId] guards against grading a card the reducer head has already moved past — the
-     * Rated voice transport still allows Next while a question is being read (before listening
-     * opens), so a grade can in principle land for a card that isn't the current head any more. A
-     * mismatch means this grade is stale; drop it rather than rating whatever the head currently is.
+     * A command changes the coordinator's snapshot at once; showing it here, rather than waiting for
+     * the snapshot collector to run, keeps the screen in step with the tap that caused it.
      */
-    private fun onVoiceGraded(grade: VoiceAnswerGrade, gradedCardId: String?) {
-        val headCardId = ratedSessionState?.currentCard?.id
-        if (gradedCardId != null && gradedCardId != headCardId) {
-            return
-        }
-        consecutiveSilenceCount = 0
-        consecutiveGradingFailureCount = 0
-        pushNextSilenceWillPauseSession()
-        pushNextGradingFailureWillPauseSession()
-        applyAttemptRating(grade.toFlashcardAttemptRating(), deferSync = true)
+    private fun showSessionNow() {
+        _state.update { it.fromSnapshot(coordinator.sessionState.value) }
     }
 
-    private fun VoiceAnswerFailureReason.GradingFailed.toMessage(): RatedStudySessionMessage = when (this) {
-        NoConnection -> RatedStudySessionMessage.VoiceAnswerGradingOffline
-        ServiceError -> RatedStudySessionMessage.VoiceAnswerGradingServiceError
+    private fun GradingFailureReason.toMessage(): RatedStudySessionMessage = when (this) {
+        GradingFailureReason.NoConnection -> RatedStudySessionMessage.VoiceAnswerGradingOffline
+        GradingFailureReason.ServiceError -> RatedStudySessionMessage.VoiceAnswerGradingServiceError
     }
 
-    /**
-     * A silence timeout: no Attempt, no Rating — the card is put back unchanged, using the Failed
-     * gap range. Three in a row pauses the session rather than letting an unattended phone cycle
-     * the deck indefinitely.
-     *
-     * The reducer updates right away, but what the screen shows waits like [applyAttemptRating]'s deferred
-     * path does — the "didn't hear you" notice is about the still-displayed card, so the queue's
-     * next head must not appear until that notice finishes.
-     */
-    private fun onVoiceSilenceTimeout() {
-        ratedSessionState = ratedSessionState?.let(::requeueAfterSilence)
-        consecutiveSilenceCount++
-        pushNextSilenceWillPauseSession()
-        pendingSessionSync = { syncStateFromRatedSession() }
-        if (consecutiveSilenceCount >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD) {
-            _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilencePause)
-            pauseVoiceAnswering()
-        } else {
-            _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerSilenceSkip)
-        }
+    private fun RatedStudySessionScreenState.fromSnapshot(snapshot: RatedSessionStateSnapshot) = when (snapshot) {
+        Loading -> copy(isLoading = true, error = null)
+        LoadFailed -> copy(isLoading = false, error = R.string.study_session_load_error_message)
+        is Running -> fromRunningSnapshot(snapshot)
     }
 
-    /**
-     * A voice answer that could not be graded: requeued exactly like [onVoiceSilenceTimeout] (no
-     * Attempt, no Rating, deferred screen sync), so the next card follows as the spoken notice
-     * promises. Counted on its own: a silence neither resets nor advances
-     * [consecutiveGradingFailureCount], and reaching its threshold pauses the session the same way.
-     */
-    private fun onVoiceGradingFailed(failureReason: VoiceAnswerFailureReason.GradingFailed) {
-        ratedSessionState = ratedSessionState?.let(::requeueAfterSilence)
-        consecutiveGradingFailureCount++
-        pushNextGradingFailureWillPauseSession()
-        // Grading revealed this card's answer; the next card must start hidden, as after a Rating.
-        pendingSessionSync = {
-            _state.update { it.copy(isAnswerRevealed = false) }
-            syncStateFromRatedSession()
+    private fun RatedStudySessionScreenState.fromRunningSnapshot(snapshot: Running) = copy(
+        isLoading = false,
+        error = null,
+        flashcards = snapshot.cards,
+        // The presented card is always the queue's head.
+        currentCardIndex = 0,
+        isAnswerRevealed = snapshot.isAnswerRevealed,
+        isVoiceActive = snapshot.playback.isActive,
+        isVoicePlaying = snapshot.playback.isPlaying,
+        speechRate = snapshot.playback.speechRate,
+        isVoiceAnswerEnabled = snapshot.isVoiceAnsweringActive,
+        voiceAnswerPhase = snapshot.round.phase,
+        voiceAnswerSanitizedTranscript = snapshot.round.transcript,
+        lastVoiceAnswerGrade = snapshot.round.grade,
+        isVoiceShortNoticeSpeaking = snapshot.isShortNoticeSpeaking,
+        isVoiceAnswerGradingFailed = snapshot.round.gradingFailure != null,
+        masteredCount = snapshot.masteredCount,
+        completedCount = snapshot.completedCount,
+        distinctCardCount = snapshot.distinctCardCount,
+        currentCardRatings = snapshot.currentCardRatings,
+        isVoiceAnswerPaused = snapshot.voiceAnswerPauseReason != null || snapshot.pauseReason != null,
+        isVoiceEngineUnavailable = snapshot.pauseReason == SessionPauseReason.VoiceEngineUnavailable,
+    )
+
+    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
+    private fun holdAdvanceForExtendedContext(snapshot: Running) {
+        val playback = snapshot.playback
+        val presentedCardId = snapshot.cards.firstOrNull()?.id
+        if (!playback.isActive || presentedCardId != lastPresentedCardId) {
+            lastPresentedCardId = presentedCardId
+            advanceAfterExtendedContextJob?.cancel()
+            pausedDueToExtendedContext = false
         }
-        if (consecutiveGradingFailureCount >= CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD) {
-            _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerGradingPause)
-            pauseVoiceAnswering()
-        } else {
-            _messages.tryEmit(failureReason.toMessage())
+        if (playback.isInBetweenPause && playback.isPlaying && isExtendedContextDialogOpen && !pausedDueToExtendedContext) {
+            pausedDueToExtendedContext = true
+            coordinator.pause()
         }
     }
 
-    /**
-     * Pushed ahead of every listen cycle (never computed reactively) so
-     * [VoiceAnswerController.onSilenceTimeout] can pick its own spoken message the instant its
-     * internal timer fires, without needing to know [consecutiveSilenceCount] itself.
-     */
-    private fun pushNextSilenceWillPauseSession() {
-        val willPause = consecutiveSilenceCount + 1 >= CONSECUTIVE_SILENCE_PAUSE_THRESHOLD
-        voiceGateway.setNextSilenceWillPauseSession(willPause)
-    }
-
-    /** The grading-failure counterpart of [pushNextSilenceWillPauseSession], pushed at the same points. */
-    private fun pushNextGradingFailureWillPauseSession() {
-        val willPause = consecutiveGradingFailureCount + 1 >= CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD
-        voiceGateway.setNextGradingFailureWillPauseSession(willPause)
-    }
-
-    /**
-     * Pausing is not ending: no Terminal State, no navigation event, the queue untouched. Playback
-     * and the microphone stop; only the resume affordance stays live.
-     */
-    private fun pauseVoiceAnswering() {
-        if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
-        voiceGateway.setVoiceAnswering(false)
-        _state.update { it.copy(isVoiceAnswerPaused = true) }
-    }
-
-    /** Re-arms voice answering on the same card, both counters back at zero. */
+    /** Resumes a paused session: voice answering, or the whole voice stack after an engine failure. */
     fun onResumeSession() {
-        consecutiveSilenceCount = 0
-        consecutiveGradingFailureCount = 0
-        pushNextSilenceWillPauseSession()
-        pushNextGradingFailureWillPauseSession()
-        _state.update { it.copy(isVoiceAnswerPaused = false) }
-        voiceGateway.setVoiceAnswering(true)
-        if (!_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
+        coordinator.resume()
     }
 
     fun onShowAnswer() {
-        if (_state.value.isVoiceActive) {
-            voiceGateway.showAnswer()
-        } else {
-            _state.update { it.copy(isAnswerRevealed = true) }
-        }
+        coordinator.revealAnswer()
+        showSessionNow()
     }
 
     /**
-     * Applies [rating] to the machine's current (head) card: Correct finishes it Mastered
-     * immediately, Failed/Partial either re-insert it further down the queue or finish it, per the
-     * Attempts limit and [RatedStudySessionRoute.partialRatingCardRequeueingEnabled]. The session
-     * completes — and the terminal navigation event fires — exactly when the queue empties.
+     * A manual self-rating of the presented card. A voice grade applies its Rating inside the
+     * coordinator, the same way.
      */
-    fun onAttemptRating(rating: FlashcardAttemptRating) = applyAttemptRating(rating, deferSync = false)
-
-    /**
-     * [deferSync] is what separates a manual tap from a voice grade: a tap has no feedback playing
-     * over it, so the queue advance is immediate exactly like before. A voice grade instead lands
-     * mid-[VoiceAnswerPhase.SpeakingNotice] — the feedback about to be read is about the card still
-     * on screen, so the queue reducer updates now (the [VoiceGateway] still needs the reordered
-     * queue reseeded to know what's next once the notice ends) but everything the user actually
-     * sees — [RatedStudySessionScreenState.currentCard] and the progress counters, the answer-reveal
-     * reset, and the terminal navigation event — is captured into [pendingSessionSync] and only
-     * runs once that notice actually finishes (see observeVoiceAnswerState).
-     * The one exception is the rated card's attempt markers, which show the new Rating at once.
-     */
-    private fun applyAttemptRating(rating: FlashcardAttemptRating, deferSync: Boolean) {
-        val machine = ratedSessionState ?: return
-        // A rapid second tap, or a late voice grade/silence timeout racing the terminal navigation
-        // event, can still reach here after the queue has emptied — rate() assumes a head to rate.
-        if (machine.isComplete) return
-        val outcome = rate(machine, rating)
-        ratedSessionState = outcome.state
-        val applyEffects = {
-            _state.update { it.copy(isAnswerRevealed = false) }
-            syncStateFromRatedSession()
-            if (outcome.state.isComplete) terminate(abandoned = false)
-        }
-        if (deferSync) {
-            // The markers follow the grade at once, together with the Graded sheet and its spoken
-            // feedback. They describe the rated card, never the machine's new head: rate() has
-            // already removed or re-inserted that card, so machine.currentCardRatings would name
-            // the next card. The deferred sync overwrites them when the card itself changes.
-            _state.update { it.copy(currentCardRatings = machine.currentCardRatings + rating) }
-            pendingSessionSync = applyEffects
-        } else {
-            applyEffects()
-        }
-    }
-
-    private fun ensureVoiceGatewayStarted() {
-        if (voiceStarted) return
-        with(_state.value) {
-            if (flashcards.isEmpty()) return
-            voiceStarted = true
-            voiceGateway.start(
-                cards = flashcards,
-                startIndex = currentCardIndex,
-                subcategoryName = sessionTitle,
-                isVoiceAnsweringSession = true,
-            )
-        }
-        voiceGateway.setSpeechRate(sessionVoiceSettings.speechRate)
-        voiceGateway.setVoice(sessionVoiceSettings.voiceId)
+    fun onAttemptRating(rating: FlashcardAttemptRating) {
+        coordinator.rate(rating)
+        showSessionNow()
     }
 
     fun onVoicePlayPause() {
-        if (_state.value.isVoiceAnswerPaused) {
-            onResumeSession()
-        } else if (pausedDueToExtendedContext) {
-            advanceAfterExtendedContextJob?.cancel()
-            pausedDueToExtendedContext = false
-            viewModelScope.launch {
-                voiceGateway.rewindToNext()
-                voiceGateway.togglePlayPause()
+        when {
+            _state.value.isVoiceAnswerPaused -> onResumeSession()
+            pausedDueToExtendedContext -> {
+                advanceAfterExtendedContextJob?.cancel()
+                pausedDueToExtendedContext = false
+                coordinator.next()
+                coordinator.play()
             }
-        } else {
-            voiceGateway.togglePlayPause()
+            _state.value.isVoicePlaying -> coordinator.pause()
+            else -> coordinator.play()
         }
+        showSessionNow()
     }
 
     fun onVoiceNext() {
         advanceAfterExtendedContextJob?.cancel()
         pausedDueToExtendedContext = false
-        voiceGateway.rewindToNext()
+        coordinator.next()
+        showSessionNow()
     }
 
     fun onVoicePrevious() {
         advanceAfterExtendedContextJob?.cancel()
         pausedDueToExtendedContext = false
-        if (isPastRewindThreshold || voiceGateway.state.value.currentIndex == 0) {
-            voiceGateway.restartCurrentCard()
-            startRewindThresholdTimer()
-        } else {
-            voiceGateway.rewindToPrevious()
-        }
+        coordinator.previous()
+        showSessionNow()
     }
 
     fun onVoiceSpeedChange(rate: Float) {
-        voiceGateway.setSpeechRate(rate)
+        coordinator.setSpeechRate(rate)
     }
 
+    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
     private fun onExtendedContextDialogOpen(dialog: CurrentCardExtendedContext) {
         _state.update { it.copy(activeDialog = dialog) }
-        val voiceState = voiceGateway.state.value
-        if (voiceState.isInBetweenPause && voiceState.isPlaying) {
+        val playback = (coordinator.sessionState.value as? Running)?.playback ?: return
+        if (playback.isInBetweenPause && playback.isPlaying) {
             pausedDueToExtendedContext = true
-            viewModelScope.launch { voiceGateway.togglePlayPause() }
+            coordinator.pause()
         }
     }
 
+    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
     private fun onExtendedContextDialogDismissed() {
         if (pausedDueToExtendedContext) {
             advanceAfterExtendedContextJob = viewModelScope.launch {
                 delay(EXTENDED_CONTEXT_ADVANCE_DELAY_MS.milliseconds)
                 pausedDueToExtendedContext = false
-                voiceGateway.rewindToNext()
-                voiceGateway.togglePlayPause()
+                coordinator.next()
+                coordinator.play()
             }
         }
     }
 
-    private fun startRewindThresholdTimer() {
-        rewindJob?.cancel()
-        isPastRewindThreshold = false
-        rewindJob = viewModelScope.launch {
-            delay(rewindThresholdMs)
-            isPastRewindThreshold = true
-        }
-    }
-
+    // Replaced by the coordinator's own advance hold once dialogs hold at the advance point.
     private fun onVoiceSettingsOpen() {
         if (_state.value.isVoicePlaying) {
             pausedForVoiceSettings = true
-            voiceGateway.togglePlayPause()
+            coordinator.pause()
         }
         _state.update {
             it.copy(activeDialog = SessionVoiceSettings(voiceSettingsController.seedDraft(sessionVoiceSettings)))
@@ -735,10 +357,7 @@ class RatedStudySessionViewModel @Inject constructor(
         } else {
             voiceSettingsController.stopPreview()
         }
-        if (_state.value.isVoiceActive) {
-            voiceGateway.setSpeechRate(settings.speechRate)
-            voiceGateway.setVoice(settings.voiceId)
-        }
+        coordinator.applyVoiceSettings(settings)
         _state.update { it.copy(activeDialog = null) }
         resumeIfPausedForVoiceSettings()
     }
@@ -752,7 +371,7 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun resumeIfPausedForVoiceSettings() {
         if (pausedForVoiceSettings) {
             pausedForVoiceSettings = false
-            voiceGateway.togglePlayPause()
+            coordinator.play()
         }
     }
 
@@ -800,7 +419,7 @@ class RatedStudySessionViewModel @Inject constructor(
             is SessionVoiceSettings -> onVoiceSettingsSave()
             ExitSession -> {
                 onDialogDismiss()
-                terminate(abandoned = true)
+                coordinator.end(abandoned = true)
             }
             // "Got it" and a scrim tap are the same act on a single-action dialog.
             is CurrentCardExtendedContext, null -> onDialogDismiss()
@@ -819,7 +438,7 @@ class RatedStudySessionViewModel @Inject constructor(
     }
 
     private fun onReportProblemOpen(dialog: ReportCurrentCardProblem) {
-        if (_state.value.isVoicePlaying) voiceGateway.togglePlayPause()
+        if (_state.value.isVoicePlaying) coordinator.pause()
         _state.update { it.copy(activeDialog = dialog) }
     }
 
@@ -840,55 +459,12 @@ class RatedStudySessionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Both terminal paths — the last card resolving and a confirmed "Exit session?" — run this,
-     * [abandoned] the only thing differing. Seals cardResults from whatever the
-     * state machine has resolved so far, stamps the duration off [clock], and emits the one-time
-     * navigation event (ADR-0019) exactly once — [terminated] guards a stray second call, e.g. the
-     * exit dialog being confirmed the instant after the last card's rating already completed the
-     * deck and sent its own Summary event. A `null` [ratedSessionState] (abandoning before
-     * flashcards ever finished loading) seals empty cardResults with zero duration rather than
-     * crashing — there is nothing to have studied yet.
-     */
-    private fun terminate(abandoned: Boolean) {
-        if (terminated) return
-        terminated = true
-        val at = now()
-        val cardResults = ratedSessionState?.let { sealRatedCardResults(it, abandoned) } ?: emptyList()
-        val placeholderResult = SessionResult.Rated(
-            id = sessionId,
-            startedAt = sessionStartedAt ?: at,
-            durationSeconds = 0, // overwritten by sealSessionResult below
-            abandoned = abandoned,
-            categoryId = route.categoryId,
-            categoryName = route.categoryName,
-            subcategoryIds = route.subcategoryIds,
-            subcategoryNames = route.subcategoryNames,
-            cardResults = cardResults,
-            // studyDate/dailyGoalMinutes are never read: toSummaryRoute() (below) doesn't carry
-            // either — the Summary ViewModel computes real values when it reconstructs its own
-            // SessionResult from the route. studyDateUtcOffsetMinutes is different: it's the real
-            // value captured at session start, and toSummaryRoute() does carry it through.
-            studyDate = "",
-            studyDateUtcOffsetMinutes = sessionStartUtcOffsetMinutes,
-            dailyGoalMinutes = 0,
-            xpConfig = sessionXpConfig,
-        )
-        val result = sealSessionResult(result = placeholderResult, clock = clock, at = at)
-        viewModelScope.launch {
-            eventChannel.send(RatedStudySessionDestination.Summary(result.toSummaryRoute()))
-        }
-    }
-
     public override fun onCleared() {
-        voiceGateway.stop()
+        coordinator.stop()
     }
 
     private companion object {
         const val EXTENDED_CONTEXT_ADVANCE_DELAY_MS = 500L
-        const val CONSECUTIVE_SILENCE_PAUSE_THRESHOLD = 3
-        const val CONSECUTIVE_GRADING_FAILURE_PAUSE_THRESHOLD = 3
-        const val SECONDS_PER_MINUTE = 60
         const val MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS = 4000L
     }
 }

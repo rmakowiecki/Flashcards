@@ -17,7 +17,7 @@ The voice-grading backend collapses from **four `onRequest` REST functions** (AD
 
 ### 2. Whole-vertical rename to `transcribeAndGradeSpokenAnswer`
 
-The production path is renamed at **every layer** — the deployed function, `VoiceGradingApi`, `VoiceAnswerGradingRepository`, and the use case (`GradeSpokenAnswerUseCase` → `TranscribeAndGradeSpokenAnswerUseCase`). The old `gradeVoiceAnswer` / `gradeSpokenAnswer` names hid that the call owns two responsibilities (transcribe+sanitize, then grade); the new name states both. The debug sibling is named in parallel: `transcribeAndSanitize` (decision 4).
+The production path is renamed at **every layer** — the deployed function, `VoiceGradingApi` and `VoiceAnswerGradingRepository.transcribeAndGradeSpokenAnswer`. There is no use case in between: the Rated study session coordinator calls the repository directly ([ADR-0054](0054-study-session-rules-in-domain-coordinators.md)). The old `gradeVoiceAnswer` / `gradeSpokenAnswer` names hid that the call owns two responsibilities (transcribe+sanitize, then grade); the new name states both. The debug sibling is named in parallel: `transcribeAndSanitize` (decision 4).
 
 Renaming the deployed function is a `functions:delete gradeVoiceAnswer` + create `transcribeAndGradeSpokenAnswer` (Firebase has no in-place rename). Acceptable because there are no production users yet.
 

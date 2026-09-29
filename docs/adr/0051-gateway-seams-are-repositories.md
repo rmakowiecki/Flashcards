@@ -14,12 +14,12 @@ concept. Concretely:
   going forward.
 
 This does not rename existing seams. `VoicePreviewGateway`
-(`core/domain/.../repository/VoicePreviewGateway.kt:3`, impl `DefaultVoicePreviewGateway` in
-`core/data`) and `VoiceGateway` (`feature/study/.../voice/VoiceGateway.kt:27`) keep their current
-names — retroactive renames are out of scope here. `VoiceGateway` is also injected directly into
-`RatedStudySessionViewModel` (`RatedStudySessionViewModel.kt:88`), bypassing a UseCase entirely; that
-is a separate, already-known problem (a ViewModel should not hold a Repository/Gateway-tier
-dependency directly) and is tracked as its own future cleanup, not fixed by this ADR.
+(`core/domain/.../repository/VoicePreviewGateway.kt`, impl `DefaultVoicePreviewGateway` in
+`core/data`) keeps its current name — retroactive renames are out of scope here. The study
+session's voice seams, `StudyVoicePlaybackGateway` and `VoiceCaptureGateway`, also live in
+`core/domain/.../repository/`; no ViewModel holds them. They are reached by the study session
+coordinators, the second orchestration kind described in
+[ADR-0054](0054-study-session-rules-in-domain-coordinators.md).
 
 ## Context
 
@@ -34,8 +34,7 @@ surfaced that this codebase has no consistent rule for when something is a "Gate
 - Every existing Repository implementation (`DefaultFlashcardRepository`, `DefaultAuthRepository`,
   `DefaultVoiceOptionsRepository`, etc. — 13 total) talks to a DataSource, never to a Gateway. No
   Repository in the codebase wraps a Gateway.
-- The only place a "Gateway" is injected directly into a ViewModel (`VoiceGateway` into
-  `RatedStudySessionViewModel`) is an already-acknowledged architecture mistake, not a pattern to
+- Injecting a "Gateway" directly into a ViewModel is an architecture mistake, not a pattern to
   replicate.
 
 So "Gateway" as a distinct tier had no actual enforced layering rule behind it in this codebase — it
@@ -57,11 +56,12 @@ is exactly the premature layering this project's own conventions ask to avoid.
 - New platform-API wrapper seams (this feature's shortcut seam, and any future one) are named and
   boxed as Repositories from the start: `AppShortcutsRepository` (interface,
   `core/domain/.../repository/`) / `DefaultAppShortcutsRepository` (impl, `core/data`).
-- UseCases remain the only orchestration layer allowed to depend on more than one Repository at once;
-  ViewModels depend on UseCases, not Repositories, for anything beyond what's already an established
-  exception (`VoiceGateway`, tracked separately for future correction).
-- "Gateway" is not retroactively purged from the codebase by this ADR — `VoicePreviewGateway` and
-  `VoiceGateway` keep their names until touched for unrelated reasons.
+- UseCases may depend on more than one Repository at once; so may the study session coordinators,
+  which hold long-lived session state a use case cannot
+  ([ADR-0054](0054-study-session-rules-in-domain-coordinators.md)). ViewModels depend on UseCases or
+  a coordinator, never on a Repository or Gateway.
+- "Gateway" is not retroactively purged from the codebase by this ADR — `VoicePreviewGateway` keeps
+  its name until touched for unrelated reasons.
 
 ## Amendments
 
@@ -71,11 +71,13 @@ line with `VoicePreviewGateway`: `PermissionGateway` and `VoiceDemoGateway` foll
 above is unchanged: the interface lives in `core:domain/.../repository/`, the implementation in a
 `data` package, UseCases depend on it directly, and ViewModels reach it only through UseCases.
 
-**2026-09-23 — a seam backed by a specialised core module is implemented in that module.** Some
-platform seams need an implementation stack that lives in its own core module rather than in
-`core:data`, e.g. the onboarding voice demo, which runs on `core:voice`'s native capture and
-playback stack. Such a seam keeps its interface in `core:domain/.../repository/` as usual, but its
-default implementation lives in that module's `data` package (for the voice demo,
-`com.rossomak.flashcards.core.voice.data.DefaultVoiceDemoGateway`), bound by a Hilt module in the
-same module. It does not pull the specialised module into `core:data`. The specialised module
+**2026-09-23 — a seam backed by a specialised module is implemented in that module.** Some
+platform seams need an implementation stack that lives in its own module (core or feature) rather
+than in `core:data`, e.g. the onboarding voice demo, which runs on `core:voice`'s native capture and
+playback stack, and the study session's voice seams, which run on `feature:study`'s Media3 service.
+Such a seam keeps its interface in `core:domain/.../repository/` as usual, but its default
+implementation lives in that module's `data` package (for the voice demo,
+`com.rossomak.flashcards.core.voice.data.DefaultVoiceDemoGateway`; for the study voice,
+`com.rossomak.flashcards.feature.study.voice.data.StudySessionVoiceGateway`), bound by a Hilt module
+in the same module. It does not pull the specialised module into `core:data`. The specialised module
 therefore depends on `core:domain`; `core:domain` never depends back on it.

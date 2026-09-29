@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.study.voice
+package com.rossomak.flashcards.feature.study.voice.data
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -15,16 +15,21 @@ import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.domain.model.CaptureEvent
+import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
  * Media3 [MediaSessionService] that reads flashcards aloud, with background playback capabilities. It owns a
@@ -33,14 +38,15 @@ import kotlinx.coroutines.launch
  * lifecycle. Audio focus is managed inside [TtsPlayer] because Media3 only auto-handles focus for
  * `ExoPlayer`, which we cannot use because it does not support TTS OOTB.
  *
- * The in-app UI binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the card queue
- * and drive playback, and observes [LocalBinder.state] — which carries TTS-specific phase and
- * between-card-pause flags that the standard `Player` state cannot express. System controllers
- * connect to the [MediaSession] returned from [onGetSession].
+ * [StudySessionVoiceGateway] binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the
+ * card queue and drive playback, and observes [LocalBinder.state] — which carries TTS-specific phase
+ * and between-card-pause flags that the standard `Player` state cannot express — and the ordered
+ * [LocalBinder.playbackEvents]. System controllers connect to the [MediaSession] returned from
+ * [onGetSession]; their commands come back out as [PlaybackEvent.ExternalCommand].
  *
- * Voice answering (premium): the service also hosts a [VoiceAnswerController], so background mic
- * capture shares this exact session-scoped foreground lifecycle — listening starts/stops with
- * the session, never outlives it.
+ * It also hosts the rest of the voice stack, so it all shares this session-scoped foreground
+ * lifecycle: a [NoticeSpeaker] on its own text-to-speech engine, and, for voice answering, a
+ * [VoiceCaptureSession]. Nothing here makes a session decision; the study session coordinators do.
  *
  * Media3 only ever starts the foreground service with the `mediaPlayback` type, and drops the
  * foreground state on every pause. Without an active `microphone` type, a background app records
@@ -56,78 +62,85 @@ import kotlinx.coroutines.launch
 class StudySessionVoiceService : MediaSessionService() {
 
     @Inject
-    lateinit var voiceAnswerController: VoiceAnswerController
+    lateinit var voiceCaptureSession: VoiceCaptureSession
 
     private val binder = LocalBinder()
 
+    // Single collector (the gateway); unlimited so nothing reported before it subscribes is lost.
+    private val playbackEvents = Channel<PlaybackEvent>(Channel.UNLIMITED)
+
     private lateinit var player: TtsPlayer
+    private lateinit var noticeSpeaker: NoticeSpeaker
     private lateinit var mediaSession: MediaSession
 
     private lateinit var notificationProvider: DefaultMediaNotificationProvider
     private val notificationActionFactory = VoiceSessionNotificationActionFactory(service = this)
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private var sessionCards: List<VoiceFlashcard> = emptyList()
 
-    // Fixed when the session loads, never by setVoiceAnswering: a pause turns voice answering off,
-    // and the microphone type must survive it for a background resume to be able to listen.
+    // Fixed when the session loads, never by stopVoiceAnswering: a pause stops voice answering, and
+    // the microphone type must survive it for a background resume to be able to listen.
     private var isVoiceAnsweringSession = false
     private var isStartedForVoiceAnswering = false
 
+    @Suppress("TooManyFunctions") // one method per voice-stack command the gateway forwards.
     inner class LocalBinder : Binder() {
         val state: StateFlow<VoicePlaybackState> get() = player.voiceState
 
-        val voiceAnswerState: StateFlow<VoiceAnswerState> get() = voiceAnswerController.state
+        val playbackEvents: Flow<PlaybackEvent> get() = this@StudySessionVoiceService.playbackEvents.receiveAsFlow()
 
-        val rawVoiceLevel: Flow<Float> get() = voiceAnswerController.rawVoiceLevel
+        val captureEvents: Flow<CaptureEvent> get() = voiceCaptureSession.events
 
-        fun loadSession(cards: List<VoiceFlashcard>, startIndex: Int, subcategoryName: String, isVoiceAnsweringSession: Boolean) {
-            sessionCards = cards
+        val rawVoiceLevel: Flow<Float> get() = voiceCaptureSession.rawVoiceLevel
+
+        fun loadSession(cards: List<VoiceFlashcard>, startIndex: Int, sessionTitle: String, isVoiceAnsweringSession: Boolean) {
             this@StudySessionVoiceService.isVoiceAnsweringSession = isVoiceAnsweringSession
-            player.loadAndStartSession(cards, startIndex, subcategoryName)
+            player.loadAndStartSession(cards, startIndex, sessionTitle)
             // Right away, while the study screen that loads the session is still visible: the
             // microphone type can only be acquired from the foreground.
             if (isVoiceAnsweringSession) startForegroundWithMicrophone(mediaSession)
         }
 
-        fun updateQueue(cards: List<VoiceFlashcard>) {
-            sessionCards = cards
-            player.updateQueue(cards)
-        }
+        fun updateQueue(cards: List<VoiceFlashcard>) = player.updateQueue(cards)
 
-        fun togglePlayPause() = player.togglePlayPause()
+        fun play() = player.startReading()
+
+        fun pause() = player.pauseReading()
 
         fun moveToNextCard() = player.moveToNextCard()
 
         fun moveToPreviousCard() = player.moveToPreviousCard()
 
-        fun restartCurrentCardPlayback() = player.restartCurrentCardPlayback()
+        fun jumpTo(index: Int) = player.jumpTo(index)
 
-        fun skipToCardAnswerPlayback() = player.skipToCardAnswerPlayback()
+        fun restartCurrentCard() = player.restartCurrentCardPlayback()
 
-        fun setPlaybackSpeechRate(rate: Float) = player.setPlaybackSpeechRate(rate)
+        fun showAnswer() = player.skipToCardAnswerPlayback()
+
+        fun advanceAfterVoiceAnswer() = player.advanceAfterVoiceAnswer()
+
+        fun setQuestionOnlyMode(enabled: Boolean) = player.setQuestionOnlyMode(enabled)
+
+        fun setSpeechRate(rate: Float) = player.setPlaybackSpeechRate(rate)
 
         fun setVoice(voiceId: String?) = player.setVoice(voiceId)
 
-        fun setVoiceAnswering(enabled: Boolean) {
-            player.setVoiceAnsweringMode(enabled)
-            if (enabled) {
-                voiceAnswerController.start()
-                // Voice answering turns on only after loadSession, which ignores a refused
-                // microphone type while the controller is not running yet; retry so a refusal reaches it.
-                if (isVoiceAnsweringSession) startForegroundWithMicrophone(mediaSession)
-            } else {
-                voiceAnswerController.stop()
-            }
+        fun speakNotice(notice: SpokenNotice) = noticeSpeaker.speak(notice)
+
+        fun startVoiceAnswering() {
+            voiceCaptureSession.start()
+            // Voice answering starts only after loadSession, which drops a refused microphone type
+            // while capture is not started yet; retry so a refusal reaches the capture events.
+            if (isVoiceAnsweringSession) startForegroundWithMicrophone(mediaSession)
         }
 
-        fun setNextSilenceWillPauseSession(willPause: Boolean) {
-            voiceAnswerController.setNextSilenceWillPauseSession(willPause)
-        }
+        fun stopVoiceAnswering() = voiceCaptureSession.stop()
 
-        fun setNextGradingFailureWillPauseSession(willPause: Boolean) {
-            voiceAnswerController.setNextGradingFailureWillPauseSession(willPause)
-        }
+        suspend fun awaitRouteReady() = voiceCaptureSession.awaitRouteReady()
+
+        fun startListening() = voiceCaptureSession.startListening()
+
+        fun stopListening() = voiceCaptureSession.stopListening()
 
         fun stopPlayback() = this@StudySessionVoiceService.stopPlayback()
     }
@@ -136,41 +149,22 @@ class StudySessionVoiceService : MediaSessionService() {
         super.onCreate()
         // applicationContext, not `this` — TextToSpeech's engine binder connection outlives our
         // own shutdown() call by a beat (async unbind), and would otherwise pin the whole Service
-        // (MediaSession, CoroutineScope, VoiceAnswerController) alive past onDestroy() (leak).
-        player = TtsPlayer(applicationContext)
+        // (MediaSession, CoroutineScope, VoiceCaptureSession) alive past onDestroy() (leak). Both
+        // engines start here, so both initialize as soon as the voice stack starts.
+        player = TtsPlayer(applicationContext) { event -> playbackEvents.trySend(event) }
+        noticeSpeaker = NoticeSpeaker(
+            scope = serviceScope,
+            resolveText = applicationContext::spokenText,
+            onNoticeFinished = { notice -> playbackEvents.trySend(PlaybackEvent.NoticeFinished(notice)) },
+            onEngineUnavailable = { playbackEvents.trySend(PlaybackEvent.EngineUnavailable) },
+            engineFactory = { listener -> TextToSpeechNoticeEngine(applicationContext, listener) },
+        )
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(contentPendingIntent())
             .build()
         // Shared with Media3's default path, so both post the same notification on the same channel.
         notificationProvider = DefaultMediaNotificationProvider.Builder(this).build()
         setMediaNotificationProvider(notificationProvider)
-        observeCurrentCardForVoiceAnswering()
-        observeVoiceAnswerAdvanceRequests()
-    }
-
-    // Keeps the grading context in lockstep with whichever card TTS playback is on, so a
-    // captured utterance is always graded against the card the user just heard, and opens the
-    // controller's listening window exactly when the shared TTS engine finishes the question
-    // (ADR-0025: never listen while any TTS is speaking).
-    private fun observeCurrentCardForVoiceAnswering() {
-        serviceScope.launch {
-            var wasAwaitingSpokenAnswer = false
-            player.voiceState.collect { voice ->
-                val currentCard = if (voice.isActive) sessionCards.getOrNull(voice.currentIndex) else null
-                voiceAnswerController.setActiveCard(currentCard)
-                if (voice.isAwaitingSpokenAnswer && !wasAwaitingSpokenAnswer) {
-                    voiceAnswerController.onQuestionFinishedSpeaking()
-                }
-                wasAwaitingSpokenAnswer = voice.isAwaitingSpokenAnswer
-            }
-        }
-    }
-
-    // Grade computed (or silence-timeout skip) + notice spoken -> controller asks to move on.
-    private fun observeVoiceAnswerAdvanceRequests() {
-        serviceScope.launch {
-            voiceAnswerController.advanceRequests.collect { player.advanceToNextCardAfterVoiceAnswer() }
-        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
@@ -224,7 +218,7 @@ class StudySessionVoiceService : MediaSessionService() {
 
     private fun onMicrophoneForegroundRefused(exception: RuntimeException) {
         loge(exception) { "Voice answering session refused the microphone foreground-service type" }
-        voiceAnswerController.reportCaptureFailure(VoiceCaptureFailureReason.CaptureLoopError(exception.message))
+        voiceCaptureSession.reportCaptureFailure(VoiceCaptureFailureReason.CaptureLoopError(exception.message))
     }
 
     override fun onBind(intent: Intent?): IBinder? =
@@ -237,7 +231,7 @@ class StudySessionVoiceService : MediaSessionService() {
     }
 
     private fun stopPlayback() {
-        voiceAnswerController.stop()
+        voiceCaptureSession.stop()
         if (isVoiceAnsweringSession) {
             // Hands the notification back to Media3's default path before the queue empties.
             isVoiceAnsweringSession = false
@@ -248,7 +242,8 @@ class StudySessionVoiceService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        voiceAnswerController.release()
+        voiceCaptureSession.release()
+        noticeSpeaker.release()
         serviceScope.cancel()
         mediaSession.release()
         player.release()
@@ -268,6 +263,6 @@ class StudySessionVoiceService : MediaSessionService() {
     }
 
     companion object {
-        const val ACTION_BIND_LOCAL = "com.rossomak.flashcards.feature.study.voice.BIND_LOCAL"
+        const val ACTION_BIND_LOCAL = "com.rossomak.flashcards.feature.study.voice.data.BIND_LOCAL"
     }
 }

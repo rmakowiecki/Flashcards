@@ -372,6 +372,19 @@ class ArchitectureKonsistTest {
     }
 
     @Test
+    fun `reducers in core domain take no constructor parameter other than Random`() {
+        // ADR-0054: a reducer is a pure function of its state and input. A clock, a gateway or a
+        // logger in its constructor would let it read or change the world; pure helpers it calls
+        // are objects, so they never show up here.
+        projectScope
+            .classes()
+            .filter { it.path.contains("/core/domain/src/main/") && it.name.endsWith("Reducer") }
+            .assertTrue { koClass ->
+                koClass.primaryConstructor?.parameters.orEmpty().all { parameter -> parameter.type.name == "Random" }
+            }
+    }
+
+    @Test
     fun `unit test files are named after the class under test`() {
         // Fake*.kt test doubles live alongside tests but aren't themselves a test class.
         projectScope

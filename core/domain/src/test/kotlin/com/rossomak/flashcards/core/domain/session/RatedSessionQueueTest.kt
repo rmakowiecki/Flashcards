@@ -1,8 +1,12 @@
-package com.rossomak.flashcards.core.domain.model
+package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating.Correct
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating.Failed
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating.PartiallyCorrect
+import com.rossomak.flashcards.core.domain.model.FlashcardTerminalRating
+import com.rossomak.flashcards.core.domain.model.RatedSessionState
+import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
@@ -10,7 +14,10 @@ import io.kotest.matchers.shouldNotBe
 import kotlin.random.Random
 import org.junit.Test
 
-class RatedSessionStateTest {
+/** The queue rules [RatedSessionReducer] runs a Rating, a silence or a skip through. */
+class RatedSessionQueueTest {
+
+    private var random: Random = Random(FIXED_SEED)
 
     private fun flashcard(id: String): Flashcard = Flashcard(
         id = id,
@@ -33,18 +40,20 @@ class RatedSessionStateTest {
         attemptsLimit: Int = DEFAULT_ATTEMPTS_LIMIT,
         partialRatingCardRequeueingEnabled: Boolean = true,
         random: Random = Random(FIXED_SEED),
-    ): RatedSessionState = RatedSessionState.seed(
-        cards = cards(cardCount),
-        attemptsLimit = attemptsLimit,
-        partialRatingCardRequeueingEnabled = partialRatingCardRequeueingEnabled,
-        random = random,
-    )
+    ): RatedSessionState {
+        this.random = random
+        return RatedSessionReducer(random).seed(
+            cards = cards(cardCount),
+            attemptsLimit = attemptsLimit,
+            partialRatingCardRequeueingEnabled = partialRatingCardRequeueingEnabled,
+        )
+    }
 
     @Test
     fun `Correct on the first Attempt finishes the card as Mastered`() {
         val session = state(cardCount = 1)
 
-        val outcome = rate(session, Correct)
+        val outcome = rate(session, Correct, random)
 
         outcome.terminal shouldBe FlashcardTerminalRating.Mastered
         outcome.state.isComplete shouldBe true
@@ -54,9 +63,9 @@ class RatedSessionStateTest {
     fun `Correct on a later Attempt still finishes the card as Mastered`() {
         val session = state(cardCount = 1, attemptsLimit = 3)
 
-        val afterFailed = rate(session, Failed)
+        val afterFailed = rate(session, Failed, random)
         afterFailed.terminal shouldBe null
-        val afterCorrect = rate(afterFailed.state, Correct)
+        val afterCorrect = rate(afterFailed.state, Correct, random)
 
         afterCorrect.terminal shouldBe FlashcardTerminalRating.Mastered
     }
@@ -65,11 +74,11 @@ class RatedSessionStateTest {
     fun `Failed then Partial then Failed resolves to Terminal Partial, not Terminal Failed`() {
         val session = state(cardCount = 1, attemptsLimit = 3)
 
-        val afterFailed = rate(session, Failed)
+        val afterFailed = rate(session, Failed, random)
         afterFailed.terminal shouldBe null
-        val afterPartial = rate(afterFailed.state, PartiallyCorrect)
+        val afterPartial = rate(afterFailed.state, PartiallyCorrect, random)
         afterPartial.terminal shouldBe null
-        val afterSecondFailed = rate(afterPartial.state, Failed)
+        val afterSecondFailed = rate(afterPartial.state, Failed, random)
 
         afterSecondFailed.terminal shouldBe FlashcardTerminalRating.Partial
     }
@@ -78,9 +87,9 @@ class RatedSessionStateTest {
     fun `exhausting Attempts having only ever rated Failed resolves to Terminal Failed`() {
         val session = state(cardCount = 1, attemptsLimit = 2)
 
-        val afterFirstFailed = rate(session, Failed)
+        val afterFirstFailed = rate(session, Failed, random)
         afterFirstFailed.terminal shouldBe null
-        val afterSecondFailed = rate(afterFirstFailed.state, Failed)
+        val afterSecondFailed = rate(afterFirstFailed.state, Failed, random)
 
         afterSecondFailed.terminal shouldBe FlashcardTerminalRating.Failed
     }
@@ -89,9 +98,9 @@ class RatedSessionStateTest {
     fun `exhausting Attempts having been Partial at least once resolves to Terminal Partial`() {
         val session = state(cardCount = 1, attemptsLimit = 2)
 
-        val afterPartial = rate(session, PartiallyCorrect)
+        val afterPartial = rate(session, PartiallyCorrect, random)
         afterPartial.terminal shouldBe null
-        val afterFailed = rate(afterPartial.state, Failed)
+        val afterFailed = rate(afterPartial.state, Failed, random)
 
         afterFailed.terminal shouldBe FlashcardTerminalRating.Partial
     }
@@ -100,7 +109,7 @@ class RatedSessionStateTest {
     fun `a Partial rating is immediately Terminal Partial when partial requeueing is disabled`() {
         val session = state(cardCount = 1, attemptsLimit = 5, partialRatingCardRequeueingEnabled = false)
 
-        val outcome = rate(session, PartiallyCorrect)
+        val outcome = rate(session, PartiallyCorrect, random)
 
         outcome.terminal shouldBe FlashcardTerminalRating.Partial
         outcome.state.isComplete shouldBe true
@@ -110,7 +119,7 @@ class RatedSessionStateTest {
     fun `a Partial rating re-inserts as normal when partial requeueing is enabled`() {
         val session = state(cardCount = 10, attemptsLimit = 5)
 
-        val outcome = rate(session, PartiallyCorrect)
+        val outcome = rate(session, PartiallyCorrect, random)
 
         outcome.terminal shouldBe null
         outcome.state.isComplete shouldBe false
@@ -121,7 +130,7 @@ class RatedSessionStateTest {
     fun `a card at its Attempts limit is never re-inserted, even with other cards still queued`() {
         val session = state(cardCount = 3, attemptsLimit = 1)
 
-        val outcome = rate(session, Failed)
+        val outcome = rate(session, Failed, random)
 
         outcome.state.remainingCards.map { it.id } shouldNotContain FIRST_CARD_ID
     }
@@ -131,7 +140,7 @@ class RatedSessionStateTest {
         listOf(Failed, PartiallyCorrect, Correct).forEach { rating ->
             val session = state(cardCount = 1, attemptsLimit = 1)
 
-            val outcome = rate(session, rating)
+            val outcome = rate(session, rating, random)
 
             outcome.terminal shouldNotBe null
             outcome.state.isComplete shouldBe true
@@ -143,7 +152,7 @@ class RatedSessionStateTest {
         repeat(REPETITIONS) {
             val session = state(cardCount = LARGE_POOL_SIZE, random = Random.Default)
 
-            val outcome = rate(session, Failed)
+            val outcome = rate(session, Failed, random)
 
             val index = outcome.state.remainingCards.indexOfFirst { it.id == FIRST_CARD_ID }
             (index in StudySessionConfig.FAILED_REQUEUE_MIN_GAP..StudySessionConfig.FAILED_REQUEUE_MAX_GAP) shouldBe true
@@ -155,7 +164,7 @@ class RatedSessionStateTest {
         repeat(REPETITIONS) {
             val session = state(cardCount = LARGE_POOL_SIZE, random = Random.Default)
 
-            val outcome = rate(session, PartiallyCorrect)
+            val outcome = rate(session, PartiallyCorrect, random)
 
             val index = outcome.state.remainingCards.indexOfFirst { it.id == FIRST_CARD_ID }
             (index in StudySessionConfig.PARTIAL_REQUEUE_MIN_GAP..StudySessionConfig.PARTIAL_REQUEUE_MAX_GAP) shouldBe true
@@ -166,7 +175,7 @@ class RatedSessionStateTest {
     fun `Failed re-insertion gap varies across repetitions rather than being fixed`() {
         val indices = (1..REPETITIONS).map {
             val session = state(cardCount = LARGE_POOL_SIZE, random = Random.Default)
-            rate(session, Failed).state.remainingCards.indexOfFirst { it.id == FIRST_CARD_ID }
+            rate(session, Failed, random).state.remainingCards.indexOfFirst { it.id == FIRST_CARD_ID }
         }
 
         indices.distinct().size shouldNotBe 1
@@ -177,7 +186,7 @@ class RatedSessionStateTest {
         // Partial's minimum gap (5) exceeds the 2 cards left once the head is removed.
         val session = state(cardCount = 3, attemptsLimit = 5, random = Random.Default)
 
-        val outcome = rate(session, PartiallyCorrect)
+        val outcome = rate(session, PartiallyCorrect, random)
 
         outcome.state.remainingCards.last().id shouldBe FIRST_CARD_ID
     }
@@ -189,7 +198,7 @@ class RatedSessionStateTest {
         // Independently reproduces reinsertAt's exact draw order and gap ranges with an unrelated
         // Random instance seeded identically to the session's — asserting only that two
         // identically-seeded runs match each other (as this test previously did) would still pass
-        // if reinsertAt stopped consulting state.random altogether (e.g. a hardcoded gap). Asserting
+        // if reinsertAt stopped consulting the injected Random altogether (e.g. a hardcoded gap). Asserting
         // against this independently-computed expectation catches that regression too.
         val referenceRandom = Random(FIXED_SEED)
         val expectedQueue = cards(LARGE_POOL_SIZE).map { it.id }.toMutableList()
@@ -210,7 +219,7 @@ class RatedSessionStateTest {
         var session = state(cardCount = LARGE_POOL_SIZE, attemptsLimit = 4, random = Random(FIXED_SEED))
         val actualHeadIds = ratingSequence.map { rating ->
             val cardId = session.currentCard?.id
-            session = rate(session, rating).state
+            session = rate(session, rating, random).state
             cardId
         }
 
@@ -224,7 +233,7 @@ class RatedSessionStateTest {
         val distinctBefore = session.distinctCardCount
         val masteredBefore = session.masteredCount
 
-        val outcome = rate(session, Failed)
+        val outcome = rate(session, Failed, random)
 
         outcome.state.distinctCardCount shouldBe distinctBefore
         outcome.state.masteredCount shouldBe masteredBefore
@@ -234,10 +243,10 @@ class RatedSessionStateTest {
     fun `mastered count increases only on a Terminal Mastered`() {
         val session = state(cardCount = 2, attemptsLimit = 1)
 
-        val afterFailed = rate(session, Failed)
+        val afterFailed = rate(session, Failed, random)
         afterFailed.state.masteredCount shouldBe 0
 
-        val afterCorrect = rate(afterFailed.state, Correct)
+        val afterCorrect = rate(afterFailed.state, Correct, random)
         afterCorrect.state.masteredCount shouldBe 1
     }
 
@@ -245,11 +254,11 @@ class RatedSessionStateTest {
     fun `completed count increases on any Terminal State, regardless of grade`() {
         val session = state(cardCount = 2, attemptsLimit = 1)
 
-        val afterFailed = rate(session, Failed)
+        val afterFailed = rate(session, Failed, random)
         afterFailed.state.completedCount shouldBe 1
         afterFailed.state.masteredCount shouldBe 0
 
-        val afterCorrect = rate(afterFailed.state, Correct)
+        val afterCorrect = rate(afterFailed.state, Correct, random)
         afterCorrect.state.completedCount shouldBe 2
     }
 
@@ -264,9 +273,9 @@ class RatedSessionStateTest {
     fun `currentCardRatings follows a card across a re-insertion, retaining its own Rating history`() {
         var session = state(cardCount = LARGE_POOL_SIZE, attemptsLimit = 3, random = Random.Default)
 
-        session = rate(session, Failed).state
+        session = rate(session, Failed, random).state
         // Fast-forward through whatever other cards sit ahead of card-1 until it is head again.
-        while (session.currentCard?.id != FIRST_CARD_ID) session = rate(session, Correct).state
+        while (session.currentCard?.id != FIRST_CARD_ID) session = rate(session, Correct, random).state
 
         session.currentCardRatings shouldBe listOf(Failed)
     }
@@ -275,7 +284,7 @@ class RatedSessionStateTest {
     fun `currentCardRatings is empty once the session is complete`() {
         val session = state(cardCount = 1, attemptsLimit = 1)
 
-        val outcome = rate(session, Correct)
+        val outcome = rate(session, Correct, random)
 
         outcome.state.currentCardRatings shouldBe emptyList()
     }
@@ -284,8 +293,8 @@ class RatedSessionStateTest {
     fun `requeueAfterSilence records no Rating and leaves the card's history unchanged`() {
         var session = state(cardCount = LARGE_POOL_SIZE, random = Random.Default)
 
-        session = requeueAfterSilence(session)
-        while (session.currentCard?.id != FIRST_CARD_ID) session = rate(session, Correct).state
+        session = requeueAfterSilence(session, random)
+        while (session.currentCard?.id != FIRST_CARD_ID) session = rate(session, Correct, random).state
 
         session.currentCardRatings shouldBe emptyList()
     }
@@ -296,7 +305,7 @@ class RatedSessionStateTest {
         val distinctBefore = session.distinctCardCount
         val masteredBefore = session.masteredCount
 
-        val next = requeueAfterSilence(session)
+        val next = requeueAfterSilence(session, random)
 
         next.distinctCardCount shouldBe distinctBefore
         next.masteredCount shouldBe masteredBefore
@@ -307,7 +316,7 @@ class RatedSessionStateTest {
         repeat(REPETITIONS) {
             val session = state(cardCount = LARGE_POOL_SIZE, random = Random.Default)
 
-            val next = requeueAfterSilence(session)
+            val next = requeueAfterSilence(session, random)
 
             val index = next.remainingCards.indexOfFirst { it.id == FIRST_CARD_ID }
             (index in StudySessionConfig.FAILED_REQUEUE_MIN_GAP..StudySessionConfig.FAILED_REQUEUE_MAX_GAP) shouldBe true
@@ -319,9 +328,9 @@ class RatedSessionStateTest {
         var session = state(cardCount = 2, attemptsLimit = 1)
 
         session.isComplete shouldBe false
-        session = rate(session, Correct).state
+        session = rate(session, Correct, random).state
         session.isComplete shouldBe false
-        session = rate(session, Correct).state
+        session = rate(session, Correct, random).state
         session.isComplete shouldBe true
     }
 

@@ -2,13 +2,13 @@ package com.rossomak.flashcards.feature.study.rated
 
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
+import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.toFlashcardAttemptRating
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Graded
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.GradingWithTranscript
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Listening
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Pending
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Transport
-import com.rossomak.flashcards.feature.study.voice.VoiceAnswerPhase
 
 /**
  * What the bottom sheet of a voice-answering Rated Study Session shows. Exactly one mode at a

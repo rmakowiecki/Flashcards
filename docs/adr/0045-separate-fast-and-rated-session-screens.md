@@ -18,7 +18,7 @@ Shared between them, extracted rather than duplicated:
 
 - the top app bar, its exit affordance and its flag affordance
 - the exit-confirmation, report-a-problem and extended-context dialogs
-- `VoiceGateway` / `TtsPlayer` and the voice settings dialog
+- `StudyVoicePlaybackGateway` / `TtsPlayer` and the voice settings dialog
 - the Session Summary screen, which both terminate into
 
 ## Context

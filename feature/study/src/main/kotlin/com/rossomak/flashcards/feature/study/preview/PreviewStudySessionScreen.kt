@@ -284,7 +284,7 @@ fun PreviewStudySessionContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    error = state.error,
+                    error = stringResource(state.error),
                     onRetry = onRetry,
                 )
 
