@@ -35,6 +35,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.session.MIN_TRANSCRIPT_DISPLAY
 import com.rossomak.flashcards.core.domain.session.NOTICE_TAIL
+import com.rossomak.flashcards.core.domain.session.RELEASE_LINGER
 import com.rossomak.flashcards.core.domain.session.RatedSessionReducer
 import com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator
 import com.rossomak.flashcards.core.domain.session.SILENCE_TIMEOUT
@@ -91,7 +92,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -735,7 +735,7 @@ class RatedStudySessionViewModelTest {
             playbackGateway.presentedQuestions.size shouldBe 0
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER - 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER - 1.milliseconds)
             viewModel.state.value.currentCard?.id shouldBe "card-1"
             advanceTimeBy(2.milliseconds)
 
@@ -756,7 +756,7 @@ class RatedStudySessionViewModelTest {
             playbackGateway.presentedQuestions.size shouldBe 0
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
 
             viewModel.state.value.currentCard?.id shouldBe "card-2"
             playbackGateway.presentedQuestions.size shouldBe 1
@@ -1701,7 +1701,7 @@ class RatedStudySessionViewModelTest {
         repeat(3) { emitSilenceTimeout() }
         val cardBeforePause = viewModel.state.value.currentCard?.id
 
-        viewModel.onResumeSession()
+        viewModel.onVoicePlayPause()
         runCurrent()
 
         viewModel.state.value.isVoiceAnswerPaused shouldBe false
@@ -1878,7 +1878,7 @@ class RatedStudySessionViewModelTest {
         val viewModel = createVoiceViewModel()
         repeat(3) { emitGradingFailure() }
 
-        viewModel.onResumeSession()
+        viewModel.onVoicePlayPause()
         runCurrent()
 
         viewModel.state.value.isVoiceAnswerPaused shouldBe false
@@ -2179,7 +2179,6 @@ class RatedStudySessionViewModelTest {
     private companion object {
         const val FIXED_SEED = 42L
         const val EXTENDED_CONTEXT = "More about this card."
-        val CLOSED_DIALOG_LINGER = 500.milliseconds
         val TRANSCRIPT_DELAY = 200.milliseconds
         const val MAX_CARDS_BEFORE_REAPPEARING = 10
         const val CORRECT_GRADE_PERCENT = 95

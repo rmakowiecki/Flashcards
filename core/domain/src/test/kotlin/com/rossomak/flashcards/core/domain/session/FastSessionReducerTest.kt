@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Pause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentAnswer
@@ -13,6 +14,7 @@ import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQues
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartAdvancePause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartQuestionPause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldReleased
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvancePauseElapsed
@@ -28,6 +30,7 @@ import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEngi
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PreviousRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.QuestionFinished
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.QuestionPauseElapsed
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.ReleaseLingerElapsed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseEnded
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseRequested
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -424,12 +427,40 @@ class FastSessionReducerTest {
     }
 
     @Test
-    fun `releasing a held session moves on and plays`() {
-        val transition = reducer.reduce(heldOnFirstCard, AdvanceHoldReleased)
+    fun `releasing a held session stays on the card for the linger, then moves on and plays`() {
+        val released = reducer.reduce(heldOnFirstCard, AdvanceHoldReleased)
+
+        released.state.isHeldAtAdvancePoint shouldBe true
+        released.state.isAdvanceHoldRequested shouldBe false
+        released.effects shouldBe listOf(StartReleaseLinger)
+
+        val transition = reducer.reduce(released.state, ReleaseLingerElapsed)
 
         transition.state.isHeldAtAdvancePoint shouldBe false
-        transition.state.isAdvanceHoldRequested shouldBe false
+        transition.state.isReleaseLingering shouldBe false
         transition.effects shouldBe listOf(PresentQuestion(1), Play)
+    }
+
+    @Test
+    fun `a hold requested again during the linger keeps the session held`() {
+        val lingering = heldOnFirstCard.after(AdvanceHoldReleased)
+
+        val transition = reducer.reduce(lingering, AdvanceHoldRequested)
+
+        transition.effects shouldBe listOf(CancelReleaseLinger)
+        transition.state.isHeldAtAdvancePoint shouldBe true
+        reducer.reduce(transition.state, ReleaseLingerElapsed).effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a pause during the linger drops it, and its end then does nothing`() {
+        val lingering = heldOnFirstCard.after(AdvanceHoldReleased)
+
+        val transition = reducer.reduce(lingering, PauseRequested)
+
+        transition.effects shouldBe listOf(Pause, CancelReleaseLinger)
+        transition.state.isReleaseLingering shouldBe false
+        reducer.reduce(transition.state, ReleaseLingerElapsed).effects.shouldBeEmpty()
     }
 
     @Test
@@ -446,7 +477,7 @@ class FastSessionReducerTest {
     fun `releasing a hold on the last card ends the session`() {
         val heldOnLast = readingAnswer(CARD_COUNT - 1).after(AdvanceHoldRequested, AnswerFinished("card-$CARD_COUNT"), AdvancePauseElapsed)
 
-        reducer.reduce(heldOnLast, AdvanceHoldReleased).effects shouldBe listOf(SessionComplete)
+        reducer.reduce(heldOnLast.after(AdvanceHoldReleased), ReleaseLingerElapsed).effects shouldBe listOf(SessionComplete)
     }
 
     @Test

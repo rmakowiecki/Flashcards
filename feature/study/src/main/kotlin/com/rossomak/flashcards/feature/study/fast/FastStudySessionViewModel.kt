@@ -24,7 +24,6 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
-import com.rossomak.flashcards.feature.study.chrome.DialogAdvanceHold
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
@@ -77,13 +76,6 @@ class FastStudySessionViewModel @Inject constructor(
 
     private val _messages = MutableSharedFlow<FastStudySessionMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<FastStudySessionMessage> = _messages.asSharedFlow()
-
-    private val dialogAdvanceHold = DialogAdvanceHold(
-        scope = viewModelScope,
-        holdAdvance = coordinator::holdAdvance,
-        releaseAdvance = coordinator::releaseAdvance,
-        isHeldAtAdvancePoint = { (coordinator.sessionState.value as? Running)?.isHeldAtAdvancePoint == true },
-    )
 
     // Identifies the report submission in flight, so a result closes only the dialog it was sent from.
     private var reportSubmissionId = 0
@@ -259,7 +251,7 @@ class FastStudySessionViewModel @Inject constructor(
      * The caller hands over the dialog it wants shown, already seeded from what it was rendering.
      */
     private fun onDialogOpen(dialog: StudySessionDialog) {
-        dialogAdvanceHold.onDialogOpen()
+        coordinator.holdAdvance()
         when (dialog) {
             is SessionVoiceSettings -> onVoiceSettingsOpen()
             is ReportCurrentCardProblem, is CurrentCardExtendedContext, ExitSession -> _state.update { it.copy(activeDialog = dialog) }
@@ -283,7 +275,6 @@ class FastStudySessionViewModel @Inject constructor(
             is SessionVoiceSettings -> onVoiceSettingsSave()
             // The session ends here, so the hold is never released: releasing it could still move on.
             ExitSession -> {
-                dialogAdvanceHold.cancel()
                 _state.update { it.copy(activeDialog = null) }
                 coordinator.end(abandoned = true)
             }
@@ -303,7 +294,7 @@ class FastStudySessionViewModel @Inject constructor(
         val dialog = _state.value.activeDialog
         _state.update { it.copy(activeDialog = null) }
         if (dialog is SessionVoiceSettings) coordinator.endTemporaryPause()
-        dialogAdvanceHold.onDialogClose()
+        coordinator.releaseAdvance()
         showSessionNow()
     }
 
@@ -337,7 +328,6 @@ class FastStudySessionViewModel @Inject constructor(
     }
 
     public override fun onCleared() {
-        dialogAdvanceHold.cancel()
         coordinator.stop()
     }
 }

@@ -47,6 +47,9 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     val calls = mutableListOf<Call>()
 
+    /** Runs right after each command is recorded, still inside that command, as a player reacting at once would. */
+    var onCall: ((Call) -> Unit)? = null
+
     /** The player's current list, as last started or updated. */
     var cards: List<Flashcard> = emptyList()
         private set
@@ -74,6 +77,11 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     /** Every [setSessionProgress] call, in order. */
     val sessionProgressUpdates = mutableListOf<SessionProgress>()
 
+    private fun record(call: Call) {
+        calls += call
+        onCall?.invoke(call)
+    }
+
     fun emit(event: PlaybackEvent) {
         eventChannel.trySend(event)
     }
@@ -97,68 +105,68 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     }
 
     override fun start(cards: List<Flashcard>, startIndex: Int, sessionTitle: String, isVoiceAnsweringSession: Boolean) {
-        calls += Call.Start(cards.map { it.id }, startIndex, sessionTitle, isVoiceAnsweringSession)
+        record(Call.Start(cards.map { it.id }, startIndex, sessionTitle, isVoiceAnsweringSession))
         this.cards = cards
         presentedIndex = startIndex
         state.update { it.copy(isActive = cards.isNotEmpty(), isPlaying = cards.isNotEmpty()) }
     }
 
     override fun updateQueue(cards: List<Flashcard>) {
-        calls += Call.UpdateQueue(cards.map { it.id })
+        record(Call.UpdateQueue(cards.map { it.id }))
         this.cards = cards
         presentedIndex = 0
         state.update { it.copy(isActive = it.isActive && cards.isNotEmpty()) }
     }
 
     override fun stop() {
-        calls += Call.Stop
+        record(Call.Stop)
         cards = emptyList()
         state.value = VoicePlaybackState()
     }
 
     override fun play() {
-        calls += Call.Play
+        record(Call.Play)
         state.update { it.copy(isPlaying = it.isActive) }
     }
 
     override fun pause() {
-        calls += Call.Pause
+        record(Call.Pause)
         state.update { it.copy(isPlaying = false) }
     }
 
     override fun presentQuestion(index: Int) {
-        calls += Call.PresentQuestion(index)
+        record(Call.PresentQuestion(index))
         if (index in cards.indices) presentedIndex = index else state.update { it.copy(isPlaying = false) }
     }
 
     override fun presentAnswer(index: Int) {
-        calls += Call.PresentAnswer(index)
+        record(Call.PresentAnswer(index))
         val card = cards.getOrNull(index) ?: return
         presentedIndex = index
         emit(PlaybackEvent.AnswerRevealed(card.id))
     }
 
     override fun setSpeechRate(rate: Float) {
-        calls += Call.SetSpeechRate(rate)
+        record(Call.SetSpeechRate(rate))
     }
 
     override fun setVoice(voiceId: String?) {
-        calls += Call.SetVoice(voiceId)
+        record(Call.SetVoice(voiceId))
     }
 
     override fun speakNotice(notice: SpokenNotice) {
-        calls += Call.SpeakNotice(notice)
+        record(Call.SpeakNotice(notice))
         speakingNotices += notice
     }
 
     /** Like the real player, a stopped feedback never reports finished. */
     override fun stopFeedback() {
-        calls += Call.StopFeedback
+        record(Call.StopFeedback)
         speakingNotices.removeAll { it is SpokenNotice.Feedback }
     }
 
     override fun resumeWithoutReading() {
-        calls += Call.ResumeWithoutReading
+        record(Call.ResumeWithoutReading)
         state.update { it.copy(isPlaying = it.isActive) }
     }
 

@@ -67,10 +67,15 @@ class FastStudySessionCoordinator @Inject constructor(
     // null until the cards load; inputs arriving before then have nothing to act on.
     private var state: FastSessionState? = null
     private var playback = VoicePlaybackState()
+
+    private val pendingInputs = ArrayDeque<FastSessionInput>()
+    private var isDispatching = false
+
     private var isObservingVoiceStack = false
     private var hasEnded = false
     private var pushedTransportCommands: Set<TransportCommandType>? = null
     private var readAloudPauseJob: Job? = null
+    private var releaseLingerJob: Job? = null
 
     // When the presented card last started or restarted, for the rewind threshold.
     private var presentedCardStartedAt: ComparableTimeMark = timeSource.markNow()
@@ -97,6 +102,7 @@ class FastStudySessionCoordinator @Inject constructor(
     /** Synchronous: `viewModelScope` is already cancelled when `onCleared` runs. */
     fun stop() {
         readAloudPauseJob?.cancel()
+        releaseLingerJob?.cancel()
         playbackGateway.stop()
     }
 
@@ -142,7 +148,10 @@ class FastStudySessionCoordinator @Inject constructor(
         dispatch(FastSessionInput.AdvanceHoldRequested)
     }
 
-    /** Moves on and plays only when still held at the auto-advance point; otherwise it only drops the request. */
+    /**
+     * Moves on and plays only when still held at the auto-advance point, after the release linger
+     * keeps the held card on screen a moment longer; otherwise it only drops the request.
+     */
     fun releaseAdvance() {
         dispatch(FastSessionInput.AdvanceHoldReleased)
     }
@@ -276,14 +285,31 @@ class FastStudySessionCoordinator @Inject constructor(
     private fun isPastRewindThreshold(): Boolean =
         presentedCardStartedAt.elapsedNow() >= REWIND_THRESHOLD || state?.currentIndex == 0
 
-    /** Returns whether [input] changed the session: its state, or anything the coordinator had to do. */
+    /**
+     * Runs one input at a time, in arrival order, even when an effect feeds another input back.
+     * Returns whether the inputs run changed the session: its state, or anything the coordinator had
+     * to do. An input queued behind one already running reports `false`.
+     */
     private fun dispatch(input: FastSessionInput): Boolean {
-        val current = state ?: return false
-        val transition = reducer.reduce(current, input)
-        state = transition.state
-        transition.effects.forEach(::run)
+        pendingInputs.addLast(input)
+        if (isDispatching) return false
+        isDispatching = true
+        val stateBefore = state
+        var hasEffects = false
+        try {
+            while (pendingInputs.isNotEmpty()) {
+                val next = pendingInputs.removeFirst()
+                val current = state ?: continue
+                val transition = reducer.reduce(current, next)
+                state = transition.state
+                hasEffects = hasEffects || transition.effects.isNotEmpty()
+                transition.effects.forEach(::run)
+            }
+        } finally {
+            isDispatching = false
+        }
         publishPresentationState()
-        return transition.state != current || transition.effects.isNotEmpty()
+        return hasEffects || state != stateBefore
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per effect, exhaustive over the sealed type.
@@ -300,6 +326,14 @@ class FastStudySessionCoordinator @Inject constructor(
             FastSessionEffect.StartQuestionPause -> startReadAloudPause(QUESTION_TO_ANSWER_PAUSE, FastSessionInput.QuestionPauseElapsed)
             FastSessionEffect.StartAdvancePause -> startReadAloudPause(ANSWER_TO_NEXT_PAUSE, FastSessionInput.AdvancePauseElapsed)
             FastSessionEffect.CancelReadAloudPause -> readAloudPauseJob?.cancel()
+            FastSessionEffect.StartReleaseLinger -> {
+                releaseLingerJob?.cancel()
+                releaseLingerJob = requireNotNull(scope).launch {
+                    delay(RELEASE_LINGER)
+                    dispatch(FastSessionInput.ReleaseLingerElapsed)
+                }
+            }
+            FastSessionEffect.CancelReleaseLinger -> releaseLingerJob?.cancel()
             is FastSessionEffect.RestartVoiceStack -> {
                 playbackGateway.stop()
                 startVoiceStack(startIndex = effect.startIndex)

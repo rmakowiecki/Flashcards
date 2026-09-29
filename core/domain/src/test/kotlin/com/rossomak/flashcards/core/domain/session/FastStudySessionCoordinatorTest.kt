@@ -30,7 +30,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -230,6 +229,7 @@ class FastStudySessionCoordinatorTest {
         val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentQuestion(1), Call.Play)
@@ -249,6 +249,7 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.emitExternal(TransportCommand.Pause)
         runCurrent()
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.User
@@ -284,6 +285,7 @@ class FastStudySessionCoordinatorTest {
         holdAtAdvancePoint(coordinator)
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result
@@ -334,6 +336,48 @@ class FastStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.EngineUnavailable
         playbackGateway.startCalls.size shouldBe 1
+    }
+
+    @Test
+    fun `a released hold keeps the held card for the linger, and a hold requested meanwhile keeps it held`() = runTest {
+        val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
+
+        coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER - 1.milliseconds)
+        runCurrent()
+        coordinator.runningSnapshot.currentIndex shouldBe 0
+
+        coordinator.holdAdvance()
+        advanceTimeBy(RELEASE_LINGER)
+        runCurrent()
+        coordinator.runningSnapshot.currentIndex shouldBe 0
+        coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
+    }
+
+    @Test
+    fun `a stopped session never moves on from a lingering release`() = runTest {
+        val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
+        coordinator.releaseAdvance()
+        val presentedBefore = playbackGateway.presentedQuestions
+
+        coordinator.stop()
+        advanceTimeBy(RELEASE_LINGER)
+        runCurrent()
+
+        playbackGateway.presentedQuestions shouldBe presentedBefore
+    }
+
+    @Test
+    fun `an input that arrives while another runs is applied after it, in order`() = runTest {
+        val coordinator = startCoordinator().also { holdAtAdvancePoint(it) }
+        playbackGateway.onCall = { call -> if (call is Call.PresentQuestion) coordinator.pause() }
+
+        coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
+        runCurrent()
+
+        playbackGateway.calls.takeLast(3) shouldBe listOf(Call.PresentQuestion(1), Call.Play, Call.Pause)
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.User
     }
 
     @Test

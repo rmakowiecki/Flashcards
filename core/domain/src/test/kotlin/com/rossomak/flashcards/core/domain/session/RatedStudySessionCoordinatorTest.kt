@@ -187,6 +187,32 @@ class RatedStudySessionCoordinatorTest {
         events shouldBe listOf(RatedSessionEvent.MicPermissionRevoked)
     }
 
+    @Test
+    fun `a revoked microphone ends the session as abandoned once the user had time to read why`() = runTest {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
+        startCoordinator()
+
+        advanceTimeBy(MIC_REVOKED_END_DELAY - 1.milliseconds)
+        runCurrent()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe true
+    }
+
+    @Test
+    fun `a session stopped before the revoked-microphone delay passes never ends`() = runTest {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
+        val coordinator = startCoordinator()
+
+        coordinator.stop()
+        advanceTimeBy(MIC_REVOKED_END_DELAY)
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+    }
+
     // Timers
 
     @Test
@@ -576,6 +602,7 @@ class RatedStudySessionCoordinatorTest {
         gradeAndReachAdvancePoint()
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
@@ -583,6 +610,7 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.presentedQuestions.size shouldBe 1
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         playbackGateway.presentedQuestions.size shouldBe 1
@@ -610,6 +638,7 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.emitExternal(TransportCommand.Pause)
         runCurrent()
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
@@ -655,6 +684,7 @@ class RatedStudySessionCoordinatorTest {
         events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe false
@@ -675,6 +705,7 @@ class RatedStudySessionCoordinatorTest {
             runCurrent()
             coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
             coordinator.releaseAdvance()
+            advanceTimeBy(RELEASE_LINGER)
             runCurrent()
         }
         coordinator.holdAdvance()
@@ -786,7 +817,7 @@ class RatedStudySessionCoordinatorTest {
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
         permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Denied)
 
-        coordinator.resume()
+        coordinator.play()
         runCurrent()
 
         events.last() shouldBe RatedSessionEvent.MicPermissionRevoked
@@ -800,7 +831,7 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
 
-        coordinator.resume()
+        coordinator.play()
         runCurrent()
 
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
@@ -821,7 +852,7 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.state.value.isActive shouldBe false
         logger.entries.single().level shouldBe FakeDomainLogger.Level.Warn
 
-        coordinator.resume()
+        coordinator.play()
         runCurrent()
 
         coordinator.runningSnapshot.pauseReason shouldBe null
@@ -952,8 +983,8 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
         val stopsBeforeResume = playbackGateway.stopCount
 
-        coordinator.resume()
-        coordinator.resume()
+        coordinator.play()
+        coordinator.play()
         runCurrent()
 
         playbackGateway.startCalls.size shouldBe 2

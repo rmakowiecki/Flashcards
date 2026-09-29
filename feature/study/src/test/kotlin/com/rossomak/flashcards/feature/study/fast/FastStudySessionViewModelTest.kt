@@ -21,6 +21,7 @@ import com.rossomak.flashcards.core.domain.session.ANSWER_TO_NEXT_PAUSE
 import com.rossomak.flashcards.core.domain.session.FastSessionReducer
 import com.rossomak.flashcards.core.domain.session.FastStudySessionCoordinator
 import com.rossomak.flashcards.core.domain.session.QUESTION_TO_ANSWER_PAUSE
+import com.rossomak.flashcards.core.domain.session.RELEASE_LINGER
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
@@ -743,7 +744,7 @@ class FastStudySessionViewModelTest {
         holdAtAdvancePoint(viewModel)
 
         viewModel.onDialogEvent(Dismiss)
-        advanceTimeBy(CLOSED_DIALOG_LINGER - 1.milliseconds)
+        advanceTimeBy(RELEASE_LINGER - 1.milliseconds)
         viewModel.state.value.currentCardIndex shouldBe 0
 
         advanceTimeBy(2.milliseconds)
@@ -817,15 +818,15 @@ class FastStudySessionViewModelTest {
             holdAtAdvancePoint(viewModel)
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER / 2)
+            advanceTimeBy(RELEASE_LINGER / 2)
             viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
-            advanceTimeBy(CLOSED_DIALOG_LINGER * 2)
+            advanceTimeBy(RELEASE_LINGER * 2)
 
             viewModel.state.value.currentCardIndex shouldBe 0
             playbackGateway.calls shouldNotContain Call.PresentQuestion(1)
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
 
             viewModel.state.value.currentCardIndex shouldBe 1
         }
@@ -909,7 +910,7 @@ class FastStudySessionViewModelTest {
             curationRepository.pendingUpsert?.complete(Unit)
             runCurrent()
             viewModel.state.value.activeDialog shouldBe null
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
 
             viewModel.state.value.currentCardIndex shouldBe 1
         }
@@ -952,7 +953,7 @@ class FastStudySessionViewModelTest {
             runCurrent()
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
             viewModel.state.value.currentCardIndex shouldBe 1
 
             viewModel.messages.test {
@@ -1171,7 +1172,6 @@ class FastStudySessionViewModelTest {
 
     private companion object {
         const val EXTENDED_CONTEXT = "More about this card."
-        val CLOSED_DIALOG_LINGER = 500.milliseconds
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value

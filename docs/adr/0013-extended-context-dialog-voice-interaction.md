@@ -4,7 +4,7 @@
 
 Extended context is displayed in a **popup dialog** (not inline). Opening it, or any other study-session dialog except voice settings, never pauses playback: it asks the session to **hold at its auto-advance point**. Read-aloud keeps reading the current card; when it reaches the point where it would move on, it stops there instead. On dialog close, a held session keeps the old card on screen for a 500 ms linger, then moves on and plays the next card.
 
-The hold is session state, so it lives in the study session coordinators ([ADR-0054](0054-study-session-rules-in-domain-coordinators.md)): the ViewModel only requests it (`holdAdvance`) and releases it (`releaseAdvance`) through the shared `DialogAdvanceHold` helper, which also owns the 500 ms linger. The reducers decide what the hold means against every other command. The player knows nothing about dialogs or holds; it only receives `pause`, `play` and part-presentation commands ([ADR-0012](0012-tts-mediasession-stack-for-fast-mode.md)).
+The hold is session state, so it lives in the study session coordinators ([ADR-0054](0054-study-session-rules-in-domain-coordinators.md)): the ViewModel only requests it (`holdAdvance`) when a dialog opens and releases it (`releaseAdvance`) when the dialog closes. The reducers decide what the hold and its release mean against every other command, including whether the release lingers, and the coordinators run the 500 ms linger timer. The player knows nothing about dialogs or holds; it only receives `pause`, `play` and part-presentation commands ([ADR-0012](0012-tts-mediasession-stack-for-fast-mode.md)).
 
 ## Context
 
@@ -43,7 +43,7 @@ An earlier version of this decision had the ViewModel watch the player's between
 
 Voice settings is the one dialog that pauses instead: it previews voices through the same engine, so it takes a temporary pause and ends it on close before releasing the hold.
 
-Rated voice sessions use the same helper and the same rules; their auto-advance point is where the queue would move to the next card.
+Rated voice sessions follow the same rules; their auto-advance point is where the queue would move to the next card.
 
 ## Key rationale
 

@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Pause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentAnswer
@@ -15,6 +16,7 @@ import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQues
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartAdvancePause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartQuestionPause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldReleased
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvancePauseElapsed
@@ -30,6 +32,7 @@ import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlaybackEngi
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PreviousRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.QuestionFinished
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.QuestionPauseElapsed
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.ReleaseLingerElapsed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseEnded
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseRequested
 import javax.inject.Inject
@@ -77,6 +80,9 @@ sealed interface FastSessionInput {
     data object TemporaryPauseEnded : FastSessionInput
     data object AdvanceHoldRequested : FastSessionInput
     data object AdvanceHoldReleased : FastSessionInput
+
+    /** The release linger ran in full. */
+    data object ReleaseLingerElapsed : FastSessionInput
 }
 
 /** What [FastStudySessionCoordinator] must do after a [FastSessionReducer] transition, in order. */
@@ -98,6 +104,10 @@ sealed interface FastSessionEffect {
 
     /** Stop the running read-aloud pause, if any, without it elapsing. */
     data object CancelReadAloudPause : FastSessionEffect
+
+    /** Wait the release linger, then report [FastSessionInput.ReleaseLingerElapsed]. */
+    data object StartReleaseLinger : FastSessionEffect
+    data object CancelReleaseLinger : FastSessionEffect
 
     /** Start the voice stack again at [startIndex], after a text-to-speech engine failure. */
     data class RestartVoiceStack(val startIndex: Int) : FastSessionEffect
@@ -140,8 +150,10 @@ class FastSessionReducer @Inject constructor() {
 
     fun seed(cards: List<Flashcard>): FastSessionState = FastSessionState(cards = cards)
 
+    fun reduce(state: FastSessionState, input: FastSessionInput): FastSessionTransition = dropStaleReleaseLinger(reduceInput(state, input))
+
     @Suppress("CyclomaticComplexMethod") // one branch per input, exhaustive over the sealed type.
-    fun reduce(state: FastSessionState, input: FastSessionInput): FastSessionTransition = when (input) {
+    private fun reduceInput(state: FastSessionState, input: FastSessionInput): FastSessionTransition = when (input) {
         is AnswerRevealed -> onAnswerRevealed(state, input.cardId)
         NextCardRequested -> onNextCardRequested(state)
         is PlaybackChanged -> onPlaybackChanged(state, input.playback)
@@ -168,8 +180,9 @@ class FastSessionReducer @Inject constructor() {
         }
         TemporaryPauseRequested -> onTemporaryPauseRequested(state)
         TemporaryPauseEnded -> if (state.pauseReason == FastPauseReason.Temporary) resume(state) else FastSessionTransition(state)
-        AdvanceHoldRequested -> FastSessionTransition(state.copy(isAdvanceHoldRequested = true))
+        AdvanceHoldRequested -> onAdvanceHoldRequested(state)
         AdvanceHoldReleased -> onAdvanceHoldReleased(state)
+        ReleaseLingerElapsed -> if (state.isReleaseLingering) moveOn(state.copy(isReleaseLingering = false)) else FastSessionTransition(state)
     }
 
     /**
@@ -293,11 +306,26 @@ class FastSessionReducer @Inject constructor() {
             FastSessionTransition(state)
         }
 
-    /** Moves on only from a hold still in place; a pause, play or card change already resolved any other. */
+    /** A hold requested again while the release lingers keeps the session held on the same card. */
+    private fun onAdvanceHoldRequested(state: FastSessionState): FastSessionTransition = FastSessionTransition(
+        state.copy(isAdvanceHoldRequested = true, isReleaseLingering = false),
+        if (state.isReleaseLingering) listOf(CancelReleaseLinger) else emptyList(),
+    )
+
+    /**
+     * A hold still in place moves on once the release linger has run; a pause, play or card change
+     * already resolved any other.
+     */
     private fun onAdvanceHoldReleased(state: FastSessionState): FastSessionTransition {
-        if (!state.isAdvanceHoldRequested && !state.isHeldAtAdvancePoint) return FastSessionTransition(state)
         val released = state.copy(isAdvanceHoldRequested = false)
-        return if (state.isHeldAtAdvancePoint) moveOn(released) else FastSessionTransition(released)
+        if (!state.isHeldAtAdvancePoint || state.isReleaseLingering) return FastSessionTransition(released)
+        return FastSessionTransition(released.copy(isReleaseLingering = true), listOf(StartReleaseLinger))
+    }
+
+    /** Whatever ended the hold during the release linger, the linger has nothing left to move on from. */
+    private fun dropStaleReleaseLinger(transition: FastSessionTransition): FastSessionTransition = with(transition) {
+        if (!state.isReleaseLingering || state.isHeldAtAdvancePoint) return this
+        FastSessionTransition(state.copy(isReleaseLingering = false), effects + CancelReleaseLinger)
     }
 
     /**

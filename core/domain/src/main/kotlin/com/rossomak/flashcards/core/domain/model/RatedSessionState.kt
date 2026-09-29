@@ -52,6 +52,9 @@ package com.rossomak.flashcards.core.domain.model
  * @param isHeldAtAdvancePoint the notice and its tail finished with a hold requested: the session
  * stopped on the answered card, with its queue sync still pending. Not a user pause: releasing the
  * hold moves on and plays.
+ * @param isReleaseLingering the hold was released while held: the session stays on the held card
+ * for the release linger, then moves on. A new hold request drops the linger and holds again;
+ * anything that ends the hold drops it too.
  * @param isPausedTemporarily playback is paused by a temporary pause, which plays again when it
  * ends; a user pause or play in between replaces it.
  * @param isPausedWhileGrading the user paused while the answer was being graded. Grading goes on;
@@ -79,6 +82,7 @@ data class RatedSessionState(
     val isPlaying: Boolean = false,
     val isAdvanceHoldRequested: Boolean = false,
     val isHeldAtAdvancePoint: Boolean = false,
+    val isReleaseLingering: Boolean = false,
     val isPausedTemporarily: Boolean = false,
     val isPausedWhileGrading: Boolean = false,
     val isPausedAfterFeedback: Boolean = false,

@@ -31,6 +31,15 @@ val MIN_TRANSCRIPT_DISPLAY: Duration = 1.seconds
 /** Within this time of a card starting, "previous" goes to the previous card instead of restarting it. */
 val REWIND_THRESHOLD: Duration = 3.seconds
 
+/** How long a session whose microphone permission was revoked keeps its screen, so the user can read why, before it ends. */
+val MIC_REVOKED_END_DELAY: Duration = 4.seconds
+
+/**
+ * How long a session released from a hold stays on the held card before moving on, so closing a
+ * dialog never cuts straight to the next card.
+ */
+val RELEASE_LINGER: Duration = 500.milliseconds
+
 /** Silence timeouts in a row that pause voice answering. */
 const val CONSECUTIVE_SILENCE_PAUSE_THRESHOLD = 3
 

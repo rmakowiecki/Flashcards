@@ -18,6 +18,9 @@ package com.rossomak.flashcards.core.domain.model
  * point instead of moving on.
  * @param isHeldAtAdvancePoint read-aloud reached the auto-advance point with a hold requested and
  * stopped there. Not a user pause: releasing the hold moves on and plays.
+ * @param isReleaseLingering the hold was released while held: the session stays on the held card
+ * for the release linger, then moves on. A new hold request drops the linger and holds again;
+ * anything that ends the hold drops it too.
  * @param isPausedAtAdvancePoint a user pause replaced a hold at the auto-advance point: the next play
  * moves on instead of re-reading the answer.
  */
@@ -31,6 +34,7 @@ data class FastSessionState(
     val isPlaying: Boolean = false,
     val isAdvanceHoldRequested: Boolean = false,
     val isHeldAtAdvancePoint: Boolean = false,
+    val isReleaseLingering: Boolean = false,
     val isPausedAtAdvancePoint: Boolean = false,
 ) {
     /**

@@ -37,7 +37,6 @@ import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
-import com.rossomak.flashcards.feature.study.chrome.DialogAdvanceHold
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
@@ -47,10 +46,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.toSummaryRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -105,13 +102,6 @@ class RatedStudySessionViewModel @Inject constructor(
     val voiceBarsLevels: StateFlow<ImmutableList<Float>> =
         flow { emitAll(observeVoiceAnswerLevel()) }.stateInVoiceBarsLevels(viewModelScope)
 
-    private val dialogAdvanceHold = DialogAdvanceHold(
-        scope = viewModelScope,
-        holdAdvance = coordinator::holdAdvance,
-        releaseAdvance = coordinator::releaseAdvance,
-        isHeldAtAdvancePoint = { (coordinator.sessionState.value as? Running)?.isHeldAtAdvancePoint == true },
-    )
-
     // Identifies the report submission in flight, so a result closes only the dialog it was sent from.
     private var reportSubmissionId = 0
 
@@ -163,14 +153,8 @@ class RatedStudySessionViewModel @Inject constructor(
             VoiceAnswerCaptureUnavailable -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
             VoicePlaybackUnavailable -> _messages.tryEmit(RatedStudySessionMessage.VoicePlaybackUnavailable)
             is ExternalTransportCommand -> onExternalTransportCommand(event.command)
-            // The session ends after a delay that gives the snackbar time to show.
-            MicPermissionRevoked -> {
-                _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
-                viewModelScope.launch {
-                    delay(MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS.milliseconds)
-                    coordinator.end(abandoned = true)
-                }
-            }
+            // The coordinator ends the session once the snackbar had time to show.
+            MicPermissionRevoked -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)
             is SessionEnded -> viewModelScope.launch {
                 eventChannel.send(RatedStudySessionDestination.Summary(event.result.toSummaryRoute()))
             }
@@ -227,11 +211,6 @@ class RatedStudySessionViewModel @Inject constructor(
         showSessionNow()
     }
 
-    /** Resumes a paused session: voice answering, or the whole voice stack after an engine failure. */
-    fun onResumeSession() {
-        coordinator.resume()
-    }
-
     fun onShowAnswer() {
         coordinator.revealAnswer()
         showSessionNow()
@@ -246,12 +225,9 @@ class RatedStudySessionViewModel @Inject constructor(
         showSessionNow()
     }
 
+    /** A play while paused by voice answering or an engine failure resumes it; the coordinator decides how. */
     fun onVoicePlayPause() {
-        when {
-            _state.value.isVoiceAnswerPaused -> onResumeSession()
-            _state.value.isVoicePlaying -> coordinator.pause()
-            else -> coordinator.play()
-        }
+        if (_state.value.isVoicePlaying) coordinator.pause() else coordinator.play()
         showSessionNow()
     }
 
@@ -337,7 +313,7 @@ class RatedStudySessionViewModel @Inject constructor(
      * draftState, which comes from the shared controller rather than screen state.
      */
     private fun onDialogOpen(dialog: StudySessionDialog) {
-        dialogAdvanceHold.onDialogOpen()
+        coordinator.holdAdvance()
         when (dialog) {
             is SessionVoiceSettings -> onVoiceSettingsOpen()
             is ReportCurrentCardProblem, is CurrentCardExtendedContext, ExitSession -> _state.update { it.copy(activeDialog = dialog) }
@@ -361,7 +337,6 @@ class RatedStudySessionViewModel @Inject constructor(
             is SessionVoiceSettings -> onVoiceSettingsSave()
             // The session ends here, so the hold is never released: releasing it could still move on.
             ExitSession -> {
-                dialogAdvanceHold.cancel()
                 _state.update { it.copy(activeDialog = null) }
                 coordinator.end(abandoned = true)
             }
@@ -381,7 +356,7 @@ class RatedStudySessionViewModel @Inject constructor(
         val dialog = _state.value.activeDialog
         _state.update { it.copy(activeDialog = null) }
         if (dialog is SessionVoiceSettings) coordinator.endTemporaryPause()
-        dialogAdvanceHold.onDialogClose()
+        coordinator.releaseAdvance()
         showSessionNow()
     }
 
@@ -415,11 +390,6 @@ class RatedStudySessionViewModel @Inject constructor(
     }
 
     public override fun onCleared() {
-        dialogAdvanceHold.cancel()
         coordinator.stop()
-    }
-
-    private companion object {
-        const val MIC_PERMISSION_REVOKED_TERMINATION_DELAY_MS = 4000L
     }
 }

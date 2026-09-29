@@ -30,6 +30,10 @@ sealed interface RatedSessionEffect {
     data object StartNoticeTail : RatedSessionEffect
     data object CancelNoticeTail : RatedSessionEffect
 
+    /** Wait the release linger, then report [RatedSessionInput.ReleaseLingerElapsed]. */
+    data object StartReleaseLinger : RatedSessionEffect
+    data object CancelReleaseLinger : RatedSessionEffect
+
     /** Cut the grading feedback being spoken, without it ever reporting finished. */
     data object StopFeedback : RatedSessionEffect
     data object PausePlayback : RatedSessionEffect
@@ -43,6 +47,12 @@ sealed interface RatedSessionEffect {
 
     /** Stop the whole voice stack: player, notices and microphone. */
     data object StopVoiceStack : RatedSessionEffect
+
+    /** Start the player again at the queue head, after an engine failure stopped it. */
+    data object RestartVoiceStack : RatedSessionEffect
+
+    /** The microphone permission is gone: stop voice, tell the user, then end the session as abandoned. */
+    data object EndForRevokedMicPermission : RatedSessionEffect
     data class Emit(val event: RatedSessionEvent) : RatedSessionEffect
 
     /** Every card has reached a Terminal State. */

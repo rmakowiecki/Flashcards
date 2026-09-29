@@ -7,10 +7,15 @@ import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerRound
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.EndForRevokedMicPermission
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldReleased
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AnswerRevealed
@@ -29,6 +34,8 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PlaybackCha
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PlaybackEngineUnavailable
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PreviousRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.QuestionFinished
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ReleaseLingerElapsed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ResumeRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SilenceTimedOut
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
@@ -36,8 +43,6 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPa
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnsweringResumed
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceStackRestarted
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -110,13 +115,14 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
                 PauseRequested -> onPauseRequested()
                 TemporaryPauseRequested -> onTemporaryPauseRequested()
                 TemporaryPauseEnded -> if (this.state.isPausedTemporarily) onPlayRequested()
-                AdvanceHoldRequested -> this.state = this.state.copy(isAdvanceHoldRequested = true)
+                AdvanceHoldRequested -> onAdvanceHoldRequested()
                 AdvanceHoldReleased -> onAdvanceHoldReleased()
-                VoiceAnsweringResumed -> onVoiceAnsweringResumed()
-                VoiceStackRestarted -> onVoiceStackRestarted()
+                ReleaseLingerElapsed -> onReleaseLingerElapsed()
+                is ResumeRequested -> onResumeRequested(input.isMicrophoneGranted)
                 PlaybackEngineUnavailable -> onPlaybackEngineUnavailable()
                 is PlaybackChanged -> onPlaybackChanged(input)
             }
+            dropStaleReleaseLinger()
         }
         return transition.build()
     }
@@ -194,10 +200,34 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         emit(PausePlayback)
     }
 
-    /** Moves on only from a hold still in place; a pause, play or skip already resolved any other. */
+    /** A hold requested again while the release lingers keeps the session held on the same card. */
+    private fun RatedTransitionBuilder.onAdvanceHoldRequested() {
+        if (state.isReleaseLingering) emit(CancelReleaseLinger)
+        state = state.copy(isAdvanceHoldRequested = true, isReleaseLingering = false)
+    }
+
+    /**
+     * A hold still in place moves on once the release linger has run; a pause, play or skip already
+     * resolved any other.
+     */
     private fun RatedTransitionBuilder.onAdvanceHoldReleased() {
         state = state.copy(isAdvanceHoldRequested = false)
-        if (state.isHeldAtAdvancePoint) moveOnFromAdvancePoint()
+        if (!state.isHeldAtAdvancePoint || state.isReleaseLingering) return
+        state = state.copy(isReleaseLingering = true)
+        emit(StartReleaseLinger)
+    }
+
+    private fun RatedTransitionBuilder.onReleaseLingerElapsed() {
+        if (!state.isReleaseLingering) return
+        state = state.copy(isReleaseLingering = false)
+        moveOnFromAdvancePoint()
+    }
+
+    /** Whatever ended the hold during the release linger, the linger has nothing left to move on from. */
+    private fun RatedTransitionBuilder.dropStaleReleaseLinger() {
+        if (!state.isReleaseLingering || state.isHeldAtAdvancePoint) return
+        state = state.copy(isReleaseLingering = false)
+        emit(CancelReleaseLinger)
     }
 
     private fun RatedTransitionBuilder.onPlaybackChanged(input: PlaybackChanged) {
@@ -211,9 +241,25 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         )
     }
 
+    /**
+     * Resumes a session paused by an engine failure or by voice answering itself (ADR-0052). A
+     * missing microphone ends the session instead. After an engine failure the whole voice stack
+     * starts again at the presented card; after a voice-answer pause, voice answering starts again
+     * on the same card. A resume that finds nothing paused does nothing, so a second resume that
+     * waited behind the first on the permission check is dropped.
+     */
+    private fun RatedTransitionBuilder.onResumeRequested(isMicrophoneGranted: Boolean) {
+        val isEnginePause = state.pauseReason == SessionPauseReason.VoiceEngineUnavailable
+        when {
+            !isEnginePause && state.voiceAnswerPauseReason == null -> Unit
+            !isMicrophoneGranted -> emit(EndForRevokedMicPermission)
+            isEnginePause -> restartVoiceStack()
+            else -> resumeVoiceAnswering()
+        }
+    }
+
     /** Clears the voice-answer pause and both counters, and starts listening again from the question. */
-    private fun RatedTransitionBuilder.onVoiceAnsweringResumed() {
-        if (state.voiceAnswerPauseReason == null || state.pauseReason != null) return
+    private fun RatedTransitionBuilder.resumeVoiceAnswering() {
         state = state.copy(
             voiceAnswerPauseReason = null,
             consecutiveSilenceCount = 0,
@@ -224,13 +270,12 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             isPausedAfterFeedback = false,
         )
         state = state.copy(round = state.idleRound())
-        emit(RatedSessionEffect.StartVoiceAnswering)
+        emit(StartVoiceAnswering)
         if (!state.isPlaying) emit(Play)
     }
 
     /** The restarted player reads the presented card by itself, so no play is issued here. */
-    private fun RatedTransitionBuilder.onVoiceStackRestarted() {
-        if (state.pauseReason == null) return
+    private fun RatedTransitionBuilder.restartVoiceStack() {
         state = state.copy(
             pauseReason = null,
             voiceAnswerPauseReason = null,
@@ -241,7 +286,8 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             isPausedAfterFeedback = false,
         )
         state = state.copy(round = state.idleRound())
-        if (state.isVoiceAnsweringSession) emit(RatedSessionEffect.StartVoiceAnswering)
+        emit(RestartVoiceStack)
+        if (state.isVoiceAnsweringSession) emit(StartVoiceAnswering)
     }
 
     /**
