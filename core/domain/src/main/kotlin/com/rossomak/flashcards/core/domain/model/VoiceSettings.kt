@@ -8,10 +8,16 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class VoiceSettings(
-    val speechRate: Float = 1f,
+    val speechRate: Float = DEFAULT_SPEECH_RATE,
     val voiceId: String? = null,
     val voiceLabel: VoiceLabel? = null,
-)
+) {
+    companion object {
+        const val DEFAULT_SPEECH_RATE = 1f
+        const val MIN_SPEECH_RATE = 0.5f
+        const val MAX_SPEECH_RATE = 2f
+    }
+}
 
 /** The persistable part of a [VoiceOption] its display label is built from. */
 @Serializable

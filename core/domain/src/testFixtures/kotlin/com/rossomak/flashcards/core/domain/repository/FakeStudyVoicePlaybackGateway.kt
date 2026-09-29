@@ -5,7 +5,6 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -15,8 +14,8 @@ import kotlinx.coroutines.flow.update
 
 /**
  * Records every command in [calls], in order, and moves [state] the way the real player would:
- * start plays from the start index, pause and play flip `isPlaying`, presenting a part changes the
- * index and phase. Like the real player, [presentAnswer] reports the answer revealed, and presenting
+ * start plays from the start index, pause and play flip `isPlaying`, presenting a part moves the
+ * presented index. Like the real player, [presentAnswer] reports the answer revealed, and presenting
  * an index outside the list stops playing. Tests drive what else the player reports with
  * [finishQuestion], [finishAnswer], [finishNotice] and [emit].
  */
@@ -52,6 +51,9 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     var cards: List<Flashcard> = emptyList()
         private set
 
+    /** The index the player presents, which [finishQuestion] and [finishAnswer] report on. */
+    private var presentedIndex = 0
+
     /** Notices spoken and not yet finished by [finishNotice], oldest first. */
     val speakingNotices = mutableListOf<SpokenNotice>()
 
@@ -81,12 +83,12 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     /** Reports that the presented card's question was read in full. */
     fun finishQuestion() {
-        cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.QuestionFinished(it.id)) }
+        cards.getOrNull(presentedIndex)?.let { emit(PlaybackEvent.QuestionFinished(it.id)) }
     }
 
     /** Reports that the presented card's answer was read in full. */
     fun finishAnswer() {
-        cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.AnswerFinished(it.id)) }
+        cards.getOrNull(presentedIndex)?.let { emit(PlaybackEvent.AnswerFinished(it.id)) }
     }
 
     /** Reports the oldest spoken notice as finished. */
@@ -97,21 +99,15 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     override fun start(cards: List<Flashcard>, startIndex: Int, sessionTitle: String, isVoiceAnsweringSession: Boolean) {
         calls += Call.Start(cards.map { it.id }, startIndex, sessionTitle, isVoiceAnsweringSession)
         this.cards = cards
-        state.update {
-            it.copy(
-                isActive = cards.isNotEmpty(),
-                isPlaying = cards.isNotEmpty(),
-                currentIndex = startIndex,
-                totalCards = cards.size,
-                phase = VoicePhase.Question,
-            )
-        }
+        presentedIndex = startIndex
+        state.update { it.copy(isActive = cards.isNotEmpty(), isPlaying = cards.isNotEmpty()) }
     }
 
     override fun updateQueue(cards: List<Flashcard>) {
         calls += Call.UpdateQueue(cards.map { it.id })
         this.cards = cards
-        state.update { it.copy(currentIndex = 0, totalCards = cards.size, isActive = it.isActive && cards.isNotEmpty()) }
+        presentedIndex = 0
+        state.update { it.copy(isActive = it.isActive && cards.isNotEmpty()) }
     }
 
     override fun stop() {
@@ -132,21 +128,18 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     override fun presentQuestion(index: Int) {
         calls += Call.PresentQuestion(index)
-        state.update {
-            if (index in cards.indices) it.copy(currentIndex = index, phase = VoicePhase.Question) else it.copy(isPlaying = false)
-        }
+        if (index in cards.indices) presentedIndex = index else state.update { it.copy(isPlaying = false) }
     }
 
     override fun presentAnswer(index: Int) {
         calls += Call.PresentAnswer(index)
         val card = cards.getOrNull(index) ?: return
-        state.update { it.copy(currentIndex = index, phase = VoicePhase.Answer) }
+        presentedIndex = index
         emit(PlaybackEvent.AnswerRevealed(card.id))
     }
 
     override fun setSpeechRate(rate: Float) {
         calls += Call.SetSpeechRate(rate)
-        state.update { it.copy(speechRate = rate) }
     }
 
     override fun setVoice(voiceId: String?) {

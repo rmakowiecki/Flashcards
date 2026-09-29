@@ -4,7 +4,6 @@ import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionState
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Pause
@@ -55,7 +54,7 @@ class FastSessionReducerTest {
 
     private val session: FastSessionState = reducer.seed((1..CARD_COUNT).map { flashcard("card-$it") })
 
-    private fun playback(isPlaying: Boolean = true) = VoicePlaybackState(isActive = true, isPlaying = isPlaying, totalCards = CARD_COUNT)
+    private fun playback(isPlaying: Boolean = true) = VoicePlaybackState(isActive = true, isPlaying = isPlaying)
 
     private fun FastSessionState.after(vararg inputs: FastSessionInput): FastSessionState =
         inputs.fold(this) { state, input -> reducer.reduce(state, input).state }
@@ -75,15 +74,6 @@ class FastSessionReducerTest {
 
         revealed.isAnswerRevealed shouldBe true
         revealed.seenCardIds shouldBe listOf("card-1")
-    }
-
-    @Test
-    fun `the player's playback state never moves the presented card or reveals its answer`() {
-        val state = session.after(PlaybackChanged(playback().copy(currentIndex = 1, phase = VoicePhase.Answer)))
-
-        state.currentIndex shouldBe 0
-        state.isAnswerRevealed shouldBe false
-        state.seenCardIds.shouldBeEmpty()
     }
 
     @Test

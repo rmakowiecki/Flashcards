@@ -10,7 +10,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
@@ -761,12 +760,6 @@ class RatedSessionReducerTest {
         listOf(voiceSession(), voiceSession().grading(), voiceSession().silence(), voiceSession().speakingFeedback().paused()).forEach { state ->
             reducer.reduce(state, FeedbackSkipRequested).effects.shouldBeEmpty()
         }
-    }
-
-    @Test
-    fun `the player reading the answer reveals it`() {
-        voiceSession().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true, phase = VoicePhase.Answer)))
-            .isAnswerRevealed shouldBe true
     }
 
     // Engine unavailable

@@ -6,7 +6,6 @@ import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerRound
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
@@ -210,9 +209,6 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             isPausedAtAdvancePoint = state.isPausedAtAdvancePoint && !startedPlaying,
             isPausedTemporarily = state.isPausedTemporarily && !startedPlaying,
         )
-        if (playback.isActive && playback.phase == VoicePhase.Answer) {
-            state = state.copy(isAnswerRevealed = true)
-        }
     }
 
     /** Clears the voice-answer pause and both counters, and starts listening again from the question. */

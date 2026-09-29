@@ -20,8 +20,8 @@ import com.rossomak.flashcards.core.data.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.type
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import java.util.Locale
@@ -44,7 +44,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * matching in-app command. Every change calls [publishState] to refresh both the Media3 state and
  * the [voiceState] side-channel.
  *
- * [voiceState] carries the [VoicePhase], which the standard [Player] state cannot express.
+ * [voiceState] carries the transport state the coordinator reads, without the Media3 types.
  *
  * It makes no session decision. Audio-focus auto-pause and auto-resume are the one behavior it
  * still runs by itself. Each utterance starts with a [PlaybackPreroll], so headset buttons reach this
@@ -79,7 +79,7 @@ class TtsPlayer(
 
     // An utterance is in flight; false while playing between parts.
     private var isSpeaking = false
-    private var speechRate = VoicePlaybackState.DEFAULT_SPEECH_RATE
+    private var speechRate = VoiceSettings.DEFAULT_SPEECH_RATE
     private var pendingVoiceId: String? = null
     private var subcategoryName = ""
 
@@ -322,7 +322,7 @@ class TtsPlayer(
     /** Applies from the next utterance; nothing is read again. */
     fun setPlaybackSpeechRate(rate: Float) {
         speechRate =
-            rate.coerceIn(VoicePlaybackState.MIN_SPEECH_RATE, VoicePlaybackState.MAX_SPEECH_RATE)
+            rate.coerceIn(VoiceSettings.MIN_SPEECH_RATE, VoiceSettings.MAX_SPEECH_RATE)
         if (ttsReady) tts.setSpeechRate(speechRate)
         publishState()
     }
@@ -449,10 +449,6 @@ class TtsPlayer(
         _voiceState.value = VoicePlaybackState(
             isActive = cards.isNotEmpty(),
             isPlaying = isPlaying,
-            currentIndex = index,
-            totalCards = cards.size,
-            phase = phase,
-            speechRate = speechRate,
         )
         invalidateState()
     }
@@ -541,3 +537,6 @@ internal fun TextToSpeech.applySessionVoice(voiceId: String?) {
         ?: VoiceCuration.curate(voices.orEmpty()).firstOrNull()
     if (resolved != null) voice = resolved
 }
+
+/** Which part of the presented card the player reads. */
+private enum class VoicePhase { Question, Answer }

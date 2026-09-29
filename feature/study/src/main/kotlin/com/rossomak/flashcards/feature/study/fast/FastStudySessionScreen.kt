@@ -374,7 +374,6 @@ private fun FastStudySessionVoiceActivePreview() {
             isReadAloudMode = true,
             isVoiceActive = true,
             isVoicePlaying = true,
-            speechRate = 1.25f,
         ),
         snackbarHostState = remember { SnackbarHostState() },
         actions = FastStudySessionActions(

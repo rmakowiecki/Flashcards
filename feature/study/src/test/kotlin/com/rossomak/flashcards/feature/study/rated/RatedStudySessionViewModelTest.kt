@@ -22,7 +22,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
@@ -484,37 +483,7 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `the mastered count increases only on a Terminal Mastered`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
-        viewModel.state.value.masteredCount shouldBe 0
-
-        viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-        viewModel.state.value.masteredCount shouldBe 1
-    }
-
-    @Test
-    fun `the mastered count does not move on a card finishing Partial or Failed`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(
-                listOf(flashcard("card-1"), flashcard("card-2")),
-            )
-            stubRoute(route.copy(cardIds = listOf("card-1", "card-2"), ratedAttempts = 1))
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
-            viewModel.state.value.masteredCount shouldBe 0
-
-            viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
-            viewModel.state.value.masteredCount shouldBe 0
-        }
-
-    @Test
-    fun `the completed count increases on any Terminal State, unlike the mastered count`() =
+    fun `the completed count increases on any Terminal State`() =
         runTest(mainDispatcherRule.testDispatcher) {
             flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(
                 listOf(flashcard("card-1"), flashcard("card-2")),
@@ -525,11 +494,9 @@ class RatedStudySessionViewModelTest {
 
             viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
             viewModel.state.value.completedCount shouldBe 1
-            viewModel.state.value.masteredCount shouldBe 0
 
             viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
             viewModel.state.value.completedCount shouldBe 2
-            viewModel.state.value.masteredCount shouldBe 0
         }
 
     @Test
@@ -704,18 +671,6 @@ class RatedStudySessionViewModelTest {
             isVoiceAnswerPaused shouldBe true
             isVoiceEngineUnavailable shouldBe true
         }
-    }
-
-    @Test
-    fun `the player reading the answer reveals it, while the presented card stays the queue's head`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createVoiceViewModel()
-
-        playbackGateway.state.update { it.copy(currentIndex = 2, phase = VoicePhase.Answer) }
-        advanceUntilIdle()
-
-        viewModel.state.value.currentCardIndex shouldBe 0
-        viewModel.state.value.isAnswerRevealed shouldBe true
-        viewModel.state.value.isVoiceActive shouldBe true
     }
 
     @Test
@@ -1642,9 +1597,9 @@ class RatedStudySessionViewModelTest {
 
             viewModel.events.test {
                 emitGrade(gradePercent = CORRECT_GRADE_PERCENT)
-                awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
+                val destination = awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
+                destination.route.cardStates shouldBe listOf(FlashcardStudyProgressState.Mastered)
             }
-            viewModel.state.value.masteredCount shouldBe 1
         }
 
     @Test
@@ -1710,7 +1665,7 @@ class RatedStudySessionViewModelTest {
             enableVoiceAnswering()
             val viewModel = createViewModel()
             advanceUntilIdle()
-            val masteredBefore = viewModel.state.value.masteredCount
+            val completedBefore = viewModel.state.value.completedCount
             val flashcardsBefore = viewModel.state.value.flashcards.map { it.id }
 
             // Independently reproduces the silence requeue's exact draw order/range with an
@@ -1736,7 +1691,7 @@ class RatedStudySessionViewModelTest {
             viewModel.state.value.isVoiceAnswerPaused shouldBe true
             playbackGateway.pauseCount shouldBe 1
             captureGateway.isVoiceAnsweringStarted shouldBe false
-            viewModel.state.value.masteredCount shouldBe masteredBefore
+            viewModel.state.value.completedCount shouldBe completedBefore
             viewModel.state.value.flashcards.map { it.id } shouldBe expectedQueue
         }
 
@@ -2019,8 +1974,6 @@ class RatedStudySessionViewModelTest {
             val viewModel = createVoiceViewModel()
 
             startSilenceNotice()
-            // A player update while the no-grade notice is active must not reveal the answer.
-            playbackGateway.state.update { it.copy(speechRate = 1.25f) }
             runCurrent()
 
             viewModel.state.value.isAnswerRevealed shouldBe false
@@ -2032,7 +1985,6 @@ class RatedStudySessionViewModelTest {
             val viewModel = createVoiceViewModel()
 
             startGradingFailureNotice(GradingFailureReason.ServiceError)
-            playbackGateway.state.update { it.copy(speechRate = 1.25f) }
             runCurrent()
 
             viewModel.state.value.isAnswerRevealed shouldBe true
@@ -2044,7 +1996,6 @@ class RatedStudySessionViewModelTest {
             val viewModel = createVoiceViewModel()
 
             emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
-            playbackGateway.state.update { it.copy(speechRate = 1.25f) }
             runCurrent()
 
             viewModel.state.value.isAnswerRevealed shouldBe true

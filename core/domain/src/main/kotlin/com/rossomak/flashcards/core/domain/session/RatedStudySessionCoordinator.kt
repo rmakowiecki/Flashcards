@@ -562,17 +562,14 @@ class RatedStudySessionCoordinator @Inject constructor(
         _sessionState.value = with(current) {
             RatedSessionStateSnapshot.Running(
                 cards = remainingCards,
-                masteredCount = masteredCount,
                 completedCount = completedCount,
                 distinctCardCount = distinctCardCount,
                 currentCardRatings = currentCardRatings,
                 isAnswerRevealed = isAnswerRevealed,
                 playback = playback,
                 round = round,
-                speakingNotice = speakingNotices.firstOrNull(),
                 isShortNoticeSpeaking = isShortNoticeSpeaking,
                 voiceAnswerPauseReason = voiceAnswerPauseReason,
-                isPausedAtAdvancePoint = isPausedAtAdvancePoint,
                 isHeldAtAdvancePoint = isHeldAtAdvancePoint,
                 pauseReason = pauseReason,
                 isPausedWhileGrading = isPausedWhileGrading,

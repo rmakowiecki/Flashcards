@@ -21,7 +21,6 @@ sealed interface RatedSessionStateSnapshot {
      * @param currentCardRatings the current card's attempt markers; a voice grade shows at once.
      * @param playback the voice player's transport state.
      * @param round the current Voice Answering round.
-     * @param speakingNotice the notice being spoken, `null` when none is.
      * @param isShortNoticeSpeaking a notice other than [SpokenNotice.Feedback] is still being spoken.
      * @param isHeldAtAdvancePoint a requested hold stopped the session at the auto-advance point, on
      * the card it just finished.
@@ -33,17 +32,14 @@ sealed interface RatedSessionStateSnapshot {
      */
     data class Running(
         val cards: List<Flashcard> = emptyList(),
-        val masteredCount: Int = 0,
         val completedCount: Int = 0,
         val distinctCardCount: Int = 0,
         val currentCardRatings: List<FlashcardAttemptRating> = emptyList(),
         val isAnswerRevealed: Boolean = false,
         val playback: VoicePlaybackState = VoicePlaybackState(),
         val round: VoiceAnswerRound = VoiceAnswerRound(),
-        val speakingNotice: SpokenNotice? = null,
         val isShortNoticeSpeaking: Boolean = false,
         val voiceAnswerPauseReason: VoiceAnswerPauseReason? = null,
-        val isPausedAtAdvancePoint: Boolean = false,
         val isHeldAtAdvancePoint: Boolean = false,
         val pauseReason: SessionPauseReason? = null,
         val isPausedWhileGrading: Boolean = false,

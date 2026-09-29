@@ -223,7 +223,8 @@ fun RatedStudySessionContent(
                 isLoading = state.isLoading,
                 error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
-                currentCardIndex = state.currentCardIndex,
+                // The presented card is always the queue's head.
+                currentCardIndex = 0,
                 isAnswerRevealed = state.isAnswerRevealed,
                 innerPadding = innerPadding,
                 attemptSlots = state.attemptSlots,

@@ -403,7 +403,6 @@ class RatedStudySessionCoordinatorTest {
 
         advanceTimeBy(NOTICE_TAIL * 2)
         playbackGateway.presentedQuestions.size shouldBe 0
-        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
 
         coordinator.play()
 
@@ -614,7 +613,6 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
-        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
         playbackGateway.presentedQuestions.size shouldBe 0
 
@@ -754,7 +752,7 @@ class RatedStudySessionCoordinatorTest {
         finishNotice()
         advanceTimeBy(NOTICE_TAIL)
         runCurrent()
-        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+        playbackGateway.presentedQuestions.size shouldBe 0
 
         coordinator.endTemporaryPause()
         runCurrent()

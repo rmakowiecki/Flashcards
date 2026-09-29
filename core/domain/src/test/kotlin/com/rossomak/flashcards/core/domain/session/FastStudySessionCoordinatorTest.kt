@@ -11,7 +11,6 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -550,18 +549,6 @@ class FastStudySessionCoordinatorTest {
 
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result
         result.cardResults.map { it.cardId } shouldBe listOf("card-1")
-    }
-
-    @Test
-    fun `an answer phase the player never reported revealed does not count as Seen`() = runTest {
-        val coordinator = startCoordinator()
-        playbackGateway.state.update { it.copy(phase = VoicePhase.Answer) }
-        runCurrent()
-
-        coordinator.end(abandoned = true)
-        runCurrent()
-
-        events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.cardResults.shouldBeEmpty()
     }
 
     @Test

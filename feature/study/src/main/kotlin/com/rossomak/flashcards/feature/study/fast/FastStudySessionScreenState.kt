@@ -2,7 +2,6 @@ package com.rossomak.flashcards.feature.study.fast
 
 import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.Flashcard
-import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 
 /**
@@ -11,9 +10,9 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)).
  *
  * Deliberately duplicates the shape of `RatedStudySessionScreenState` rather than sharing a base
- * type with it: Rated gains an attempt counter and a per-card ledger in the next spec in the
- * sequence, and a shared base would need a `when` on mode to stay useful — exactly the branching
- * this split exists to remove.
+ * type with it: Rated carries an Attempt indicator, a completed counter and the Voice Answering
+ * round, and a shared base would need a `when` on mode to stay useful — exactly the branching this
+ * split exists to remove.
  */
 data class FastStudySessionScreenState(
     val categoryName: String = "",
@@ -28,7 +27,6 @@ data class FastStudySessionScreenState(
     val isVoicePlaying: Boolean = false,
     // False at the last card's answer: the session ends only once that answer has been read.
     val isReadAloudNextAvailable: Boolean = true,
-    val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
     // A voice engine could not start. Read-aloud stays on, never falling back to tap-through, and
     // the play control stays enabled to restart it.
     val isVoiceEngineUnavailable: Boolean = false,
