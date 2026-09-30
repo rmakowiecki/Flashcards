@@ -2,70 +2,36 @@
 <issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
 
     <issue
-        id="EmptySuperCall"
-        message="No need to call `super.onCleared`; the super method is defined to be empty"
-        errorLine1="        super.onCleared()"
-        errorLine2="              ~~~~~~~~~">
+        id="QueryPermissionsNeeded"
+        message="Consider adding a `&lt;queries>` declaration to your manifest when calling this method; see https://g.co/dev/packagevisibility for details"
+        errorLine1="                    if (ttsSettingsIntent.resolveActivity(context.packageManager) != null) {"
+        errorLine2="                                          ~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionViewModel.kt"
-            line="841"
-            column="15"/>
+            file="src/main/kotlin/com/rossomak/flashcards/feature/study/fast/FastStudySessionScreen.kt"
+            line="131"
+            column="43"/>
     </issue>
 
     <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="            voiceCaptureEngine.startListening()"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        id="QueryPermissionsNeeded"
+        message="Consider adding a `&lt;queries>` declaration to your manifest when calling this method; see https://g.co/dev/packagevisibility for details"
+        errorLine1="                if (ttsSettingsIntent.resolveActivity(context.packageManager) != null) {"
+        errorLine2="                                      ~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/rossomak/flashcards/feature/study/voice/VoiceAnswerController.kt"
-            line="173"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingPermission"
-        message="Missing permissions required by VoiceCaptureEngine.startListening: android.permission.RECORD_AUDIO"
-        errorLine1="            voiceCaptureEngine.startListening()"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/rossomak/flashcards/feature/study/voice/VoiceAnswerController.kt"
-            line="173"
-            column="13"/>
+            file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionScreen.kt"
+            line="127"
+            column="39"/>
     </issue>
 
     <issue
         id="LocalContextGetResourceValueCall"
         message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
-        errorLine1="            message = context.getString("
-        errorLine2="                      ^">
+        errorLine1="                actionLabel = if (message == VoicePlaybackUnavailable) context.getString(R.string.study_session_open_tts_settings_button) else null,"
+        errorLine2="                                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionScreen.kt"
-            line="126"
-            column="23"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
-        errorLine1="            message = context.getString(R.string.study_session_voice_answer_error_message),"
-        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/rossomak/flashcards/feature/study/rated/RatedStudySessionScreen.kt"
-            line="139"
-            column="23"/>
-    </issue>
-
-
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;mastered&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;rated_study_session_mastered_counter_label&quot;>%1$d / %2$d mastered&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="41"
-            column="5"/>
+            line="120"
+            column="72"/>
     </issue>
 
     <issue
@@ -75,7 +41,7 @@
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="70"
+            line="69"
             column="5"/>
     </issue>
 
@@ -86,7 +52,7 @@
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="71"
+            line="70"
             column="5"/>
     </issue>
 
@@ -97,30 +63,8 @@
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="72"
+            line="71"
             column="5"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/rossomak/flashcards/feature/study/voice/TtsPlayer.kt"
-            line="501"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/rossomak/flashcards/feature/study/voice/TtsPlayer.kt"
-            line="527"
-            column="13"/>
     </issue>
 
 </issues>
