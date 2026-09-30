@@ -11,7 +11,7 @@ Authoritative reference for JVM unit tests. All test-writing agents and contribu
 - **Nav-arg ViewModels**: read routes via `SavedStateHandle.decodeRoute<T>()` (`core:ui`, `core/ui/.../navigation/RouteDecoder.kt`), not the bare `toRoute` (whose `android.os.Bundle` decode can't run off-device). Tests stub the seam: `mockkObject(RouteDecoder)` + `every { RouteDecoder.decode(any<() -> MyRoute>()) } returns fakeRoute`, with `unmockkObject(RouteDecoder)` in `@After`. For navigation assertions, collect `viewModel.events` with Turbine instead of checking a `navigationDestination` state field.
 - **Location**: `app/src/test/java/…` and `feature/*/src/test/kotlin/…`, mirroring production package structure.
 - **Test wiring**: feature-module test deps (junit, mockk, turbine, kotest, coroutines-test) are applied centrally by the `android-feature` convention plugin — do not re-declare them per module.
-- **Shared utilities**: `MainDispatcherRule` and the `assertValue` helper live in `core:domain` **testFixtures** (package `com.rossomak.flashcards.testutil`); consume via `testImplementation(testFixtures(project(":core:domain")))`. Domain fakes (`FakeAuthRepository`, `FakeFlashcardRepository`) live there too — prefer a fake over mocking a use case that returns `kotlin.Result` (MockK unwraps the `Result` value class and hands back its payload).
+- **Shared utilities**: `MainDispatcherRule` and the `assertValue` helper live in `core:domain` **testFixtures** (package `com.rossomak.flashcards.testutil`); consume via `testImplementation(testFixtures(project(":core:domain")))`. Domain fakes (`FakeAuthRepository`, `FakeFlashcardRepository`) live there too. See section 5 for when to write a fake and when to mock.
 - **Coverage targets**: use cases 90%+, ViewModels 80%+, repositories 80%+.
 
 ---
@@ -105,7 +105,16 @@ testScheduler.currentTime shouldBeLessThan 7_000L
 
 ---
 
-## 5. Mocking — MockK
+## 5. Fakes and mocks
+**Use a MockK mock** for a collaborator that returns canned values and whose calls you verify, or that you only call for side effects (a logger, a sign-out). This is the default, in `core:domain` tests as well as feature modules.
+
+**Write a fake** (in `core:domain` testFixtures) only for a collaborator with behavior of its own that several tests share: state that reacts to calls, or values emitted over time. Examples: `FakeUserPreferencesRepository` (`save` updates a `StateFlow`), `FakeAudioInterruptionGateway` (`emit(signal)`), the voice playback and capture gateways. A mock of these needs the same logic re-stubbed in every test. A fake that only returns a canned value and records calls is a mock in disguise: do not add one.
+
+**Why:** a fake per interface costs a class to write and keep in sync with every interface change, and most collaborators need no behavior.
+
+**`kotlin.Result`:** `coEvery { ... } returns Result.success(x)` / `Result.failure(e)` works on MockK 1.14.11 (and 1.13.13) for suspend and plain functions, including `Result<Unit>`, `Result<List<T>>`, `Result<T?>` and `returnsMany`. A relaxed mock that returns a `Result` yields a `Success` wrapping a mock object, not a real value: stub any `Result` the code under test reads.
+
+### MockK
 - `mockk()` — mocks whose calls you verify or whose returns you stub.
 - `mockk(relaxed = true)` — collaborators called for side effects only (sign-out, logging) where returns don't matter.
 - `coEvery` / `coVerify` — `suspend` functions. `every` / `verify` — non-suspend.
