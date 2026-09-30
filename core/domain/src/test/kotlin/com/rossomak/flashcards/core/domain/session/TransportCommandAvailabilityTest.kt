@@ -30,12 +30,13 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
 import kotlin.random.Random
 import org.junit.Test
 
 class TransportCommandAvailabilityTest {
 
-    private val reducer = RatedSessionReducer(Random(FIXED_SEED))
+    private val reducer = RatedSessionReducer(Random(FIXED_SEED), mockk(relaxed = true))
 
     private fun flashcard(id: String): Flashcard = Flashcard(
         id = id,

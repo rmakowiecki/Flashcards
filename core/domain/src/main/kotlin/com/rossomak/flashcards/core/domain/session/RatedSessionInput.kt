@@ -1,11 +1,13 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import kotlin.time.ComparableTimeMark
 
 /** Everything that can happen to a Rated Study Session, as [RatedSessionReducer] takes it in. */
 sealed interface RatedSessionInput {
@@ -60,4 +62,13 @@ sealed interface RatedSessionInput {
 
     /** The voice player's transport state changed. */
     data class PlaybackChanged(val playback: VoicePlaybackState) : RatedSessionInput
+
+    /** Something changed in the audio around the session, stamped [at] when the coordinator received it. */
+    data class AudioEnvironmentChanged(val signal: AudioEnvironmentSignal, val at: ComparableTimeMark) : RatedSessionInput
+
+    /** A blip lasted as long as [StartBlipTimer][RatedSessionEffect.StartBlipTimer] asked. */
+    data object BlipElapsed : RatedSessionInput
+
+    /** The capture gate tail after the end of a blip ran in full. */
+    data object GateTailElapsed : RatedSessionInput
 }

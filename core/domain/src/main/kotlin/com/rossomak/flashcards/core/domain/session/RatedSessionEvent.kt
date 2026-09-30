@@ -15,6 +15,9 @@ sealed interface RatedSessionEvent {
     /** A text-to-speech engine could not start; the session is paused until resumed. */
     data object VoicePlaybackUnavailable : RatedSessionEvent
 
+    /** The user asked to play while a call rings or runs, and nothing started. */
+    data object PlayIgnoredDuringCall : RatedSessionEvent
+
     /** The microphone permission is no longer granted; voice is stopped and the session should end. */
     data object MicPermissionRevoked : RatedSessionEvent
 

@@ -14,7 +14,8 @@ package com.rossomak.flashcards.core.domain.model
  * @param isAnswerRevealed whether the presented card shows its answer.
  * @param readAloudStep where read-aloud is in the presented card. Only meaningful with read-aloud on.
  * @param pauseReason who paused the session; `null` while nothing did. A player that stopped by
- * itself (an audio-focus loss, a failed utterance) has no pause reason.
+ * itself (a failed utterance) has no pause reason. An audio interruption pauses as
+ * [FastPauseReason.User] and is told apart from a user pause by [episode].
  * @param isPlaying the voice player's playing state, as last reported.
  * @param isAdvanceHoldRequested while set, read-aloud stops on the current card at the auto-advance
  * point instead of moving on.
@@ -25,6 +26,8 @@ package com.rossomak.flashcards.core.domain.model
  * anything that ends the hold drops it too.
  * @param isPausedAtAdvancePoint a user pause replaced a hold at the auto-advance point: the next play
  * moves on instead of re-reading the answer.
+ * @param episode the audio interruption in progress, if any, and the latest audio mode. It
+ * remembers whether the end of the interruption may resume the session.
  */
 data class FastSessionState(
     val cards: List<Flashcard>,
@@ -39,6 +42,7 @@ data class FastSessionState(
     val isHeldAtAdvancePoint: Boolean = false,
     val isReleaseLingering: Boolean = false,
     val isPausedAtAdvancePoint: Boolean = false,
+    val episode: InterruptionEpisode = InterruptionEpisode(),
 ) {
     /**
      * Whether the read-aloud Next does anything: at a question it reveals that card's answer, at an

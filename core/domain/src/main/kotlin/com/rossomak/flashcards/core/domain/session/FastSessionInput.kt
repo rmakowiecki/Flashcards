@@ -1,6 +1,8 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import kotlin.time.ComparableTimeMark
 
 /** Everything that can happen to a Fast Study Session, as [FastSessionReducer] takes it in. */
 sealed interface FastSessionInput {
@@ -49,4 +51,10 @@ sealed interface FastSessionInput {
 
     /** The release linger ran in full. */
     data object ReleaseLingerElapsed : FastSessionInput
+
+    /** Something changed in the audio around the session, stamped [at] when the coordinator received it. */
+    data class AudioEnvironmentChanged(val signal: AudioEnvironmentSignal, val at: ComparableTimeMark) : FastSessionInput
+
+    /** A blip lasted as long as [StartBlipTimer][FastSessionEffect.StartBlipTimer] asked. */
+    data object BlipElapsed : FastSessionInput
 }

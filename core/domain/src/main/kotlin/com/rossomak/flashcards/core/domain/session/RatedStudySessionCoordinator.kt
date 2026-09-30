@@ -21,10 +21,13 @@ import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.sealRatedCardResults
 import com.rossomak.flashcards.core.domain.model.type
+import com.rossomak.flashcards.core.domain.repository.AudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
 import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelBlipTimer
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGateTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
@@ -40,7 +43,10 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PresentHea
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SetCaptureGate
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartBlipTimer
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartGateTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartSilenceTimer
@@ -77,12 +83,17 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Its ViewModel calls [start] with `viewModelScope` and [stop] from `onCleared`. It never creates a
  * scope of its own. A voice-answering session keeps its delivery mode to the end: an unavailable
  * voice engine pauses it, and [play] restarts the voice stack.
+ *
+ * What other apps' audio does to the session ([AudioInterruptionGateway]) is decided by the reducer
+ * from each signal and the time this coordinator stamps it with; this only runs the timers and the
+ * capture gate that follow, and writes the log lines.
  */
 @Suppress("LongParameterList", "TooManyFunctions") // one collaborator per seam, one command per session action.
 class RatedStudySessionCoordinator @Inject constructor(
     private val getSessionStartData: GetSessionStartDataUseCase,
     private val playbackGateway: StudyVoicePlaybackGateway,
     private val captureGateway: VoiceCaptureGateway,
+    private val interruptionGateway: AudioInterruptionGateway,
     private val gradingRepository: VoiceAnswerGradingRepository,
     private val permissionGateway: PermissionGateway,
     private val reducer: RatedSessionReducer,
@@ -116,6 +127,10 @@ class RatedStudySessionCoordinator @Inject constructor(
     private var noticeTailJob: Job? = null
     private var micRevokedEndJob: Job? = null
     private val releaseLingerTimer = ReleaseLingerTimer { dispatch(RatedSessionInput.ReleaseLingerElapsed) }
+    private val interruptionTimers = InterruptionTimers(
+        onBlipElapsed = { dispatch(RatedSessionInput.BlipElapsed) },
+        onGateTailElapsed = { dispatch(RatedSessionInput.GateTailElapsed) },
+    )
     private var isMicPermissionRevoked = false
     private var hasEnded = false
     private var pushedTransportCommands: Set<TransportCommandType>? = null
@@ -142,6 +157,7 @@ class RatedStudySessionCoordinator @Inject constructor(
         stopVoiceStack()
         noticeTailJob?.cancel()
         releaseLingerTimer.cancel()
+        interruptionTimers.cancelAll()
         micRevokedEndJob?.cancel()
     }
 
@@ -304,6 +320,11 @@ class RatedStudySessionCoordinator @Inject constructor(
         }
         scope.launch { playbackGateway.playbackEvents.collect(::onPlaybackEvent) }
         scope.launch { captureGateway.captureEvents.collect(::onCaptureEvent) }
+        scope.launch {
+            interruptionGateway.signals.collect { signal ->
+                dispatch(RatedSessionInput.AudioEnvironmentChanged(signal, timeSource.markNow()))
+            }
+        }
     }
 
     private fun onPlaybackEvent(event: PlaybackEvent) {
@@ -471,6 +492,11 @@ class RatedStudySessionCoordinator @Inject constructor(
             EndForRevokedMicPermission -> onMicPermissionRevoked()
             is Emit -> eventChannel.trySend(effect.event)
             SessionComplete -> end(abandoned = false)
+            is SetCaptureGate -> captureGateway.setCaptureGate(effect.closed)
+            is StartBlipTimer -> interruptionTimers.startBlip(scope, effect.duration)
+            CancelBlipTimer -> interruptionTimers.cancelBlip()
+            StartGateTail -> interruptionTimers.startGateTail(scope)
+            CancelGateTail -> interruptionTimers.cancelGateTail()
         }
     }
 

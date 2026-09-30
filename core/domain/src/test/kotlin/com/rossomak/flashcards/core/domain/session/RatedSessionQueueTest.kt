@@ -12,6 +12,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.mockk
 import kotlin.random.Random
 import org.junit.Test
 
@@ -43,7 +44,7 @@ class RatedSessionQueueTest {
         random: Random = Random(FIXED_SEED),
     ): RatedSessionState {
         this.random = random
-        return RatedSessionReducer(random).seed(
+        return RatedSessionReducer(random, mockk(relaxed = true)).seed(
             cards = cards(cardCount),
             attemptsLimit = attemptsLimit,
             partialRatingCardRequeueingEnabled = partialRatingCardRequeueingEnabled,

@@ -1,14 +1,23 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.logging.DomainLogger
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.MicSilenced
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.MicUnsilenced
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.OutputDisconnected
+import com.rossomak.flashcards.core.domain.model.EpisodeChange
+import com.rossomak.flashcards.core.domain.model.EpisodeEnd
 import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionState
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.InterruptionEpisode
+import com.rossomak.flashcards.core.domain.model.InterruptionTier
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep.AdvancePause
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep.Answer
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep.Question
 import com.rossomak.flashcards.core.domain.model.ReadAloudStep.QuestionPause
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelBlipTimer
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PausePlayback
@@ -17,6 +26,7 @@ import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentAnsw
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQuestion
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartAdvancePause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartBlipTimer
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartQuestionPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldReleased
@@ -24,6 +34,8 @@ import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvanceHoldR
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvancePauseElapsed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerFinished
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerRevealed
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.AudioEnvironmentChanged
+import com.rossomak.flashcards.core.domain.session.FastSessionInput.BlipElapsed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.JumpRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PauseRequested
@@ -47,15 +59,19 @@ data class FastSessionTransition(val state: FastSessionState, val effects: List<
  * pause, next card loop: it tells the player which part of which card to present, starts the two
  * pauses, and decides at the auto-advance point (the end of the pause after an answer) whether to
  * move on or stop there while a hold is requested. It also decides every transport command and who
- * paused the session.
+ * paused the session. [logger] only records audio interruption decisions; it never affects the
+ * state or the effects.
  */
 @Suppress("TooManyFunctions") // one handler per input.
-class FastSessionReducer @Inject constructor() {
+class FastSessionReducer @Inject constructor(private val logger: DomainLogger) {
 
     fun seed(cards: List<Flashcard>, isReadAloudSession: Boolean): FastSessionState =
         FastSessionState(cards = cards, isReadAloudSession = isReadAloudSession)
 
-    fun reduce(state: FastSessionState, input: FastSessionInput): FastSessionTransition = dropStaleReleaseLinger(reduceInput(state, input))
+    fun reduce(state: FastSessionState, input: FastSessionInput): FastSessionTransition {
+        val transition = dropStaleReleaseLinger(reduceInput(state, input))
+        return stripPlayDuringCall(withdrawResumeOnPlay(escalateLongBlip(transition)))
+    }
 
     @Suppress("CyclomaticComplexMethod") // one branch per input, exhaustive over the sealed type.
     private fun reduceInput(state: FastSessionState, input: FastSessionInput): FastSessionTransition = when (input) {
@@ -66,8 +82,8 @@ class FastSessionReducer @Inject constructor() {
         is AnswerFinished -> onPartFinished(state, input.cardId, Answer)
         QuestionPauseElapsed -> onQuestionPauseElapsed(state)
         AdvancePauseElapsed -> onAdvancePoint(state)
-        PlayRequested -> onPlayRequested(state)
-        PauseRequested -> onPauseRequested(state)
+        PlayRequested -> onUserPlayRequested(state)
+        PauseRequested -> onUserPauseRequested(state)
         NextRequested -> if (state.isReadAloudSession) onReadAloudNextRequested(state) else onManualNextRequested(state)
         is PreviousRequested -> onCardChangeRequested(
             state = state,
@@ -83,6 +99,8 @@ class FastSessionReducer @Inject constructor() {
         AdvanceHoldRequested -> onAdvanceHoldRequested(state)
         AdvanceHoldReleased -> onAdvanceHoldReleased(state)
         ReleaseLingerElapsed -> if (state.isReleaseLingering) moveOn(state.copy(isReleaseLingering = false)) else FastSessionTransition(state, emptyList())
+        is AudioEnvironmentChanged -> onAudioEnvironmentChanged(state, input)
+        BlipElapsed -> FastSessionTransition(state.copy(episode = state.episode.markBlipLong()), emptyList())
     }
 
     /**
@@ -105,23 +123,18 @@ class FastSessionReducer @Inject constructor() {
         }
 
     /**
-     * Only whether the player plays. The player starting to play ends any pause or hold, whatever
-     * started it, and inside a read-aloud pause it goes on to the next step (an audio-focus gain
-     * resumes the player without reading). The player stopping by itself inside a pause stops the
-     * pause, which the next resume then skips.
+     * Only whether the player plays. The player follows the coordinator's orders and starts and
+     * stops by nothing else, apart from a failed utterance: the player stopping by itself inside a
+     * pause stops the pause, which the next resume then skips.
      */
     private fun onPlaybackChanged(state: FastSessionState, playback: VoicePlaybackState): FastSessionTransition {
         if (!playback.isActive) return FastSessionTransition(state.copy(isPlaying = false), emptyList())
-        val startedPlaying = playback.isPlaying && !state.isPlaying
         val stoppedPlaying = !playback.isPlaying && state.isPlaying
         val updated = state.copy(isPlaying = playback.isPlaying)
-        return when {
-            startedPlaying && state.pauseReason != FastPauseReason.VoiceEngineUnavailable -> {
-                val playing = updated.copy(pauseReason = null, isHeldAtAdvancePoint = false, isPausedAtAdvancePoint = false)
-                if (state.readAloudStep.isPause) resume(playing) else FastSessionTransition(playing, emptyList())
-            }
-            stoppedPlaying && state.readAloudStep.isPause -> FastSessionTransition(updated, listOf(CancelReadAloudPause))
-            else -> FastSessionTransition(updated, emptyList())
+        return if (stoppedPlaying && state.readAloudStep.isPause) {
+            FastSessionTransition(updated, listOf(CancelReadAloudPause))
+        } else {
+            FastSessionTransition(updated, emptyList())
         }
     }
 
@@ -210,9 +223,15 @@ class FastSessionReducer @Inject constructor() {
         )
     }
 
-    /** Only pauses a session that is playing; a paused one stays paused by whoever paused it. */
+    /**
+     * Only pauses a session that is playing; a paused one stays paused by whoever paused it. A dialog
+     * that opens while an interruption holds the session takes over the resume: the dialog closing
+     * plays again, not the end of the interruption.
+     */
     private fun onTemporaryPauseRequested(state: FastSessionState): FastSessionTransition =
-        if (state.pauseReason == null && state.isPlaying) {
+        if (state.isHeldByResumableInterruption()) {
+            FastSessionTransition(state.copy(pauseReason = FastPauseReason.Temporary, episode = state.episode.cancelResume()), emptyList())
+        } else if (state.pauseReason == null && state.isPlaying) {
             FastSessionTransition(state.copy(pauseReason = FastPauseReason.Temporary), state.cancelPauseEffects() + PausePlayback)
         } else {
             FastSessionTransition(state, emptyList())
@@ -292,10 +311,6 @@ class FastSessionReducer @Inject constructor() {
         )
     }
 
-    /** The player plays and nothing paused or held the session. */
-    private val FastSessionState.isReading: Boolean
-        get() = isPlaying && pauseReason == null && !isHeldAtAdvancePoint && !isPausedAtAdvancePoint
-
     private fun FastSessionState.isPresented(cardId: String): Boolean = cards.getOrNull(currentIndex)?.id == cardId
 
     private fun FastSessionState.cancelPauseEffects(): List<FastSessionEffect> =
@@ -303,4 +318,141 @@ class FastSessionReducer @Inject constructor() {
 
     private fun FastSessionState.markSeen(cardId: String): FastSessionState =
         if (cardId in seenCardIds || cards.none { it.id == cardId }) this else copy(seenCardIds = seenCardIds + cardId)
+
+    // ---- Audio interruptions: what other apps' audio does to read-aloud, by severity.
+
+    /** Play from the user: nothing starts while a call rings or runs; any other interruption gives way, and the session plays now. */
+    private fun onUserPlayRequested(state: FastSessionState): FastSessionTransition {
+        if (InterruptionPolicy.ignoresPlay(state.episode, hasSomethingToPlay = !state.isReading)) {
+            return FastSessionTransition(state, listOf(FastSessionEffect.Emit(FastSessionEvent.PlayIgnoredDuringCall)))
+        }
+        if (!state.episode.isHolding) return onPlayRequested(state)
+        logger.interruption { "hold cleared by a play" }
+        return onPlayRequested(state.copy(episode = state.episode.cleared()))
+    }
+
+    /** A pause from the user: what an audio interruption would have resumed is theirs to resume from now on. */
+    private fun onUserPauseRequested(state: FastSessionState): FastSessionTransition {
+        if (state.episode.isHolding && !state.episode.isResumeCancelled) logger.interruption { "hold cancelled by a user action" }
+        return onPauseRequested(state.copy(episode = state.episode.cancelResume()))
+    }
+
+    private fun onAudioEnvironmentChanged(state: FastSessionState, input: AudioEnvironmentChanged): FastSessionTransition {
+        val signal = input.signal
+        // A headset went away: pause as the user would, and never resume on the device speaker by itself.
+        if (signal == OutputDisconnected) {
+            logger.interruption { "output disconnected, the session pauses" }
+            return onPauseRequested(state.copy(episode = state.episode.cancelResume()))
+        }
+        // Read-aloud has no microphone.
+        if (signal == MicSilenced || signal == MicUnsilenced) return FastSessionTransition(state, emptyList())
+        val step = state.episode.onSignal(signal, input.at)
+        val updated = state.copy(episode = step.episode)
+        return when (val change = step.change) {
+            is EpisodeChange.Started -> onEpisodeStarted(updated, change.tier)
+            is EpisodeChange.Escalated -> onEpisodeEscalated(updated, change)
+            is EpisodeChange.Ended -> onEpisodeEnded(updated, change.end)
+            null -> FastSessionTransition(updated, emptyList())
+        }
+    }
+
+    private fun onEpisodeStarted(state: FastSessionState, tier: InterruptionTier): FastSessionTransition {
+        logger.interruption { "started as $tier" }
+        return if (tier == InterruptionTier.Blip) {
+            FastSessionTransition(state, listOf(StartBlipTimer(InterruptionEpisode.BLIP_SPEECH_THRESHOLD)))
+        } else {
+            holdSession(dropTemporaryPauseFromCallOn(state, tier))
+        }
+    }
+
+    private fun onEpisodeEscalated(state: FastSessionState, change: EpisodeChange.Escalated): FastSessionTransition {
+        logger.interruption { InterruptionPolicy.escalationLog(change) }
+        val calm = dropTemporaryPauseFromCallOn(state, change.to)
+        if (change.from != InterruptionTier.Blip) return FastSessionTransition(calm, emptyList())
+        return holdSession(calm).prepend(listOf(CancelBlipTimer))
+    }
+
+    private fun dropTemporaryPauseFromCallOn(state: FastSessionState, tier: InterruptionTier): FastSessionState =
+        if (InterruptionPolicy.dropsTemporaryPause(tier) && state.pauseReason == FastPauseReason.Temporary) {
+            state.copy(pauseReason = FastPauseReason.User)
+        } else {
+            state
+        }
+
+    /**
+     * Pauses as a user pause would, and leaves the resume to the end of the episode. A session that
+     * something else already paused, or holds, has nothing to resume.
+     */
+    private fun holdSession(state: FastSessionState): FastSessionTransition {
+        if (!state.isReading) {
+            logger.interruption { "session already paused, nothing to resume" }
+            return FastSessionTransition(state.copy(episode = state.episode.cancelResume()), emptyList())
+        }
+        // The player reports the pause later; an end of the episode before that must still find the session paused.
+        return FastSessionTransition(
+            state.copy(pauseReason = FastPauseReason.User, isPlaying = false),
+            state.cancelPauseEffects() + PausePlayback,
+        )
+    }
+
+    private fun onEpisodeEnded(state: FastSessionState, end: EpisodeEnd): FastSessionTransition {
+        val cancelBlipTimer = FastSessionTransition(state, listOf(CancelBlipTimer))
+        if (end == EpisodeEnd.AutoResume) return autoResume(state).prepend(cancelBlipTimer.effects)
+        InterruptionPolicy.endLog(end)?.let { text -> logger.interruption { text } }
+        return cancelBlipTimer
+    }
+
+    private fun autoResume(state: FastSessionState): FastSessionTransition {
+        val skip = InterruptionPolicy.autoResumeSkip(
+            isComplete = false,
+            isPausedForAnotherReason = state.pauseReason != FastPauseReason.User,
+            episode = state.episode,
+        )
+        if (skip != null) {
+            logger.interruption { "auto-resume skipped, ${skip.text}" }
+            return FastSessionTransition(state, emptyList())
+        }
+        logger.interruption { "auto-resume" }
+        return resume(state)
+    }
+
+    /**
+     * A blip that already lasted too long meets a part about to be read: it becomes an interruption
+     * now, and the part is presented paused instead of read over the other app.
+     */
+    private fun escalateLongBlip(transition: FastSessionTransition): FastSessionTransition {
+        val state = transition.state
+        val isAboutToRead = state.readAloudStep == Question || state.readAloudStep == Answer
+        val isReading = state.isReading || transition.effects.any { it == Play }
+        if (!state.episode.isLongBlip || !isAboutToRead || !isReading) return transition
+        val step = state.episode.escalateBlip()
+        val change = step.change as? EpisodeChange.Escalated ?: return transition
+        logger.interruption { InterruptionPolicy.escalationLog(change) }
+        return FastSessionTransition(
+            state.copy(episode = step.episode, pauseReason = FastPauseReason.User, isPlaying = false),
+            listOf(CancelBlipTimer, PausePlayback) + transition.effects.filterNot { it == Play },
+        )
+    }
+
+    /** A transition that makes the session play again withdraws the resume an interruption was waiting to make. */
+    private fun withdrawResumeOnPlay(transition: FastSessionTransition): FastSessionTransition {
+        val isPlay = transition.effects.any { it.isPlay }
+        if (!isPlay || !transition.state.episode.isHolding) return transition
+        return transition.copy(state = transition.state.copy(episode = transition.state.episode.cancelResume()))
+    }
+
+    /** The one choke point of the call block: no play starts anything while a call rings or runs, whatever asked for it. */
+    private fun stripPlayDuringCall(transition: FastSessionTransition): FastSessionTransition =
+        if (transition.state.episode.isCallBlocking) transition.copy(effects = transition.effects.filterNot { it.isPlay }) else transition
+
+    private val FastSessionEffect.isPlay: Boolean get() = this == Play || this is FastSessionEffect.RestartVoiceStack
+
+    private fun FastSessionState.isHeldByResumableInterruption(): Boolean =
+        episode.tier == InterruptionTier.Interruption && !episode.isResumeCancelled && pauseReason == FastPauseReason.User
+
+    private fun FastSessionTransition.prepend(before: List<FastSessionEffect>): FastSessionTransition = copy(effects = before + effects)
 }
+
+/** The player plays and nothing paused or held the session. */
+internal val FastSessionState.isReading: Boolean
+    get() = isPlaying && pauseReason == null && !isHeldAtAdvancePoint && !isPausedAtAdvancePoint

@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.domain.session
 
-import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FastPauseReason
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot
@@ -12,6 +11,7 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
@@ -23,6 +23,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.mockk.mockk
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -45,7 +46,7 @@ class FastStudySessionCoordinatorTest {
         GetSubcategoryProgressUseCase(cardProgressRepository),
     )
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
-    private val logger = FakeDomainLogger()
+    private val interruptionGateway = FakeAudioInterruptionGateway()
 
     private val setup = FastSessionSetup(
         categoryId = "android",
@@ -82,10 +83,11 @@ class FastStudySessionCoordinatorTest {
         val coordinator = FastStudySessionCoordinator(
             getSessionStartData = getSessionStartData,
             playbackGateway = playbackGateway,
-            reducer = FastSessionReducer(),
+            interruptionGateway = interruptionGateway,
+            reducer = FastSessionReducer(mockk(relaxed = true)),
             clock = Clock.fixed(START_INSTANT, ZoneOffset.UTC),
             timeSource = testScheduler.timeSource,
-            logger = logger,
+            logger = mockk(relaxed = true),
         )
         backgroundScope.launch { coordinator.events.collect { events += it } }
         coordinator.start(backgroundScope, sessionSetup)

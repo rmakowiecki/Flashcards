@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.domain.session
 
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
+import kotlin.time.Duration
 
 /** What [RatedStudySessionCoordinator] must do after a [RatedSessionReducer] transition, in order. */
 sealed interface RatedSessionEffect {
@@ -58,4 +59,15 @@ sealed interface RatedSessionEffect {
 
     /** Every card has reached a Terminal State. */
     data object SessionComplete : RatedSessionEffect
+
+    /** Close or open the microphone's capture gate. */
+    data class SetCaptureGate(val closed: Boolean) : RatedSessionEffect
+
+    /** Wait [duration], then report [RatedSessionInput.BlipElapsed]. Starting again restarts the wait. */
+    data class StartBlipTimer(val duration: Duration) : RatedSessionEffect
+    data object CancelBlipTimer : RatedSessionEffect
+
+    /** Wait the capture gate tail, then report [RatedSessionInput.GateTailElapsed]. */
+    data object StartGateTail : RatedSessionEffect
+    data object CancelGateTail : RatedSessionEffect
 }

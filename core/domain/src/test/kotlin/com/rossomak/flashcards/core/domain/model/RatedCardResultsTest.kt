@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.session.requeueAfterSilence
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
 import kotlin.random.Random
 import org.junit.Test
 
@@ -31,7 +32,7 @@ class RatedCardResultsTest {
 
     private val random = Random(42)
 
-    private fun state(cardCount: Int, attemptsLimit: Int = 3): RatedSessionState = RatedSessionReducer(random).seed(
+    private fun state(cardCount: Int, attemptsLimit: Int = 3): RatedSessionState = RatedSessionReducer(random, mockk(relaxed = true)).seed(
         cards = (1..cardCount).map { flashcard("card-$it") },
         attemptsLimit = attemptsLimit,
     )
