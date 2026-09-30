@@ -16,6 +16,7 @@ import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
@@ -70,7 +71,13 @@ class TtsPlayer(
     private var wasIdleBeforeFocusLoss = false
 
     private var ttsReady = false
+
+    // Reading was asked for before the engine was ready; it starts on the presented part once it is.
     private var startWhenReady = false
+
+    // The requested voice was found and set. False until then, so a voice list that was still empty
+    // when the engine reported ready is tried again before the next utterance.
+    private var isVoiceApplied = false
 
     private var cards: List<VoiceFlashcard> = emptyList()
     private var index = 0
@@ -103,11 +110,12 @@ class TtsPlayer(
                 tts.language = Locale.US // app supports English voice only
             }
             applyVoice(pendingVoiceId)
+            logd { "TTS ready: voices=${tts.voices?.size}, requested=$pendingVoiceId, applied=$isVoiceApplied" }
             tts.setSpeechRate(speechRate)
             tts.setOnUtteranceProgressListener(utteranceListener)
             if (startWhenReady) {
                 startWhenReady = false
-                speakQuestion()
+                doPlay()
             }
         } else {
             onEvent(PlaybackEvent.EngineUnavailable)
@@ -246,7 +254,7 @@ class TtsPlayer(
             publishState()
             return
         }
-        if (ttsReady) speakQuestion() else startWhenReady = true
+        doPlay()
     }
 
     /**
@@ -317,7 +325,9 @@ class TtsPlayer(
         if (ttsReady) applyVoice(voiceId)
     }
 
-    private fun applyVoice(voiceId: String?) = tts.applySessionVoice(voiceId)
+    private fun applyVoice(voiceId: String?) {
+        isVoiceApplied = tts.applySessionVoice(voiceId)
+    }
 
     /** Applies from the next utterance; nothing is read again. */
     fun setPlaybackSpeechRate(rate: Float) {
@@ -343,6 +353,10 @@ class TtsPlayer(
 
     private fun doPlay() {
         if (cards.isEmpty()) return
+        if (!ttsReady) {
+            startWhenReady = true
+            return
+        }
         when (phase) {
             VoicePhase.Question -> speakQuestion()
             VoicePhase.Answer -> speakAnswer()
@@ -350,6 +364,7 @@ class TtsPlayer(
     }
 
     private fun doPause() {
+        startWhenReady = false
         isPlaying = false
         stopUtterance()
         publishState()
@@ -364,6 +379,7 @@ class TtsPlayer(
         requestAudioFocus()
         publishState()
         playbackPreroll.play()
+        if (!isVoiceApplied) applyVoice(pendingVoiceId)
         tts.speak(
             card.spokenQuestion.ifBlank { " " },
             TextToSpeech.QUEUE_FLUSH,
@@ -382,6 +398,7 @@ class TtsPlayer(
         publishState()
         onEvent(PlaybackEvent.AnswerRevealed(card.cardId))
         playbackPreroll.play()
+        if (!isVoiceApplied) applyVoice(pendingVoiceId)
         tts.speak(
             card.spokenAnswer.ifBlank { " " },
             TextToSpeech.QUEUE_FLUSH,
@@ -530,12 +547,13 @@ internal fun Set<TransportCommandType>.toPlayerCommands(): Player.Commands {
 /**
  * [voiceId] `null` means "no explicit choice yet" — resolves to a curated English voice, never the
  * device's system default (which may not even be English). Shared by the question and notice
- * engines, so both speak with the same voice.
+ * engines, so both speak with the same voice. Returns whether a voice was found and set.
  */
-internal fun TextToSpeech.applySessionVoice(voiceId: String?) {
+internal fun TextToSpeech.applySessionVoice(voiceId: String?): Boolean {
     val resolved = voiceId?.let { id -> voices?.firstOrNull { it.name == id } }
         ?: VoiceCuration.curate(voices.orEmpty()).firstOrNull()
     if (resolved != null) voice = resolved
+    return resolved != null
 }
 
 /** Which part of the presented card the player reads. */

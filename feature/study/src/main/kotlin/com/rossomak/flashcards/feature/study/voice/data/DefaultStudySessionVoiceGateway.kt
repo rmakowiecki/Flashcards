@@ -100,11 +100,12 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
             // Subscribed before the replay below, so an event a replayed command causes (such as a
             // refused microphone type on startVoiceAnswering) is never lost.
             observe(binder)
-            binder.loadSession(pendingCards, pendingStartIndex, pendingSessionTitle, pendingIsVoiceAnsweringSession)
             // Commands can land before the async bind completes (voiceBinder was still null), so
-            // replay whatever was requested in the meantime.
+            // replay whatever was requested in the meantime. The voice and rate go first: loading
+            // the session can start reading the first question at once.
             pendingSpeechRate?.let { binder.setSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
+            binder.loadSession(pendingCards, pendingStartIndex, pendingSessionTitle, pendingIsVoiceAnsweringSession)
             pendingVoiceAnswering?.let { if (it) binder.startVoiceAnswering() }
             pendingTransportCommands?.let { binder.setAvailableCommands(it) }
             pendingSessionProgress?.let { (completedCount, totalCount) -> binder.setSessionProgress(completedCount, totalCount) }
