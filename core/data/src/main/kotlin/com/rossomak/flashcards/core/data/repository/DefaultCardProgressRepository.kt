@@ -54,12 +54,18 @@ class DefaultCardProgressRepository @Inject constructor(
      * an empty baseline instead of failing, so the Pending Session results still show.
      *
      * The queue is read before the remote document, so a session delivered in between is replayed
-     * over state that already includes it (harmless) rather than missing from both.
+     * over state that already includes it (harmless) rather than missing from both. If the signed-in
+     * User changes between the two reads, the queue and the remote document may belong to different
+     * Users, so the read fails rather than projecting one User's sessions over the other's progress.
      */
     override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgress?> {
+        val uidAtStart = pendingSessionProjector.signedInUid()
         val pendingSessions = pendingSessionProjector.pendingSessions().filter { session -> session.touches(subcategoryId) }
         val remoteProgress = readRemoteProgress(subcategoryId)
         if (pendingSessions.isEmpty()) return remoteProgress
+        if (pendingSessionProjector.signedInUid() != uidAtStart) {
+            return Result.failure(IllegalStateException("Signed-in User changed while reading Card Progress for $subcategoryId"))
+        }
 
         val baseline = remoteProgress.getOrElse { exception ->
             logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
@@ -71,7 +77,8 @@ class DefaultCardProgressRepository @Inject constructor(
     /**
      * Completes when the remote summary flow completes (on sign-out), even though the queue is still
      * observed. The two sources are merged rather than combined, so a summary the remote flow emits
-     * just before completing is never conflated away.
+     * just before completing is never conflated away. That last summary may carry deltas from before a
+     * recalculation still in flight; nothing collects it past sign-out, so it is not worth guarding.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {

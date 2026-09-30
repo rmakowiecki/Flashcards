@@ -47,6 +47,9 @@ class PendingSessionProjector @Inject constructor(
 
     suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
 
+    /** The signed-in User's uid, for callers that must detect a User change between two reads. */
+    fun signedInUid(): String? = authRepository.getCurrentUser()?.uid
+
     /**
      * Replays [pendingSessions] over [baselineBySubcategory], the cached server Card Progress of each
      * Subcategory they touch (`null` for one with no document). A Subcategory missing from

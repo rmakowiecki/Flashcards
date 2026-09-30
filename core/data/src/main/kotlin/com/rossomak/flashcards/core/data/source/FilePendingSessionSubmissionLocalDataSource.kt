@@ -64,7 +64,8 @@ import kotlinx.serialization.json.Json
  *
  * **Observing**: [observeAll] serves [entries], an in-memory copy of the queue loaded from [file] once,
  * on the first [observeAll] collection, and replaced inside [mutex] by every [append], [listAll] and
- * [remove], so observers see each change without polling the file.
+ * [remove], so observers see each change without polling the file. A load that fails is not kept:
+ * that collection sees an empty queue, and the next collection reads the file again.
  *
  * **App-start recovery**: this class has no init-time logic of its own.
  * [com.rossomak.flashcards.core.data.SignedInWorkRunner] re-enqueues the drain worker whenever a User
@@ -168,19 +169,24 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
 
     override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flow {
         if (entries.value == null) {
-            withContext(Dispatchers.IO) {
-                mutex.withLock { if (entries.value == null) entries.value = readAllForObservers() }
+            val loaded = withContext(Dispatchers.IO) {
+                mutex.withLock {
+                    entries.value ?: readAllOrNullForObservers()?.also { readable -> entries.value = readable }
+                }
             }
+            // An unreadable file stays uncached, so the next collection retries the load instead of
+            // serving a failed read as an empty queue.
+            if (loaded == null) emit(emptyList())
         }
         emitAll(entries.filterNotNull())
     }
 
     /** Must only be called while holding [mutex]. */
-    private fun readAllForObservers(): List<PendingSessionSubmissionDto> = try {
+    private fun readAllOrNullForObservers(): List<PendingSessionSubmissionDto>? = try {
         readAll()
     } catch (exception: IOException) {
         Log.e(TAG, "Could not read queue file for observers, projecting no pending sessions", exception)
-        emptyList()
+        null
     }
 
     /**

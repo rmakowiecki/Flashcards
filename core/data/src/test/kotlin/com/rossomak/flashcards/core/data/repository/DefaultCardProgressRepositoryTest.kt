@@ -268,6 +268,17 @@ class DefaultCardProgressRepositoryTest {
     }
 
     @Test
+    fun `getProgress fails instead of mixing Users when the signed-in User changes during the remote read`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } coAnswers {
+            authRepository.userToReturn = authUser(OTHER_USER_ID)
+            null
+        }
+        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+
+        createRepository().getProgress(SUBCATEGORY_ID).isFailure shouldBe true
+    }
+
+    @Test
     fun `getProgress skips a malformed pending session and still projects the others`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         val malformed = ratedSession("session-1", SESSION_ONE_START, OTHER_CARD_ID to Mastered).toDto(USER_ID)

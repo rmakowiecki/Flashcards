@@ -286,4 +286,23 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
             awaitItem() shouldBe emptyList()
         }
     }
+
+    @Test
+    fun `observeAll retries the load on a later collection once an unreadable queue file becomes readable`() = runTest {
+        val context: Context = mockk()
+        every { context.filesDir } returns temporaryFolder.root
+        val queueFile = File(temporaryFolder.root, "pending_session_submissions.jsonl")
+        queueFile.mkdir()
+        val dataSource = FilePendingSessionSubmissionLocalDataSource(context)
+        dataSource.observeAll().test {
+            awaitItem() shouldBe emptyList()
+        }
+
+        queueFile.delete()
+        dataSource.append(pendingSubmission("session-1"))
+
+        dataSource.observeAll().test {
+            awaitItem().map { it.id } shouldBe listOf("session-1")
+        }
+    }
 }
