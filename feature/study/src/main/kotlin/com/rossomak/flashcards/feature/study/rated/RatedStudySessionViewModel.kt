@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSett
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.ExternalTransportCommand
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.MicPermissionRevoked
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.PlayIgnoredDuringCall
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.SessionEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerGradingFailed
@@ -152,6 +153,7 @@ class RatedStudySessionViewModel @Inject constructor(
             VoiceAnswerGradingPause -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerGradingPause)
             VoiceAnswerCaptureUnavailable -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerCaptureUnavailable)
             VoicePlaybackUnavailable -> _messages.tryEmit(RatedStudySessionMessage.VoicePlaybackUnavailable)
+            PlayIgnoredDuringCall -> _messages.tryEmit(RatedStudySessionMessage.PlayIgnoredDuringCall)
             is ExternalTransportCommand -> onExternalTransportCommand(event.command)
             // The coordinator ends the session once the snackbar had time to show.
             MicPermissionRevoked -> _messages.tryEmit(RatedStudySessionMessage.VoiceAnswerMicPermissionRevoked)

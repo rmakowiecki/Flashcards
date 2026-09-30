@@ -116,6 +116,7 @@ class FastStudySessionViewModel @Inject constructor(
             coordinator.events.collect { event ->
                 when (event) {
                     FastSessionEvent.VoicePlaybackUnavailable -> _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
+                    FastSessionEvent.PlayIgnoredDuringCall -> _messages.tryEmit(FastStudySessionMessage.PlayIgnoredDuringCall)
                     is FastSessionEvent.ExternalTransportCommand -> onExternalTransportCommand(event.command)
                     is FastSessionEvent.SessionEnded -> eventChannel.send(FastStudySessionDestination.Summary(event.result.toSummaryRoute()))
                 }

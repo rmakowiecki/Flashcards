@@ -2,14 +2,17 @@ package com.rossomak.flashcards.feature.study.rated
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
 import com.rossomak.flashcards.core.domain.model.AppPermission
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.AudioModeChanged
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.FocusChanged
+import com.rossomak.flashcards.core.domain.model.AudioMode
 import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
@@ -25,6 +28,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
+import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -118,6 +122,7 @@ class RatedStudySessionViewModelTest {
     private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress)
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val captureGateway = FakeVoiceCaptureGateway()
+    private val interruptionGateway = FakeAudioInterruptionGateway()
     private val gradingRepository = FakeVoiceAnswerGradingRepository()
     private val permissionGateway = FakePermissionGateway().apply {
         statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Granted)
@@ -173,12 +178,13 @@ class RatedStudySessionViewModelTest {
                 getSessionStartData = getSessionStartData,
                 playbackGateway = playbackGateway,
                 captureGateway = captureGateway,
+                interruptionGateway = interruptionGateway,
                 gradingRepository = gradingRepository,
                 permissionGateway = permissionGateway,
-                reducer = RatedSessionReducer(Random(FIXED_SEED)),
+                reducer = RatedSessionReducer(Random(FIXED_SEED), mockk(relaxed = true)),
                 clock = clock,
                 timeSource = mainDispatcherRule.testDispatcher.scheduler.timeSource,
-                logger = FakeDomainLogger(),
+                logger = mockk(relaxed = true),
             ),
             voiceSettingsController,
         )
@@ -590,6 +596,22 @@ class RatedStudySessionViewModelTest {
 
         viewModel.state.value.activeDialog shouldBe null
         viewModel.events.test { expectNoEvents() }
+    }
+
+    @Test
+    fun `a play during a call is ignored and shows the paused during a call message`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+        interruptionGateway.emit(AudioModeChanged(AudioMode.InCall))
+        interruptionGateway.emit(FocusChanged(FocusChange.LossTransient))
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            viewModel.onVoicePlayPause()
+            advanceUntilIdle()
+
+            awaitItem() shouldBe RatedStudySessionMessage.PlayIgnoredDuringCall
+        }
+        viewModel.state.value.isVoicePlaying shouldBe false
     }
 
     @Test

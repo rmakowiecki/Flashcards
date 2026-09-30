@@ -72,6 +72,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.PlayIgnoredDuringCall
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
 import kotlinx.coroutines.launch
 
@@ -112,6 +113,7 @@ fun FastStudySessionScreen(
     val voicePlaybackUnavailableMessage = stringResource(R.string.study_session_voice_playback_unavailable_message)
     val openTtsSettingsAction = stringResource(R.string.study_session_open_tts_settings_button)
     val curationReportFailedMessage = stringResource(R.string.fast_study_session_report_failure_message)
+    val playIgnoredDuringCallMessage = stringResource(R.string.study_session_play_ignored_during_call_message)
 
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
@@ -134,6 +136,10 @@ fun FastStudySessionScreen(
 
             CurationReportFailed -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(message = curationReportFailedMessage, duration = SnackbarDuration.Short)
+            }
+
+            PlayIgnoredDuringCall -> snackbarScope.launch {
+                snackbarHostState.showSnackbar(message = playIgnoredDuringCallMessage, duration = SnackbarDuration.Short)
             }
         }
     }

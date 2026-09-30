@@ -11,6 +11,9 @@ sealed interface RatedStudySessionMessage {
 
     data object CurationReportFailed : RatedStudySessionMessage
 
+    /** The user asked to play while a call rings or runs, and nothing started. */
+    data object PlayIgnoredDuringCall : RatedStudySessionMessage
+
     /** Grading could not reach its service: the device is offline or the request timed out. */
     data object VoiceAnswerGradingOffline : RatedStudySessionMessage
 
