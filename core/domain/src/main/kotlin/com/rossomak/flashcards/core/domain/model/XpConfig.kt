@@ -16,11 +16,11 @@ import kotlin.math.pow
  * They stay identical to the shared default configuration file in `testdata/xp-scoring/` at the repo
  * root, and to the Cloud Functions' own bundled default; a test on each side enforces that.
  *
- * **A session's local preview uses the [XpConfig] captured when it started.** It is fetched alongside
- * the session's cards, carried in the session state, and carried forward on [SessionResult.xpConfig]
- * — the Summary screen's preview computes from that snapshot, never from a fresh read, so a value
- * changing mid-session cannot rewrite the preview's arithmetic. The server always scores with its
- * current document, not with this snapshot.
+ * **The client scores with its cached copy.** The Session Summary's fallback preview and the
+ * projection of Pending Sessions both read [com.rossomak.flashcards.core.domain.repository.XpConfigRepository]
+ * when they score, never a copy captured at session start. The server scores each session with the
+ * document current when it is delivered, so a rate changed in between makes the preview differ from
+ * the recorded award until the server's result is read back.
  *
  * @param newCardStudied per card seeing a card for the first time ever. Both Study Modes.
  * @param cardMastered per card ending Mastered. Rated only — Fast has no mastery concept.
@@ -65,7 +65,7 @@ data class XpConfig(
 /**
  * The total points needed to complete [level] and advance to the next one, per the curve
  * shape: `ceil(base × level^exponent / 1000) × 1000`. A free function on [XpConfig] rather than a
- * member, so [com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase]'s level-up loop
+ * member, so [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp]'s level-up loop
  * and the Session Summary's own progress-within-level display read the exact same formula — the one
  * place a tuning change to the curve's shape, not just its parameters, would need to happen.
  */

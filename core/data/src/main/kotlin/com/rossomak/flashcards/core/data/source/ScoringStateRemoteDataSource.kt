@@ -13,8 +13,9 @@ import kotlinx.coroutines.tasks.await
  * Read-only: the server-authoritative `submitStudySession` Cloud Function
  * is the sole writer of this document now — it recomputes and overwrites the whole
  * [com.rossomak.flashcards.core.domain.model.ScoringState] itself, so this client never composes a
- * write for it; [getScoringState] only ever feeds
- * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s optimistic preview.
+ * write for it. [com.rossomak.flashcards.core.data.repository.PendingSessionProjector] reads it as the
+ * baseline it replays Pending Sessions over, and its `studiedSecondsOnLastStudyDate` as the seconds
+ * already studied that day when it judges a Pending Session's Daily Goal.
  *
  * [Source.SERVER] skips the local cache and, on success, refreshes it:
  * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] reads that way after each
@@ -40,6 +41,7 @@ class ScoringStateRemoteDataSource @Inject constructor(
             bestStreak = (document.getLong(FIELD_BEST_STREAK) ?: 0).toInt(),
             lastStudyDate = document.getString(FIELD_LAST_STUDY_DATE) ?: "",
             goalMetDate = document.getString(FIELD_GOAL_MET_DATE) ?: "",
+            studiedSecondsOnLastStudyDate = document.getLong(FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE) ?: 0,
         )
     }
 
@@ -53,5 +55,6 @@ class ScoringStateRemoteDataSource @Inject constructor(
         const val FIELD_BEST_STREAK = "bestStreak"
         const val FIELD_LAST_STUDY_DATE = "lastStudyDate"
         const val FIELD_GOAL_MET_DATE = "goalMetDate"
+        const val FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE = "studiedSecondsOnLastStudyDate"
     }
 }

@@ -12,7 +12,6 @@ import com.rossomak.flashcards.core.data.mapper.toDto
 import com.rossomak.flashcards.core.data.model.DeliveredSessionDto
 import com.rossomak.flashcards.core.data.model.PendingFlashcardResultDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
-import com.rossomak.flashcards.core.data.model.PendingXpConfigDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FakeDeadLetteredSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
@@ -115,20 +114,6 @@ class SessionSubmissionDeliveryWorkerTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
-        xpConfig = PendingXpConfigDto(
-            newCardStudied = 10,
-            cardMastered = 100,
-            cardPartial = 25,
-            masteryDefended = 50,
-            cardDemastered = -80,
-            sessionCompleted = 500,
-            dailyGoalMet = 1000,
-            streakPerDay = 250,
-            streakMaxPerDay = 2500,
-            minuteStudied = 10,
-            levelCurveBase = 1000.0,
-            levelCurveExponent = 2.5,
-        ),
     )
 
     private fun functionsException(code: FirebaseFunctionsException.Code): FirebaseFunctionsException {

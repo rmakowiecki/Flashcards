@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.core.domain.model
 
-import com.rossomak.flashcards.core.domain.xpscoring.XpScoringCases
+import com.rossomak.flashcards.core.domain.scoring.XpScoringCases
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 

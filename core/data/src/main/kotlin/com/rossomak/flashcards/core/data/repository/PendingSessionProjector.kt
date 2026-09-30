@@ -1,18 +1,27 @@
 package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.common.logw
+import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDomain
+import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
+import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.AuthRepository
+import com.rossomak.flashcards.core.domain.repository.XpConfigRepository
 import com.rossomak.flashcards.core.domain.scoring.SubcategoryProgressDelta
 import com.rossomak.flashcards.core.domain.scoring.applyTo
-import com.rossomak.flashcards.core.domain.scoring.mergeSessionIntoCardProgress
+import com.rossomak.flashcards.core.domain.scoring.scoreSession
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -29,13 +38,21 @@ import kotlinx.coroutines.flow.map
  * Other Users' entries are ignored, so signing in as another User drops the first User's projection.
  * An entry that fails to map is skipped and logged; the delivery worker dead-letters it separately.
  *
- * The replay merges one whole session at a time, through the same rules the server applies
- * ([mergeSessionIntoCardProgress]), each against the state the sessions before it left.
+ * The replay scores one whole session at a time with [scoreSession], the same rules the server
+ * applies, each against the Card Progress and scoring state the sessions before it left. It scores
+ * with the cached XP configuration, as the server scores with its current one at delivery.
+ *
+ * Baselines are read from the Firestore cache or the server (default source). A Card Progress read
+ * that fails (typically offline with no cached copy) projects over no record; see
+ * [DefaultCardProgressRepository] for that limitation.
  */
 @Singleton
 class PendingSessionProjector @Inject constructor(
     private val authRepository: AuthRepository,
     private val pendingSessionSubmissionLocalDataSource: PendingSessionSubmissionLocalDataSource,
+    private val cardProgressRemoteDataSource: CardProgressRemoteDataSource,
+    private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource,
+    private val xpConfigRepository: XpConfigRepository,
 ) {
 
     /** The signed-in User's Pending Sessions, oldest first; empty while signed out. Re-emits on every queue or User change. */
@@ -45,31 +62,106 @@ class PendingSessionProjector @Inject constructor(
     ) { uid, entries -> uid?.let { ownedPendingSessions(it, entries) }.orEmpty() }
         .distinctUntilChanged()
 
-    suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
+    /**
+     * The Card Progress of [subcategoryId] with the Pending Sessions that touch it replayed on top.
+     *
+     * With no such session, this is the plain remote read, failure included. Otherwise a failed remote
+     * read projects over no record instead of failing, so the Pending Session results still show.
+     *
+     * The queue is read before the remote document, so a session delivered in between is replayed over
+     * state that already includes it (harmless) rather than missing from both. If the signed-in User
+     * changes between the two reads, the queue and the remote document may belong to different Users,
+     * so the read fails rather than projecting one User's sessions over the other's progress.
+     */
+    suspend fun projectCardProgress(subcategoryId: String): Result<SubcategoryProgress?> {
+        val uidAtStart = signedInUid()
+        val pendingSessions = pendingSessions().filter { session -> session.touches(subcategoryId) }
+        val remoteProgress = readRemoteProgress(subcategoryId)
+        if (pendingSessions.isEmpty()) return remoteProgress
+        if (signedInUid() != uidAtStart) {
+            return Result.failure(IllegalStateException("Signed-in User changed while reading Card Progress for $subcategoryId"))
+        }
 
-    /** The signed-in User's uid, for callers that must detect a User change between two reads. */
-    fun signedInUid(): String? = authRepository.getCurrentUser()?.uid
+        val baseline = remoteProgress.orEmptyBaseline(subcategoryId)
+        return Result.success(replay(mapOf(subcategoryId to baseline), pendingSessions).progressBySubcategory[subcategoryId])
+    }
+
+    /**
+     * How [pendingSessions] change the Studied and Mastered counts of each Subcategory they touch, or
+     * `null` when they are stale by the time the baselines are read.
+     *
+     * [pendingSessions] is a snapshot taken earlier, possibly under a User who has since signed out.
+     * The baselines are read for whoever is signed in now, so the queue is read again afterwards: a
+     * different list means the User (or the queue) changed, and a projection mixing the two would be
+     * wrong. Another User's list never equals a non-empty one, since entries are owned by uid and ids
+     * are unique. The caller drops a `null` result; the queue change that made it stale re-emits.
+     */
+    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta>? {
+        if (pendingSessions.isEmpty()) return emptyMap()
+        val baselines = readProgressBaselines(pendingSessions)
+        if (pendingSessions() != pendingSessions) return null
+        return replay(baselines, pendingSessions).summaryDeltas
+    }
+
+    /**
+     * The User's scoring state with every Pending Session replayed on top.
+     *
+     * With no Pending Session, this is the plain remote read: `null` for an account with no document
+     * yet. Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state
+     * read always fails: a guessed low starting state would show a misleading number.
+     *
+     * If the signed-in User changes while the reads are in flight, the queue and the remote documents
+     * may belong to different Users, so the read fails rather than projecting one User's sessions over
+     * the other's scoring state.
+     */
+    suspend fun projectScoringState(): Result<ScoringState?> = coroutineScope {
+        val uidAtStart = signedInUid()
+        val pendingSessions = pendingSessions()
+        val remoteScoringState = async { readRemoteScoringState() }
+        if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await()
+
+        val progressBaselines = async { readProgressBaselines(pendingSessions) }
+        val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
+        val scoringState = remoteScoringState.await().getOrElse { exception -> return@coroutineScope Result.failure(exception) } ?: ScoringState()
+        val baselines = progressBaselines.await()
+        val xpConfig = config.await()
+        if (signedInUid() != uidAtStart) {
+            return@coroutineScope Result.failure(IllegalStateException("Signed-in User changed while reading the scoring state"))
+        }
+        Result.success(replay(baselines, pendingSessions, scoringState, xpConfig).scoringState)
+    }
+
+    private suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
+
+    private fun signedInUid(): String? = authRepository.getCurrentUser()?.uid
 
     /**
      * Replays [pendingSessions] over [baselineBySubcategory], the cached server Card Progress of each
-     * Subcategory they touch (`null` for one with no document). A Subcategory missing from
-     * [baselineBySubcategory] replays over no record at all.
+     * Subcategory they touch (`null` for one with no document), and over [scoringState]. A Subcategory
+     * missing from [baselineBySubcategory] replays over no record at all. The Card Progress results
+     * never depend on [scoringState] or [config], so a caller after those alone may leave both at
+     * their defaults.
      *
      * Replayed entries are stamped with their session's start. The server stamps at delivery instead;
      * no current reader looks at the stamps closely enough to tell the difference.
      */
-    fun replay(baselineBySubcategory: Map<String, SubcategoryProgress?>, pendingSessions: List<SessionResult>): CardProgressReplay {
+    private fun replay(
+        baselineBySubcategory: Map<String, SubcategoryProgress?>,
+        pendingSessions: List<SessionResult>,
+        scoringState: ScoringState = ScoringState(),
+        config: XpConfig = XpConfig(),
+    ): Replay {
         val progressBySubcategory = baselineBySubcategory.mapNotNull { (subcategoryId, progress) -> progress?.let { subcategoryId to it } }.toMap().toMutableMap()
         val summaryDeltas = mutableMapOf<String, SubcategoryProgressDelta>()
+        var projectedScoringState = scoringState
 
         pendingSessions.forEach { session ->
-            val touchedSubcategoryIds = session.cardResults.map(FlashcardResult::subcategoryId).toSet()
-            val priorStatesBySubcategory = touchedSubcategoryIds.associateWith { subcategoryId ->
+            val priorCardStatesBySubcategory = session.touchedSubcategoryIds().associateWith { subcategoryId ->
                 progressBySubcategory[subcategoryId]?.cards.orEmpty().mapValues { (_, entry) -> entry.state }
             }
-            val mergeResult = mergeSessionIntoCardProgress(priorStatesBySubcategory, session)
+            val scoring = scoreSession(priorCardStatesBySubcategory, projectedScoringState, session, config)
 
-            mergeResult.cardUpdatesBySubcategory.forEach { (subcategoryId, cardUpdates) ->
+            scoring.cardProgressMerge.cardUpdatesBySubcategory.forEach { (subcategoryId, cardUpdates) ->
                 val prior = progressBySubcategory[subcategoryId]
                 val updatedCards = cardUpdates.mapValues { (cardId, update) -> update.applyTo(prior?.cards?.get(cardId), session.startedAt) }
                 progressBySubcategory[subcategoryId] = SubcategoryProgress(
@@ -78,13 +170,33 @@ class PendingSessionProjector @Inject constructor(
                     cards = prior?.cards.orEmpty() + updatedCards,
                 )
             }
-            mergeResult.summaryDeltas.forEach { (subcategoryId, delta) ->
+            scoring.cardProgressMerge.summaryDeltas.forEach { (subcategoryId, delta) ->
                 summaryDeltas[subcategoryId] = summaryDeltas[subcategoryId]?.plus(delta) ?: delta
             }
+            projectedScoringState = scoring.newScoringState
         }
 
-        return CardProgressReplay(progressBySubcategory = progressBySubcategory, summaryDeltas = summaryDeltas)
+        return Replay(progressBySubcategory = progressBySubcategory, summaryDeltas = summaryDeltas, scoringState = projectedScoringState)
     }
+
+    /** The cached server Card Progress of every Subcategory [pendingSessions] touch, `null` where unreadable or absent. */
+    private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgress?> = coroutineScope {
+        pendingSessions.flatMap { session -> session.touchedSubcategoryIds() }.toSet().map { subcategoryId ->
+            async { subcategoryId to readRemoteProgress(subcategoryId).orEmptyBaseline(subcategoryId) }
+        }.awaitAll().toMap()
+    }
+
+    /** A failed read projects over no record instead of failing, so the Pending Session results still show. */
+    private fun Result<SubcategoryProgress?>.orEmptyBaseline(subcategoryId: String): SubcategoryProgress? = getOrElse { exception ->
+        logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
+        null
+    }
+
+    private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgress?> =
+        runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
+
+    private suspend fun readRemoteScoringState(): Result<ScoringState?> =
+        runCatchingFirestore { scoringStateRemoteDataSource.getScoringState()?.toDomain() }
 
     private fun ownedPendingSessions(uid: String, entries: List<PendingSessionSubmissionDto>): List<SessionResult> = entries
         .filter { entry -> entry.uid == uid }
@@ -95,17 +207,23 @@ class PendingSessionProjector @Inject constructor(
         }
         .sortedBy(SessionResult::startedAt)
 
+    private fun SessionResult.touchedSubcategoryIds(): Set<String> = cardResults.map(FlashcardResult::subcategoryId).toSet()
+
+    private fun SessionResult.touches(subcategoryId: String): Boolean = cardResults.any { entry -> entry.subcategoryId == subcategoryId }
+
     private operator fun SubcategoryProgressDelta.plus(other: SubcategoryProgressDelta) = SubcategoryProgressDelta(
         masteredDelta = masteredDelta + other.masteredDelta,
         studiedDelta = studiedDelta + other.studiedDelta,
     )
-}
 
-/**
- * What replaying Pending Sessions produced: the projected Card Progress of every Subcategory with a
- * baseline document or a replayed result, and the accumulated Studied/Mastered count changes.
- */
-data class CardProgressReplay(
-    val progressBySubcategory: Map<String, SubcategoryProgress>,
-    val summaryDeltas: Map<String, SubcategoryProgressDelta>,
-)
+    /**
+     * What replaying Pending Sessions produced: the projected Card Progress of every Subcategory with a
+     * baseline document or a replayed result, the accumulated Studied/Mastered count changes, and the
+     * projected scoring state.
+     */
+    private data class Replay(
+        val progressBySubcategory: Map<String, SubcategoryProgress>,
+        val summaryDeltas: Map<String, SubcategoryProgressDelta>,
+        val scoringState: ScoringState,
+    )
+}

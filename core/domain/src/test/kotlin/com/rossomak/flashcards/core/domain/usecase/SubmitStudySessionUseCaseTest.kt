@@ -13,12 +13,13 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
-import com.rossomak.flashcards.core.domain.model.SessionXpResult
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
+import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
+import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.time.Instant
@@ -39,11 +40,12 @@ class SubmitStudySessionUseCaseTest {
     private val sessionSubmissionRepository = FakeSessionSubmissionRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
     private val scoringStateRepository = FakeScoringStateRepository()
+    private val xpConfigRepository = FakeXpConfigRepository()
 
     private fun createUseCase(): SubmitStudySessionUseCase = SubmitStudySessionUseCase(
         cardProgressRepository,
         scoringStateRepository,
-        CalculateSessionXpUseCase(),
+        GetXpConfigUseCase(xpConfigRepository),
         sessionSubmissionRepository,
     )
 
@@ -98,8 +100,8 @@ class SubmitStudySessionUseCaseTest {
     private fun fastEntry(cardId: String = "card-1", subcategoryId: String = "sub-1"): FlashcardResult.Fast =
         FlashcardResult.Fast(cardId = cardId, subcategoryId = subcategoryId, state = FlashcardStudyProgressState.Seen)
 
-    private suspend fun SubmitStudySessionUseCase.invokeAndCapturePreview(sessionResult: SessionResult): Result<SessionXpResult> =
-        invoke(sessionResult).map { result -> (result as LocalPreview).sessionXpResult }
+    private suspend fun SubmitStudySessionUseCase.invokeAndCapturePreview(sessionResult: SessionResult): Result<SessionScore> =
+        invoke(sessionResult).map { result -> (result as LocalPreview).score }
 
     @Test
     fun `hands the exact session result to the submission repository`() = runTest {
@@ -217,7 +219,7 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session)
 
-        preview.getOrThrow().newCardsStudied shouldBe 1
+        preview.getOrThrow().counts?.newCardsStudied shouldBe 1
     }
 
     @Test
@@ -242,7 +244,7 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session)
 
-        preview.getOrThrow().newCardsStudied shouldBe 2
+        preview.getOrThrow().counts?.newCardsStudied shouldBe 2
     }
 
     @Test
@@ -251,7 +253,7 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session)
 
-        preview.getOrThrow().newCardsStudied shouldBe 1
+        preview.getOrThrow().counts?.newCardsStudied shouldBe 1
     }
 
     @Test
@@ -287,27 +289,67 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
 
-        preview.newScoringState.xp shouldBe preview.breakdown.xpTotal.toLong()
+        preview.level shouldBe ScoringState.STARTING_LEVEL
+        preview.xpIntoCurrentLevel shouldBe preview.breakdown.xpTotal.toLong()
     }
 
     @Test
     fun `the preview carries the calculated xp breakdown starting from the prior scoring state`() = runTest {
-        val priorXp = 40L
-        scoringStateRepository.resultToReturn = Result.success(ScoringState(xp = priorXp))
+        val priorXpIntoLevel = 40L
+        scoringStateRepository.resultToReturn = Result.success(ScoringState(xp = priorXpIntoLevel, xpIntoCurrentLevel = priorXpIntoLevel))
         val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
 
         val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
 
-        preview.newScoringState.xp shouldBe priorXp + preview.breakdown.xpTotal
+        preview.xpIntoCurrentLevel shouldBe priorXpIntoLevel + preview.breakdown.xpTotal
     }
 
-    private fun priorEntry(): CardProgressEntry = CardProgressEntry(
-        state = FlashcardStudyProgressState.Partial,
+    @Test
+    fun `the preview is scored with the cached xp configuration`() = runTest {
+        xpConfigRepository.resultToReturn = Result.success(CUSTOM_CONFIG)
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        preview.breakdown.mastered shouldBe CUSTOM_CONFIG.cardMastered
+        preview.rates?.cardMastered shouldBe CUSTOM_CONFIG.cardMastered
+    }
+
+    @Test
+    fun `the preview falls back to the default xp configuration when the cached one is unreadable`() = runTest {
+        xpConfigRepository.resultToReturn = Result.failure(IllegalStateException("unreadable"))
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        preview.breakdown.mastered shouldBe XpConfig().cardMastered
+    }
+
+    @Test
+    fun `a card Mastered in the prior Card Progress scores as defended, whatever the session's own flag says`() = runTest {
+        cardProgressRepository.seed(
+            SubcategoryProgress(subcategoryId = SUBCATEGORY_ID, categoryId = CATEGORY_ID, cards = mapOf(CARD_ID to priorEntry(FlashcardStudyProgressState.Mastered))),
+        )
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(cardId = CARD_ID, state = FlashcardStudyProgressState.Mastered)))
+
+        val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        preview.counts?.defended shouldBe 1
+        preview.counts?.newlyMastered shouldBe 0
+        preview.breakdown.masteryDefenseBonus shouldBe XpConfig().masteryDefended
+    }
+
+    private fun priorEntry(state: FlashcardStudyProgressState = FlashcardStudyProgressState.Partial): CardProgressEntry = CardProgressEntry(
+        state = state,
         firstStudiedAt = Instant.parse("2026-01-01T00:00:00Z"),
         masteredAt = null,
     )
 
     private companion object {
+        const val CATEGORY_ID = "cat-1"
+        const val SUBCATEGORY_ID = "sub-1"
+        const val CARD_ID = "card-1"
+        val CUSTOM_CONFIG = XpConfig(cardMastered = 321)
         val SERVER_SCORE = SessionScore(
             breakdown = XpBreakdown(newCards = 10, mastered = 100, streakBonus = 250),
             level = 2,

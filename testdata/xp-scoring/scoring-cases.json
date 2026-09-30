@@ -1,5 +1,5 @@
 {
-  "description": "Shared XP scoring cases, run by both the TypeScript submitStudySession scoring module and the Kotlin CalculateSessionXpUseCase. See README.md in this directory for the schema.",
+  "description": "Shared XP scoring cases, run by both the TypeScript submitStudySession scoring module and the Kotlin calculateSessionXp. See README.md in this directory for the schema.",
   "configs": {
     "test": {
       "newCardStudied": 10,
@@ -69,7 +69,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -112,7 +113,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -155,7 +157,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -198,7 +201,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -241,7 +245,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -284,7 +289,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -327,7 +333,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -370,7 +377,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -429,7 +437,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -471,7 +480,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -509,7 +519,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -547,7 +558,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -590,7 +602,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -637,7 +650,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -684,7 +698,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": [
           2
@@ -733,7 +748,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": [
           2
@@ -782,7 +798,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": [
           2,
@@ -833,7 +850,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -881,7 +899,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -936,7 +955,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -982,7 +1002,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -1029,7 +1050,8 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": []
       }
@@ -1077,10 +1099,68 @@
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
-          "goalMetDate": ""
+          "goalMetDate": "",
+          "studiedSecondsOnLastStudyDate": 0
         },
         "levelsCrossed": [
           3
+        ]
+      }
+    },
+    {
+      "name": "a session extending the streak and reaching the daily goal pays both awards in the breakdown and the level delta",
+      "kind": "sessionXp",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "currentStreak": 2,
+          "bestStreak": 2,
+          "lastStudyDate": "2026-09-08",
+          "studiedSecondsOnLastStudyDate": 300
+        },
+        "session": {
+          "studyMode": "Rated",
+          "durationSeconds": 1200,
+          "abandoned": false,
+          "cardResults": [
+            {
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        },
+        "newCardsStudied": 1,
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalSeconds": 1200
+        }
+      },
+      "expected": {
+        "breakdown": {
+          "newCards": 10,
+          "mastered": 100,
+          "partial": 0,
+          "masteryDefenseBonus": 0,
+          "demastered": 0,
+          "timeStudied": 200,
+          "sessionCompletionBonus": 500,
+          "dailyGoalBonus": 1000,
+          "streakBonus": 750,
+          "xpTotal": 2560
+        },
+        "newScoringState": {
+          "xp": 2560,
+          "level": 2,
+          "xpIntoCurrentLevel": 1560,
+          "currentStreak": 3,
+          "bestStreak": 3,
+          "lastStudyDate": "2026-09-09",
+          "goalMetDate": "2026-09-09",
+          "studiedSecondsOnLastStudyDate": 1200
+        },
+        "levelsCrossed": [
+          2
         ]
       }
     },
@@ -1168,9 +1248,6 @@
     {
       "name": "the streak advances when the study date is exactly one day after the last study date",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1181,7 +1258,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 999999,
-          "todayTotalMinutes": 0
+          "todayTotalSeconds": 0
         }
       },
       "expected": {
@@ -1190,15 +1267,13 @@
         "currentStreak": 4,
         "bestStreak": 5,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "the streak does not advance, and pays no bonus, on the same study date",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1209,7 +1284,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 999999,
-          "todayTotalMinutes": 0
+          "todayTotalSeconds": 0
         }
       },
       "expected": {
@@ -1218,15 +1293,13 @@
         "currentStreak": 3,
         "bestStreak": 3,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "the streak resets to 1 after a gap of more than one day and the best streak is kept",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1237,7 +1310,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 999999,
-          "todayTotalMinutes": 0
+          "todayTotalSeconds": 0
         }
       },
       "expected": {
@@ -1246,15 +1319,13 @@
         "currentStreak": 1,
         "bestStreak": 10,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "the streak award reaches the per-day cap exactly",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1265,7 +1336,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 999999,
-          "todayTotalMinutes": 0
+          "todayTotalSeconds": 0
         }
       },
       "expected": {
@@ -1274,15 +1345,13 @@
         "currentStreak": 10,
         "bestStreak": 10,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "the streak award is clamped at the per-day cap",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1293,7 +1362,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-10",
           "dailyGoalMinutes": 999999,
-          "todayTotalMinutes": 0
+          "todayTotalSeconds": 0
         }
       },
       "expected": {
@@ -1302,15 +1371,13 @@
         "currentStreak": 11,
         "bestStreak": 11,
         "lastStudyDate": "2026-09-10",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "a study date earlier than the last study date changes nothing",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1321,7 +1388,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-01",
           "dailyGoalMinutes": 999999,
-          "todayTotalMinutes": 0
+          "todayTotalSeconds": 0
         }
       },
       "expected": {
@@ -1330,15 +1397,13 @@
         "currentStreak": 5,
         "bestStreak": 5,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "the daily goal pays when today's minutes reach the goal",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1349,7 +1414,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 20,
-          "todayTotalMinutes": 20
+          "todayTotalSeconds": 1200
         }
       },
       "expected": {
@@ -1358,15 +1423,13 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": "2026-09-09"
+        "goalMetDate": "2026-09-09",
+        "studiedSecondsOnLastStudyDate": 1200
       }
     },
     {
       "name": "the daily goal does not pay twice on the same day",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1378,7 +1441,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 20,
-          "todayTotalMinutes": 40
+          "todayTotalSeconds": 2400
         }
       },
       "expected": {
@@ -1387,15 +1450,13 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": "2026-09-09"
+        "goalMetDate": "2026-09-09",
+        "studiedSecondsOnLastStudyDate": 2400
       }
     },
     {
       "name": "the daily goal does not pay below the goal",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1406,7 +1467,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 20,
-          "todayTotalMinutes": 19
+          "todayTotalSeconds": 1140
         }
       },
       "expected": {
@@ -1415,15 +1476,13 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": ""
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 1140
       }
     },
     {
       "name": "a study date earlier than the goal-met date changes nothing",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1435,7 +1494,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-01",
           "dailyGoalMinutes": 20,
-          "todayTotalMinutes": 100
+          "todayTotalSeconds": 6000
         }
       },
       "expected": {
@@ -1444,15 +1503,13 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": "2026-09-09"
+        "goalMetDate": "2026-09-09",
+        "studiedSecondsOnLastStudyDate": 0
       }
     },
     {
       "name": "a lowered goal is evaluated live: the same minutes that missed a 60-minute goal clear a 25-minute one",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "priorState": {
@@ -1463,7 +1520,7 @@
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 25,
-          "todayTotalMinutes": 30
+          "todayTotalSeconds": 1800
         }
       },
       "expected": {
@@ -1472,21 +1529,19 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": "2026-09-09"
+        "goalMetDate": "2026-09-09",
+        "studiedSecondsOnLastStudyDate": 1800
       }
     },
     {
       "name": "the first-ever submission starts the streak at 1 and evaluates the goal normally",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "test",
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 20,
-          "todayTotalMinutes": 20
+          "todayTotalSeconds": 1200
         }
       },
       "expected": {
@@ -1495,21 +1550,19 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": "2026-09-09"
+        "goalMetDate": "2026-09-09",
+        "studiedSecondsOnLastStudyDate": 1200
       }
     },
     {
       "name": "both awards read their rate, cap and flat amount from the configuration, not a literal",
       "kind": "streakAndGoal",
-      "skip": {
-        "kotlin": "Streak and Daily Goal awards are computed server-side only; the Kotlin preview does not port them yet."
-      },
       "input": {
         "config": "unusual",
         "streakAndGoal": {
           "studyDate": "2026-09-09",
           "dailyGoalMinutes": 20,
-          "todayTotalMinutes": 20
+          "todayTotalSeconds": 1200
         }
       },
       "expected": {
@@ -1518,7 +1571,116 @@
         "currentStreak": 1,
         "bestStreak": 1,
         "lastStudyDate": "2026-09-09",
-        "goalMetDate": "2026-09-09"
+        "goalMetDate": "2026-09-09",
+        "studiedSecondsOnLastStudyDate": 1200
+      }
+    },
+    {
+      "name": "the daily goal compares whole minutes: 1199 seconds miss a 20-minute goal",
+      "kind": "streakAndGoal",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1,
+          "studiedSecondsOnLastStudyDate": 600
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 20,
+          "todayTotalSeconds": 1199
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 1199
+      }
+    },
+    {
+      "name": "the seconds studied on the last study date restart at the day's total on a later day",
+      "kind": "streakAndGoal",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-08",
+          "currentStreak": 1,
+          "bestStreak": 1,
+          "studiedSecondsOnLastStudyDate": 1500
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 999999,
+          "todayTotalSeconds": 300
+        }
+      },
+      "expected": {
+        "streakBonus": 500,
+        "dailyGoalBonus": 0,
+        "currentStreak": 2,
+        "bestStreak": 2,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 300
+      }
+    },
+    {
+      "name": "the seconds studied on the last study date become the day's total on the same day",
+      "kind": "streakAndGoal",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1,
+          "studiedSecondsOnLastStudyDate": 600
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-09",
+          "dailyGoalMinutes": 999999,
+          "todayTotalSeconds": 900
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 900
+      }
+    },
+    {
+      "name": "a study date earlier than the last study date keeps the seconds studied on the last study date",
+      "kind": "streakAndGoal",
+      "input": {
+        "config": "test",
+        "priorState": {
+          "lastStudyDate": "2026-09-09",
+          "currentStreak": 1,
+          "bestStreak": 1,
+          "studiedSecondsOnLastStudyDate": 600
+        },
+        "streakAndGoal": {
+          "studyDate": "2026-09-01",
+          "dailyGoalMinutes": 999999,
+          "todayTotalSeconds": 120
+        }
+      },
+      "expected": {
+        "streakBonus": 0,
+        "dailyGoalBonus": 0,
+        "currentStreak": 1,
+        "bestStreak": 1,
+        "lastStudyDate": "2026-09-09",
+        "goalMetDate": "",
+        "studiedSecondsOnLastStudyDate": 600
       }
     }
   ]

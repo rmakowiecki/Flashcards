@@ -3,19 +3,22 @@ package com.rossomak.flashcards.core.domain.repository
 import com.rossomak.flashcards.core.domain.model.ScoringState
 
 /**
- * Reads the User's account-wide [ScoringState] singleton, `progress/user-stats`.
- * Writing is not exposed here, nor anywhere else on the client: the server-authoritative
- * `submitStudySession` Cloud Function is the sole writer of this document, computing and
- * overwriting the whole next [ScoringState] itself inside its own Firestore transaction.
- * [getScoringState] only ever feeds
- * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s optimistic preview now.
+ * Reads the User's account-wide [ScoringState] singleton, `progress/user-stats`, including the User's
+ * sessions that are finished but not yet delivered to the server, so XP and Level count a session
+ * studied offline at once; how that happens is the implementation's concern, not the caller's.
  *
- * @return `Result.success(null)` for an account with no scoring state document yet — a genuinely new
- * user, not a failure — leaving it to the caller to start from [ScoringState]'s own defaults.
- * `Result.failure` for a real read failure, which
- * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase] must never paper over with
- * a default for its preview: guessing a low starting state would show a misleadingly small number,
- * even though — unlike the old client-write path — it can no longer corrupt any persisted state.
+ * Writing is not exposed here, nor anywhere else on the client: the server-authoritative
+ * `submitStudySession` Cloud Function is the sole writer of this document, computing and overwriting
+ * the whole next [ScoringState] inside its own Firestore transaction.
+ *
+ * The only reader today is [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s
+ * fallback preview, so this is a one-shot read. An observable read belongs here once a screen shows
+ * the Level live (such as a Home Level card).
+ *
+ * @return `Result.success(null)` for an account with no scoring state document and nothing pending — a
+ * genuinely new user, not a failure — leaving it to the caller to start from [ScoringState]'s own
+ * defaults. `Result.failure` for a real read failure, which the fallback preview must never paper over
+ * with a default: guessing a low starting state would show a misleadingly small number.
  */
 interface ScoringStateRepository {
 

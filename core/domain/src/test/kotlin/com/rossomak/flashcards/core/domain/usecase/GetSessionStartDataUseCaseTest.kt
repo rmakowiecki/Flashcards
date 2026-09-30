@@ -4,10 +4,8 @@ import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
-import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
-import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,11 +22,9 @@ class GetSessionStartDataUseCaseTest {
 
     private val flashcardRepository = FakeFlashcardRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
-    private val xpConfigRepository = FakeXpConfigRepository()
     private val useCase = GetSessionStartDataUseCase(
         GetFlashcardsUseCase(flashcardRepository),
         GetSubcategoryProgressUseCase(cardProgressRepository),
-        GetXpConfigUseCase(xpConfigRepository),
     )
 
     private fun flashcard(id: String, subcategoryId: String): Flashcard = Flashcard(
@@ -122,16 +118,5 @@ class GetSessionStartDataUseCaseTest {
         val result = useCase(listOf("sub-1"))
 
         result.priorProgressByCardId shouldBe emptyMap()
-    }
-
-    @Test
-    fun `carries the fetched xp configuration through`() = runTest {
-        flashcardRepository.flashcardsBySubcategory["sub-1"] = Result.success(listOf(flashcard("card-1", "sub-1")))
-        val config = XpConfig(newCardStudied = 999)
-        xpConfigRepository.resultToReturn = Result.success(config)
-
-        val result = useCase(listOf("sub-1"))
-
-        result.xpConfig shouldBe config
     }
 }

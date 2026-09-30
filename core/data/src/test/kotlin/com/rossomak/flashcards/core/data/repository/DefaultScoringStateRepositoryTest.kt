@@ -1,7 +1,12 @@
 package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
+import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
+import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
+import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -15,8 +20,14 @@ import org.junit.Test
 class DefaultScoringStateRepositoryTest {
 
     private val remoteDataSource: ScoringStateRemoteDataSource = mockk()
+    private val cardProgressRemoteDataSource: CardProgressRemoteDataSource = mockk()
+    private val authRepository = FakeAuthRepository().apply { userToReturn = authUser(USER_ID) }
+    private val pendingSessionQueue = FakePendingSessionSubmissionLocalDataSource()
+    private val xpConfigRepository = FakeXpConfigRepository()
 
-    private fun createRepository(): DefaultScoringStateRepository = DefaultScoringStateRepository(remoteDataSource)
+    private fun createRepository(): DefaultScoringStateRepository = DefaultScoringStateRepository(
+        PendingSessionProjector(authRepository, pendingSessionQueue, cardProgressRemoteDataSource, remoteDataSource, xpConfigRepository),
+    )
 
     @Test
     fun `getScoringState maps the dto to domain`() = runTest {
@@ -27,6 +38,7 @@ class DefaultScoringStateRepositoryTest {
         val bestStreak = 5
         val lastStudyDate = "2026-09-06"
         val goalMetDate = "2026-09-06"
+        val studiedSecondsOnLastStudyDate = 1500L
         val dto = ScoringStateDto(
             xp = xp,
             level = level,
@@ -35,6 +47,7 @@ class DefaultScoringStateRepositoryTest {
             bestStreak = bestStreak,
             lastStudyDate = lastStudyDate,
             goalMetDate = goalMetDate,
+            studiedSecondsOnLastStudyDate = studiedSecondsOnLastStudyDate,
         )
         coEvery { remoteDataSource.getScoringState() } returns dto
 
@@ -49,6 +62,7 @@ class DefaultScoringStateRepositoryTest {
         state?.bestStreak shouldBe bestStreak
         state?.lastStudyDate shouldBe lastStudyDate
         state?.goalMetDate shouldBe goalMetDate
+        state?.studiedSecondsOnLastStudyDate shouldBe studiedSecondsOnLastStudyDate
         coVerify(exactly = 1) { remoteDataSource.getScoringState() }
     }
 
@@ -83,5 +97,11 @@ class DefaultScoringStateRepositoryTest {
 
         (thrown is CancellationException) shouldBe true
         coVerify(exactly = 1) { remoteDataSource.getScoringState() }
+    }
+
+    private fun authUser(uid: String) = AuthUser(uid = uid, email = null, displayName = null, photoUrl = null)
+
+    private companion object {
+        const val USER_ID = "user-1"
     }
 }

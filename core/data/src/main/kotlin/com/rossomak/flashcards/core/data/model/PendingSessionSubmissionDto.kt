@@ -5,10 +5,10 @@ import kotlinx.serialization.Serializable
 /**
  * Full-fidelity, lossless mirror of a domain
  * [com.rossomak.flashcards.core.domain.model.SessionResult] for the local durable delivery queue
- * — carries every field the domain type carries, both `Rated`/`Fast` variants, including
- * [xpConfig]. **Independent of** [com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource]'s
- * own wire payload: that one is a network-wire subset (no `xpConfig`); this DTO's job is a lossless
- * round trip through an app restart, not matching what the network call sends.
+ * — carries every field the domain type carries, both `Rated`/`Fast` variants.
+ * **Independent of** [com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource]'s
+ * own wire payload: this DTO's job is a lossless round trip through an app restart, not matching
+ * what the network call sends.
  *
  * [mode] and [startedAtEpochMillis] use the same string/epoch-millis encoding as the network payload
  * (`StudyMode.name`, `Instant.toEpochMilli()`) rather than relying on kotlinx.serialization's default
@@ -28,9 +28,9 @@ import kotlinx.serialization.Serializable
  * **A field added to [com.rossomak.flashcards.core.domain.model.SessionResult] needs updating in two
  * independent places, not just one**: here (plus [PendingSessionSubmissionMapper]) for the durable
  * queue, and separately in [com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource]'s
- * own `toPayload()` for the network wire shape — the two are deliberately different subsets (this one
- * is full-fidelity, that one omits `xpConfig`), so neither can be derived from the other, and nothing
- * enforces they stay in sync beyond this note.
+ * own `toPayload()` for the network wire shape — the two are deliberately independent (this one is
+ * full-fidelity, that one is whatever the function accepts), so neither can be derived from the other,
+ * and nothing enforces they stay in sync beyond this note.
  */
 @Serializable
 data class PendingSessionSubmissionDto(
@@ -45,21 +45,9 @@ data class PendingSessionSubmissionDto(
     val subcategoryIds: List<String>,
     val subcategoryNames: List<String>,
     val cardResults: List<PendingFlashcardResultDto>,
-    // Defaulted, not required: an entry queued by an older app version has neither
-    // field in its persisted JSON. kotlinx.serialization only tolerates a *missing* field when it has
-    // a default, so without one, one stale entry throws on decode and takes the whole array with it
-    // (readAll() catches SerializationException by discarding every queued session, not just the bad
-    // one). Unlike an ordinary permanently-invalid entry, PendingSessionSubmissionMapper.toDomain()
-    // migrates these two sentinels away (blank studyDate, non-positive dailyGoalMinutes) before the
-    // domain object ever reaches submitStudySession, so a legacy entry submits successfully instead
-    // of being permanently rejected by the server's validation.
-    val studyDate: String = "",
-    val dailyGoalMinutes: Int = 0,
-    // No default: unlike studyDate/dailyGoalMinutes above, no shipped app version ever queued an entry
-    // without this field — it is introduced alongside the field itself, so no legacy JSONL line can be
-    // missing it, and there is nothing meaningful to migrate a missing value to.
+    val studyDate: String,
+    val dailyGoalMinutes: Int,
     val studyDateUtcOffsetMinutes: Int,
-    val xpConfig: PendingXpConfigDto,
 )
 
 /**
@@ -74,21 +62,4 @@ data class PendingFlashcardResultDto(
     val state: String,
     val attemptsUsed: Int? = null,
     val wasPreviouslyMastered: Boolean? = null,
-)
-
-/** Field-for-field mirror of [com.rossomak.flashcards.core.domain.model.XpConfig]. */
-@Serializable
-data class PendingXpConfigDto(
-    val newCardStudied: Int,
-    val cardMastered: Int,
-    val cardPartial: Int,
-    val masteryDefended: Int,
-    val cardDemastered: Int,
-    val sessionCompleted: Int,
-    val dailyGoalMet: Int,
-    val streakPerDay: Int,
-    val streakMaxPerDay: Int,
-    val minuteStudied: Int,
-    val levelCurveBase: Double,
-    val levelCurveExponent: Double,
 )

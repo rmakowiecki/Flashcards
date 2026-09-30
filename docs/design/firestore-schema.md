@@ -144,10 +144,25 @@ users/{uid}/progress/summary                          → { subcategories: { <su
 ```
 users/{uid}/progress/user-stats                       → { xp, level, xpIntoCurrentLevel,
                                                           currentStreak, bestStreak,
-                                                          lastStudyDate, goalMetDate }
+                                                          lastStudyDate, goalMetDate,
+                                                          studiedSecondsOnLastStudyDate }
 ```
 
 - **`progress` holds the User's singleton documents** — the progress summary (`summary`) and the scoring state (`user-stats`) — alongside the fixed `details` anchor document that hosts the packed per-Subcategory documents one hop deeper. Firestore paths alternate collection and document, so each per-User singleton needs a fixed document id inside a collection; one security rule covers them all.
+- **`user-stats` is the scoring state**, written only by the `submitStudySession` Cloud Function. `lastStudyDate` and `goalMetDate` only move forward ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). `studiedSecondsOnLastStudyDate` is the seconds of every recorded session on `lastStudyDate`: a submission sets it to that day's total when its `studyDate` is not earlier than `lastStudyDate`, and leaves it unchanged otherwise. A missing field reads as `0`. The client reads it as the day's baseline when it previews the Daily Goal for a Pending Session ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
+
+## XP configuration
+
+```
+config/xp                                             → { newCardStudied, cardMastered, cardPartial,
+                                                          masteryDefended, cardDemastered,
+                                                          sessionCompleted, dailyGoalMet,
+                                                          streakPerDay, streakMaxPerDay,
+                                                          minuteStudied,
+                                                          levelCurveBase, levelCurveExponent }
+```
+
+- **`config/xp` is the one server-owned XP configuration**, every `XpConfig` field in one document ([ADR-0047](../adr/0047-xp-values-behind-a-config-repository.md)). `submitStudySession` scores each session with its current copy. Readable by any signed-in user, a Guest included; written only by the Admin SDK (`scripts/seed/seed_xp_config.py` or a console edit), never by a client. The client refreshes its copy on every sign-in and keeps it on the device for offline scoring, falling back to the bundled defaults only until a first fetch succeeds.
 
 ## Private flashcards
 
@@ -175,3 +190,4 @@ users/{uid}/curationRequests/{cardId}                       → { subcategoryId:
 ## Offline persistence
 
 - Offline: Firestore Android SDK built-in persistence. No Room needed.
+- Pending Sessions live outside Firestore, in a local file queue that the delivery worker drains through `submitStudySession`. The Card Progress, progress summary and scoring state repositories replay them on top of the cached documents above, so every screen counts a session as soon as it is queued ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).

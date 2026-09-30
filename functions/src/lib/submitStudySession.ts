@@ -96,6 +96,7 @@ const FIELD_CURRENT_STREAK = "currentStreak";
 const FIELD_BEST_STREAK = "bestStreak";
 const FIELD_LAST_STUDY_DATE = "lastStudyDate";
 const FIELD_GOAL_MET_DATE = "goalMetDate";
+const FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE = "studiedSecondsOnLastStudyDate";
 
 // The itemised XP breakdown's own fields — mirrors StudySessionRemoteDataSource.kt's FIELD_XP_* names.
 const FIELD_XP_NEW_CARDS = "newCards";
@@ -199,7 +200,6 @@ const RESERVED_FIRESTORE_NAME = /^__.*__$/;
 // transaction's reads or push a session document toward Firestore's 1 MiB limit.
 const MAX_CARD_RESULTS = 50;
 
-const SECONDS_PER_MINUTE = 60;
 const MILLIS_PER_MINUTE = 60_000;
 
 // The real-world extremes of a UTC offset (Baker Island UTC-12:00 to Kiritimati/Line Islands
@@ -393,6 +393,7 @@ function scoringStateFields(state: ScoringState): Record<string, unknown> {
     [FIELD_BEST_STREAK]: state.bestStreak,
     [FIELD_LAST_STUDY_DATE]: state.lastStudyDate,
     [FIELD_GOAL_MET_DATE]: state.goalMetDate,
+    [FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE]: state.studiedSecondsOnLastStudyDate,
   };
 }
 
@@ -407,6 +408,7 @@ function readScoringState(snapshot: FirebaseFirestore.DocumentSnapshot): Scoring
     bestStreak: (data[FIELD_BEST_STREAK] as number) ?? 0,
     lastStudyDate: (data[FIELD_LAST_STUDY_DATE] as string) ?? "",
     goalMetDate: (data[FIELD_GOAL_MET_DATE] as string) ?? "",
+    studiedSecondsOnLastStudyDate: (data[FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE] as number) ?? 0,
   };
 }
 
@@ -498,7 +500,7 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  *    sessions committed since would have moved it on.
  * 2. Otherwise, reads every touched Subcategory's prior progress and the account's prior
  *    [ScoringState], computes the new progress writes, the [XpBreakdown] and the new [ScoringState]
- *    (mirroring `CommitStudySessionUseCase`/`CalculateSessionXpUseCase`) with the server-owned XP
+ *    (mirrored by the client's `scoreSession`) with the server-owned XP
  *    configuration (`config/xp`, see `xpConfig.ts`), and writes all four
  *    documents — the session document, every touched Subcategory's progress, the progress summary's
  *    increments, and the full scoring-state overwrite — before answering from the session document
@@ -553,15 +555,14 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
 
     // This session isn't in todaySessionsSnapshot's results yet — it doesn't exist until this
     // transaction commits — so its own durationSeconds is added on top of the query's sum.
-    const todaySeconds =
+    const todayTotalSeconds =
       todaySessionsSnapshot.docs.reduce((sum, doc) => sum + ((doc.data()[FIELD_DURATION_SECONDS] as number) ?? 0), 0) + request.durationSeconds;
-    const todayTotalMinutes = Math.floor(todaySeconds / SECONDS_PER_MINUTE);
 
     const currentScoringState = readScoringState(scoringSnapshot);
     const streakAndGoalInput: StreakAndGoalInput = {
       studyDate: derivedStudyDate,
       dailyGoalMinutes: request.dailyGoalMinutes,
-      todayTotalMinutes,
+      todayTotalSeconds,
     };
     const { breakdown, newScoringState, levelsCrossed } = computeSessionXp(
       {

@@ -1,7 +1,7 @@
 /**
  * Server-authoritative XP and level scoring. A TypeScript port of
  * `core/domain/.../model/XpConfig.kt`, `ScoringState.kt`, `XpBreakdown.kt` and
- * `CalculateSessionXpUseCase.kt` — kept field-for-field and rule-for-rule identical to that Kotlin
+ * `scoring/SessionXpCalculation.kt` — kept field-for-field and rule-for-rule identical to that Kotlin
  * source. Both test suites run the shared scoring cases in `testdata/xp-scoring/` at the repo root, and
  * both bundled defaults are checked against the default configuration file there.
  *
@@ -58,6 +58,8 @@ export interface ScoringState {
   bestStreak: number;
   lastStudyDate: string;
   goalMetDate: string;
+  /** every delivered session's `durationSeconds` summed for [lastStudyDate]; `0` before any session. */
+  studiedSecondsOnLastStudyDate: number;
 }
 
 export const DEFAULT_SCORING_STATE: ScoringState = {
@@ -68,6 +70,7 @@ export const DEFAULT_SCORING_STATE: ScoringState = {
   bestStreak: 0,
   lastStudyDate: "",
   goalMetDate: "",
+  studiedSecondsOnLastStudyDate: 0,
 };
 
 const LEVEL_THRESHOLD_ROUNDING_UNIT = 1000;
@@ -133,7 +136,7 @@ interface RatedCardAwards {
 }
 
 /**
- * Mirrors `CalculateSessionXpUseCase.calculateRatedCardAwards`: a card ending Mastered that was
+ * Mirrors Kotlin `calculateRatedCardAwards` (`SessionXpCalculation.kt`): a card ending Mastered that was
  * already Mastered earns [XpConfig.masteryDefended] **instead of** [XpConfig.cardMastered] — a
  * smaller, distinct reward, not a bonus stacked on a fresh mastery.
  */
@@ -202,8 +205,8 @@ export interface StreakAndGoalInput {
   studyDate: string;
   /** the Daily Goal (minutes/day) in effect when this session ended. */
   dailyGoalMinutes: number;
-  /** every session's `durationSeconds` summed for this local day, THIS session's included, floored to whole minutes. */
-  todayTotalMinutes: number;
+  /** every session's `durationSeconds` summed for this local day, THIS session's included. */
+  todayTotalSeconds: number;
 }
 
 export interface StreakAndGoalResult {
@@ -213,13 +216,15 @@ export interface StreakAndGoalResult {
   bestStreak: number;
   lastStudyDate: string;
   goalMetDate: string;
+  studiedSecondsOnLastStudyDate: number;
 }
 
 /**
  * Both awards are forward-only: a submission whose `studyDate` is not strictly later than the stored
  * date never advances the streak and never regresses `lastStudyDate`/`goalMetDate` — covers same-day
  * resubmission (no double-count) and out-of-order offline delivery (an old session arriving after a
- * later one already committed) alike.
+ * later one already committed) alike. `studiedSecondsOnLastStudyDate` follows the same rule: a
+ * submission on or after `lastStudyDate` sets it to `todayTotalSeconds`, an earlier one leaves it.
  */
 export function computeStreakAndGoalAwards(state: ScoringState, input: StreakAndGoalInput, config: XpConfig): StreakAndGoalResult {
   let currentStreak = state.currentStreak;
@@ -235,15 +240,19 @@ export function computeStreakAndGoalAwards(state: ScoringState, input: StreakAnd
     streakBonus = Math.min(currentStreak * config.streakPerDay, config.streakMaxPerDay);
   }
 
+  const studiedSecondsOnLastStudyDate =
+    input.studyDate >= state.lastStudyDate ? input.todayTotalSeconds : state.studiedSecondsOnLastStudyDate;
+
   let goalMetDate = state.goalMetDate;
   let dailyGoalBonus = 0;
   const alreadyMetToday = input.studyDate === state.goalMetDate;
-  if (!alreadyMetToday && input.studyDate >= state.goalMetDate && input.todayTotalMinutes >= input.dailyGoalMinutes) {
+  const todayTotalMinutes = Math.floor(input.todayTotalSeconds / SECONDS_PER_MINUTE);
+  if (!alreadyMetToday && input.studyDate >= state.goalMetDate && todayTotalMinutes >= input.dailyGoalMinutes) {
     dailyGoalBonus = config.dailyGoalMet;
     goalMetDate = input.studyDate;
   }
 
-  return { streakBonus, dailyGoalBonus, currentStreak, bestStreak, lastStudyDate, goalMetDate };
+  return { streakBonus, dailyGoalBonus, currentStreak, bestStreak, lastStudyDate, goalMetDate, studiedSecondsOnLastStudyDate };
 }
 
 // yyyy-MM-dd strings, both anchored to UTC midnight purely as a calendar-arithmetic device — these
@@ -256,7 +265,7 @@ function daysBetween(earlier: string, later: string): number {
 }
 
 /**
- * Mirrors `CalculateSessionXpUseCase.applyDelta`: a positive delta climbs [ScoringState.level] one
+ * Mirrors Kotlin `applyDelta` (`SessionXpCalculation.kt`): a positive delta climbs [ScoringState.level] one
  * [levelThreshold] at a time, reporting each crossing in ascending order, with no burst awarded for
  * reaching one. A negative delta is clamped to `max(delta, -xpIntoCurrentLevel)` — never enough to
  * push points-into-level below zero or the level below where it already stood.
@@ -286,9 +295,9 @@ export interface SessionXpResult {
 }
 
 /**
- * Mirrors `CalculateSessionXpUseCase.invoke`: computes the breakdown, then applies its total to
- * `currentState`. The streak/goal result's `currentStreak`/`bestStreak`/`lastStudyDate`/`goalMetDate`
- * are merged onto the returned `newScoringState` after `applyDelta` — independent of whether
+ * Mirrors Kotlin `calculateSessionXp`: computes the breakdown, then applies its total to
+ * `currentState`. The streak/goal result's `currentStreak`/`bestStreak`/`lastStudyDate`/`goalMetDate`/
+ * `studiedSecondsOnLastStudyDate` are merged onto the returned `newScoringState` after `applyDelta` — independent of whether
  * `applyDelta`'s own XP-delta clamping had anything to do with this session's XP total.
  */
 export function computeSessionXp(
@@ -307,6 +316,7 @@ export function computeSessionXp(
     bestStreak: streakAndGoal.bestStreak,
     lastStudyDate: streakAndGoal.lastStudyDate,
     goalMetDate: streakAndGoal.goalMetDate,
+    studiedSecondsOnLastStudyDate: streakAndGoal.studiedSecondsOnLastStudyDate,
   };
   return { breakdown, newScoringState, levelsCrossed };
 }

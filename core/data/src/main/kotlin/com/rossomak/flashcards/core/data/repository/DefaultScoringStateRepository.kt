@@ -1,25 +1,20 @@
 package com.rossomak.flashcards.core.data.repository
 
-import com.rossomak.flashcards.core.data.mapper.toDomain
-import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.repository.ScoringStateRepository
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
+/**
+ * Serves the cached server scoring state with the signed-in User's Pending Sessions replayed on top
+ * ([PendingSessionProjector.projectScoringState]), so a session studied offline counts toward XP and
+ * Level as soon as it is queued. With an empty queue it is the plain remote read.
+ *
+ * **Known transient:** the delivery worker refreshes the cached server state before it removes the
+ * delivered entry from the queue. In between, that session counts twice.
+ */
 class DefaultScoringStateRepository @Inject constructor(
-    private val remoteDataSource: ScoringStateRemoteDataSource,
+    private val pendingSessionProjector: PendingSessionProjector,
 ) : ScoringStateRepository {
 
-    override suspend fun getScoringState(): Result<ScoringState?> = withContext(Dispatchers.IO) {
-        try {
-            Result.success(remoteDataSource.getScoringState()?.toDomain())
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: Exception) {
-            Result.failure(exception)
-        }
-    }
+    override suspend fun getScoringState(): Result<ScoringState?> = pendingSessionProjector.projectScoringState()
 }

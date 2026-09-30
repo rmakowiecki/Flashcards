@@ -65,3 +65,18 @@ owns, so trust moves from "whatever the client says" to "whatever the function c
 - Streak and daily-goal awarding was designed against this architecture rather than
   its own original client-side plan, once this landed — see
   [ADR-0048](0048-streak-and-daily-goal-ride-the-session-payload.md).
+
+## Amendments
+
+**2026-09-30 — the Summary waits for the server, and the local preview is a fallback.** Three
+consequences above changed. See [ADR-0055](0055-pending-sessions-and-local-progress-projection.md).
+
+- The Session Summary now waits up to 6 seconds for the server's score and renders it. The local
+  preview, computed by `scoreSession`, shows only when the device is offline, the server rejects the
+  session, the drain ends without its score, or the wait runs out. `CalculateSessionXpUseCase` is
+  gone. The client's scoring rules now run shared test cases against the TypeScript ones, so a
+  divergence fails a test instead of relying on manual discipline.
+- The delivery queue has no attempt limit. Transient failures retry forever; permanent rejections move
+  the entry to a dead-letter file.
+- The configuration drift note is replaced. `XpConfig` is a server-owned Firestore document, and the
+  server always scores with its current copy (ADR-0047's amendment).

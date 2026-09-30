@@ -36,18 +36,6 @@ fun SessionResult.toSummaryRoute(): StudySessionSummaryRoute = StudySessionSumma
         is SessionResult.Rated -> cardResults.map { it.wasPreviouslyMastered }
         is SessionResult.Fast -> null
     },
-    xpNewCardStudied = xpConfig.newCardStudied,
-    xpCardMastered = xpConfig.cardMastered,
-    xpCardPartial = xpConfig.cardPartial,
-    xpMasteryDefended = xpConfig.masteryDefended,
-    xpCardDemastered = xpConfig.cardDemastered,
-    xpSessionCompleted = xpConfig.sessionCompleted,
-    xpDailyGoalMet = xpConfig.dailyGoalMet,
-    xpStreakPerDay = xpConfig.streakPerDay,
-    xpStreakMaxPerDay = xpConfig.streakMaxPerDay,
-    xpMinuteStudied = xpConfig.minuteStudied,
-    xpLevelCurveBase = xpConfig.levelCurveBase,
-    xpLevelCurveExponent = xpConfig.levelCurveExponent,
 )
 
 /**
@@ -98,7 +86,6 @@ private fun StudySessionSummaryRoute.toSessionResult(
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
-        xpConfig = xpConfig,
     )
     StudyMode.Fast -> SessionResult.Fast(
         id = sessionId,
@@ -119,6 +106,5 @@ private fun StudySessionSummaryRoute.toSessionResult(
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
-        xpConfig = xpConfig,
     )
 }

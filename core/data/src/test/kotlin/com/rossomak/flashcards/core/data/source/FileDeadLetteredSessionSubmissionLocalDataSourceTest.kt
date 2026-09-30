@@ -4,7 +4,6 @@ import android.content.Context
 import com.rossomak.flashcards.core.data.model.DeadLetteredSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingFlashcardResultDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
-import com.rossomak.flashcards.core.data.model.PendingXpConfigDto
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -47,20 +46,6 @@ class FileDeadLetteredSessionSubmissionLocalDataSourceTest {
             studyDate = "2026-09-08",
             dailyGoalMinutes = 20,
             studyDateUtcOffsetMinutes = 0,
-            xpConfig = PendingXpConfigDto(
-                newCardStudied = 10,
-                cardMastered = 100,
-                cardPartial = 25,
-                masteryDefended = 50,
-                cardDemastered = -80,
-                sessionCompleted = 500,
-                dailyGoalMet = 1000,
-                streakPerDay = 250,
-                streakMaxPerDay = 2500,
-                minuteStudied = 10,
-                levelCurveBase = 1000.0,
-                levelCurveExponent = 2.5,
-            ),
         ),
         failureCode = "INVALID_ARGUMENT",
         failureMessage = "rejected",

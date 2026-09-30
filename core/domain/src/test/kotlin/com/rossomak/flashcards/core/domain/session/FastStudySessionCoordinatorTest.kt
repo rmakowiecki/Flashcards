@@ -16,11 +16,9 @@ import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway.Call
-import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -45,7 +43,6 @@ class FastStudySessionCoordinatorTest {
     private val getSessionStartData = GetSessionStartDataUseCase(
         GetFlashcardsUseCase(flashcardRepository),
         GetSubcategoryProgressUseCase(cardProgressRepository),
-        GetXpConfigUseCase(FakeXpConfigRepository()),
     )
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val logger = FakeDomainLogger()

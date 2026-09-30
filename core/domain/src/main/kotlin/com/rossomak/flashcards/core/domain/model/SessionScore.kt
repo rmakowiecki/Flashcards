@@ -1,10 +1,10 @@
 package com.rossomak.flashcards.core.domain.model
 
 /**
- * What the server-authoritative `submitStudySession` Cloud Function computed for one delivered
- * session: the XP it awarded, line by line, and the account's Level position right after applying it.
- * Unlike [SessionXpResult], the client's own local preview, this is the award actually recorded, so the
- * Session Summary shows it as-is whenever it arrives in time.
+ * One session's XP award, line by line, and the account's Level position right after applying it.
+ * Comes from the server-authoritative `submitStudySession` Cloud Function for a delivered session, or
+ * from the client's own [com.rossomak.flashcards.core.domain.scoring.scoreSession] for the Session
+ * Summary's fallback preview; both use the same rules, so the Summary renders either the same way.
  *
  * @param breakdown every award line, [XpBreakdown.dailyGoalBonus] and [XpBreakdown.streakBonus] included.
  * @param level the account's Level after this session.
@@ -12,9 +12,9 @@ package com.rossomak.flashcards.core.domain.model
  * @param xpForNextLevel points [level] needs in total before the next Level.
  * @param levelsCrossed every Level reached by this session, ascending; empty when none was.
  * @param counts how many cards or events each multiplied line counts; `null` only when the function
- * answered without them.
- * @param rates the per-line rates the function scored with; `null` when it answered from a session
- * recorded before it stored them.
+ * answered without them. Always present on a client score.
+ * @param rates the per-line rates the session was scored with; `null` when the function answered from
+ * a session recorded before it stored them. Always present on a client score.
  */
 data class SessionScore(
     val breakdown: XpBreakdown,

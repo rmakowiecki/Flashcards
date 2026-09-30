@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.Flow
  *   [com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase], which derives each
  *   Rated card's previously-Mastered flag from it
  *   ([com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator]); and
- *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], whose local preview counts
- *   new cards from it.
+ *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], whose local preview scores
+ *   the session against it.
  * - [observeProgressSummary]: the Studied/Mastered rings on Browse and Category Details.
  *
  * Any future selection that depends on which cards are Mastered (such as Mastery Defense's floor and

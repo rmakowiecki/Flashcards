@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.lifecycle.SavedStateHandle
+import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
@@ -8,6 +9,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
@@ -15,7 +17,8 @@ import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
-import com.rossomak.flashcards.core.domain.usecase.CalculateSessionXpUseCase
+import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
+import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
@@ -57,11 +60,12 @@ class StudySessionSummaryViewModelTest {
     private val cardProgressRepository = FakeCardProgressRepository()
     private val scoringStateRepository = FakeScoringStateRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
+    private val xpConfigRepository = FakeXpConfigRepository()
 
     private fun createViewModel(): StudySessionSummaryViewModel = StudySessionSummaryViewModel(
         savedStateHandle,
         ObserveUserPreferencesUseCase(userPreferencesRepository),
-        SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, CalculateSessionXpUseCase(), sessionSubmissionRepository),
+        SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, GetXpConfigUseCase(xpConfigRepository), sessionSubmissionRepository),
     )
 
     @Before
@@ -376,7 +380,8 @@ class StudySessionSummaryViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // 4 new cards × 10 + 2 mastered × 100 + 1 partial × 25 + 2 minutes × 10 + 500 completion = 785.
+            // 4 new cards × 10 + 2 mastered × 100 + 1 partial × 25 + 2 minutes × 10 + 500 completion + the
+            // first day of a Streak × 250 = 1035, which crosses Level 1's threshold of 1000.
             val config = XpConfig()
             with(viewModel.state.value) {
                 xpLines shouldBe listOf(
@@ -385,14 +390,54 @@ class StudySessionSummaryViewModelTest {
                     XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
                     XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
                     XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
+                    XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
                 )
-                xpTotal shouldBe 785
-                level shouldBe 1
-                xpIntoCurrentLevel shouldBe 785L
-                xpForNextLevel shouldBe config.levelThreshold(1)
+                xpTotal shouldBe 1035
+                level shouldBe 2
+                xpIntoCurrentLevel shouldBe 35L
+                xpForNextLevel shouldBe config.levelThreshold(2)
                 isLoading shouldBe false
             }
         }
+
+    @Test
+    fun `the local preview's line counts come from the score, so a card Mastered before the session shows as defended`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // The route says card-0 was not previously Mastered; the prior Card Progress says it was.
+            cardProgressRepository.seed(
+                SubcategoryProgress(
+                    subcategoryId = "sub-1",
+                    categoryId = "cat-1",
+                    cards = mapOf("card-0" to CardProgressEntry(FlashcardStudyProgressState.Mastered, firstStudiedAt = Instant.EPOCH, masteredAt = Instant.EPOCH)),
+                ),
+            )
+            stubRoute(ratedRoute())
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.xpLines shouldBe listOf(
+                XpBreakdownLine(XpAwardSource.NewCards, count = 3, rate = 10, amount = 30),
+                XpBreakdownLine(XpAwardSource.Mastered, count = 1, rate = 100, amount = 100),
+                XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
+                XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
+                XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
+                XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
+                XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
+            )
+        }
+
+    @Test
+    fun `the local preview is scored with the cached xp configuration`() = runTest(mainDispatcherRule.testDispatcher) {
+        xpConfigRepository.resultToReturn = Result.success(XpConfig(cardMastered = 321))
+        stubRoute(ratedRoute())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.xpLines.single { it.source == XpAwardSource.Mastered } shouldBe
+            XpBreakdownLine(XpAwardSource.Mastered, count = 2, rate = 321, amount = 642)
+    }
 
     @Test
     fun `a failed scoring-state read leaves the xp fields at their defaults`() = runTest(mainDispatcherRule.testDispatcher) {

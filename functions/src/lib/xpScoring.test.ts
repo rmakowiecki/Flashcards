@@ -1,5 +1,5 @@
 // Runs the XP scoring cases shared with the Kotlin client (`testdata/xp-scoring/` at the repo root)
-// against this module. The Kotlin `CalculateSessionXpUseCase` runs the same file, so the two
+// against this module. The Kotlin `XpScoringCasesTest` runs the same file, so the two
 // implementations are checked against one set of expectations. Add new scenarios to that file, not here.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -42,8 +42,9 @@ interface ScoringCaseFile {
   cases: ScoringCase[];
 }
 
-// Scores without either award: an empty study date is never later than a stored one.
-const NO_STREAK_OR_GOAL: StreakAndGoalInput = { studyDate: "", dailyGoalMinutes: 0, todayTotalMinutes: 0 };
+// A sessionXp case without its own streakAndGoal input scores without either award: an empty study
+// date is never later than a stored one.
+const NO_STREAK_OR_GOAL: StreakAndGoalInput = { studyDate: "", dailyGoalMinutes: 0, todayTotalSeconds: 0 };
 
 // Resolved from the functions package root, found by walking up from this file, so the path does not
 // depend on where the compiled output lands.
@@ -79,7 +80,7 @@ function run(scoringCase: ScoringCase): unknown {
   const config = resolveConfig(input);
   switch (scoringCase.kind) {
     case "sessionXp":
-      return computeSessionXp(input.session!, input.newCardsStudied ?? 0, priorState(input), config, NO_STREAK_OR_GOAL);
+      return computeSessionXp(input.session!, input.newCardsStudied ?? 0, priorState(input), config, input.streakAndGoal ?? NO_STREAK_OR_GOAL);
     case "levelThreshold":
       return { threshold: levelThreshold(config, input.level!) };
     case "streakAndGoal":
