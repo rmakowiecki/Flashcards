@@ -64,6 +64,4 @@ fun calculateStreakAndGoalAwards(state: ScoringState, input: StreakAndGoalInput,
     )
 }
 
-private const val SECONDS_PER_MINUTE = 60
-
 private fun daysBetween(earlier: String, later: String): Long = ChronoUnit.DAYS.between(LocalDate.parse(earlier), LocalDate.parse(later))

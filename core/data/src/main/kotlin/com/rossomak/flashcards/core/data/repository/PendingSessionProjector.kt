@@ -82,10 +82,7 @@ class PendingSessionProjector @Inject constructor(
             return Result.failure(IllegalStateException("Signed-in User changed while reading Card Progress for $subcategoryId"))
         }
 
-        val baseline = remoteProgress.getOrElse { exception ->
-            logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
-            null
-        }
+        val baseline = remoteProgress.orEmptyBaseline(subcategoryId)
         return Result.success(replay(mapOf(subcategoryId to baseline), pendingSessions).progressBySubcategory[subcategoryId])
     }
 
@@ -185,20 +182,21 @@ class PendingSessionProjector @Inject constructor(
     /** The cached server Card Progress of every Subcategory [pendingSessions] touch, `null` where unreadable or absent. */
     private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgress?> = coroutineScope {
         pendingSessions.flatMap { session -> session.touchedSubcategoryIds() }.toSet().map { subcategoryId ->
-            async {
-                subcategoryId to readRemoteProgress(subcategoryId).getOrElse { exception ->
-                    logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
-                    null
-                }
-            }
+            async { subcategoryId to readRemoteProgress(subcategoryId).orEmptyBaseline(subcategoryId) }
         }.awaitAll().toMap()
     }
 
+    /** A failed read projects over no record instead of failing, so the Pending Session results still show. */
+    private fun Result<SubcategoryProgress?>.orEmptyBaseline(subcategoryId: String): SubcategoryProgress? = getOrElse { exception ->
+        logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
+        null
+    }
+
     private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgress?> =
-        runCatchingFirestoreWrite { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
+        runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
 
     private suspend fun readRemoteScoringState(): Result<ScoringState?> =
-        runCatchingFirestoreWrite { scoringStateRemoteDataSource.getScoringState()?.toDomain() }
+        runCatchingFirestore { scoringStateRemoteDataSource.getScoringState()?.toDomain() }
 
     private fun ownedPendingSessions(uid: String, entries: List<PendingSessionSubmissionDto>): List<SessionResult> = entries
         .filter { entry -> entry.uid == uid }

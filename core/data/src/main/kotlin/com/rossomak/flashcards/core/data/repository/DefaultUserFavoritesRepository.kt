@@ -18,11 +18,11 @@ class DefaultUserFavoritesRepository @Inject constructor(
             .retryOnFirestorePermissionDenied()
 
     override suspend fun setCategoryFavorite(categoryId: String, isFavorite: Boolean): Result<Unit> =
-        runCatchingFirestoreWrite { remoteDataSource.setCategoryFavorite(categoryId, isFavorite) }
+        runCatchingFirestore { remoteDataSource.setCategoryFavorite(categoryId, isFavorite) }
 
     override suspend fun setSubcategoryFavorite(subcategoryId: String, isFavorite: Boolean): Result<Unit> =
-        runCatchingFirestoreWrite { remoteDataSource.setSubcategoryFavorite(subcategoryId, isFavorite) }
+        runCatchingFirestore { remoteDataSource.setSubcategoryFavorite(subcategoryId, isFavorite) }
 
     override suspend fun setSubcategoriesFavorite(subcategoryIds: Set<String>, isFavorite: Boolean): Result<Unit> =
-        runCatchingFirestoreWrite { remoteDataSource.setSubcategoriesFavorite(subcategoryIds, isFavorite) }
+        runCatchingFirestore { remoteDataSource.setSubcategoriesFavorite(subcategoryIds, isFavorite) }
 }

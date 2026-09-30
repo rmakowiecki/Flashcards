@@ -96,6 +96,10 @@ Accepted transient inaccuracies, all corrected by the next successful server rea
 - **Daily Goal under-count.** A Pending Session dated before `lastStudyDate` counts only its own
   seconds, and sessions delivered from another device count only once this device reads the scoring
   state again.
+- **Seconds field not yet written.** Until the function has rewritten a User's `user-stats` document
+  after the deploy that added `studiedSecondsOnLastStudyDate`, the field is absent and reads as 0, so a
+  replay on the day of `lastStudyDate` starts the Daily Goal's minutes from zero. The next delivered
+  session writes it.
 - **Multi-device Streak.** Each device projects from its own cached scoring state, so two devices
   studying offline on the same day each preview a Streak award that the server pays once.
 - **Empty Card Progress baseline.** Offline, a Subcategory never read on this device has no cached

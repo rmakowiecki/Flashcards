@@ -53,7 +53,7 @@ fun <T> Flow<T>.retryOnFirestorePermissionDenied(): Flow<T> =
 
 // Generic catch is deliberate: this is the repository boundary converting any Firestore/task failure into Result.failure
 @Suppress("TooGenericExceptionCaught")
-suspend fun <T> runCatchingFirestoreWrite(block: suspend () -> T): Result<T> = withContext(Dispatchers.IO) {
+suspend fun <T> runCatchingFirestore(block: suspend () -> T): Result<T> = withContext(Dispatchers.IO) {
     try {
         Result.success(block())
     } catch (exception: CancellationException) {
