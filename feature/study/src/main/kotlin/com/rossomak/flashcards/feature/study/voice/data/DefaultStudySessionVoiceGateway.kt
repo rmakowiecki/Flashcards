@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 @UnstableApi
 @ViewModelScoped
 @Suppress("TooManyFunctions") // one method per command of the two gateways it implements.
-class StudySessionVoiceGateway @Inject constructor(
+class DefaultStudySessionVoiceGateway @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : StudyVoicePlaybackGateway, VoiceCaptureGateway {
 

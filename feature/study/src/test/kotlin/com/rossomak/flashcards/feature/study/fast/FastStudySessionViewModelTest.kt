@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
@@ -687,11 +688,11 @@ class FastStudySessionViewModelTest {
         val viewModel = createReadAloudViewModel()
         moveToCard(2)
 
-        viewModel.state.value.isReadAloudNextAvailable shouldBe true
+        (TransportCommandType.Next in viewModel.state.value.availableTransportCommands) shouldBe true
 
         readQuestionThrough()
 
-        viewModel.state.value.isReadAloudNextAvailable shouldBe false
+        (TransportCommandType.Next in viewModel.state.value.availableTransportCommands) shouldBe false
     }
 
     @Test

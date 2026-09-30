@@ -14,6 +14,19 @@ import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReleaseLinger
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Emit
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PausePlayback
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Play
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentAnswer
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQuestion
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.RestartVoiceStack
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartAdvancePause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartQuestionPause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartReleaseLinger
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StopVoiceStack
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import java.time.Clock
 import javax.inject.Inject
@@ -75,7 +88,7 @@ class FastStudySessionCoordinator @Inject constructor(
     private var hasEnded = false
     private var pushedTransportCommands: Set<TransportCommandType>? = null
     private var readAloudPauseJob: Job? = null
-    private var releaseLingerJob: Job? = null
+    private val releaseLingerTimer = ReleaseLingerTimer { dispatch(FastSessionInput.ReleaseLingerElapsed) }
 
     // When the presented card last started or restarted, for the rewind threshold.
     private var presentedCardStartedAt: ComparableTimeMark = timeSource.markNow()
@@ -102,7 +115,7 @@ class FastStudySessionCoordinator @Inject constructor(
     /** Synchronous: `viewModelScope` is already cancelled when `onCleared` runs. */
     fun stop() {
         readAloudPauseJob?.cancel()
-        releaseLingerJob?.cancel()
+        releaseLingerTimer.cancel()
         playbackGateway.stop()
     }
 
@@ -110,11 +123,6 @@ class FastStudySessionCoordinator @Inject constructor(
     fun revealAnswer() {
         val current = state ?: return
         current.cards.getOrNull(current.currentIndex)?.let { card -> dispatch(FastSessionInput.AnswerRevealed(card.id)) }
-    }
-
-    /** The manual advance: only a session without read-aloud offers it. On the last card it ends the session. */
-    fun nextCard() {
-        dispatch(FastSessionInput.NextCardRequested)
     }
 
     /** Also the resume after an engine failure: the voice stack starts again at the presented card. */
@@ -127,9 +135,10 @@ class FastStudySessionCoordinator @Inject constructor(
     }
 
     /**
-     * The read-aloud Next, in-app or from outside the app: at a question it reveals that card's
-     * answer, at an answer it moves on. At the last card's answer it does nothing; the session ends
-     * after the pause that follows reading it.
+     * Next, in-app or from outside the app. With read-aloud on, at a question it reveals that card's
+     * answer, at an answer it moves on; at the last card's answer it does nothing, and the session
+     * ends after the pause that follows reading it. Without read-aloud it advances once the answer
+     * shows, and on the last card it ends the session.
      */
     fun next() {
         dispatch(FastSessionInput.NextRequested)
@@ -217,8 +226,8 @@ class FastStudySessionCoordinator @Inject constructor(
         xpConfig = sessionStartData.xpConfig
         val cardsById = flashcards.associateBy { it.id }
         val sessionCards = setup.cardIds.mapNotNull(cardsById::get)
-        state = reducer.seed(sessionCards)
-        publishPresentationState()
+        state = reducer.seed(sessionCards, isReadAloudSession = setup.readAloudEnabled)
+        publish()
         if (sessionCards.isEmpty()) return
         // Read-aloud off is a tap-through session and never starts text-to-speech.
         if (setup.readAloudEnabled) startVoiceStack(startIndex = 0)
@@ -308,45 +317,39 @@ class FastStudySessionCoordinator @Inject constructor(
         } finally {
             isDispatching = false
         }
-        publishPresentationState()
+        publish()
         return hasEffects || state != stateBefore
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per effect, exhaustive over the sealed type.
     private fun run(effect: FastSessionEffect) {
         when (effect) {
-            FastSessionEffect.Play -> playbackGateway.play()
-            FastSessionEffect.Pause -> playbackGateway.pause()
+            Play -> playbackGateway.play()
+            PausePlayback -> playbackGateway.pause()
             // Every question presented starts or restarts the card, for the rewind threshold.
-            is FastSessionEffect.PresentQuestion -> {
+            is PresentQuestion -> {
                 presentedCardStartedAt = timeSource.markNow()
                 playbackGateway.presentQuestion(effect.index)
             }
-            is FastSessionEffect.PresentAnswer -> playbackGateway.presentAnswer(effect.index)
-            FastSessionEffect.StartQuestionPause -> startReadAloudPause(QUESTION_TO_ANSWER_PAUSE, FastSessionInput.QuestionPauseElapsed)
-            FastSessionEffect.StartAdvancePause -> startReadAloudPause(ANSWER_TO_NEXT_PAUSE, FastSessionInput.AdvancePauseElapsed)
-            FastSessionEffect.CancelReadAloudPause -> readAloudPauseJob?.cancel()
-            FastSessionEffect.StartReleaseLinger -> {
-                releaseLingerJob?.cancel()
-                releaseLingerJob = requireNotNull(scope).launch {
-                    delay(RELEASE_LINGER)
-                    dispatch(FastSessionInput.ReleaseLingerElapsed)
-                }
-            }
-            FastSessionEffect.CancelReleaseLinger -> releaseLingerJob?.cancel()
-            is FastSessionEffect.RestartVoiceStack -> {
+            is PresentAnswer -> playbackGateway.presentAnswer(effect.index)
+            StartQuestionPause -> startReadAloudPause(QUESTION_TO_ANSWER_PAUSE, FastSessionInput.QuestionPauseElapsed)
+            StartAdvancePause -> startReadAloudPause(ANSWER_TO_NEXT_PAUSE, FastSessionInput.AdvancePauseElapsed)
+            CancelReadAloudPause -> readAloudPauseJob?.cancel()
+            StartReleaseLinger -> releaseLingerTimer.start(requireNotNull(scope))
+            CancelReleaseLinger -> releaseLingerTimer.cancel()
+            is RestartVoiceStack -> {
                 playbackGateway.stop()
                 startVoiceStack(startIndex = effect.startIndex)
             }
-            FastSessionEffect.StopVoiceStack -> {
+            // The reducer emits CancelReadAloudPause first, so a running pause is already stopped.
+            StopVoiceStack -> {
                 logger.warn { "Voice engine unavailable, Fast session paused" }
-                readAloudPauseJob?.cancel()
                 playback = VoicePlaybackState()
                 playbackGateway.stop()
             }
-            is FastSessionEffect.Emit -> eventChannel.trySend(effect.event)
+            is Emit -> eventChannel.trySend(effect.event)
             // The last card's answer is read in full before this fires, never when it merely started.
-            FastSessionEffect.SessionComplete -> end(abandoned = false)
+            SessionComplete -> end(abandoned = false)
         }
     }
 
@@ -368,7 +371,7 @@ class FastStudySessionCoordinator @Inject constructor(
     }
 
     /** The system transport controls get the same commands as the screen; unchanged ones are not sent again. */
-    private fun publishPresentationState() {
+    private fun publish() {
         val current = state ?: return
         val availableCommands = current.availableTransportCommands
         if (setup.readAloudEnabled && availableCommands != pushedTransportCommands) {
@@ -379,7 +382,6 @@ class FastStudySessionCoordinator @Inject constructor(
             cards = current.cards,
             currentIndex = current.currentIndex,
             isAnswerRevealed = current.isAnswerRevealed,
-            isReadAloudNextAvailable = current.isReadAloudNextAvailable,
             playback = playback,
             pauseReason = current.pauseReason,
             isHeldAtAdvancePoint = current.isHeldAtAdvancePoint,

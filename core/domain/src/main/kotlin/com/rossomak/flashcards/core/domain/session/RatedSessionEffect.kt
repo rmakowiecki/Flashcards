@@ -8,7 +8,9 @@ sealed interface RatedSessionEffect {
 
     /** Hand the voice player the queue in its new order; the screen already shows it. */
     data class SyncQueue(val cards: List<Flashcard>) : RatedSessionEffect
-    data object AdvanceAfterVoiceAnswer : RatedSessionEffect
+
+    /** Present the question of the queue head, after any [SyncQueue]. The player reads it only while it plays. */
+    data object PresentHeadQuestion : RatedSessionEffect
 
     /** Prepare the microphone, then open it; [RatedSessionInput.MicrophoneOpened] reports it recording. */
     data class OpenListeningWindow(val cardId: String) : RatedSessionEffect
@@ -41,7 +43,6 @@ sealed interface RatedSessionEffect {
 
     /** Mark the player playing again without reading anything: the round goes on on another voice. */
     data object ResumeWithoutReading : RatedSessionEffect
-    data object RestartCurrentCard : RatedSessionEffect
     data object StopVoiceAnswering : RatedSessionEffect
     data object StartVoiceAnswering : RatedSessionEffect
 

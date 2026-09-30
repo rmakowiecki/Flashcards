@@ -26,7 +26,6 @@ import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
 import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
@@ -38,7 +37,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.OpenListen
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PlayListeningCue
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PresentHeadQuestion
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
@@ -117,7 +116,7 @@ class RatedStudySessionCoordinator @Inject constructor(
     private var gradingJob: Job? = null
     private var noticeTailJob: Job? = null
     private var micRevokedEndJob: Job? = null
-    private var releaseLingerJob: Job? = null
+    private val releaseLingerTimer = ReleaseLingerTimer { dispatch(RatedSessionInput.ReleaseLingerElapsed) }
     private var isMicPermissionRevoked = false
     private var hasEnded = false
     private var pushedTransportCommands: Set<TransportCommandType>? = null
@@ -147,7 +146,7 @@ class RatedStudySessionCoordinator @Inject constructor(
     fun stop() {
         stopVoiceStack()
         noticeTailJob?.cancel()
-        releaseLingerJob?.cancel()
+        releaseLingerTimer.cancel()
         micRevokedEndJob?.cancel()
     }
 
@@ -275,7 +274,7 @@ class RatedStudySessionCoordinator @Inject constructor(
         publish()
         if (sessionCards.isEmpty()) return
         timekeeper.start()
-        if (!setup.voiceAnsweringEnabled) return
+        if (state?.isVoiceAnsweringSession != true) return
         // Preview only starts a voice-answering session with the microphone granted; a session
         // restored after it was revoked in system Settings ends instead.
         if (isMicrophoneGranted()) startVoiceStack(startVoiceAnswering = true) else onMicPermissionRevoked()
@@ -339,8 +338,8 @@ class RatedStudySessionCoordinator @Inject constructor(
             TransportCommand.Play -> applyPlay()
             TransportCommand.Pause, TransportCommand.Stop -> dispatch(RatedSessionInput.PauseRequested)
             TransportCommand.Next -> dispatch(RatedSessionInput.CardSkipped)
-            TransportCommand.Previous, TransportCommand.PreviousCard -> dispatch(RatedSessionInput.PreviousRequested)
-            is TransportCommand.JumpTo -> false
+            TransportCommand.Previous -> dispatch(RatedSessionInput.PreviousRequested)
+            TransportCommand.PreviousCard, is TransportCommand.JumpTo -> false
         }
         if (isChanged) eventChannel.trySend(RatedSessionEvent.ExternalTransportCommand(command))
     }
@@ -367,8 +366,8 @@ class RatedStudySessionCoordinator @Inject constructor(
      */
     private fun requestResume() {
         requireNotNull(scope).launch {
-            val isMicrophoneGranted = state?.isVoiceAnsweringSession != true || isMicrophoneGranted()
-            dispatch(RatedSessionInput.ResumeRequested(isMicrophoneGranted))
+            val isMicrophonePermitted = state?.isVoiceAnsweringSession != true || isMicrophoneGranted()
+            dispatch(RatedSessionInput.ResumeRequested(isMicrophonePermitted))
         }
     }
 
@@ -415,12 +414,7 @@ class RatedStudySessionCoordinator @Inject constructor(
         val scope = requireNotNull(scope)
         when (effect) {
             is SyncQueue -> if (isVoiceStackStarted) playbackGateway.updateQueue(effect.cards)
-            // The queue head, after any SyncQueue. Moving on from a hold or a paused advance point
-            // also plays: the player only reads a presented question while playing.
-            AdvanceAfterVoiceAnswer -> {
-                playbackGateway.presentQuestion(0)
-                if (state?.isPlaying != true) playbackGateway.play()
-            }
+            PresentHeadQuestion -> playbackGateway.presentQuestion(0)
             // A microphone that cannot be prepared, or never reports it records, fails the round
             // like a microphone that dropped out. The silence timer waits for the microphone to open.
             is OpenListeningWindow -> {
@@ -462,19 +456,12 @@ class RatedStudySessionCoordinator @Inject constructor(
                 }
             }
             CancelNoticeTail -> noticeTailJob?.cancel()
-            StartReleaseLinger -> {
-                releaseLingerJob?.cancel()
-                releaseLingerJob = scope.launch {
-                    delay(RELEASE_LINGER)
-                    dispatch(RatedSessionInput.ReleaseLingerElapsed)
-                }
-            }
-            CancelReleaseLinger -> releaseLingerJob?.cancel()
+            StartReleaseLinger -> releaseLingerTimer.start(scope)
+            CancelReleaseLinger -> releaseLingerTimer.cancel()
             StopFeedback -> playbackGateway.stopFeedback()
             PausePlayback -> playbackGateway.pause()
             Play -> playbackGateway.play()
             ResumeWithoutReading -> playbackGateway.resumeWithoutReading()
-            RestartCurrentCard -> playbackGateway.presentQuestion(0)
             StopVoiceAnswering -> {
                 listeningJob?.cancel()
                 captureGateway.stopVoiceAnswering()

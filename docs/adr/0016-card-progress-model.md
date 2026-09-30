@@ -56,8 +56,8 @@ into its entry, and set `firstStudiedAt` on first contact. A card is Studied onc
 at least one Attempt.
 
 **Fast** sessions create an entry with `state = Seen` **if and only if no entry exists**, and never
-modify an existing one. A card is Studied once **its answer has been shown** — `VoicePhase.Answer`
-entered under read-aloud, `isAnswerRevealed` set under manual advance. Reaching a card's question
+modify an existing one. A card is Studied once **its answer has been shown** — the player presenting the answer
+under read-aloud, `isAnswerRevealed` set under manual advance. Reaching a card's question
 and skipping forward marks nothing.
 
 The create-if-absent rule is what makes this safe: a Fast session can never overwrite a judgement a

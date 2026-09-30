@@ -7,7 +7,7 @@ import com.rossomak.flashcards.core.domain.model.ReadAloudStep
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReleaseLinger
-import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Pause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentAnswer
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQuestion
@@ -21,7 +21,6 @@ import com.rossomak.flashcards.core.domain.session.FastSessionInput.AdvancePause
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerFinished
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.JumpRequested
-import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextCardRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.NextRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PauseRequested
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.PlayRequested
@@ -55,7 +54,11 @@ class FastSessionReducerTest {
         extendedContext = null,
     )
 
-    private val session: FastSessionState = reducer.seed((1..CARD_COUNT).map { flashcard("card-$it") })
+    private fun cardId(number: Int): String = "card-$number"
+
+    private val session: FastSessionState = reducer.seed((1..CARD_COUNT).map { flashcard(cardId(it)) }, isReadAloudSession = true)
+
+    private val manualSession: FastSessionState = session.copy(isReadAloudSession = false)
 
     private fun playback(isPlaying: Boolean = true) = VoicePlaybackState(isActive = true, isPlaying = isPlaying)
 
@@ -65,27 +68,27 @@ class FastSessionReducerTest {
     /** Read-aloud playing card [index]'s question. */
     private fun readingQuestion(index: Int): FastSessionState = session.copy(currentIndex = index).after(PlaybackChanged(playback()))
 
-    private fun inQuestionPause(index: Int): FastSessionState = readingQuestion(index).after(QuestionFinished("card-${index + 1}"))
+    private fun inQuestionPause(index: Int): FastSessionState = readingQuestion(index).after(QuestionFinished(cardId(index + 1)))
 
     private fun readingAnswer(index: Int): FastSessionState = inQuestionPause(index).after(QuestionPauseElapsed)
 
-    private fun inAdvancePause(index: Int): FastSessionState = readingAnswer(index).after(AnswerFinished("card-${index + 1}"))
+    private fun inAdvancePause(index: Int): FastSessionState = readingAnswer(index).after(AnswerFinished(cardId(index + 1)))
 
     @Test
     fun `a manual reveal shows the answer and marks the card Seen`() {
-        val revealed = session.after(AnswerRevealed("card-1"))
+        val revealed = session.after(AnswerRevealed(cardId(1)))
 
         revealed.isAnswerRevealed shouldBe true
-        revealed.seenCardIds shouldBe listOf("card-1")
+        revealed.seenCardIds shouldBe listOf(cardId(1))
     }
 
     @Test
     fun `a revealed answer the session already moved past still marks that card Seen`() {
         val movedOn = session.copy(currentIndex = 1)
 
-        val state = movedOn.after(AnswerRevealed("card-1"))
+        val state = movedOn.after(AnswerRevealed(cardId(1)))
 
-        state.seenCardIds shouldBe listOf("card-1")
+        state.seenCardIds shouldBe listOf(cardId(1))
         state.isAnswerRevealed shouldBe false
     }
 
@@ -96,14 +99,14 @@ class FastSessionReducerTest {
 
     @Test
     fun `a revisited card is not recorded twice, and first-seen order holds`() {
-        val state = session.after(AnswerRevealed("card-2"), AnswerRevealed("card-1"), AnswerRevealed("card-2"))
+        val state = session.after(AnswerRevealed(cardId(2)), AnswerRevealed(cardId(1)), AnswerRevealed(cardId(2)))
 
-        state.seenCardIds shouldBe listOf("card-2", "card-1")
+        state.seenCardIds shouldBe listOf(cardId(2), cardId(1))
     }
 
     @Test
     fun `manual next moves to the next card with the answer hidden`() {
-        val transition = reducer.reduce(session.after(AnswerRevealed("card-1")), NextCardRequested)
+        val transition = reducer.reduce(manualSession.after(AnswerRevealed(cardId(1))), NextRequested)
 
         transition.state.currentIndex shouldBe 1
         transition.state.isAnswerRevealed shouldBe false
@@ -112,19 +115,35 @@ class FastSessionReducerTest {
 
     @Test
     fun `manual next before the answer shows is ignored`() {
-        val transition = reducer.reduce(session, NextCardRequested)
+        val transition = reducer.reduce(manualSession, NextRequested)
 
-        transition.state shouldBe session
+        transition.state shouldBe manualSession
         transition.effects.shouldBeEmpty()
     }
 
     @Test
     fun `manual next on the last card ends the session once its answer shows`() {
-        val onLast = session.copy(currentIndex = CARD_COUNT - 1)
+        val onLast = manualSession.copy(currentIndex = CARD_COUNT - 1)
 
-        reducer.reduce(onLast, NextCardRequested).effects.shouldBeEmpty()
-        reducer.reduce(onLast.after(AnswerRevealed("card-$CARD_COUNT")), NextCardRequested).effects shouldBe
+        reducer.reduce(onLast, NextRequested).effects.shouldBeEmpty()
+        reducer.reduce(onLast.after(AnswerRevealed(cardId(CARD_COUNT))), NextRequested).effects shouldBe
             listOf(FastSessionEffect.SessionComplete)
+    }
+
+    @Test
+    fun `next presents nothing in a tap-through session, where there is no player to tell`() {
+        val transition = reducer.reduce(manualSession.after(AnswerRevealed(cardId(1))), NextRequested)
+
+        transition.effects.filterIsInstance<PresentQuestion>().shouldBeEmpty()
+        transition.effects.filterIsInstance<PresentAnswer>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `next at a read-aloud question presents the answer, where a tap-through session ignores it`() {
+        val reading = readingQuestion(0)
+
+        reducer.reduce(reading, NextRequested).effects shouldBe listOf(PresentAnswer(0))
+        reducer.reduce(reading.copy(isReadAloudSession = false), NextRequested).effects.shouldBeEmpty()
     }
 
     @Test
@@ -142,7 +161,7 @@ class FastSessionReducerTest {
 
     @Test
     fun `a question read in full starts the question pause`() {
-        val transition = reducer.reduce(readingQuestion(0), QuestionFinished("card-1"))
+        val transition = reducer.reduce(readingQuestion(0), QuestionFinished(cardId(1)))
 
         transition.state.readAloudStep shouldBe ReadAloudStep.QuestionPause
         transition.effects shouldBe listOf(StartQuestionPause)
@@ -159,7 +178,7 @@ class FastSessionReducerTest {
 
     @Test
     fun `an answer read in full starts the advance pause`() {
-        val transition = reducer.reduce(readingAnswer(0), AnswerFinished("card-1"))
+        val transition = reducer.reduce(readingAnswer(0), AnswerFinished(cardId(1)))
 
         transition.state.readAloudStep shouldBe ReadAloudStep.AdvancePause
         transition.effects shouldBe listOf(StartAdvancePause)
@@ -184,9 +203,9 @@ class FastSessionReducerTest {
 
     @Test
     fun `a stale part report does nothing`() {
-        val otherCard = reducer.reduce(readingQuestion(0), QuestionFinished("card-2"))
-        val otherPart = reducer.reduce(readingQuestion(0), AnswerFinished("card-1"))
-        val paused = reducer.reduce(readingQuestion(0).after(PauseRequested), QuestionFinished("card-1"))
+        val otherCard = reducer.reduce(readingQuestion(0), QuestionFinished(cardId(2)))
+        val otherPart = reducer.reduce(readingQuestion(0), AnswerFinished(cardId(1)))
+        val paused = reducer.reduce(readingQuestion(0).after(PauseRequested), QuestionFinished(cardId(1)))
         val staleElapsed = reducer.reduce(readingAnswer(0), QuestionPauseElapsed)
 
         listOf(otherCard, otherPart, paused, staleElapsed).forEach { transition -> transition.effects.shouldBeEmpty() }
@@ -197,7 +216,7 @@ class FastSessionReducerTest {
     fun `an unavailable engine pauses the session and stops the voice stack`() {
         val transition = reducer.reduce(session, PlaybackEngineUnavailable)
 
-        transition.state.pauseReason shouldBe FastPauseReason.EngineUnavailable
+        transition.state.pauseReason shouldBe FastPauseReason.VoiceEngineUnavailable
         transition.effects shouldBe listOf(FastSessionEffect.StopVoiceStack, FastSessionEffect.Emit(FastSessionEvent.VoicePlaybackUnavailable))
         reducer.reduce(transition.state, PlaybackEngineUnavailable).effects.shouldBeEmpty()
     }
@@ -226,8 +245,8 @@ class FastSessionReducerTest {
         val paused = reducer.reduce(playing, PauseRequested)
 
         paused.state.pauseReason shouldBe FastPauseReason.User
-        paused.effects shouldBe listOf(Pause)
-        reducer.reduce(paused.state.after(PlaybackChanged(playback(isPlaying = false))), PauseRequested).effects shouldBe listOf(Pause)
+        paused.effects shouldBe listOf(PausePlayback)
+        reducer.reduce(paused.state.after(PlaybackChanged(playback(isPlaying = false))), PauseRequested).effects shouldBe listOf(PausePlayback)
 
         val resumed = reducer.reduce(paused.state, PlayRequested)
         resumed.state.pauseReason shouldBe null
@@ -256,7 +275,7 @@ class FastSessionReducerTest {
     fun `a temporary pause plays again when it ends, only while still paused by it`() {
         val paused = reducer.reduce(playing, TemporaryPauseRequested)
         paused.state.pauseReason shouldBe FastPauseReason.Temporary
-        paused.effects shouldBe listOf(Pause)
+        paused.effects shouldBe listOf(PausePlayback)
         reducer.reduce(paused.state, TemporaryPauseEnded).effects shouldBe listOf(Play)
 
         val userPaused = paused.state.after(PauseRequested)
@@ -288,8 +307,8 @@ class FastSessionReducerTest {
         val transition = reducer.reduce(inQuestionPause(0), PauseRequested)
 
         transition.state.readAloudStep shouldBe ReadAloudStep.QuestionPause
-        transition.effects shouldBe listOf(CancelReadAloudPause, Pause)
-        reducer.reduce(inAdvancePause(0), TemporaryPauseRequested).effects shouldBe listOf(CancelReadAloudPause, Pause)
+        transition.effects shouldBe listOf(CancelReadAloudPause, PausePlayback)
+        reducer.reduce(inAdvancePause(0), TemporaryPauseRequested).effects shouldBe listOf(CancelReadAloudPause, PausePlayback)
     }
 
     @Test
@@ -418,12 +437,12 @@ class FastSessionReducerTest {
         requested.effects.shouldBeEmpty()
         reducer.reduce(requested.state, AdvanceHoldRequested).state shouldBe requested.state
 
-        val held = reducer.reduce(requested.state.after(AnswerFinished("card-1")), AdvancePauseElapsed)
+        val held = reducer.reduce(requested.state.after(AnswerFinished(cardId(1))), AdvancePauseElapsed)
 
         held.state.isHeldAtAdvancePoint shouldBe true
         held.state.pauseReason shouldBe null
         held.state.currentIndex shouldBe 0
-        held.effects shouldBe listOf(Pause)
+        held.effects shouldBe listOf(PausePlayback)
     }
 
     @Test
@@ -458,7 +477,7 @@ class FastSessionReducerTest {
 
         val transition = reducer.reduce(lingering, PauseRequested)
 
-        transition.effects shouldBe listOf(Pause, CancelReleaseLinger)
+        transition.effects shouldBe listOf(PausePlayback, CancelReleaseLinger)
         transition.state.isReleaseLingering shouldBe false
         reducer.reduce(transition.state, ReleaseLingerElapsed).effects.shouldBeEmpty()
     }
@@ -475,7 +494,7 @@ class FastSessionReducerTest {
 
     @Test
     fun `releasing a hold on the last card ends the session`() {
-        val heldOnLast = readingAnswer(CARD_COUNT - 1).after(AdvanceHoldRequested, AnswerFinished("card-$CARD_COUNT"), AdvancePauseElapsed)
+        val heldOnLast = readingAnswer(CARD_COUNT - 1).after(AdvanceHoldRequested, AnswerFinished(cardId(CARD_COUNT)), AdvancePauseElapsed)
 
         reducer.reduce(heldOnLast.after(AdvanceHoldReleased), ReleaseLingerElapsed).effects shouldBe listOf(SessionComplete)
     }
@@ -506,14 +525,14 @@ class FastSessionReducerTest {
 
     @Test
     fun `the advance point reached after the hold was released moves on at once`() {
-        val released = answering.after(AdvanceHoldRequested, AdvanceHoldReleased, AnswerFinished("card-1"))
+        val released = answering.after(AdvanceHoldRequested, AdvanceHoldReleased, AnswerFinished(cardId(1)))
 
         reducer.reduce(released, AdvancePauseElapsed).effects shouldBe listOf(PresentQuestion(1))
     }
 
     @Test
     fun `next at the last card's answer is ignored, even at a hold`() {
-        val heldOnLast = readingAnswer(CARD_COUNT - 1).after(AdvanceHoldRequested, AnswerFinished("card-$CARD_COUNT"), AdvancePauseElapsed)
+        val heldOnLast = readingAnswer(CARD_COUNT - 1).after(AdvanceHoldRequested, AnswerFinished(cardId(CARD_COUNT)), AdvancePauseElapsed)
 
         val transition = reducer.reduce(heldOnLast, NextRequested)
 
@@ -528,7 +547,7 @@ class FastSessionReducerTest {
         get() = readingAnswer(0)
 
     private val heldOnFirstCard: FastSessionState
-        get() = answering.after(AdvanceHoldRequested, AnswerFinished("card-1"), AdvancePauseElapsed)
+        get() = answering.after(AdvanceHoldRequested, AnswerFinished(cardId(1)), AdvancePauseElapsed)
 
     private companion object {
         const val CARD_COUNT = 3

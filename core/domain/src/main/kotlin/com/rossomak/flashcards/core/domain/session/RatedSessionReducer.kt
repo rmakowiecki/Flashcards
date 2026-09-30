@@ -6,12 +6,11 @@ import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerRound
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.EndForRevokedMicPermission
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PresentHeadQuestion
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
@@ -98,7 +97,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
                 AnswerRevealed -> this.state = this.state.copy(isAnswerRevealed = true)
                 CardSkipped -> onCardSkipped()
                 FeedbackSkipRequested -> if (this.state.isFeedbackPlaying) skipFeedback()
-                PreviousRequested -> if (acceptsCardCommand()) emit(RestartCurrentCard)
+                PreviousRequested -> if (acceptsCardCommand()) emit(PresentHeadQuestion)
                 is QuestionFinished -> onQuestionFinished(input.cardId)
                 MicrophoneOpened -> onMicrophoneOpened()
                 SpeechStarted -> onSpeechStarted()
@@ -149,7 +148,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
             acceptsCardCommand() -> {
                 state = recordSilence(state, random).copy(round = state.idleRound())
                 syncQueue()
-                if (state.isPlaying) emit(AdvanceAfterVoiceAnswer)
+                if (state.isPlaying) emit(PresentHeadQuestion)
             }
         }
     }
@@ -365,7 +364,14 @@ internal fun RatedTransitionBuilder.moveOnFromAdvancePoint() {
     )
     if (state.isSyncPending) syncQueue()
     state = state.copy(round = state.idleRound())
-    emit(if (state.isComplete) SessionComplete else AdvanceAfterVoiceAnswer)
+    if (state.isComplete) {
+        emit(SessionComplete)
+    } else {
+        emit(PresentHeadQuestion)
+        // Moving on from a hold or a paused advance point also plays: the player only reads a
+        // presented question while playing.
+        if (!state.isPlaying) emit(Play)
+    }
 }
 
 /** Paused after the feedback, "next" moves the head on and shows the next card, still paused. */

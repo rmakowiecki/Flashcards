@@ -78,6 +78,6 @@ playback stack, and the study session's voice seams, which run on `feature:study
 Such a seam keeps its interface in `core:domain/.../repository/` as usual, but its default
 implementation lives in that module's `data` package (for the voice demo,
 `com.rossomak.flashcards.core.voice.data.DefaultVoiceDemoGateway`; for the study voice,
-`com.rossomak.flashcards.feature.study.voice.data.StudySessionVoiceGateway`), bound by a Hilt module
+`com.rossomak.flashcards.feature.study.voice.data.DefaultStudySessionVoiceGateway`), bound by a Hilt module
 in the same module. It does not pull the specialised module into `core:data`. The specialised module
 therefore depends on `core:domain`; `core:domain` never depends back on it.

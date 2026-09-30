@@ -134,8 +134,8 @@ class FastStudySessionViewModel @Inject constructor(
             isAnswerRevealed = snapshot.isAnswerRevealed,
             isVoiceActive = snapshot.playback.isActive,
             isVoicePlaying = snapshot.playback.isPlaying,
-            isReadAloudNextAvailable = snapshot.isReadAloudNextAvailable,
-            isVoiceEngineUnavailable = snapshot.pauseReason == FastPauseReason.EngineUnavailable,
+            isVoiceEngineUnavailable = snapshot.pauseReason == FastPauseReason.VoiceEngineUnavailable,
+            availableTransportCommands = snapshot.availableTransportCommands,
         )
     }
 
@@ -168,7 +168,7 @@ class FastStudySessionViewModel @Inject constructor(
      * then), so the last card is always fully Studied before this can end the session.
      */
     fun onNextCard() {
-        coordinator.nextCard()
+        coordinator.next()
         showSessionNow()
     }
 

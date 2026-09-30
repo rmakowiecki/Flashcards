@@ -22,6 +22,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
+import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
@@ -60,7 +61,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
-import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingPause
@@ -667,7 +668,7 @@ class RatedStudySessionViewModelTest {
         with(viewModel.state.value) {
             isVoiceActive shouldBe false
             isVoicePlaying shouldBe false
-            isVoiceMode shouldBe true
+            isVoiceAnsweringSession shouldBe true
             isVoiceAnswerPaused shouldBe true
             isVoiceEngineUnavailable shouldBe true
         }
@@ -1874,6 +1875,23 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
+    fun `onVoicePlayPause pauses rather than resumes when the player plays during a voice answering pause`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createVoiceViewModel()
+            repeat(3) { emitSilenceTimeout() }
+            playbackGateway.state.value = VoicePlaybackState(isActive = true, isPlaying = true)
+            runCurrent()
+            val pausesBefore = playbackGateway.pauseCount
+
+            viewModel.onVoicePlayPause()
+            runCurrent()
+
+            playbackGateway.pauseCount shouldBe pausesBefore + 1
+            viewModel.state.value.isVoiceAnswerPaused shouldBe true
+            captureGateway.isVoiceAnsweringStarted shouldBe false
+        }
+
+    @Test
     fun `resuming after a grading failure pause resets the grading failure count`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createVoiceViewModel()
         repeat(3) { emitGradingFailure() }
@@ -2030,7 +2048,7 @@ class RatedStudySessionViewModelTest {
             viewModel.onDialogEvent(Confirm)
             advanceUntilIdle()
 
-            awaitItem() shouldBe CurationSubmissionFailed
+            awaitItem() shouldBe CurationReportFailed
         }
         reportDraft(viewModel).isSubmitting shouldBe false
     }

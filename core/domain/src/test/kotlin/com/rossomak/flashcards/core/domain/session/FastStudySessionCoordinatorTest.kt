@@ -334,7 +334,7 @@ class FastStudySessionCoordinatorTest {
         coordinator.releaseAdvance()
         coordinator.endTemporaryPause()
 
-        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.EngineUnavailable
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.VoiceEngineUnavailable
         playbackGateway.startCalls.size shouldBe 1
     }
 
@@ -425,7 +425,7 @@ class FastStudySessionCoordinatorTest {
         reachAnswer()
         val callCount = playbackGateway.calls.size
 
-        coordinator.runningSnapshot.isReadAloudNextAvailable shouldBe false
+        (TransportCommandType.Next in coordinator.runningSnapshot.availableTransportCommands) shouldBe false
         coordinator.next()
         playbackGateway.emitExternal(TransportCommand.Next)
         runCurrent()
@@ -532,7 +532,7 @@ class FastStudySessionCoordinatorTest {
         playbackGateway.emit(PlaybackEvent.EngineUnavailable)
         runCurrent()
 
-        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.EngineUnavailable
+        coordinator.runningSnapshot.pauseReason shouldBe FastPauseReason.VoiceEngineUnavailable
         coordinator.runningSnapshot.currentIndex shouldBe 2
         events shouldContain FastSessionEvent.VoicePlaybackUnavailable
         playbackGateway.stopCount shouldBe 1

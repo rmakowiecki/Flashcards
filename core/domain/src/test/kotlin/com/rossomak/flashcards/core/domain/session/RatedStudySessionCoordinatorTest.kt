@@ -553,7 +553,6 @@ class RatedStudySessionCoordinatorTest {
             TransportCommandType.Stop,
             TransportCommandType.Next,
             TransportCommandType.Previous,
-            TransportCommandType.PreviousCard,
         )
         playbackGateway.sessionProgressUpdates.last() shouldBe FakeStudyVoicePlaybackGateway.SessionProgress(completedCount = 0, totalCount = 3)
 
@@ -1030,14 +1029,25 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `external previous and previous card restart the question`() = runTest {
+    fun `an external previous restarts the question`() = runTest {
         startCoordinator()
 
         playbackGateway.emitExternal(TransportCommand.Previous)
+        runCurrent()
+
+        playbackGateway.presentedQuestions.size shouldBe 1
+    }
+
+    @Test
+    fun `an external previous card is ignored`() = runTest {
+        startCoordinator()
+        val callsBefore = playbackGateway.calls.size
+
         playbackGateway.emitExternal(TransportCommand.PreviousCard)
         runCurrent()
 
-        playbackGateway.presentedQuestions.size shouldBe 2
+        playbackGateway.calls.size shouldBe callsBefore
+        events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 
     @Test

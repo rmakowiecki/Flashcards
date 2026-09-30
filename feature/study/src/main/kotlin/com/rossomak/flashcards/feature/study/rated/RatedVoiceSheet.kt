@@ -379,7 +379,7 @@ private fun RatedVoiceTransportRow(
     modifier: Modifier = Modifier,
 ) {
     // The same commands the notification and a headset offer, so the surfaces never drift apart.
-    val commands = state.availableTransportCommands
+    val availableCommands = state.availableTransportCommands
     val playPauseCommand = if (state.isVoicePlaying) TransportCommandType.Pause else TransportCommandType.Play
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -388,7 +388,7 @@ private fun RatedVoiceTransportRow(
     ) {
         IconButton(
             onClick = onVoicePrevious,
-            enabled = state.isVoiceActive && TransportCommandType.Previous in commands,
+            enabled = state.isVoiceActive && TransportCommandType.Previous in availableCommands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
@@ -400,12 +400,12 @@ private fun RatedVoiceTransportRow(
             icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd),
             onClick = onVoicePlayPause,
-            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && playPauseCommand in commands,
+            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && playPauseCommand in availableCommands,
         )
         Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
         IconButton(
             onClick = onVoiceNext,
-            enabled = state.isVoiceActive && TransportCommandType.Next in commands,
+            enabled = state.isVoiceActive && TransportCommandType.Next in availableCommands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,

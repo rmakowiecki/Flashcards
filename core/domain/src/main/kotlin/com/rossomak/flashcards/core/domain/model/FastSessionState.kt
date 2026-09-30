@@ -5,6 +5,8 @@ package com.rossomak.flashcards.core.domain.model
  * returns the next one of.
  *
  * @param cards the session's cards, in routed order. Fixed for the whole session.
+ * @param isReadAloudSession whether the session reads its cards aloud, fixed for the whole session. It
+ * decides what Next does: the read-aloud step through a card, or the manual advance of a tap-through.
  * @param currentIndex the presented card. Owned here in both deliveries: with read-aloud on, the
  * voice player is told which card to present and never moves on by itself.
  * @param seenCardIds every card whose answer was shown, in first-seen order: Fast's Studied
@@ -26,6 +28,7 @@ package com.rossomak.flashcards.core.domain.model
  */
 data class FastSessionState(
     val cards: List<Flashcard>,
+    val isReadAloudSession: Boolean,
     val currentIndex: Int = 0,
     val seenCardIds: List<String> = emptyList(),
     val isAnswerRevealed: Boolean = false,
@@ -73,5 +76,5 @@ enum class FastPauseReason {
      * A text-to-speech engine could not start. The session stays in read-aloud and waits for a
      * play, which restarts the voice stack.
      */
-    EngineUnavailable,
+    VoiceEngineUnavailable,
 }

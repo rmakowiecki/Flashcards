@@ -187,7 +187,7 @@ internal fun RatedTransitionBuilder.onCaptureFailed() {
     emit(CancelGrading)
     speakNotice(SpokenNotice.CaptureFailed)
     pauseVoiceAnswering(VoiceAnswerPauseReason.CaptureFailed)
-    emit(RatedSessionEffect.RestartCurrentCard)
+    emit(RatedSessionEffect.PresentHeadQuestion)
     emit(Emit(VoiceAnswerCaptureUnavailable))
 }
 
@@ -297,7 +297,7 @@ internal fun RatedTransitionBuilder.onNoticeTailElapsed() {
     state = state.copy(round = state.idleRound())
     when {
         state.isComplete -> emit(SessionComplete)
-        state.isPlaying -> emit(RatedSessionEffect.AdvanceAfterVoiceAnswer)
+        state.isPlaying -> emit(RatedSessionEffect.PresentHeadQuestion)
         else -> state = state.copy(isPausedAtAdvancePoint = true)
     }
 }

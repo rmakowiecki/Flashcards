@@ -84,7 +84,7 @@ class RatedStudySessionViewModel @Inject constructor(
             categoryName = route.categoryName,
             subcategoryNameById = route.subcategoryIds.zip(route.subcategoryNames).toMap(),
             attemptsLimit = route.ratedAttempts,
-            isVoiceMode = route.voiceAnsweringEnabled,
+            isVoiceAnsweringSession = route.voiceAnsweringEnabled,
         ),
     )
     val state: StateFlow<RatedStudySessionScreenState> = _state.asStateFlow()
@@ -384,7 +384,7 @@ class RatedStudySessionViewModel @Inject constructor(
                 .onSuccess { if (submittingDialog != null) closeDialog() }
                 .onFailure {
                     if (submittingDialog != null) _state.update { it.copy(activeDialog = submittingDialog.copy(isSubmitting = false)) }
-                    _messages.tryEmit(RatedStudySessionMessage.CurationSubmissionFailed)
+                    _messages.tryEmit(RatedStudySessionMessage.CurationReportFailed)
                 }
         }
     }

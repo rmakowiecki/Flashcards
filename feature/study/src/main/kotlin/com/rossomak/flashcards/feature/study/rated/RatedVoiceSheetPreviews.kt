@@ -21,7 +21,7 @@ private fun RatedStudySessionVoicePreview(state: RatedStudySessionScreenState, v
         state = state.copy(
             categoryName = "Android",
             subcategoryNameById = mapOf("compose" to "Compose"),
-            isVoiceMode = true,
+            isVoiceAnsweringSession = true,
             isVoiceActive = true,
             // Every control enabled unless a preview says otherwise.
             availableTransportCommands = state.availableTransportCommands.ifEmpty { TransportCommandType.entries.toSet() },

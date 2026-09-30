@@ -11,7 +11,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelSilenceTimer
@@ -22,7 +21,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.OpenListen
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PlayListeningCue
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PresentHeadQuestion
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
@@ -439,7 +438,7 @@ class RatedSessionReducerTest {
             PausePlayback,
             StopVoiceAnswering,
             CancelGrading,
-            RestartCurrentCard,
+            PresentHeadQuestion,
             Emit(RatedSessionEvent.VoiceAnswerCaptureUnavailable),
         )
         transition.state.queue shouldBe listening.queue
@@ -468,7 +467,7 @@ class RatedSessionReducerTest {
         finished.state.isSyncPending shouldBe true
 
         val tail = reducer.reduce(finished.state, NoticeTailElapsed)
-        tail.effects shouldBe listOf(SyncQueue(tail.state.remainingCards), AdvanceAfterVoiceAnswer)
+        tail.effects shouldBe listOf(SyncQueue(tail.state.remainingCards), PresentHeadQuestion)
         tail.state.currentCard?.id shouldBe "card-2"
         tail.state.isAnswerRevealed shouldBe false
         tail.state.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
@@ -504,7 +503,7 @@ class RatedSessionReducerTest {
         held.isPausedAtAdvancePoint shouldBe true
 
         val play = reducer.reduce(held, PlayRequested)
-        play.effects shouldBe listOf(AdvanceAfterVoiceAnswer)
+        play.effects shouldBe listOf(PresentHeadQuestion, Play)
         play.state.isPausedAtAdvancePoint shouldBe false
     }
 
@@ -518,7 +517,7 @@ class RatedSessionReducerTest {
         released.state.isHeldAtAdvancePoint shouldBe true
 
         val elapsed = reducer.reduce(released.state, ReleaseLingerElapsed)
-        elapsed.effects.last() shouldBe AdvanceAfterVoiceAnswer
+        elapsed.effects.last() shouldBe PresentHeadQuestion
         elapsed.state.isHeldAtAdvancePoint shouldBe false
     }
 
@@ -561,7 +560,7 @@ class RatedSessionReducerTest {
 
         val transition = reducer.reduce(session, CardSkipped)
 
-        transition.effects shouldBe listOf(SyncQueue(transition.state.remainingCards), AdvanceAfterVoiceAnswer)
+        transition.effects shouldBe listOf(SyncQueue(transition.state.remainingCards), PresentHeadQuestion)
         transition.state.currentCard?.id shouldBe "card-2"
         transition.state.queue.first { it.card.id == "card-1" }.ratings.shouldBeEmpty()
         transition.state.consecutiveSilenceCount shouldBe 0
@@ -599,7 +598,23 @@ class RatedSessionReducerTest {
 
     @Test
     fun `previous at the question restarts the presented card`() {
-        reducer.reduce(voiceSession(), PreviousRequested).effects shouldBe listOf(RestartCurrentCard)
+        reducer.reduce(voiceSession(), PreviousRequested).effects shouldBe listOf(PresentHeadQuestion)
+    }
+
+    @Test
+    fun `presenting the head question also plays when the player is paused`() {
+        val paused = voiceSession().silence().paused().noticesOver()
+        paused.isPlaying shouldBe false
+
+        reducer.reduce(paused, CardSkipped).effects.takeLast(2) shouldBe listOf(PresentHeadQuestion, Play)
+    }
+
+    @Test
+    fun `presenting the head question does not play again when the player already plays`() {
+        val playing = voiceSession()
+        playing.isPlaying shouldBe true
+
+        reducer.reduce(playing, CardSkipped).effects.shouldNotContain(Play)
     }
 
     @Test
@@ -609,7 +624,7 @@ class RatedSessionReducerTest {
 
         val transition = reducer.reduce(atAdvancePoint, CardSkipped)
 
-        transition.effects shouldBe listOf(AdvanceAfterVoiceAnswer)
+        transition.effects shouldBe listOf(PresentHeadQuestion, Play)
         transition.state.isPausedAtAdvancePoint shouldBe false
     }
 
@@ -685,7 +700,7 @@ class RatedSessionReducerTest {
             currentCard?.id shouldBe "card-2"
             consecutiveGradingFailureCount shouldBe 1
         }
-        reducer.reduce(transition.state, PlayRequested).effects shouldBe listOf(AdvanceAfterVoiceAnswer)
+        reducer.reduce(transition.state, PlayRequested).effects shouldBe listOf(PresentHeadQuestion, Play)
     }
 
     @Test
@@ -790,7 +805,7 @@ class RatedSessionReducerTest {
             RatedSessionEffect.StopFeedback,
             RatedSessionEffect.CancelNoticeTail,
             SyncQueue(transition.state.remainingCards),
-            AdvanceAfterVoiceAnswer,
+            PresentHeadQuestion,
         )
         transition.state.currentCard?.id shouldBe "card-2"
         transition.state.speakingNotices.shouldBeEmpty()
@@ -798,7 +813,7 @@ class RatedSessionReducerTest {
 
     @Test
     fun `a feedback skip acts only while the feedback plays`() {
-        reducer.reduce(voiceSession().speakingFeedback(), FeedbackSkipRequested).effects shouldContain AdvanceAfterVoiceAnswer
+        reducer.reduce(voiceSession().speakingFeedback(), FeedbackSkipRequested).effects shouldContain PresentHeadQuestion
         listOf(voiceSession(), voiceSession().grading(), voiceSession().silence(), voiceSession().speakingFeedback().paused()).forEach { state ->
             reducer.reduce(state, FeedbackSkipRequested).effects.shouldBeEmpty()
         }

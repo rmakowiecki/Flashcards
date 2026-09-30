@@ -36,7 +36,7 @@ data class RatedStudySessionScreenState(
     // unlike isVoiceActive below, which only flips once the voice engine finishes binding. The
     // sheet must never show the manual-mode perspective for a voice session, even for the moment
     // between entry and that bind completing, so it branches on this flag instead of isVoiceActive.
-    val isVoiceMode: Boolean = false,
+    val isVoiceAnsweringSession: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,

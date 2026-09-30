@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.study.fast
 
 import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 
 /**
@@ -25,11 +26,11 @@ data class FastStudySessionScreenState(
     val isReadAloudMode: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
-    // False at the last card's answer: the session ends only once that answer has been read.
-    val isReadAloudNextAvailable: Boolean = true,
     // A voice engine could not start. Read-aloud stays on, never falling back to tap-through, and
     // the play control stays enabled to restart it.
     val isVoiceEngineUnavailable: Boolean = false,
+    // What the transport row may offer: the same set the notification and a headset get.
+    val availableTransportCommands: Set<TransportCommandType> = TransportCommandType.entries.toSet(),
     val activeDialog: StudySessionDialog? = null,
 ) {
     val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)

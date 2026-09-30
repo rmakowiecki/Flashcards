@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
  * lifecycle. Audio focus is managed inside [TtsPlayer] because Media3 only auto-handles focus for
  * `ExoPlayer`, which we cannot use because it does not support TTS OOTB.
  *
- * [StudySessionVoiceGateway] binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the
+ * [DefaultStudySessionVoiceGateway] binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the
  * card queue and drive playback, and observes [LocalBinder.state] — which carries the TTS-specific
  * phase that the standard `Player` state cannot express — and the ordered
  * [LocalBinder.playbackEvents]. System controllers connect to the [MediaSession] returned from

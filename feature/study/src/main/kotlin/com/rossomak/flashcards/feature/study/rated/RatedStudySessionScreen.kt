@@ -60,7 +60,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
-import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationSubmissionFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingPause
@@ -76,6 +76,9 @@ import kotlinx.coroutines.launch
 
 internal val SHEET_PEEK_HEIGHT_VOICE: Dp = 176.dp
 private val SHEET_PEEK_HEIGHT_MANUAL: Dp = 150.dp
+
+/** The presented card is always the queue's head. */
+private const val PRESENTED_CARD_INDEX = 0
 
 @Composable
 fun RatedStudySessionScreen(
@@ -173,7 +176,7 @@ fun RatedStudySessionContent(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             sheetSwipeEnabled = false,
-            sheetPeekHeight = if (state.isVoiceMode) SHEET_PEEK_HEIGHT_VOICE else SHEET_PEEK_HEIGHT_MANUAL,
+            sheetPeekHeight = if (state.isVoiceAnsweringSession) SHEET_PEEK_HEIGHT_VOICE else SHEET_PEEK_HEIGHT_MANUAL,
             sheetDragHandle = {},
             topBar = {
                 StudySessionHeader(
@@ -200,7 +203,7 @@ fun RatedStudySessionContent(
                 )
             },
             sheetContent = {
-                if (state.isVoiceMode) {
+                if (state.isVoiceAnsweringSession) {
                     RatedVoiceSheetContent(
                         state = state,
                         voiceBarsLevels = voiceBarsLevels,
@@ -223,8 +226,7 @@ fun RatedStudySessionContent(
                 isLoading = state.isLoading,
                 error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
-                // The presented card is always the queue's head.
-                currentCardIndex = 0,
+                currentCardIndex = PRESENTED_CARD_INDEX,
                 isAnswerRevealed = state.isAnswerRevealed,
                 innerPadding = innerPadding,
                 attemptSlots = state.attemptSlots,
@@ -271,7 +273,7 @@ private fun RatedManualSheetContent(isAnswerRevealed: Boolean, onShowAnswer: () 
 
 private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
     VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
-    CurationSubmissionFailed -> context.getString(R.string.fast_study_session_report_failure_message)
+    CurationReportFailed -> context.getString(R.string.fast_study_session_report_failure_message)
     VoiceAnswerGradingOffline -> context.getString(R.string.study_session_voice_answer_offline_message)
     VoiceAnswerGradingServiceError -> context.getString(R.string.study_session_voice_answer_service_error_message)
     VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)
