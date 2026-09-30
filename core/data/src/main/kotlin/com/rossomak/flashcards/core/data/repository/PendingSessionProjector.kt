@@ -101,8 +101,13 @@ class PendingSessionProjector @Inject constructor(
      * With no Pending Session, this is the plain remote read: `null` for an account with no document
      * yet. Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state
      * read always fails: a guessed low starting state would show a misleading number.
+     *
+     * If the signed-in User changes while the reads are in flight, the queue and the remote documents
+     * may belong to different Users, so the read fails rather than projecting one User's sessions over
+     * the other's scoring state.
      */
     suspend fun projectScoringState(): Result<ScoringState?> = coroutineScope {
+        val uidAtStart = signedInUid()
         val pendingSessions = pendingSessions()
         val remoteScoringState = async { readRemoteScoringState() }
         if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await()
@@ -110,7 +115,12 @@ class PendingSessionProjector @Inject constructor(
         val progressBaselines = async { readProgressBaselines(pendingSessions) }
         val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
         val scoringState = remoteScoringState.await().getOrElse { exception -> return@coroutineScope Result.failure(exception) } ?: ScoringState()
-        Result.success(replay(progressBaselines.await(), pendingSessions, scoringState, config.await()).scoringState)
+        val baselines = progressBaselines.await()
+        val xpConfig = config.await()
+        if (signedInUid() != uidAtStart) {
+            return@coroutineScope Result.failure(IllegalStateException("Signed-in User changed while reading the scoring state"))
+        }
+        Result.success(replay(baselines, pendingSessions, scoringState, xpConfig).scoringState)
     }
 
     private suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()

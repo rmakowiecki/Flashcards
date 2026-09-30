@@ -244,6 +244,18 @@ class DefaultScoringStateRepositoryTest {
     }
 
     @Test
+    fun `getScoringState fails instead of mixing Users when the signed-in User changes during the reads`() = runTest {
+        coEvery { remoteDataSource.getScoringState() } coAnswers {
+            authRepository.userToReturn = authUser(OTHER_USER_ID)
+            null
+        }
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+
+        createRepository().getScoringState().isFailure shouldBe true
+    }
+
+    @Test
     fun `a failed scoring-state read fails even with pending sessions`() = runTest {
         val error = IllegalStateException("offline, not cached")
         coEvery { remoteDataSource.getScoringState() } throws error
