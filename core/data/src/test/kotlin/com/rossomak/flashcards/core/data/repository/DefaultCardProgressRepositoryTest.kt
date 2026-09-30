@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -49,10 +50,9 @@ class DefaultCardProgressRepositoryTest {
     private val pendingSessionQueue = FakePendingSessionSubmissionLocalDataSource()
     private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk()
 
-    private fun createRepository(): DefaultCardProgressRepository = DefaultCardProgressRepository(
-        progressSummaryRemoteDataSource,
-        PendingSessionProjector(authRepository, pendingSessionQueue, remoteDataSource, scoringStateRemoteDataSource, FakeXpConfigRepository()),
-    )
+    private fun createProjector() = PendingSessionProjector(authRepository, pendingSessionQueue, remoteDataSource, scoringStateRemoteDataSource, FakeXpConfigRepository())
+
+    private fun createRepository(): DefaultCardProgressRepository = DefaultCardProgressRepository(progressSummaryRemoteDataSource, createProjector())
 
     @Test
     fun `getProgress maps the dto to domain keyed by the requested subcategory id`() = runTest {
@@ -362,6 +362,31 @@ class DefaultCardProgressRepositoryTest {
         createRepository().observeProgressSummary().test {
             awaitItem() shouldBe null
         }
+    }
+
+    @Test
+    fun `projectSummaryDeltas drops a snapshot taken under a User who has since signed out`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        val projector = createProjector()
+        val staleSnapshot = projector.observePendingSessions().first()
+
+        authRepository.userToReturn = authUser(OTHER_USER_ID)
+
+        projector.projectSummaryDeltas(staleSnapshot) shouldBe null
+    }
+
+    @Test
+    fun `projectSummaryDeltas drops a snapshot once a pending session leaves the queue during the baseline read`() = runTest {
+        val projector = createProjector()
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } coAnswers {
+            pendingSessionQueue.remove("session-1")
+            null
+        }
+        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        val snapshot = projector.observePendingSessions().first()
+
+        projector.projectSummaryDeltas(snapshot) shouldBe null
     }
 
     private fun queue(sessionResult: SessionResult, uid: String = USER_ID) {

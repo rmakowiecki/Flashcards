@@ -89,10 +89,21 @@ class PendingSessionProjector @Inject constructor(
         return Result.success(replay(mapOf(subcategoryId to baseline), pendingSessions).progressBySubcategory[subcategoryId])
     }
 
-    /** How [pendingSessions] change the Studied and Mastered counts of each Subcategory they touch. */
-    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta> {
+    /**
+     * How [pendingSessions] change the Studied and Mastered counts of each Subcategory they touch, or
+     * `null` when they are stale by the time the baselines are read.
+     *
+     * [pendingSessions] is a snapshot taken earlier, possibly under a User who has since signed out.
+     * The baselines are read for whoever is signed in now, so the queue is read again afterwards: a
+     * different list means the User (or the queue) changed, and a projection mixing the two would be
+     * wrong. Another User's list never equals a non-empty one, since entries are owned by uid and ids
+     * are unique. The caller drops a `null` result; the queue change that made it stale re-emits.
+     */
+    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta>? {
         if (pendingSessions.isEmpty()) return emptyMap()
-        return replay(readProgressBaselines(pendingSessions), pendingSessions).summaryDeltas
+        val baselines = readProgressBaselines(pendingSessions)
+        if (pendingSessions() != pendingSessions) return null
+        return replay(baselines, pendingSessions).summaryDeltas
     }
 
     /**
