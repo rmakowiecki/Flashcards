@@ -9,6 +9,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
@@ -112,9 +113,18 @@ class AudioRouteManager @Inject constructor(
     @Volatile
     private var isRouteActive = false
 
-    /** This manager set the call audio mode and a Bluetooth link, so it must undo them. */
+    /**
+     * This manager set the call audio mode and a Bluetooth link, so it must undo them. Readable, so
+     * the call audio mode the session sets itself is never mistaken for another app's call.
+     */
     @Volatile
-    private var isBluetoothLinkActive = false
+    var isBluetoothLinkActive = false
+        private set
+
+    /** When the last Bluetooth link was released, in [android.os.SystemClock.elapsedRealtime] milliseconds; a long time ago until then. */
+    @Volatile
+    var lastBluetoothLinkReleaseElapsedMillis = Long.MIN_VALUE / 2
+        private set
 
     /** Starts watching the audio devices. Touches neither the audio mode nor the routing. Idempotent. */
     fun startSession() {
@@ -268,13 +278,15 @@ class AudioRouteManager @Inject constructor(
     @SuppressLint("DEPRECATION") // stopBluetoothSco is the only teardown path below API 31.
     private fun releaseBluetoothLink() {
         if (!isBluetoothLinkActive) return
-        isBluetoothLinkActive = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             audioManager.clearCommunicationDevice()
         } else {
             runCatching { audioManager.stopBluetoothSco() }
         }
         audioManager.mode = AudioManager.MODE_NORMAL
+        // Cleared last: while it is set, the call audio mode of the session reads as its own, never as another app's call.
+        lastBluetoothLinkReleaseElapsedMillis = SystemClock.elapsedRealtime()
+        isBluetoothLinkActive = false
     }
 
     private fun registerDeviceCallback() {

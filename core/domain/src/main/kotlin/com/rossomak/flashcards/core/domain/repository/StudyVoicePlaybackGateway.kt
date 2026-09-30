@@ -42,13 +42,10 @@ interface StudyVoicePlaybackGateway {
     /** Stops the voice stack. Synchronous and safe to call more than once. */
     fun stop()
 
-    /**
-     * Starts or resumes reading the part being presented, from its start. Clears an auto-resume
-     * pending from a transient audio-focus loss.
-     */
+    /** Starts or resumes reading the part being presented, from its start. */
     fun play()
 
-    /** Pauses reading. Clears an auto-resume pending from a transient audio-focus loss. */
+    /** Pauses reading. The player never resumes on its own; only [play] does. */
     fun pause()
 
     /**
