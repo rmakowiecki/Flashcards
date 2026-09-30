@@ -49,10 +49,9 @@ class DefaultCardProgressRepositoryTest {
     private val pendingSessionQueue = FakePendingSessionSubmissionLocalDataSource()
     private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk()
 
-    private fun createRepository(): DefaultCardProgressRepository = DefaultCardProgressRepository(
-        progressSummaryRemoteDataSource,
-        PendingSessionProjector(authRepository, pendingSessionQueue, remoteDataSource, scoringStateRemoteDataSource, FakeXpConfigRepository()),
-    )
+    private fun createProjector() = PendingSessionProjector(authRepository, pendingSessionQueue, remoteDataSource, scoringStateRemoteDataSource, FakeXpConfigRepository())
+
+    private fun createRepository(): DefaultCardProgressRepository = DefaultCardProgressRepository(progressSummaryRemoteDataSource, createProjector())
 
     @Test
     fun `getProgress maps the dto to domain keyed by the requested subcategory id`() = runTest {

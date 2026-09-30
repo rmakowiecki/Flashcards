@@ -14,7 +14,8 @@ package com.rossomak.flashcards.core.domain.model
  * ([com.rossomak.flashcards.core.domain.scoring.calculateStreakAndGoalAwards]): the server applies
  * them when it records a session, and the client applies the same rules when it replays a Pending
  * Session. The two dates are calendar days in the device's local zone (`yyyy-MM-dd`), not instants; an
- * empty string means "no study day recorded yet".
+ * empty string means "no study day recorded yet". A replay can under-count the Daily Goal's day in a few
+ * cases, listed on [com.rossomak.flashcards.core.domain.scoring.scoreSession].
  *
  * @param xp total points currently held.
  * @param level denormalized from [xp] via the configured curve ([XpConfig.levelThreshold]); never

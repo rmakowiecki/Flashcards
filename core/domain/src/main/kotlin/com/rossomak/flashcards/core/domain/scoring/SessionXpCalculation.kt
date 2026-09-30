@@ -57,7 +57,7 @@ fun calculateSessionXp(
     return SessionXpCalculation(breakdown = breakdown, newScoringState = newScoringState, levelsCrossed = levelsCrossed)
 }
 
-private const val SECONDS_PER_MINUTE = 60
+internal const val SECONDS_PER_MINUTE = 60
 
 private fun calculateBreakdown(session: SessionResult, newCardsStudied: Int, config: XpConfig): XpBreakdown {
     val cardAwards = if (session is SessionResult.Rated) calculateRatedCardAwards(session.cardResults, config) else RatedCardAwards()

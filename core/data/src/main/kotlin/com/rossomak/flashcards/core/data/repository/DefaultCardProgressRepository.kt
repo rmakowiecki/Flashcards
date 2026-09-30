@@ -11,6 +11,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -56,7 +57,8 @@ class DefaultCardProgressRepository @Inject constructor(
             .retryOnFirestorePermissionDenied()
             .onCompletion { cause -> if (cause == null) emit(SummaryEvent.RemoteCompleted) }
         val pendingDeltas = pendingSessionProjector.observePendingSessions()
-            .mapLatest { pendingSessions -> SummaryEvent.PendingDeltas(pendingSessionProjector.projectSummaryDeltas(pendingSessions)) }
+            .mapLatest { pendingSessions -> pendingSessionProjector.projectSummaryDeltas(pendingSessions)?.let { deltas -> SummaryEvent.PendingDeltas(deltas) } }
+            .filterNotNull()
 
         var latestSummary: SummaryEvent.RemoteSummary? = null
         var latestDeltas: Map<String, SubcategoryProgressDelta>? = null

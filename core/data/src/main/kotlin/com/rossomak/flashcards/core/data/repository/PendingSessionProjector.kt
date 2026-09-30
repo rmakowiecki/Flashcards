@@ -82,17 +82,25 @@ class PendingSessionProjector @Inject constructor(
             return Result.failure(IllegalStateException("Signed-in User changed while reading Card Progress for $subcategoryId"))
         }
 
-        val baseline = remoteProgress.getOrElse { exception ->
-            logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
-            null
-        }
+        val baseline = remoteProgress.orEmptyBaseline(subcategoryId)
         return Result.success(replay(mapOf(subcategoryId to baseline), pendingSessions).progressBySubcategory[subcategoryId])
     }
 
-    /** How [pendingSessions] change the Studied and Mastered counts of each Subcategory they touch. */
-    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta> {
+    /**
+     * How [pendingSessions] change the Studied and Mastered counts of each Subcategory they touch, or
+     * `null` when they are stale by the time the baselines are read.
+     *
+     * [pendingSessions] is a snapshot taken earlier, possibly under a User who has since signed out.
+     * The baselines are read for whoever is signed in now, so the queue is read again afterwards: a
+     * different list means the User (or the queue) changed, and a projection mixing the two would be
+     * wrong. Another User's list never equals a non-empty one, since entries are owned by uid and ids
+     * are unique. The caller drops a `null` result; the queue change that made it stale re-emits.
+     */
+    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta>? {
         if (pendingSessions.isEmpty()) return emptyMap()
-        return replay(readProgressBaselines(pendingSessions), pendingSessions).summaryDeltas
+        val baselines = readProgressBaselines(pendingSessions)
+        if (pendingSessions() != pendingSessions) return null
+        return replay(baselines, pendingSessions).summaryDeltas
     }
 
     /**
@@ -101,8 +109,13 @@ class PendingSessionProjector @Inject constructor(
      * With no Pending Session, this is the plain remote read: `null` for an account with no document
      * yet. Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state
      * read always fails: a guessed low starting state would show a misleading number.
+     *
+     * If the signed-in User changes while the reads are in flight, the queue and the remote documents
+     * may belong to different Users, so the read fails rather than projecting one User's sessions over
+     * the other's scoring state.
      */
     suspend fun projectScoringState(): Result<ScoringState?> = coroutineScope {
+        val uidAtStart = signedInUid()
         val pendingSessions = pendingSessions()
         val remoteScoringState = async { readRemoteScoringState() }
         if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await()
@@ -110,7 +123,12 @@ class PendingSessionProjector @Inject constructor(
         val progressBaselines = async { readProgressBaselines(pendingSessions) }
         val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
         val scoringState = remoteScoringState.await().getOrElse { exception -> return@coroutineScope Result.failure(exception) } ?: ScoringState()
-        Result.success(replay(progressBaselines.await(), pendingSessions, scoringState, config.await()).scoringState)
+        val baselines = progressBaselines.await()
+        val xpConfig = config.await()
+        if (signedInUid() != uidAtStart) {
+            return@coroutineScope Result.failure(IllegalStateException("Signed-in User changed while reading the scoring state"))
+        }
+        Result.success(replay(baselines, pendingSessions, scoringState, xpConfig).scoringState)
     }
 
     private suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
@@ -164,20 +182,21 @@ class PendingSessionProjector @Inject constructor(
     /** The cached server Card Progress of every Subcategory [pendingSessions] touch, `null` where unreadable or absent. */
     private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgress?> = coroutineScope {
         pendingSessions.flatMap { session -> session.touchedSubcategoryIds() }.toSet().map { subcategoryId ->
-            async {
-                subcategoryId to readRemoteProgress(subcategoryId).getOrElse { exception ->
-                    logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
-                    null
-                }
-            }
+            async { subcategoryId to readRemoteProgress(subcategoryId).orEmptyBaseline(subcategoryId) }
         }.awaitAll().toMap()
     }
 
+    /** A failed read projects over no record instead of failing, so the Pending Session results still show. */
+    private fun Result<SubcategoryProgress?>.orEmptyBaseline(subcategoryId: String): SubcategoryProgress? = getOrElse { exception ->
+        logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
+        null
+    }
+
     private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgress?> =
-        runCatchingFirestoreWrite { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
+        runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
 
     private suspend fun readRemoteScoringState(): Result<ScoringState?> =
-        runCatchingFirestoreWrite { scoringStateRemoteDataSource.getScoringState()?.toDomain() }
+        runCatchingFirestore { scoringStateRemoteDataSource.getScoringState()?.toDomain() }
 
     private fun ownedPendingSessions(uid: String, entries: List<PendingSessionSubmissionDto>): List<SessionResult> = entries
         .filter { entry -> entry.uid == uid }
