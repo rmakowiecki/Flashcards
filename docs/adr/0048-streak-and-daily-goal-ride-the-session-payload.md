@@ -64,3 +64,17 @@ day's `dailyGoalMet` award.
 - Out-of-order submission delivery (multi-device, or a long-queued offline backlog crossing a streak
   boundary) can silently under-award streak/goal — the same class of accepted drift as `XpConfig`'s own
   redeploy-mid-queue gap (ADR-0047).
+
+## Amendments
+
+**2026-09-30 — the client previews the Streak and Daily Goal, and `user-stats` stores the day's
+seconds.** The client ports the Streak and Daily Goal calculation (`calculateStreakAndGoalAwards`),
+checked against the server's by shared test cases, for the Session Summary's fallback preview and the
+projection of Pending Sessions. The server stays the authority: only its awards are written.
+
+The Daily Goal needs the day's studied time, and the client has no cached copy of the day's sessions.
+The function therefore stores `studiedSecondsOnLastStudyDate` on `progress/user-stats`: the seconds of
+every recorded session on `lastStudyDate`. A submission sets it to the day's total when its
+`studyDate` is not earlier than `lastStudyDate`, and leaves it unchanged otherwise. The client reads
+it as the day's baseline and advances it while replaying Pending Sessions. See
+[ADR-0055](0055-pending-sessions-and-local-progress-projection.md).

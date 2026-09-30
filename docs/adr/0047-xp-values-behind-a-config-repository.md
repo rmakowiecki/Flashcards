@@ -69,3 +69,19 @@ transport can arrive whenever rebalancing actually becomes necessary.
 - Two sessions run either side of a config change compute different XP for identical performance.
   This is intended, and the session record's stored counts allow a historical session's breakdown to
   be recomputed under whichever config is current if that is ever wanted.
+
+## Amendments
+
+**2026-09-30 — the configuration is server-owned, and the session-start snapshot is removed.** The
+source of truth is the Firestore document `config/xp`, written only by the Admin SDK. The
+`submitStudySession` function scores every session with its current copy of that document. The
+client refreshes its copy best-effort on every sign-in and keeps it on the device, so it works
+offline with the last rates it saw. It falls back to `XpConfig`'s bundled defaults only until a first
+fetch succeeds. The "local and hardcoded" implementation and the "remote source later" alternative
+above are superseded.
+
+The per-session snapshot rule is removed. The server never saw the snapshot, so a preview scored from
+it could disagree with the server's score for the same session. The Session Summary's fallback
+preview and the projection of Pending Sessions both score with the cached configuration. A session
+queued across a configuration change is scored with the configuration current at delivery, and no
+configuration is versioned. See [ADR-0055](0055-pending-sessions-and-local-progress-projection.md).
