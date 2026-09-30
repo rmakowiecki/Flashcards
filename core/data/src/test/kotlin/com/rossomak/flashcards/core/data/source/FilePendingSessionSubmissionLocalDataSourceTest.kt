@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.source
 
 import android.content.Context
 import android.util.Log
+import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.PendingFlashcardResultDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingXpConfigDto
@@ -231,5 +232,77 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
         FilePendingSessionSubmissionLocalDataSource(context).append(second)
 
         FilePendingSessionSubmissionLocalDataSource(context).listAll() shouldBe listOf(first, second)
+    }
+
+    @Test
+    fun `observeAll emits what the file already holds`() = runTest {
+        val context: Context = mockk()
+        every { context.filesDir } returns temporaryFolder.root
+        val submission = pendingSubmission("session-1")
+        FilePendingSessionSubmissionLocalDataSource(context).append(submission)
+
+        FilePendingSessionSubmissionLocalDataSource(context).observeAll().test {
+            awaitItem() shouldBe listOf(submission)
+        }
+    }
+
+    @Test
+    fun `observeAll re-emits after each append and remove`() = runTest {
+        val dataSource = createDataSource()
+        val first = pendingSubmission("session-1")
+        val second = pendingSubmission("session-2")
+
+        dataSource.observeAll().test {
+            awaitItem() shouldBe emptyList()
+            dataSource.append(first)
+            awaitItem() shouldBe listOf(first)
+            dataSource.append(second)
+            awaitItem() shouldBe listOf(first, second)
+            dataSource.remove("session-1")
+            awaitItem() shouldBe listOf(second)
+        }
+    }
+
+    @Test
+    fun `observeAll does not re-emit for a session id already queued`() = runTest {
+        val dataSource = createDataSource()
+        val submission = pendingSubmission("session-1")
+        dataSource.append(submission)
+
+        dataSource.observeAll().test {
+            awaitItem() shouldBe listOf(submission)
+            dataSource.append(pendingSubmission("session-1", startedAtEpochMillis = 2_000L))
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `observeAll emits an empty list for an unreadable queue file instead of failing`() = runTest {
+        val context: Context = mockk()
+        every { context.filesDir } returns temporaryFolder.root
+        File(temporaryFolder.root, "pending_session_submissions.jsonl").mkdir()
+
+        FilePendingSessionSubmissionLocalDataSource(context).observeAll().test {
+            awaitItem() shouldBe emptyList()
+        }
+    }
+
+    @Test
+    fun `observeAll retries the load on a later collection once an unreadable queue file becomes readable`() = runTest {
+        val context: Context = mockk()
+        every { context.filesDir } returns temporaryFolder.root
+        val queueFile = File(temporaryFolder.root, "pending_session_submissions.jsonl")
+        queueFile.mkdir()
+        val dataSource = FilePendingSessionSubmissionLocalDataSource(context)
+        dataSource.observeAll().test {
+            awaitItem() shouldBe emptyList()
+        }
+
+        queueFile.delete()
+        dataSource.append(pendingSubmission("session-1"))
+
+        dataSource.observeAll().test {
+            awaitItem().map { it.id } shouldBe listOf("session-1")
+        }
     }
 }

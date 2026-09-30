@@ -1,0 +1,642 @@
+{
+  "description": "Shared Card Progress merge cases, run by both the TypeScript submitStudySession merge module and the Kotlin mergeSessionIntoCardProgress. See README.md in this directory for the schema.",
+  "cases": [
+    {
+      "name": "a Rated card with no record that ends Mastered is written Mastered, stamped both times and counted new",
+      "input": {
+        "priorCards": {},
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Mastered",
+              "stampFirstStudied": true,
+              "stampMastered": true
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 1,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 1,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Rated card with no record that ends Partial is written Partial and counted new",
+      "input": {
+        "priorCards": {},
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Partial",
+              "stampFirstStudied": true,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 0,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 1,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Rated card with no record that ends Failed is written Failed and counted new",
+      "input": {
+        "priorCards": {},
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Failed",
+              "stampFirstStudied": true,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 0,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 1,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Mastered card that ends Mastered again changes nothing and is previously Mastered",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Mastered"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {},
+        "summaryDeltas": {},
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": true
+        }
+      }
+    },
+    {
+      "name": "a Mastered card that ends Partial stays Mastered",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Mastered"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Partial",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {},
+        "summaryDeltas": {},
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": true
+        }
+      }
+    },
+    {
+      "name": "a Mastered card that ends Failed is de-mastered",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Mastered"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Failed",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Failed",
+              "stampFirstStudied": false,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": -1,
+            "studiedDelta": 0
+          }
+        },
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": true
+        }
+      }
+    },
+    {
+      "name": "a Partial card that ends Mastered is mastered and stamped mastered only",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Partial"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Mastered",
+              "stampFirstStudied": false,
+              "stampMastered": true
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 1,
+            "studiedDelta": 0
+          }
+        },
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Seen card that ends Mastered is mastered",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Seen"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Mastered",
+              "stampFirstStudied": false,
+              "stampMastered": true
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 1,
+            "studiedDelta": 0
+          }
+        },
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Failed card that ends Partial is written Partial with no count change",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Failed"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Partial",
+              "stampFirstStudied": false,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {},
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Partial card that ends Failed is written Failed with no count change",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Partial"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Failed",
+              "stampFirstStudied": false,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {},
+        "newCardsStudied": 0,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a card the session claims was previously Mastered but has no record is new and not previously Mastered",
+      "input": {
+        "priorCards": {},
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": true
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Mastered",
+              "stampFirstStudied": true,
+              "stampMastered": true
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 1,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 1,
+        "previouslyMastered": {
+          "card-1": false
+        }
+      }
+    },
+    {
+      "name": "a Fast card with no record is written Seen and counted new",
+      "input": {
+        "priorCards": {},
+        "session": {
+          "studyMode": "Fast",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Seen"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-1": {
+              "state": "Seen",
+              "stampFirstStudied": true,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 0,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 1,
+        "previouslyMastered": {}
+      }
+    },
+    {
+      "name": "a Fast session on a Mastered card changes nothing",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Mastered"
+          }
+        },
+        "session": {
+          "studyMode": "Fast",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Seen"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {},
+        "summaryDeltas": {},
+        "newCardsStudied": 0,
+        "previouslyMastered": {}
+      }
+    },
+    {
+      "name": "a Fast session on a Failed card changes nothing",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Failed"
+          }
+        },
+        "session": {
+          "studyMode": "Fast",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Seen"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {},
+        "summaryDeltas": {},
+        "newCardsStudied": 0,
+        "previouslyMastered": {}
+      }
+    },
+    {
+      "name": "a session over two Subcategories merges each against its own prior record and omits unchanged counts",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Mastered",
+            "card-2": "Failed"
+          },
+          "sub-2": {
+            "card-3": "Mastered"
+          }
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Partial",
+              "wasPreviouslyMastered": true
+            },
+            {
+              "cardId": "card-2",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "cardId": "card-4",
+              "subcategoryId": "sub-1",
+              "state": "Failed",
+              "wasPreviouslyMastered": false
+            },
+            {
+              "cardId": "card-3",
+              "subcategoryId": "sub-2",
+              "state": "Mastered",
+              "wasPreviouslyMastered": true
+            },
+            {
+              "cardId": "card-5",
+              "subcategoryId": "sub-2",
+              "state": "Partial",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-1": {
+            "card-2": {
+              "state": "Mastered",
+              "stampFirstStudied": false,
+              "stampMastered": true
+            },
+            "card-4": {
+              "state": "Failed",
+              "stampFirstStudied": true,
+              "stampMastered": false
+            }
+          },
+          "sub-2": {
+            "card-5": {
+              "state": "Partial",
+              "stampFirstStudied": true,
+              "stampMastered": false
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-1": {
+            "masteredDelta": 1,
+            "studiedDelta": 1
+          },
+          "sub-2": {
+            "masteredDelta": 0,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 2,
+        "previouslyMastered": {
+          "card-1": true,
+          "card-2": false,
+          "card-4": false,
+          "card-3": true,
+          "card-5": false
+        }
+      }
+    },
+    {
+      "name": "a Subcategory whose cards all stay as they were has no summary delta",
+      "input": {
+        "priorCards": {
+          "sub-1": {
+            "card-1": "Mastered"
+          },
+          "sub-2": {}
+        },
+        "session": {
+          "studyMode": "Rated",
+          "cardResults": [
+            {
+              "cardId": "card-1",
+              "subcategoryId": "sub-1",
+              "state": "Mastered",
+              "wasPreviouslyMastered": true
+            },
+            {
+              "cardId": "card-2",
+              "subcategoryId": "sub-2",
+              "state": "Mastered",
+              "wasPreviouslyMastered": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "cardUpdates": {
+          "sub-2": {
+            "card-2": {
+              "state": "Mastered",
+              "stampFirstStudied": true,
+              "stampMastered": true
+            }
+          }
+        },
+        "summaryDeltas": {
+          "sub-2": {
+            "masteredDelta": 1,
+            "studiedDelta": 1
+          }
+        },
+        "newCardsStudied": 1,
+        "previouslyMastered": {
+          "card-1": true,
+          "card-2": false
+        }
+      }
+    }
+  ]
+}

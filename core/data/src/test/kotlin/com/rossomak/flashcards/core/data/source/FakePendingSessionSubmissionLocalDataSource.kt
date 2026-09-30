@@ -1,6 +1,10 @@
 package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * In-memory [PendingSessionSubmissionLocalDataSource] for tests. Lives under `src/test`, not
@@ -9,23 +13,25 @@ import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
  */
 class FakePendingSessionSubmissionLocalDataSource : PendingSessionSubmissionLocalDataSource {
 
-    private val entries: MutableList<PendingSessionSubmissionDto> = mutableListOf()
+    private val entries = MutableStateFlow<List<PendingSessionSubmissionDto>>(emptyList())
 
     /** Every entry [append] was actually called with, in call order — separate from [entries] so a test can assert calls survived a [remove]. */
     val appendedEntries: MutableList<PendingSessionSubmissionDto> = mutableListOf()
 
     fun seed(pendingSessionSubmission: PendingSessionSubmissionDto) {
-        entries.add(pendingSessionSubmission)
+        entries.update { it + pendingSessionSubmission }
     }
 
     override suspend fun append(pendingSessionSubmission: PendingSessionSubmissionDto) {
         appendedEntries.add(pendingSessionSubmission)
-        if (entries.none { it.id == pendingSessionSubmission.id }) entries.add(pendingSessionSubmission)
+        entries.update { queued -> if (queued.none { it.id == pendingSessionSubmission.id }) queued + pendingSessionSubmission else queued }
     }
 
-    override suspend fun listAll(): List<PendingSessionSubmissionDto> = entries.toList()
+    override suspend fun listAll(): List<PendingSessionSubmissionDto> = entries.value
 
     override suspend fun remove(sessionId: String) {
-        entries.removeAll { it.id == sessionId }
+        entries.update { queued -> queued.filterNot { it.id == sessionId } }
     }
+
+    override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = entries.asStateFlow()
 }

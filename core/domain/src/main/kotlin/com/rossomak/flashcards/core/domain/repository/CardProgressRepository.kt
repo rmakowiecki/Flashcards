@@ -6,12 +6,22 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Reads a User's packed per-Subcategory progress document and their per-user progress-summary
- * singleton (both [ADR-0016](docs/adr/0016-card-progress-model.md)).
- * [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase] is one caller of
- * [getProgress] — this read is what feeds its optimistic new-cards-studied estimate — but it also
- * serves Subcategory Details and the Preview screen's defense selection; [observeProgressSummary] serves
- * Category Details' and Browse's search results. Both live in `core:domain` rather than inside a
- * single feature module because more than one feature reads each.
+ * singleton (both [ADR-0016](docs/adr/0016-card-progress-model.md)). Both reads include the User's
+ * sessions that are finished but not yet delivered to the server, so a session studied offline counts
+ * at once; how that happens is the implementation's concern, not the caller's.
+ *
+ * Readers:
+ * - [getProgress]: session start, through
+ *   [com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase], which derives each
+ *   Rated card's previously-Mastered flag from it
+ *   ([com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator]); and
+ *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], whose local preview counts
+ *   new cards from it.
+ * - [observeProgressSummary]: the Studied/Mastered rings on Browse and Category Details.
+ *
+ * Any future selection that depends on which cards are Mastered (such as Mastery Defense's floor and
+ * shield) must read Card Progress through [getProgress] too, so it sees undelivered sessions like
+ * session start does.
  *
  * Writing is not exposed here, nor anywhere else on the client: the server-authoritative
  * `submitStudySession` Cloud Function is the sole writer of both documents, inside its own

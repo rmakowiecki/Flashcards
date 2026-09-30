@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.data.source
 
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
+import kotlinx.coroutines.flow.Flow
 
 /**
  * The local durable delivery queue's read/write surface — matches this codebase's
@@ -11,8 +12,9 @@ import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
  *
  * [com.rossomak.flashcards.core.data.repository.DefaultSessionSubmissionRepository] is the only
  * [append] caller; [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] is the
- * only [listAll]/[remove] caller. See [FilePendingSessionSubmissionLocalDataSource] for the concrete
- * storage shape and its concurrency guarantee across those two callers.
+ * only [listAll]/[remove] caller. [com.rossomak.flashcards.core.data.repository.PendingSessionProjector]
+ * is the only [observeAll] caller. See [FilePendingSessionSubmissionLocalDataSource] for the concrete
+ * storage shape and its concurrency guarantee across those callers.
  */
 interface PendingSessionSubmissionLocalDataSource {
 
@@ -26,4 +28,11 @@ interface PendingSessionSubmissionLocalDataSource {
     suspend fun listAll(): List<PendingSessionSubmissionDto>
 
     suspend fun remove(sessionId: String)
+
+    /**
+     * Every User's queued entries, re-emitted after each [append] and [remove]. Unlike [listAll], never
+     * fails: a queue file that cannot be read emits an empty list, since an observer only projects the
+     * queue and has nothing to retry.
+     */
+    fun observeAll(): Flow<List<PendingSessionSubmissionDto>>
 }
