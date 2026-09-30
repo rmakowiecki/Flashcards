@@ -8,8 +8,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
-import com.rossomak.flashcards.core.domain.model.VoicePhase
-import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
@@ -19,8 +18,11 @@ import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway.Call
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
+import com.rossomak.flashcards.core.domain.session.ANSWER_TO_NEXT_PAUSE
 import com.rossomak.flashcards.core.domain.session.FastSessionReducer
 import com.rossomak.flashcards.core.domain.session.FastStudySessionCoordinator
+import com.rossomak.flashcards.core.domain.session.QUESTION_TO_ANSWER_PAUSE
+import com.rossomak.flashcards.core.domain.session.RELEASE_LINGER
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
@@ -57,7 +59,6 @@ import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -133,6 +134,26 @@ class FastStudySessionViewModelTest {
             ),
             voiceSettingsController,
         )
+
+    /** The player reads the presented question in full; after the pause the answer is presented. */
+    private fun TestScope.readQuestionThrough() {
+        playbackGateway.finishQuestion()
+        advanceUntilIdle()
+    }
+
+    /** The player reads the presented answer in full; after the pause read-aloud moves on, holds or ends. */
+    private fun TestScope.readAnswerThrough() {
+        playbackGateway.finishAnswer()
+        advanceUntilIdle()
+    }
+
+    /** Reads aloud from the first card to the question of card [index]. */
+    private fun TestScope.moveToCard(index: Int) {
+        repeat(index) {
+            readQuestionThrough()
+            readAnswerThrough()
+        }
+    }
 
     /** A read-aloud session on three cards, loaded and reading its first question. */
     private fun TestScope.createReadAloudViewModel(): FastStudySessionViewModel {
@@ -331,7 +352,7 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `onShowAnswer reveals answer when voice inactive`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `onShowAnswer reveals the answer`() = runTest(mainDispatcherRule.testDispatcher) {
         loadThreeCards()
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -339,16 +360,7 @@ class FastStudySessionViewModelTest {
         viewModel.onShowAnswer()
 
         viewModel.state.value.isAnswerRevealed shouldBe true
-        playbackGateway.showAnswerCount shouldBe 0
-    }
-
-    @Test
-    fun `onShowAnswer delegates to gateway when voice active`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createReadAloudViewModel()
-
-        viewModel.onShowAnswer()
-
-        playbackGateway.showAnswerCount shouldBe 1
+        playbackGateway.presentedAnswers shouldBe emptyList()
     }
 
     @Test
@@ -485,8 +497,7 @@ class FastStudySessionViewModelTest {
             val viewModel = createReadAloudViewModel()
 
             viewModel.events.test {
-                playbackGateway.readAnswer()
-                advanceUntilIdle()
+                readQuestionThrough()
                 expectNoEvents()
             }
             viewModel.onDialogEvent(Open(ExitSession))
@@ -499,25 +510,20 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `read-aloud ends when the player reports the end, not when it settles back on the last card's question`() =
+    fun `read-aloud ends once the pause after the last card's answer has run, with every card recorded`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createReadAloudViewModel()
-            // Each card's answer phase is reached in turn as read-aloud progresses through the deck.
-            listOf(0, 1, 2).forEach { index ->
-                playbackGateway.state.value =
-                    VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = index, totalCards = 3, phase = VoicePhase.Question)
-                playbackGateway.readAnswer()
-                advanceUntilIdle()
-            }
+            moveToCard(2)
+            readQuestionThrough()
 
             viewModel.events.test {
-                playbackGateway.state.value =
-                    VoicePlaybackState(isActive = true, isPlaying = false, currentIndex = 2, totalCards = 3, phase = VoicePhase.Question)
-                advanceUntilIdle()
+                playbackGateway.finishAnswer()
+                advanceTimeBy(ANSWER_TO_NEXT_PAUSE - 1.milliseconds)
+                runCurrent()
                 expectNoEvents()
 
-                playbackGateway.emit(PlaybackEvent.EndReached)
-                advanceUntilIdle()
+                advanceTimeBy(1.milliseconds)
+                runCurrent()
                 val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
                 destination.route.abandoned shouldBe false
@@ -526,21 +532,18 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `the terminal navigation event fires exactly once even if the player reports the end twice`() =
+    fun `the terminal navigation event fires exactly once even if the player reports the last answer finished twice`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createReadAloudViewModel()
-            playbackGateway.state.value =
-                VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = 2, totalCards = 3, phase = VoicePhase.Answer)
-            advanceUntilIdle()
+            moveToCard(2)
+            readQuestionThrough()
 
             viewModel.events.test {
-                playbackGateway.emit(PlaybackEvent.EndReached)
-                advanceUntilIdle()
+                readAnswerThrough()
                 awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
                 // The coordinator's end must guard a second report.
-                playbackGateway.emit(PlaybackEvent.EndReached)
-                advanceUntilIdle()
+                readAnswerThrough()
                 expectNoEvents()
             }
         }
@@ -638,8 +641,7 @@ class FastStudySessionViewModelTest {
     @Test
     fun `play after an engine failure restarts the voice stack at the presented card`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
-        playbackGateway.moveToNextCard()
-        advanceUntilIdle()
+        moveToCard(1)
         playbackGateway.emit(PlaybackEvent.EngineUnavailable)
         advanceUntilIdle()
 
@@ -652,11 +654,11 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `the player's index and answer phase reach the screen`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `the presented card and its answer reach the screen`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
 
-        playbackGateway.state.value = VoicePlaybackState(isActive = true, currentIndex = 2, totalCards = 3, phase = VoicePhase.Answer)
-        advanceUntilIdle()
+        moveToCard(2)
+        readQuestionThrough()
 
         viewModel.state.value.currentCardIndex shouldBe 2
         viewModel.state.value.isAnswerRevealed shouldBe true
@@ -664,35 +666,33 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `onVoiceNext reveals the answer at a question and moves to the next card at an answer`() =
+    fun `onVoiceNext presents the answer at a question and moves to the next card at an answer`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createReadAloudViewModel()
 
             viewModel.onVoiceNext()
             advanceUntilIdle()
 
-            playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.ShowAnswer
+            playbackGateway.calls.last() shouldBe Call.PresentAnswer(0)
             viewModel.state.value.isAnswerRevealed shouldBe true
 
             viewModel.onVoiceNext()
             advanceUntilIdle()
 
-            playbackGateway.calls.last() shouldBe FakeStudyVoicePlaybackGateway.Call.MoveToNextCard
+            playbackGateway.calls.last() shouldBe Call.PresentQuestion(1)
             viewModel.state.value.currentCardIndex shouldBe 1
         }
 
     @Test
     fun `the read-aloud next is unavailable at the last card's answer`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
-        playbackGateway.state.value = VoicePlaybackState(isActive = true, isPlaying = true, currentIndex = 2, totalCards = 3)
-        advanceUntilIdle()
+        moveToCard(2)
 
-        viewModel.state.value.isReadAloudNextAvailable shouldBe true
+        (TransportCommandType.Next in viewModel.state.value.availableTransportCommands) shouldBe true
 
-        playbackGateway.readAnswer()
-        advanceUntilIdle()
+        readQuestionThrough()
 
-        viewModel.state.value.isReadAloudNextAvailable shouldBe false
+        (TransportCommandType.Next in viewModel.state.value.availableTransportCommands) shouldBe false
     }
 
     @Test
@@ -702,17 +702,6 @@ class FastStudySessionViewModelTest {
         viewModel.onVoicePlayPause()
 
         playbackGateway.pauseCount shouldBe 1
-    }
-
-    @Test
-    fun `onVoiceSpeedChange forwards the rate to the gateway`() = runTest(mainDispatcherRule.testDispatcher) {
-        val rate = 1.75f
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.onVoiceSpeedChange(rate)
-
-        playbackGateway.lastSpeechRate shouldBe rate
     }
 
     // Dialogs hold at the auto-advance point
@@ -756,13 +745,13 @@ class FastStudySessionViewModelTest {
         holdAtAdvancePoint(viewModel)
 
         viewModel.onDialogEvent(Dismiss)
-        advanceTimeBy(CLOSED_DIALOG_LINGER - 1.milliseconds)
+        advanceTimeBy(RELEASE_LINGER - 1.milliseconds)
         viewModel.state.value.currentCardIndex shouldBe 0
 
         advanceTimeBy(2.milliseconds)
         viewModel.state.value.currentCardIndex shouldBe 1
         viewModel.state.value.isVoicePlaying shouldBe true
-        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.MoveToNextCard, Call.Play)
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentQuestion(1), Call.Play)
     }
 
     @Test
@@ -776,8 +765,7 @@ class FastStudySessionViewModelTest {
 
         viewModel.state.value.currentCardIndex shouldBe 0
         viewModel.state.value.isVoicePlaying shouldBe true
-        playbackGateway.calls shouldNotContain Call.MoveToNextCard
-        playbackGateway.isAdvanceGateClosed shouldBe false
+        playbackGateway.calls shouldNotContain Call.PresentQuestion(1)
     }
 
     @Test
@@ -831,15 +819,15 @@ class FastStudySessionViewModelTest {
             holdAtAdvancePoint(viewModel)
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER / 2)
+            advanceTimeBy(RELEASE_LINGER / 2)
             viewModel.onDialogEvent(Open(openReportProblem(viewModel)))
-            advanceTimeBy(CLOSED_DIALOG_LINGER * 2)
+            advanceTimeBy(RELEASE_LINGER * 2)
 
             viewModel.state.value.currentCardIndex shouldBe 0
-            playbackGateway.calls shouldNotContain Call.MoveToNextCard
+            playbackGateway.calls shouldNotContain Call.PresentQuestion(1)
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
 
             viewModel.state.value.currentCardIndex shouldBe 1
         }
@@ -847,9 +835,8 @@ class FastStudySessionViewModelTest {
     @Test
     fun `an ignored external next leaves the dialog open`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
-        playbackGateway.state.update { it.copy(currentIndex = 2) }
-        playbackGateway.readAnswer()
-        runCurrent()
+        moveToCard(2)
+        readQuestionThrough()
         viewModel.onDialogEvent(Open(ExitSession))
 
         playbackGateway.emitExternal(TransportCommand.Next)
@@ -861,8 +848,7 @@ class FastStudySessionViewModelTest {
     @Test
     fun `an external play while held on the last card ends the session`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
-        playbackGateway.state.update { it.copy(currentIndex = 2) }
-        runCurrent()
+        moveToCard(2)
         viewModel.onDialogEvent(Open(ExitSession))
         holdAtAdvancePoint(viewModel)
 
@@ -925,7 +911,7 @@ class FastStudySessionViewModelTest {
             curationRepository.pendingUpsert?.complete(Unit)
             runCurrent()
             viewModel.state.value.activeDialog shouldBe null
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
 
             viewModel.state.value.currentCardIndex shouldBe 1
         }
@@ -968,7 +954,7 @@ class FastStudySessionViewModelTest {
             runCurrent()
 
             viewModel.onDialogEvent(Dismiss)
-            advanceTimeBy(CLOSED_DIALOG_LINGER + 1.milliseconds)
+            advanceTimeBy(RELEASE_LINGER + 1.milliseconds)
             viewModel.state.value.currentCardIndex shouldBe 1
 
             viewModel.messages.test {
@@ -980,10 +966,13 @@ class FastStudySessionViewModelTest {
             viewModel.state.value.activeDialog shouldBe null
         }
 
-    /** Reads the presented card's answer and finishes the pause after it, with a dialog already holding. */
+    /** Reads the presented card in full and finishes the pause after its answer, with a dialog already holding. */
     private fun TestScope.holdAtAdvancePoint(viewModel: FastStudySessionViewModel) {
-        playbackGateway.readAnswer()
-        playbackGateway.reachAdvancePoint()
+        playbackGateway.finishQuestion()
+        advanceTimeBy(QUESTION_TO_ANSWER_PAUSE)
+        runCurrent()
+        playbackGateway.finishAnswer()
+        advanceTimeBy(ANSWER_TO_NEXT_PAUSE)
         runCurrent()
         viewModel.state.value.isVoicePlaying shouldBe false
     }
@@ -1184,7 +1173,6 @@ class FastStudySessionViewModelTest {
 
     private companion object {
         const val EXTENDED_CONTEXT = "More about this card."
-        val CLOSED_DIALOG_LINGER = 500.milliseconds
         val FIXED_INSTANT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct from XpConfig()'s defaults in every field, so a test asserting this exact value

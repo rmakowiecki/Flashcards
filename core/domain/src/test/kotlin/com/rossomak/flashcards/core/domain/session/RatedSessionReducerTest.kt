@@ -10,28 +10,32 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.AdvanceAfterVoiceAnswer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelSilenceTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Emit
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.EndForRevokedMicPermission
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Grade
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.OpenListeningWindow
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PlayListeningCue
-import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PresentHeadQuestion
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartSilenceTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopListening
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SyncQueue
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldReleased
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AttemptRated
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
@@ -47,6 +51,8 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PlaybackCha
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PlaybackEngineUnavailable
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PreviousRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.QuestionFinished
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ReleaseLingerElapsed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ResumeRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SilenceTimedOut
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
@@ -54,8 +60,6 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPa
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnsweringResumed
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceStackRestarted
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainInOrder
@@ -214,6 +218,38 @@ class RatedSessionReducerTest {
         stopped.state.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
         val replaying = stopped.state.after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
         reducer.reduce(replaying, QuestionFinished(listening.head())).effects shouldBe listOf(OpenListeningWindow(listening.head()))
+    }
+
+    @Test
+    fun `the player starting on its own while waiting for the question presents it again`() {
+        val stopped = voiceSession().listening().after(
+            MicrophoneOpened,
+            PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)),
+        )
+
+        val transition = reducer.reduce(stopped, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+
+        transition.effects shouldBe listOf(PresentHeadQuestion)
+    }
+
+    @Test
+    fun `a start the session asked for does not present the question a second time`() {
+        val paused = voiceSession().paused()
+        val played = reducer.reduce(paused, PlayRequested)
+        played.effects shouldBe listOf(Play)
+
+        val transition = reducer.reduce(played.state, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `the player starting on its own during a notice does not present the question`() {
+        val speaking = voiceSession().speakingFeedback().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
+
+        val transition = reducer.reduce(speaking, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+
+        transition.effects.shouldBeEmpty()
     }
 
     @Test
@@ -409,7 +445,7 @@ class RatedSessionReducerTest {
             .after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
         paused.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
 
-        val transition = reducer.reduce(paused, VoiceAnsweringResumed)
+        val transition = reducer.reduce(paused, ResumeRequested(isMicrophoneGranted = true))
 
         transition.effects shouldBe listOf(StartVoiceAnswering, Play)
         with(transition.state) {
@@ -434,7 +470,7 @@ class RatedSessionReducerTest {
             PausePlayback,
             StopVoiceAnswering,
             CancelGrading,
-            RestartCurrentCard,
+            PresentHeadQuestion,
             Emit(RatedSessionEvent.VoiceAnswerCaptureUnavailable),
         )
         transition.state.queue shouldBe listening.queue
@@ -463,7 +499,7 @@ class RatedSessionReducerTest {
         finished.state.isSyncPending shouldBe true
 
         val tail = reducer.reduce(finished.state, NoticeTailElapsed)
-        tail.effects shouldBe listOf(SyncQueue(tail.state.remainingCards), AdvanceAfterVoiceAnswer)
+        tail.effects shouldBe listOf(SyncQueue(tail.state.remainingCards), PresentHeadQuestion)
         tail.state.currentCard?.id shouldBe "card-2"
         tail.state.isAnswerRevealed shouldBe false
         tail.state.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
@@ -499,8 +535,44 @@ class RatedSessionReducerTest {
         held.isPausedAtAdvancePoint shouldBe true
 
         val play = reducer.reduce(held, PlayRequested)
-        play.effects shouldBe listOf(AdvanceAfterVoiceAnswer)
+        play.effects shouldBe listOf(PresentHeadQuestion, Play)
         play.state.isPausedAtAdvancePoint shouldBe false
+    }
+
+    @Test
+    fun `releasing a held session stays on the answered card for the linger, then advances`() {
+        val held = voiceSession().after(AdvanceHoldRequested).speakingFeedback().noticesOver()
+        held.isHeldAtAdvancePoint shouldBe true
+
+        val released = reducer.reduce(held, AdvanceHoldReleased)
+        released.effects shouldBe listOf(StartReleaseLinger)
+        released.state.isHeldAtAdvancePoint shouldBe true
+
+        val elapsed = reducer.reduce(released.state, ReleaseLingerElapsed)
+        elapsed.effects.last() shouldBe PresentHeadQuestion
+        elapsed.state.isHeldAtAdvancePoint shouldBe false
+    }
+
+    @Test
+    fun `a hold requested again during the linger keeps the session held`() {
+        val lingering = voiceSession().after(AdvanceHoldRequested).speakingFeedback().noticesOver().after(AdvanceHoldReleased)
+
+        val transition = reducer.reduce(lingering, AdvanceHoldRequested)
+
+        transition.effects shouldBe listOf(CancelReleaseLinger)
+        transition.state.isHeldAtAdvancePoint shouldBe true
+        reducer.reduce(transition.state, ReleaseLingerElapsed).effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a pause during the linger drops it, and its end then does nothing`() {
+        val lingering = voiceSession().after(AdvanceHoldRequested).speakingFeedback().noticesOver().after(AdvanceHoldReleased)
+
+        val transition = reducer.reduce(lingering, PauseRequested)
+
+        transition.effects shouldBe listOf(PausePlayback, CancelReleaseLinger)
+        transition.state.isReleaseLingering shouldBe false
+        reducer.reduce(transition.state, ReleaseLingerElapsed).effects.shouldBeEmpty()
     }
 
     @Test
@@ -520,7 +592,7 @@ class RatedSessionReducerTest {
 
         val transition = reducer.reduce(session, CardSkipped)
 
-        transition.effects shouldBe listOf(SyncQueue(transition.state.remainingCards), AdvanceAfterVoiceAnswer)
+        transition.effects shouldBe listOf(SyncQueue(transition.state.remainingCards), PresentHeadQuestion)
         transition.state.currentCard?.id shouldBe "card-2"
         transition.state.queue.first { it.card.id == "card-1" }.ratings.shouldBeEmpty()
         transition.state.consecutiveSilenceCount shouldBe 0
@@ -558,7 +630,23 @@ class RatedSessionReducerTest {
 
     @Test
     fun `previous at the question restarts the presented card`() {
-        reducer.reduce(voiceSession(), PreviousRequested).effects shouldBe listOf(RestartCurrentCard)
+        reducer.reduce(voiceSession(), PreviousRequested).effects shouldBe listOf(PresentHeadQuestion)
+    }
+
+    @Test
+    fun `presenting the head question also plays when the player is paused`() {
+        val paused = voiceSession().silence().paused().noticesOver()
+        paused.isPlaying shouldBe false
+
+        reducer.reduce(paused, CardSkipped).effects.takeLast(2) shouldBe listOf(PresentHeadQuestion, Play)
+    }
+
+    @Test
+    fun `presenting the head question does not play again when the player already plays`() {
+        val playing = voiceSession()
+        playing.isPlaying shouldBe true
+
+        reducer.reduce(playing, CardSkipped).effects.shouldNotContain(Play)
     }
 
     @Test
@@ -568,7 +656,7 @@ class RatedSessionReducerTest {
 
         val transition = reducer.reduce(atAdvancePoint, CardSkipped)
 
-        transition.effects shouldBe listOf(AdvanceAfterVoiceAnswer)
+        transition.effects shouldBe listOf(PresentHeadQuestion, Play)
         transition.state.isPausedAtAdvancePoint shouldBe false
     }
 
@@ -644,7 +732,7 @@ class RatedSessionReducerTest {
             currentCard?.id shouldBe "card-2"
             consecutiveGradingFailureCount shouldBe 1
         }
-        reducer.reduce(transition.state, PlayRequested).effects shouldBe listOf(AdvanceAfterVoiceAnswer)
+        reducer.reduce(transition.state, PlayRequested).effects shouldBe listOf(PresentHeadQuestion, Play)
     }
 
     @Test
@@ -749,7 +837,7 @@ class RatedSessionReducerTest {
             RatedSessionEffect.StopFeedback,
             RatedSessionEffect.CancelNoticeTail,
             SyncQueue(transition.state.remainingCards),
-            AdvanceAfterVoiceAnswer,
+            PresentHeadQuestion,
         )
         transition.state.currentCard?.id shouldBe "card-2"
         transition.state.speakingNotices.shouldBeEmpty()
@@ -757,16 +845,10 @@ class RatedSessionReducerTest {
 
     @Test
     fun `a feedback skip acts only while the feedback plays`() {
-        reducer.reduce(voiceSession().speakingFeedback(), FeedbackSkipRequested).effects shouldContain AdvanceAfterVoiceAnswer
+        reducer.reduce(voiceSession().speakingFeedback(), FeedbackSkipRequested).effects shouldContain PresentHeadQuestion
         listOf(voiceSession(), voiceSession().grading(), voiceSession().silence(), voiceSession().speakingFeedback().paused()).forEach { state ->
             reducer.reduce(state, FeedbackSkipRequested).effects.shouldBeEmpty()
         }
-    }
-
-    @Test
-    fun `the player reading the answer reveals it`() {
-        voiceSession().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true, phase = VoicePhase.Answer)))
-            .isAnswerRevealed shouldBe true
     }
 
     // Engine unavailable
@@ -803,11 +885,31 @@ class RatedSessionReducerTest {
     fun `a restarted voice stack clears the pause and starts voice answering without playing`() {
         val paused = voiceSession().after(PlaybackEngineUnavailable)
 
-        val transition = reducer.reduce(paused, VoiceStackRestarted)
+        val transition = reducer.reduce(paused, ResumeRequested(isMicrophoneGranted = true))
 
-        transition.effects shouldBe listOf(StartVoiceAnswering)
+        transition.effects shouldBe listOf(RestartVoiceStack, StartVoiceAnswering)
         transition.state.pauseReason shouldBe null
         transition.state.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+    }
+
+    @Test
+    fun `a resume without the microphone ends the session and keeps the pause`() {
+        val paused = voiceSession().after(PlaybackEngineUnavailable)
+
+        val transition = reducer.reduce(paused, ResumeRequested(isMicrophoneGranted = false))
+
+        transition.effects shouldBe listOf(EndForRevokedMicPermission)
+        transition.state shouldBe paused
+    }
+
+    @Test
+    fun `a resume with nothing paused does nothing`() {
+        val playing = voiceSession()
+
+        val transition = reducer.reduce(playing, ResumeRequested(isMicrophoneGranted = false))
+
+        transition.effects.shouldBeEmpty()
+        transition.state shouldBe playing
     }
 
     private companion object {

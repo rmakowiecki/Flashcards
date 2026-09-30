@@ -7,7 +7,6 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
-import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
@@ -15,15 +14,13 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 /**
  * Everything a Rated Study Session screen renders. No Study Mode field — the type itself is the
  * mode
- * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)),
- * and no voice-auto-start-pending flag — that is Fast's; Rated never auto-starts playback, only
- * voice answering switches the gateway on.
+ * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)).
+ * The presented card is always the queue's head, the first of [flashcards].
  *
  * Deliberately duplicates the shape of `FastStudySessionScreenState` rather than sharing a base
- * type with it: this screen carries a mastered-out-of-distinct counter and a per-card Rating ledger
- * that Fast has no concept of, and a shared
- * base would need a `when` on mode to stay useful — exactly the branching this split exists to
- * remove.
+ * type with it: this screen carries a completed-out-of-distinct counter, the current card's Rating
+ * history and the Voice Answering round, none of which Fast has, and a shared base would need a
+ * `when` on mode to stay useful — exactly the branching this split exists to remove.
  */
 data class RatedStudySessionScreenState(
     val categoryName: String = "",
@@ -33,18 +30,15 @@ data class RatedStudySessionScreenState(
     val subcategoryNameById: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val flashcards: List<Flashcard> = emptyList(),
-    val currentCardIndex: Int = 0,
     val isAnswerRevealed: Boolean = false,
     @param:StringRes val error: Int? = null,
     // Routed at session start (RatedStudySessionRoute.voiceAnsweringEnabled) — known synchronously,
     // unlike isVoiceActive below, which only flips once the voice engine finishes binding. The
     // sheet must never show the manual-mode perspective for a voice session, even for the moment
     // between entry and that bind completing, so it branches on this flag instead of isVoiceActive.
-    val isVoiceMode: Boolean = false,
+    val isVoiceAnsweringSession: Boolean = false,
     val isVoiceActive: Boolean = false,
     val isVoicePlaying: Boolean = false,
-    val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
-    val isVoiceAnswerEnabled: Boolean = false,
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
     // The listening window's microphone records; until then the window is still being prepared.
     val isVoiceMicrophoneOpen: Boolean = false,
@@ -57,12 +51,7 @@ data class RatedStudySessionScreenState(
     // A short notice is being spoken: outlives the pause a short notice can trigger, so the sheet
     // stays on its status disc until the notice has actually finished.
     val isVoiceShortNoticeSpeaking: Boolean = false,
-    // This round's grading failed: its notice keeps the card answer revealed, which grading already did.
-    val isVoiceAnswerGradingFailed: Boolean = false,
     val activeDialog: StudySessionDialog? = null,
-    // Mirrors RatedSessionState.masteredCount. No longer the header's counter (see completedCount
-    // below) — kept for the Session Summary screen's own mastered tally.
-    val masteredCount: Int = 0,
     // Mirrors RatedSessionState.completedCount; the "completed" half of the top bar's counter —
     // every distinct card that has reached a Terminal State so far, any grade.
     val completedCount: Int = 0,
@@ -89,11 +78,10 @@ data class RatedStudySessionScreenState(
     // What the transport row may offer: the same set the notification and a headset get.
     val availableTransportCommands: Set<TransportCommandType> = emptySet(),
 ) {
-    val currentCard: Flashcard? get() = flashcards.getOrNull(currentCardIndex)
+    val currentCard: Flashcard? get() = flashcards.firstOrNull()
 
     val voiceSheetMode: RatedVoiceSheetMode
         get() = voiceSheetModeOf(
-            isVoiceAnswerEnabled = isVoiceAnswerEnabled,
             voiceAnswerPhase = voiceAnswerPhase,
             isMicrophoneOpen = isVoiceMicrophoneOpen,
             isVoiceAnswerPaused = isVoiceAnswerPaused || isVoiceRoundPaused,

@@ -47,11 +47,19 @@ package com.rossomak.flashcards.core.domain.model
  * @param isPausedAtAdvancePoint the notice and its tail finished while playback was paused: the
  * next play reads the next question instead of re-reading the answered one.
  * @param isPlaying the voice player's playing state, as last reported.
+ * @param isPlayerStartExpected the session itself made the player start, and the player has not
+ * reported it yet: the loaded voice stack reads the first question by itself, and a play, a resume
+ * or a restart start it too. A start reported while this is unset came from the player alone, such
+ * as an audio-focus gain, so nothing has read the question again. Any change of the playing state
+ * reported clears it.
  * @param isAdvanceHoldRequested while set, the session stops at the auto-advance point instead of
  * moving on.
  * @param isHeldAtAdvancePoint the notice and its tail finished with a hold requested: the session
  * stopped on the answered card, with its queue sync still pending. Not a user pause: releasing the
  * hold moves on and plays.
+ * @param isReleaseLingering the hold was released while held: the session stays on the held card
+ * for the release linger, then moves on. A new hold request drops the linger and holds again;
+ * anything that ends the hold drops it too.
  * @param isPausedTemporarily playback is paused by a temporary pause, which plays again when it
  * ends; a user pause or play in between replaces it.
  * @param isPausedWhileGrading the user paused while the answer was being graded. Grading goes on;
@@ -77,8 +85,10 @@ data class RatedSessionState(
     val pauseReason: SessionPauseReason? = null,
     val isPausedAtAdvancePoint: Boolean = false,
     val isPlaying: Boolean = false,
+    val isPlayerStartExpected: Boolean = true,
     val isAdvanceHoldRequested: Boolean = false,
     val isHeldAtAdvancePoint: Boolean = false,
+    val isReleaseLingering: Boolean = false,
     val isPausedTemporarily: Boolean = false,
     val isPausedWhileGrading: Boolean = false,
     val isPausedAfterFeedback: Boolean = false,

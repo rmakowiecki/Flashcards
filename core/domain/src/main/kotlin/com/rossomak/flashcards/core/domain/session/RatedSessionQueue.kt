@@ -1,6 +1,3 @@
-// Named for the queue rules it holds, not for its one small result type.
-@file:Suppress("MatchingDeclarationName")
-
 package com.rossomak.flashcards.core.domain.session
 
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
@@ -11,19 +8,6 @@ import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.ResolvedRatedCard
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import kotlin.random.Random
-
-/**
- * One [rate] call's result: the next snapshot, alongside the [FlashcardTerminalRating] the rated card
- * resolved to, or `null` when it was re-inserted rather than finished.
- */
-internal data class RatedSessionAttemptRatingResult(val state: RatedSessionState, val terminal: FlashcardTerminalRating?)
-
-/** Applies [rating] to [state]'s current (head) card and moves the queue at once. */
-internal fun rate(state: RatedSessionState, rating: FlashcardAttemptRating, random: Random): RatedSessionAttemptRatingResult {
-    val cardId = state.queue.first().card.id
-    val recorded = recordRating(state, rating, random)
-    return RatedSessionAttemptRatingResult(state = applyPendingMove(recorded), terminal = recorded.terminalStates[cardId]?.terminalState)
-}
 
 /**
  * Records [rating] on [state]'s current (head) card without moving the queue: the head keeps its
@@ -55,10 +39,6 @@ internal fun recordRating(state: RatedSessionState, rating: FlashcardAttemptRati
  */
 internal fun recordSilence(state: RatedSessionState, random: Random): RatedSessionState =
     state.copy(pendingMove = QueueMove.Requeue(silenceGap(random)))
-
-/** [recordSilence], with the queue moved at once. */
-internal fun requeueAfterSilence(state: RatedSessionState, random: Random): RatedSessionState =
-    applyPendingMove(recordSilence(state, random))
 
 /** Moves the head as [RatedSessionState.pendingMove] says, then clears it. No pending move, no change. */
 internal fun applyPendingMove(state: RatedSessionState): RatedSessionState {

@@ -9,9 +9,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The study session's voice player: reads cards aloud, speaks notices on a separate voice, and
- * reports transport commands from outside the app instead of acting on them. It makes no session
- * decision; the study session coordinators do.
+ * The study session's voice player: presents one part of one card when told to and reports when
+ * that part was read in full, speaks notices on a separate voice, and reports transport commands from
+ * outside the app instead of acting on them. It never moves on to another part or card by itself and
+ * makes no session decision; the study session coordinators do.
  */
 @Suppress("TooManyFunctions") // one method per command of the voice stack.
 interface StudyVoicePlaybackGateway {
@@ -25,7 +26,7 @@ interface StudyVoicePlaybackGateway {
     val playbackEvents: Flow<PlaybackEvent>
 
     /**
-     * Starts the voice stack and reads [cards] from [startIndex]. [isVoiceAnsweringSession] is fixed
+     * Starts the voice stack and reads the question of [cards] at [startIndex]. [isVoiceAnsweringSession] is fixed
      * for the whole session and keeps the microphone foreground-service type held from the first
      * question to [stop], even while voice answering is paused, so a background resume can still
      * listen.
@@ -41,33 +42,33 @@ interface StudyVoicePlaybackGateway {
     /** Stops the voice stack. Synchronous and safe to call more than once. */
     fun stop()
 
-    /** Starts or resumes reading. Clears an auto-resume pending from a transient audio-focus loss. */
+    /**
+     * Starts or resumes reading the part being presented, from its start. Clears an auto-resume
+     * pending from a transient audio-focus loss.
+     */
     fun play()
 
     /** Pauses reading. Clears an auto-resume pending from a transient audio-focus loss. */
     fun pause()
-    fun moveToNextCard()
-    fun moveToPreviousCard()
-    fun jumpTo(index: Int)
-    fun restartCurrentCard()
-    fun showAnswer()
-
-    /** Reads the question of the head card, or stops when there is none. */
-    fun advanceAfterVoiceAnswer()
 
     /**
-     * While [closed], the player stops on the current card at the end of the pause after its answer,
-     * instead of moving on, and reports [PlaybackEvent.AdvanceGateReached].
+     * Presents card [index] at its question and, while playing, reads it aloud; while paused it only
+     * shows it. An [index] outside the list stops playing. Answered by
+     * [PlaybackEvent.QuestionFinished] once the question was read in full.
      */
-    fun setAdvanceGate(closed: Boolean)
+    fun presentQuestion(index: Int)
 
-    /** In question-only mode the player stops after each question and reports [PlaybackEvent.QuestionFinished]. */
-    fun setQuestionOnlyMode(enabled: Boolean)
+    /**
+     * Presents card [index] at its answer, reports [PlaybackEvent.AnswerRevealed] and, while playing,
+     * reads it aloud; while paused it only shows it. Answered by [PlaybackEvent.AnswerFinished] once
+     * the answer was read in full.
+     */
+    fun presentAnswer(index: Int)
 
-    /** Applies to the questions and answers, and to the spoken notices. */
+    /** Applies to the questions and answers, and to the spoken notices, from the next utterance on. */
     fun setSpeechRate(rate: Float)
 
-    /** Applies to the questions and answers, and to the spoken notices. */
+    /** Applies to the questions and answers, and to the spoken notices, from the next utterance on. */
     fun setVoice(voiceId: String?)
 
     /**

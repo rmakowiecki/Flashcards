@@ -83,7 +83,6 @@ private val RatedVoiceSheetMode.group: RatedVoiceSheetGroup
 internal fun RatedVoiceSheetContent(
     state: RatedStudySessionScreenState,
     voiceBarsLevels: StateFlow<ImmutableList<Float>>,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
@@ -107,7 +106,6 @@ internal fun RatedVoiceSheetContent(
         when (group) {
             RatedVoiceSheetGroup.Transport -> RatedVoiceTransportSheet(
                 state = state,
-                onShowAnswer = onShowAnswer,
                 onVoicePlayPause = onVoicePlayPause,
                 onVoiceNext = onVoiceNext,
                 onVoicePrevious = onVoicePrevious,
@@ -127,7 +125,6 @@ internal fun RatedVoiceSheetContent(
 @Composable
 private fun RatedVoiceTransportSheet(
     state: RatedStudySessionScreenState,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
@@ -136,7 +133,6 @@ private fun RatedVoiceTransportSheet(
     Box(modifier = Modifier.fillMaxSize()) {
         RatedVoiceTransportRow(
             state = state,
-            onShowAnswer = onShowAnswer,
             onVoicePlayPause = onVoicePlayPause,
             onVoiceNext = onVoiceNext,
             onVoicePrevious = onVoicePrevious,
@@ -377,14 +373,13 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDe
 @Composable
 private fun RatedVoiceTransportRow(
     state: RatedStudySessionScreenState,
-    onShowAnswer: () -> Unit,
     onVoicePlayPause: () -> Unit,
     onVoiceNext: () -> Unit,
     onVoicePrevious: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // The same commands the notification and a headset offer, so the surfaces never drift apart.
-    val commands = state.availableTransportCommands
+    val availableCommands = state.availableTransportCommands
     val playPauseCommand = if (state.isVoicePlaying) TransportCommandType.Pause else TransportCommandType.Play
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -393,7 +388,7 @@ private fun RatedVoiceTransportRow(
     ) {
         IconButton(
             onClick = onVoicePrevious,
-            enabled = state.isVoiceActive && TransportCommandType.Previous in commands,
+            enabled = state.isVoiceActive && TransportCommandType.Previous in availableCommands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
@@ -405,18 +400,16 @@ private fun RatedVoiceTransportRow(
             icon = if (state.isVoicePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = stringResource(if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd),
             onClick = onVoicePlayPause,
-            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && playPauseCommand in commands,
+            enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && playPauseCommand in availableCommands,
         )
         Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
         IconButton(
-            onClick = if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) onVoiceNext else onShowAnswer,
-            enabled = state.isVoiceActive && TransportCommandType.Next in commands,
+            onClick = onVoiceNext,
+            enabled = state.isVoiceActive && TransportCommandType.Next in availableCommands,
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,
-                contentDescription = stringResource(
-                    if (state.isVoiceAnswerEnabled || state.isAnswerRevealed) R.string.study_session_next_flashcard_cd else R.string.study_session_show_answer_cd
-                )
+                contentDescription = stringResource(R.string.study_session_next_flashcard_cd),
             )
         }
     }

@@ -5,7 +5,6 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoicePhase
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -15,9 +14,10 @@ import kotlinx.coroutines.flow.update
 
 /**
  * Records every command in [calls], in order, and moves [state] the way the real player would:
- * start plays from the start index, pause and play flip `isPlaying`, card moves change the index.
- * Like the real player, [showAnswer] reports the answer revealed. Tests drive what else the player
- * reports with [readAnswer], [finishQuestion], [finishNotice], [reachAdvancePoint] and [emit].
+ * start plays from the start index, pause and play flip `isPlaying`, presenting a part moves the
+ * presented index. Like the real player, [presentAnswer] reports the answer revealed, and presenting
+ * an index outside the list stops playing. Tests drive what else the player reports with
+ * [finishQuestion], [finishAnswer], [finishNotice] and [emit].
  */
 class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
@@ -28,14 +28,8 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
         data object Stop : Call
         data object Play : Call
         data object Pause : Call
-        data object MoveToNextCard : Call
-        data object MoveToPreviousCard : Call
-        data class JumpTo(val index: Int) : Call
-        data object RestartCurrentCard : Call
-        data object ShowAnswer : Call
-        data object AdvanceAfterVoiceAnswer : Call
-        data class SetQuestionOnlyMode(val enabled: Boolean) : Call
-        data class SetAdvanceGate(val closed: Boolean) : Call
+        data class PresentQuestion(val index: Int) : Call
+        data class PresentAnswer(val index: Int) : Call
         data class SetSpeechRate(val rate: Float) : Call
         data class SetVoice(val voiceId: String?) : Call
         data class SpeakNotice(val notice: SpokenNotice) : Call
@@ -53,9 +47,15 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
 
     val calls = mutableListOf<Call>()
 
+    /** Runs right after each command is recorded, still inside that command, as a player reacting at once would. */
+    var onCall: ((Call) -> Unit)? = null
+
     /** The player's current list, as last started or updated. */
     var cards: List<Flashcard> = emptyList()
         private set
+
+    /** The index the player presents, which [finishQuestion] and [finishAnswer] report on. */
+    private var presentedIndex = 0
 
     /** Notices spoken and not yet finished by [finishNotice], oldest first. */
     val speakingNotices = mutableListOf<SpokenNotice>()
@@ -64,9 +64,8 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     val stopCount: Int get() = calls.count { it == Call.Stop }
     val playCount: Int get() = calls.count { it == Call.Play }
     val pauseCount: Int get() = calls.count { it == Call.Pause }
-    val showAnswerCount: Int get() = calls.count { it == Call.ShowAnswer }
-    val restartCurrentCardCount: Int get() = calls.count { it == Call.RestartCurrentCard }
-    val advanceAfterVoiceAnswerCount: Int get() = calls.count { it == Call.AdvanceAfterVoiceAnswer }
+    val presentedQuestions: List<Int> get() = calls.filterIsInstance<Call.PresentQuestion>().map { it.index }
+    val presentedAnswers: List<Int> get() = calls.filterIsInstance<Call.PresentAnswer>().map { it.index }
     val lastSpeechRate: Float? get() = calls.filterIsInstance<Call.SetSpeechRate>().lastOrNull()?.rate
     val lastVoiceId: String? get() = calls.filterIsInstance<Call.SetVoice>().lastOrNull()?.voiceId
     val spokenNotices: List<SpokenNotice> get() = calls.filterIsInstance<Call.SpeakNotice>().map { it.notice }
@@ -78,9 +77,10 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     /** Every [setSessionProgress] call, in order. */
     val sessionProgressUpdates = mutableListOf<SessionProgress>()
 
-    /** The advance gate, as last set. */
-    var isAdvanceGateClosed: Boolean = false
-        private set
+    private fun record(call: Call) {
+        calls += call
+        onCall?.invoke(call)
+    }
 
     fun emit(event: PlaybackEvent) {
         eventChannel.trySend(event)
@@ -89,35 +89,14 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     /** Reports a transport [command] from outside the app. */
     fun emitExternal(command: TransportCommand) = emit(PlaybackEvent.ExternalCommand(command))
 
-    /** Moves the presented card to its answer phase and reports it revealed, as reading on by itself does. */
-    fun readAnswer() {
-        state.update { it.copy(phase = VoicePhase.Answer) }
-        cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.AnswerRevealed(it.id)) }
-    }
-
-    /** Reports that the presented card's question has been read, as question-only mode does. */
+    /** Reports that the presented card's question was read in full. */
     fun finishQuestion() {
-        cards.getOrNull(state.value.currentIndex)?.let { emit(PlaybackEvent.QuestionFinished(it.id)) }
+        cards.getOrNull(presentedIndex)?.let { emit(PlaybackEvent.QuestionFinished(it.id)) }
     }
 
-    /**
-     * Finishes the pause after the presented card's answer, as the real player's loop does: with the
-     * gate closed it stops there and reports [PlaybackEvent.AdvanceGateReached]; otherwise it moves
-     * on to the next card, or reports [PlaybackEvent.EndReached] after the last one.
-     */
-    fun reachAdvancePoint() {
-        val current = state.value
-        when {
-            isAdvanceGateClosed -> {
-                state.update { it.copy(isPlaying = false) }
-                emit(PlaybackEvent.AdvanceGateReached)
-            }
-            current.currentIndex < cards.lastIndex -> state.update { it.copy(currentIndex = it.currentIndex + 1, phase = VoicePhase.Question) }
-            else -> {
-                state.update { it.copy(isPlaying = false, phase = VoicePhase.Question) }
-                emit(PlaybackEvent.EndReached)
-            }
-        }
+    /** Reports that the presented card's answer was read in full. */
+    fun finishAnswer() {
+        cards.getOrNull(presentedIndex)?.let { emit(PlaybackEvent.AnswerFinished(it.id)) }
     }
 
     /** Reports the oldest spoken notice as finished. */
@@ -126,103 +105,68 @@ class FakeStudyVoicePlaybackGateway : StudyVoicePlaybackGateway {
     }
 
     override fun start(cards: List<Flashcard>, startIndex: Int, sessionTitle: String, isVoiceAnsweringSession: Boolean) {
-        calls += Call.Start(cards.map { it.id }, startIndex, sessionTitle, isVoiceAnsweringSession)
+        record(Call.Start(cards.map { it.id }, startIndex, sessionTitle, isVoiceAnsweringSession))
         this.cards = cards
-        state.update {
-            it.copy(
-                isActive = cards.isNotEmpty(),
-                isPlaying = cards.isNotEmpty(),
-                currentIndex = startIndex,
-                totalCards = cards.size,
-                phase = VoicePhase.Question,
-            )
-        }
+        presentedIndex = startIndex
+        state.update { it.copy(isActive = cards.isNotEmpty(), isPlaying = cards.isNotEmpty()) }
     }
 
     override fun updateQueue(cards: List<Flashcard>) {
-        calls += Call.UpdateQueue(cards.map { it.id })
+        record(Call.UpdateQueue(cards.map { it.id }))
         this.cards = cards
-        state.update { it.copy(currentIndex = 0, totalCards = cards.size, isActive = it.isActive && cards.isNotEmpty()) }
+        presentedIndex = 0
+        state.update { it.copy(isActive = it.isActive && cards.isNotEmpty()) }
     }
 
     override fun stop() {
-        calls += Call.Stop
+        record(Call.Stop)
         cards = emptyList()
-        isAdvanceGateClosed = false
         state.value = VoicePlaybackState()
     }
 
     override fun play() {
-        calls += Call.Play
+        record(Call.Play)
         state.update { it.copy(isPlaying = it.isActive) }
     }
 
     override fun pause() {
-        calls += Call.Pause
+        record(Call.Pause)
         state.update { it.copy(isPlaying = false) }
     }
 
-    override fun moveToNextCard() {
-        calls += Call.MoveToNextCard
-        state.update { if (it.currentIndex < cards.lastIndex) it.copy(currentIndex = it.currentIndex + 1, phase = VoicePhase.Question) else it }
+    override fun presentQuestion(index: Int) {
+        record(Call.PresentQuestion(index))
+        if (index in cards.indices) presentedIndex = index else state.update { it.copy(isPlaying = false) }
     }
 
-    override fun moveToPreviousCard() {
-        calls += Call.MoveToPreviousCard
-        state.update { if (it.currentIndex > 0) it.copy(currentIndex = it.currentIndex - 1, phase = VoicePhase.Question) else it }
-    }
-
-    override fun jumpTo(index: Int) {
-        calls += Call.JumpTo(index)
-        state.update { it.copy(currentIndex = index.coerceIn(0, maxOf(0, cards.lastIndex)), phase = VoicePhase.Question) }
-    }
-
-    override fun restartCurrentCard() {
-        calls += Call.RestartCurrentCard
-        state.update { it.copy(phase = VoicePhase.Question) }
-    }
-
-    override fun showAnswer() {
-        calls += Call.ShowAnswer
-        readAnswer()
-    }
-
-    override fun advanceAfterVoiceAnswer() {
-        calls += Call.AdvanceAfterVoiceAnswer
-        state.update { it.copy(currentIndex = 0, phase = VoicePhase.Question, isPlaying = cards.isNotEmpty()) }
-    }
-
-    override fun setQuestionOnlyMode(enabled: Boolean) {
-        calls += Call.SetQuestionOnlyMode(enabled)
-    }
-
-    override fun setAdvanceGate(closed: Boolean) {
-        calls += Call.SetAdvanceGate(closed)
-        isAdvanceGateClosed = closed
+    override fun presentAnswer(index: Int) {
+        record(Call.PresentAnswer(index))
+        val card = cards.getOrNull(index) ?: return
+        presentedIndex = index
+        emit(PlaybackEvent.AnswerRevealed(card.id))
     }
 
     override fun setSpeechRate(rate: Float) {
-        calls += Call.SetSpeechRate(rate)
-        state.update { it.copy(speechRate = rate) }
+        record(Call.SetSpeechRate(rate))
     }
 
     override fun setVoice(voiceId: String?) {
-        calls += Call.SetVoice(voiceId)
+        record(Call.SetVoice(voiceId))
     }
 
     override fun speakNotice(notice: SpokenNotice) {
-        calls += Call.SpeakNotice(notice)
+        record(Call.SpeakNotice(notice))
         speakingNotices += notice
     }
 
     /** Like the real player, a stopped feedback never reports finished. */
     override fun stopFeedback() {
-        calls += Call.StopFeedback
+        record(Call.StopFeedback)
         speakingNotices.removeAll { it is SpokenNotice.Feedback }
     }
 
     override fun resumeWithoutReading() {
-        calls += Call.ResumeWithoutReading
+        record(Call.ResumeWithoutReading)
         state.update { it.copy(isPlaying = it.isActive) }
     }
 
