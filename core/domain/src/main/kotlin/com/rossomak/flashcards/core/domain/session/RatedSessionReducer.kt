@@ -21,6 +21,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.FeedbackSkipRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.MicrophoneOpened
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeTailElapsed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.PauseRequested
@@ -95,6 +96,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
                 FeedbackSkipRequested -> if (this.state.isFeedbackPlaying) skipFeedback()
                 PreviousRequested -> if (acceptsCardCommand()) emit(RestartCurrentCard)
                 is QuestionFinished -> onQuestionFinished(input.cardId)
+                MicrophoneOpened -> onMicrophoneOpened()
                 SpeechStarted -> onSpeechStarted()
                 SpeechEnded -> onSpeechEnded()
                 is UtteranceCaptured -> onUtteranceCaptured(input.obfuscatedWav)
@@ -202,6 +204,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
     private fun RatedTransitionBuilder.onPlaybackChanged(input: PlaybackChanged) {
         val playback = input.playback
         val startedPlaying = playback.isPlaying && !state.isPlaying
+        if (!playback.isPlaying && state.isPlaying) onPlayerStopped()
         state = state.copy(
             isPlaying = playback.isPlaying,
             isPausedAtAdvancePoint = state.isPausedAtAdvancePoint && !startedPlaying,

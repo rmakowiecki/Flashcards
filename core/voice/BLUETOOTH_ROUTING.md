@@ -10,13 +10,18 @@ this doc is the implementation-level "how it actually works, and what broke."
 
 | Owns | Type | Scope |
 |------|------|-------|
-| **Routing** — which device to bind, when it's ready, mid-session switches | `AudioRouteManager` | Session-scoped (`acquireSessionRoute()` → `releaseSessionRoute()`) |
+| **Routing** — which device to bind, when it's ready, mid-window switches | `AudioRouteManager` | Device watching per session (`startSession()` → `releaseSession()`); route activation per listening window (`activateRoute()` → `deactivateRoute()`) |
 | **Capture** — the `AudioRecord`, the frame loop, VAD | `VoiceCaptureEngine` | Per-`startListening()` call; reads `AudioRouteManager.route.value` |
 
 `VoiceCaptureEngine` never touches `AudioManager`/Bluetooth APIs directly — it binds
 `AudioRecord.setPreferredDevice(route.device)` and reacts to `AudioRouteManager.routeChanges`. This
 split means routing bugs and capture bugs are independently testable, but it also means **a caller
-that skips `acquireSessionRoute()` gets a dead route** — see Bug 1.
+that skips `activateRoute()` gets a dead route** — see Bug 1.
+
+The route is activated only while a listening window is open, because the Bluetooth stack drops
+the headset's media buttons (AVRCP passthrough) while SCO is up; see ADR-0027 point 2. Without a
+mic-capable Bluetooth device, activation touches neither the audio mode nor the communication
+device.
 
 ## Route resolution
 
@@ -25,7 +30,7 @@ CaptureRouteType: PHONE | BLUETOOTH_LE | BLUETOOTH_SCO | WAITING | NONE
 ```
 
 `CaptureRoute.isCapturable` is true only for `PHONE` and the two Bluetooth types — `WAITING`
-(BT mic present but link not ready) and `NONE` (session never acquired) are not. This is the
+(BT mic present but link not ready) and `NONE` (no route active) are not. This is the
 **BT-strict** rule from ADR-0027: a mic-capable BT device connected-but-not-ready must never
 silently fall back to the phone mic.
 
@@ -34,12 +39,13 @@ Two resolution paths, picked by SDK version:
 - **API 31+** (`resolveCommunicationRoute()`): scan `audioManager.availableCommunicationDevices` for
   `TYPE_BLE_HEADSET` (preferred) then `TYPE_BLUETOOTH_SCO` (fallback). `setCommunicationDevice()` +
   poll `communicationDevice` until the id matches, timeout 3s, 1 retry. No BT device present →
-  `clearCommunicationDevice()` and `PHONE`.
+  `PHONE`, undoing a Bluetooth link only if this manager had set one up.
 - **Pre-31** (`resolveLegacyScoRoute()`): Classic SCO only. `startBluetoothSco()`, await
   `ACTION_SCO_AUDIO_STATE_UPDATED` → `SCO_AUDIO_STATE_CONNECTED` (same 3s timeout).
 
-Mid-session connect/disconnect is observed via `AudioDeviceCallback` (all versions) and the SCO-state
-`BroadcastReceiver` (pre-31 only), which re-resolve and emit on `routeChanges`. `VoiceCaptureEngine`
+Connect/disconnect is observed for the whole session via `AudioDeviceCallback` (all versions) and the
+SCO-state `BroadcastReceiver` (pre-31 only). While a route is active they re-resolve and emit on
+`routeChanges`; otherwise the next `activateRoute()` resolves afresh. `VoiceCaptureEngine`
 only applies a route change at an utterance boundary — never mid-clip.
 
 ---
@@ -53,12 +59,13 @@ even with Bluetooth off entirely.
 
 **Cause:** `AudioRouteManager.route` defaults to `CaptureRoute(NONE)`, and `NONE.isCapturable` is
 `false`. `VoiceDebugViewModel` called `VoiceCaptureEngine.startListening()` directly and never called
-`AudioRouteManager.acquireSessionRoute()` first — unlike `feature:study`'s `VoiceCaptureSession`,
+`AudioRouteManager.acquireSessionRoute()` (now `activateRoute()`) first — unlike `feature:study`'s `VoiceCaptureSession`,
 which does. `runCaptureLoop()`'s very first check (`if (!route.isCapturable)`) failed before looking
 at real BT state at all.
 
-**Fix:** `VoiceDebugViewModel` now injects `AudioRouteManager`, calls `acquireSessionRoute()` in
-`init`, `releaseSessionRoute()` in `onCleared()` — mirroring the production session lifecycle.
+**Fix:** `VoiceDebugViewModel` now injects `AudioRouteManager`, calls `startSession()` in `init`,
+activates the route for each recording and deactivates it after, and calls `releaseSession()` in
+`onCleared()` — mirroring the production per-window lifecycle.
 
 ### 2. AudioRecord stream-open warm-up dead zone (partial mitigation)
 
@@ -94,7 +101,7 @@ behind Bug 2's symptom; Bug 2's fix addressed a real but different failure mode.
 `setCommunicationDevice()`/`startBluetoothSco()` on both resolution paths, and restores
 `MODE_NORMAL`:
 - when resolution falls back to `PHONE` (no BT device present), and
-- in `deactivateRoute()` (called from `releaseSessionRoute()`).
+- in `deactivateRoute()` (called when each listening window closes, and from `releaseSession()`).
 
 ### 4. Audio source mismatch for BT routes
 

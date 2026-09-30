@@ -24,12 +24,13 @@ sealed interface RatedVoiceSheetMode {
      */
     data object Transport : RatedVoiceSheetMode
 
-    /** The microphone is open: only the live capture indicator, centered. */
+    /** The microphone records: only the live capture indicator, centered. */
     data object Listening : RatedVoiceSheetMode
 
     /**
-     * Waiting with nothing to show yet, or a short notice (silence skip or pause, grading or capture
-     * failure) is being spoken: only the progress disc, centered, with no controls.
+     * Waiting with nothing to show yet (including while the microphone is being prepared), or a short
+     * notice (silence skip or pause, grading or capture failure) is being spoken: only the progress
+     * disc, centered, with no controls.
      */
     data object Pending : RatedVoiceSheetMode
 
@@ -47,6 +48,7 @@ sealed interface RatedVoiceSheetMode {
 fun voiceSheetModeOf(
     isVoiceAnswerEnabled: Boolean,
     voiceAnswerPhase: VoiceAnswerPhase,
+    isMicrophoneOpen: Boolean,
     isVoiceAnswerPaused: Boolean,
     isShortNoticeSpeaking: Boolean,
     sanitizedTranscript: String?,
@@ -56,7 +58,8 @@ fun voiceSheetModeOf(
     isVoiceAnswerPaused || !isVoiceAnswerEnabled -> Transport
     else -> when (voiceAnswerPhase) {
         VoiceAnswerPhase.Idle, VoiceAnswerPhase.WaitingForQuestion -> Transport
-        VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected -> Listening
+        VoiceAnswerPhase.Listening -> if (isMicrophoneOpen) Listening else Pending
+        VoiceAnswerPhase.SpeechDetected -> Listening
         VoiceAnswerPhase.Grading -> if (sanitizedTranscript.isNullOrBlank()) Pending else GradingWithTranscript(sanitizedTranscript)
         VoiceAnswerPhase.SpeakingNotice -> if (lastGrade == null) Pending else Graded(lastGrade.toFlashcardAttemptRating(), lastGrade.feedback)
     }

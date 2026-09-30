@@ -1167,6 +1167,46 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
+    fun `voice sheet mode is Pending while the microphone is prepared, then Listening once it records`() = runTest(mainDispatcherRule.testDispatcher) {
+        captureGateway.reportsMicrophoneOpened = false
+        val viewModel = createVoiceViewModel()
+
+        finishQuestion()
+        viewModel.state.value.voiceAnswerPhase shouldBe VoiceAnswerPhase.Listening
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Pending
+
+        captureGateway.emit(CaptureEvent.MicrophoneOpened)
+        runCurrent()
+        viewModel.state.value.voiceSheetMode shouldBe RatedVoiceSheetMode.Listening
+    }
+
+    @Test
+    fun `voiceSheetModeOf shows Pending while listening with the microphone not yet open`() {
+        voiceSheetModeOf(
+            isVoiceAnswerEnabled = true,
+            voiceAnswerPhase = VoiceAnswerPhase.Listening,
+            isMicrophoneOpen = false,
+            isVoiceAnswerPaused = false,
+            isShortNoticeSpeaking = false,
+            sanitizedTranscript = null,
+            lastGrade = null,
+        ) shouldBe RatedVoiceSheetMode.Pending
+    }
+
+    @Test
+    fun `voiceSheetModeOf shows Listening while listening with the microphone open`() {
+        voiceSheetModeOf(
+            isVoiceAnswerEnabled = true,
+            voiceAnswerPhase = VoiceAnswerPhase.Listening,
+            isMicrophoneOpen = true,
+            isVoiceAnswerPaused = false,
+            isShortNoticeSpeaking = false,
+            sanitizedTranscript = null,
+            lastGrade = null,
+        ) shouldBe RatedVoiceSheetMode.Listening
+    }
+
+    @Test
     fun `voice sheet mode is Pending while grading without a transcript`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createVoiceViewModel()
 

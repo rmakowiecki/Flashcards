@@ -35,11 +35,13 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Grade
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.OpenListeningWindow
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PlayListeningCue
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartCurrentCard
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartSilenceTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopFeedback
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopListening
@@ -390,6 +392,7 @@ class RatedStudySessionCoordinator @Inject constructor(
 
     private fun onCaptureEvent(event: CaptureEvent) {
         val input = when (event) {
+            CaptureEvent.MicrophoneOpened -> RatedSessionInput.MicrophoneOpened
             CaptureEvent.SpeechStarted -> RatedSessionInput.SpeechStarted
             CaptureEvent.SpeechEnded -> RatedSessionInput.SpeechEnded
             is CaptureEvent.UtteranceCaptured -> RatedSessionInput.UtteranceCaptured(event.obfuscatedWav)
@@ -431,22 +434,31 @@ class RatedStudySessionCoordinator @Inject constructor(
         when (effect) {
             is SyncQueue -> if (isVoiceStackStarted) playbackGateway.updateQueue(effect.cards)
             AdvanceAfterVoiceAnswer -> playbackGateway.advanceAfterVoiceAnswer()
-            // The silence timer only starts once the route is ready and the microphone is open. A
-            // route that never settles fails the round like a microphone that dropped out.
+            // A microphone that cannot be prepared, or never reports it records, fails the round
+            // like a microphone that dropped out. The silence timer waits for the microphone to open.
             is OpenListeningWindow -> {
                 listeningJob?.cancel()
                 listeningJob = scope.launch {
-                    val routeReady = withTimeoutOrNull(ROUTE_READY_TIMEOUT) { captureGateway.awaitRouteReady() }
-                    if (routeReady == null) {
-                        logger.warn { "Capture route not ready after $ROUTE_READY_TIMEOUT, voice answering paused" }
+                    val prepared = withTimeoutOrNull(ROUTE_READY_TIMEOUT) { captureGateway.prepareListening() }
+                    if (prepared == null) {
+                        logger.warn { "Microphone not prepared after $ROUTE_READY_TIMEOUT, voice answering paused" }
                         dispatch(RatedSessionInput.CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable))
                         return@launch
                     }
                     captureGateway.startListening()
+                    delay(MICROPHONE_OPEN_TIMEOUT)
+                    logger.warn { "Microphone did not open after $MICROPHONE_OPEN_TIMEOUT, voice answering paused" }
+                    dispatch(RatedSessionInput.CaptureFailed(VoiceCaptureFailureReason.CaptureLoopError("Microphone did not open")))
+                }
+            }
+            StartSilenceTimer -> {
+                listeningJob?.cancel()
+                listeningJob = scope.launch {
                     delay(SILENCE_TIMEOUT)
                     dispatch(RatedSessionInput.SilenceTimedOut)
                 }
             }
+            PlayListeningCue -> captureGateway.playListeningCue()
             StopListening -> {
                 listeningJob?.cancel()
                 captureGateway.stopListening()

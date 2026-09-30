@@ -208,6 +208,7 @@ class RatedStudySessionViewModel @Inject constructor(
         speechRate = snapshot.playback.speechRate,
         isVoiceAnswerEnabled = snapshot.isVoiceAnsweringActive,
         voiceAnswerPhase = snapshot.round.phase,
+        isVoiceMicrophoneOpen = snapshot.round.isMicrophoneOpen,
         voiceAnswerSanitizedTranscript = snapshot.round.transcript,
         lastVoiceAnswerGrade = snapshot.round.grade,
         isVoiceShortNoticeSpeaking = snapshot.isShortNoticeSpeaking,
