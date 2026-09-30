@@ -30,6 +30,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
@@ -174,7 +175,7 @@ class StudySessionVoiceService : MediaSessionService() {
         )
         playbackWakeLock = PlaybackWakeLock(applicationContext)
         serviceScope.launch {
-            player.voiceState.collect { state -> if (state.isActive && state.isPlaying) playbackWakeLock.acquire() else playbackWakeLock.release() }
+            playbackWakeLock.holdWhile(player.voiceState.map { state -> state.isActive && state.isPlaying })
         }
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(contentPendingIntent())
