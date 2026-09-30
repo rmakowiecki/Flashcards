@@ -328,9 +328,9 @@ class SubmitStudySessionUseCaseTest {
     @Test
     fun `a card Mastered in the prior Card Progress scores as defended, whatever the session's own flag says`() = runTest {
         cardProgressRepository.seed(
-            SubcategoryProgress(subcategoryId = "sub-1", categoryId = "cat-1", cards = mapOf("card-1" to priorEntry(FlashcardStudyProgressState.Mastered))),
+            SubcategoryProgress(subcategoryId = SUBCATEGORY_ID, categoryId = CATEGORY_ID, cards = mapOf(CARD_ID to priorEntry(FlashcardStudyProgressState.Mastered))),
         )
-        val session = ratedSessionResult(cardResults = listOf(ratedEntry(cardId = "card-1", state = FlashcardStudyProgressState.Mastered)))
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(cardId = CARD_ID, state = FlashcardStudyProgressState.Mastered)))
 
         val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
 
@@ -346,6 +346,9 @@ class SubmitStudySessionUseCaseTest {
     )
 
     private companion object {
+        const val CATEGORY_ID = "cat-1"
+        const val SUBCATEGORY_ID = "sub-1"
+        const val CARD_ID = "card-1"
         val CUSTOM_CONFIG = XpConfig(cardMastered = 321)
         val SERVER_SCORE = SessionScore(
             breakdown = XpBreakdown(newCards = 10, mastered = 100, streakBonus = 250),
