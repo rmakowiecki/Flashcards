@@ -25,6 +25,9 @@ sealed interface RatedSessionInput {
     /** "Previous", from the app or from outside it: restart the presented card's question. */
     data object PreviousRequested : RatedSessionInput
     data class QuestionFinished(val cardId: String) : RatedSessionInput
+
+    /** The microphone is recording for the open listening window. May repeat within one window. */
+    data object MicrophoneOpened : RatedSessionInput
     data object SpeechStarted : RatedSessionInput
     data object SpeechEnded : RatedSessionInput
 
@@ -44,11 +47,15 @@ sealed interface RatedSessionInput {
     data object AdvanceHoldRequested : RatedSessionInput
     data object AdvanceHoldReleased : RatedSessionInput
 
-    /** Voice answering resumes after a pause of its own. The microphone permission is already confirmed. */
-    data object VoiceAnsweringResumed : RatedSessionInput
+    /** The release linger ran in full. */
+    data object ReleaseLingerElapsed : RatedSessionInput
 
-    /** The voice stack started again after a text-to-speech engine failure. */
-    data object VoiceStackRestarted : RatedSessionInput
+    /**
+     * Play while the session is paused by an engine failure or by voice answering itself.
+     * [isMicrophoneGranted] is the permission read just before; a session without voice answering
+     * needs no microphone and always passes `true`.
+     */
+    data class ResumeRequested(val isMicrophoneGranted: Boolean) : RatedSessionInput
     data object PlaybackEngineUnavailable : RatedSessionInput
 
     /** The voice player's transport state changed. */

@@ -69,12 +69,18 @@ class PendingSessionProjector @Inject constructor(
      * read projects over no record instead of failing, so the Pending Session results still show.
      *
      * The queue is read before the remote document, so a session delivered in between is replayed over
-     * state that already includes it (harmless) rather than missing from both.
+     * state that already includes it (harmless) rather than missing from both. If the signed-in User
+     * changes between the two reads, the queue and the remote document may belong to different Users,
+     * so the read fails rather than projecting one User's sessions over the other's progress.
      */
     suspend fun projectCardProgress(subcategoryId: String): Result<SubcategoryProgress?> {
+        val uidAtStart = signedInUid()
         val pendingSessions = pendingSessions().filter { session -> session.touches(subcategoryId) }
         val remoteProgress = readRemoteProgress(subcategoryId)
         if (pendingSessions.isEmpty()) return remoteProgress
+        if (signedInUid() != uidAtStart) {
+            return Result.failure(IllegalStateException("Signed-in User changed while reading Card Progress for $subcategoryId"))
+        }
 
         val baseline = remoteProgress.getOrElse { exception ->
             logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
@@ -108,6 +114,8 @@ class PendingSessionProjector @Inject constructor(
     }
 
     private suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
+
+    private fun signedInUid(): String? = authRepository.getCurrentUser()?.uid
 
     /**
      * Replays [pendingSessions] over [baselineBySubcategory], the cached server Card Progress of each

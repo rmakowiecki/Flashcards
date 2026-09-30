@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsButtonIconPosition
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -310,6 +311,9 @@ private fun FastVoiceTransportControls(
     onVoicePrevious: () -> Unit,
     onVoiceSettingsCogClick: () -> Unit,
 ) {
+    // The same commands the notification and a headset offer, so the surfaces never drift apart.
+    val availableCommands = state.availableTransportCommands
+    val playPauseCommand = if (state.isVoicePlaying) TransportCommandType.Pause else TransportCommandType.Play
     Box(modifier = Modifier.fillMaxSize()) {
         IconButton(
             onClick = onVoiceSettingsCogClick,
@@ -330,7 +334,7 @@ private fun FastVoiceTransportControls(
         ) {
             IconButton(
                 onClick = onVoicePrevious,
-                enabled = state.isVoiceActive,
+                enabled = state.isVoiceActive && TransportCommandType.Previous in availableCommands,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
@@ -344,12 +348,12 @@ private fun FastVoiceTransportControls(
                     if (state.isVoicePlaying) R.string.study_session_voice_pause_cd else R.string.study_session_voice_play_cd
                 ),
                 onClick = onVoicePlayPause,
-                enabled = state.isVoiceActive || state.isVoiceEngineUnavailable,
+                enabled = (state.isVoiceActive || state.isVoiceEngineUnavailable) && playPauseCommand in availableCommands,
             )
             Spacer(modifier = Modifier.size(MaterialTheme.spacing.normal))
             IconButton(
                 onClick = onVoiceNext,
-                enabled = state.isVoiceActive && state.isReadAloudNextAvailable,
+                enabled = state.isVoiceActive && TransportCommandType.Next in availableCommands,
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
@@ -374,7 +378,6 @@ private fun FastStudySessionVoiceActivePreview() {
             isReadAloudMode = true,
             isVoiceActive = true,
             isVoicePlaying = true,
-            speechRate = 1.25f,
         ),
         snackbarHostState = remember { SnackbarHostState() },
         actions = FastStudySessionActions(

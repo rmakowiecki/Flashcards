@@ -7,7 +7,6 @@ import com.rossomak.flashcards.core.domain.model.TransportCommandType.Next
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Pause
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Play
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Previous
-import com.rossomak.flashcards.core.domain.model.TransportCommandType.PreviousCard
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Stop
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 
@@ -34,7 +33,7 @@ val RatedSessionState.availableTransportCommands: Set<TransportCommandType>
         else -> when (round.phase) {
             VoiceAnswerPhase.Listening, VoiceAnswerPhase.SpeechDetected, VoiceAnswerPhase.Grading, VoiceAnswerPhase.SpeakingNotice -> PAUSE_ONLY
             VoiceAnswerPhase.Idle, VoiceAnswerPhase.WaitingForQuestion ->
-                if (isPlaying) setOf(Pause, Stop, Next, Previous, PreviousCard) else setOf(Play, Next, Previous, PreviousCard)
+                if (isPlaying) setOf(Pause, Stop, Next, Previous) else setOf(Play, Next, Previous)
         }
     }
 

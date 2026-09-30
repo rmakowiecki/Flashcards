@@ -30,7 +30,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 
 /**
  * Media3 [MediaSessionService] that reads flashcards aloud, with background playback capabilities. It owns a
@@ -39,15 +41,18 @@ import kotlinx.coroutines.flow.receiveAsFlow
  * lifecycle. Audio focus is managed inside [TtsPlayer] because Media3 only auto-handles focus for
  * `ExoPlayer`, which we cannot use because it does not support TTS OOTB.
  *
- * [StudySessionVoiceGateway] binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the
- * card queue and drive playback, and observes [LocalBinder.state] — which carries TTS-specific phase
- * and between-card-pause flags that the standard `Player` state cannot express — and the ordered
+ * [DefaultStudySessionVoiceGateway] binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the
+ * card queue and drive playback, and observes [LocalBinder.state] — which carries the TTS-specific
+ * phase that the standard `Player` state cannot express — and the ordered
  * [LocalBinder.playbackEvents]. System controllers connect to the [MediaSession] returned from
  * [onGetSession]; their commands come back out as [PlaybackEvent.ExternalCommand].
  *
  * It also hosts the rest of the voice stack, so it all shares this session-scoped foreground
  * lifecycle: a [NoticeSpeaker] on its own text-to-speech engine, and, for voice answering, a
  * [VoiceCaptureSession]. Nothing here makes a session decision; the study session coordinators do.
+ *
+ * A [PlaybackWakeLock] is held exactly while the player plays, including the silent pauses between
+ * parts, which the coordinator times in this process.
  *
  * Media3 only ever starts the foreground service with the `mediaPlayback` type, and drops the
  * foreground state on every pause. Without an active `microphone` type, a background app records
@@ -73,6 +78,7 @@ class StudySessionVoiceService : MediaSessionService() {
     private lateinit var player: TtsPlayer
     private lateinit var noticeSpeaker: NoticeSpeaker
     private lateinit var mediaSession: MediaSession
+    private lateinit var playbackWakeLock: PlaybackWakeLock
 
     private lateinit var notificationProvider: DefaultMediaNotificationProvider
     private val notificationActionFactory = VoiceSessionNotificationActionFactory(service = this)
@@ -108,21 +114,9 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun pause() = player.pauseReading()
 
-        fun moveToNextCard() = player.moveToNextCard()
+        fun presentQuestion(index: Int) = player.presentQuestion(index)
 
-        fun moveToPreviousCard() = player.moveToPreviousCard()
-
-        fun jumpTo(index: Int) = player.jumpTo(index)
-
-        fun restartCurrentCard() = player.restartCurrentCardPlayback()
-
-        fun showAnswer() = player.skipToCardAnswerPlayback()
-
-        fun advanceAfterVoiceAnswer() = player.advanceAfterVoiceAnswer()
-
-        fun setQuestionOnlyMode(enabled: Boolean) = player.setQuestionOnlyMode(enabled)
-
-        fun setAdvanceGate(closed: Boolean) = player.setAdvanceGate(closed)
+        fun presentAnswer(index: Int) = player.presentAnswer(index)
 
         // Notices and feedback speak with the same voice and rate as the questions.
         fun setSpeechRate(rate: Float) {
@@ -154,11 +148,13 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun stopVoiceAnswering() = voiceCaptureSession.stop()
 
-        suspend fun awaitRouteReady() = voiceCaptureSession.awaitRouteReady()
+        suspend fun prepareListening() = voiceCaptureSession.prepareListening()
 
         fun startListening() = voiceCaptureSession.startListening()
 
         fun stopListening() = voiceCaptureSession.stopListening()
+
+        fun playListeningCue() = voiceCaptureSession.playListeningCue()
 
         fun stopPlayback() = this@StudySessionVoiceService.stopPlayback()
     }
@@ -177,6 +173,10 @@ class StudySessionVoiceService : MediaSessionService() {
             onEngineUnavailable = { playbackEvents.trySend(PlaybackEvent.EngineUnavailable) },
             engineFactory = { listener -> TextToSpeechNoticeEngine(applicationContext, listener) },
         )
+        playbackWakeLock = PlaybackWakeLock(applicationContext)
+        serviceScope.launch {
+            playbackWakeLock.holdWhile(player.voiceState.map { state -> state.isActive && state.isPlaying })
+        }
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(contentPendingIntent())
             .build()
@@ -256,6 +256,7 @@ class StudySessionVoiceService : MediaSessionService() {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         }
         player.stopPlayback()
+        playbackWakeLock.release()
         stopSelf()
     }
 
@@ -263,6 +264,7 @@ class StudySessionVoiceService : MediaSessionService() {
         voiceCaptureSession.release()
         noticeSpeaker.release()
         serviceScope.cancel()
+        playbackWakeLock.release()
         mediaSession.release()
         player.release()
         super.onDestroy()

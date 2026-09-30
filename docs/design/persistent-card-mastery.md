@@ -97,7 +97,7 @@ set and `state` set to the session's outcome — the Terminal State in a Rated s
 Fast session. New-card XP is awarded once, here, for either mode.
 
 A Rated Flashcard counts as studied once it has completed at least one Attempt. A Fast Flashcard
-counts once its **answer has been shown** — `VoicePhase.Answer` entered under read-aloud,
+counts once its **answer has been shown** — the player presenting the answer under read-aloud,
 `isAnswerRevealed` set under manual advance. Skipping past a question marks nothing.
 
 **Mastery gained.** A Flashcard reaches a Correct Rating on any Attempt in a Rated Study Session

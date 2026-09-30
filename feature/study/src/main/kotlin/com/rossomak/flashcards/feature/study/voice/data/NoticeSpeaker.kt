@@ -4,7 +4,7 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
-import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -180,7 +180,7 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
 
     private var isReady = false
     private var voiceId: String? = null
-    private var speechRate = VoicePlaybackState.DEFAULT_SPEECH_RATE
+    private var speechRate = VoiceSettings.DEFAULT_SPEECH_RATE
 
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
         isReady = status == TextToSpeech.SUCCESS
@@ -235,7 +235,7 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
     }
 
     override fun setSpeechRate(rate: Float) {
-        speechRate = rate.coerceIn(VoicePlaybackState.MIN_SPEECH_RATE, VoicePlaybackState.MAX_SPEECH_RATE)
+        speechRate = rate.coerceIn(VoiceSettings.MIN_SPEECH_RATE, VoiceSettings.MAX_SPEECH_RATE)
         if (isReady) tts.setSpeechRate(speechRate)
     }
 }

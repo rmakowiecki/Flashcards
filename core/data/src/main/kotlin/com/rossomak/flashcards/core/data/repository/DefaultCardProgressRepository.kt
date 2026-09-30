@@ -46,7 +46,8 @@ class DefaultCardProgressRepository @Inject constructor(
     /**
      * Completes when the remote summary flow completes (on sign-out), even though the queue is still
      * observed. The two sources are merged rather than combined, so a summary the remote flow emits
-     * just before completing is never conflated away.
+     * just before completing is never conflated away. That last summary may carry deltas from before a
+     * recalculation still in flight; nothing collects it past sign-out, so it is not worth guarding.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {

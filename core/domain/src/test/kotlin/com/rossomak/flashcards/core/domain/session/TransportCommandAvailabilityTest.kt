@@ -76,14 +76,14 @@ class TransportCommandAvailabilityTest {
     // Rated
 
     @Test
-    fun `the question being read offers everything but jumping`() {
-        questionBeingRead.availableTransportCommands shouldBe setOf(Pause, Stop, Next, Previous, PreviousCard)
+    fun `the question being read offers everything but jumping and going back a card`() {
+        questionBeingRead.availableTransportCommands shouldBe setOf(Pause, Stop, Next, Previous)
     }
 
     @Test
     fun `paused at the question, play replaces pause`() {
-        questionBeingRead.paused().availableTransportCommands shouldBe setOf(Play, Next, Previous, PreviousCard)
-        listening.paused().availableTransportCommands shouldBe setOf(Play, Next, Previous, PreviousCard)
+        questionBeingRead.paused().availableTransportCommands shouldBe setOf(Play, Next, Previous)
+        listening.paused().availableTransportCommands shouldBe setOf(Play, Next, Previous)
     }
 
     @Test
@@ -144,7 +144,7 @@ class TransportCommandAvailabilityTest {
 
     @Test
     fun `fast read-aloud offers every command until the last card's answer`() {
-        val fast = FastSessionState(cards = cards)
+        val fast = FastSessionState(cards = cards, isReadAloudSession = true)
         fast.availableTransportCommands shouldBe TransportCommandType.entries.toSet()
         fast.copy(currentIndex = CARD_COUNT - 1, isAnswerRevealed = true).availableTransportCommands shouldBe
             setOf(Play, Pause, Previous, PreviousCard, JumpTo, Stop)

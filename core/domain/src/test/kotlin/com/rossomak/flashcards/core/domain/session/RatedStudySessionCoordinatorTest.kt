@@ -152,14 +152,13 @@ class RatedStudySessionCoordinatorTest {
     // Start
 
     @Test
-    fun `a voice-answering session starts the voice stack in question-only mode with the session's voice settings`() = runTest {
+    fun `a voice-answering session starts the voice stack with the session's voice settings`() = runTest {
         startCoordinator()
 
         playbackGateway.calls shouldContainInOrder listOf(
             Call.Start(listOf("card-1", "card-2", "card-3"), 0, "Compose", true),
             Call.SetSpeechRate(SPEECH_RATE),
             Call.SetVoice(VOICE_ID),
-            Call.SetQuestionOnlyMode(true),
         )
         captureGateway.isVoiceAnsweringStarted shouldBe true
     }
@@ -183,6 +182,32 @@ class RatedStudySessionCoordinatorTest {
         events shouldBe listOf(RatedSessionEvent.MicPermissionRevoked)
     }
 
+    @Test
+    fun `a revoked microphone ends the session as abandoned once the user had time to read why`() = runTest {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
+        startCoordinator()
+
+        advanceTimeBy(MIC_REVOKED_END_DELAY - 1.milliseconds)
+        runCurrent()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe true
+    }
+
+    @Test
+    fun `a session stopped before the revoked-microphone delay passes never ends`() = runTest {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
+        val coordinator = startCoordinator()
+
+        coordinator.stop()
+        advanceTimeBy(MIC_REVOKED_END_DELAY)
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+    }
+
     // Timers
 
     @Test
@@ -200,24 +225,76 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `the silence timer starts only once the route is ready`() = runTest {
+    fun `a listening window prepares the microphone, then opens it and plays the cue once`() = runTest {
         val routeReady = CompletableDeferred<Unit>()
         captureGateway.routeReadyGate = routeReady
         val coordinator = startCoordinator()
         openListening()
 
-        advanceTimeBy(ROUTE_READY_TIMEOUT - 1.milliseconds)
-        captureGateway.isListening shouldBe false
+        captureGateway.prepareListeningCount shouldBe 1
+        captureGateway.startListeningCount shouldBe 0
+        coordinator.runningSnapshot.round.isMicrophoneOpen shouldBe false
         routeReady.complete(Unit)
         runCurrent()
-        captureGateway.isListening shouldBe true
-        advanceTimeBy(SILENCE_TIMEOUT - 1.milliseconds)
 
-        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.Listening
+        captureGateway.startListeningCount shouldBe 1
+        coordinator.runningSnapshot.round.isMicrophoneOpen shouldBe true
+        captureGateway.listeningCueCount shouldBe 1
     }
 
     @Test
-    fun `a route that is not ready within 5 seconds pauses voice answering as a capture failure`() = runTest {
+    fun `the silence timer starts only once the microphone opens`() = runTest {
+        captureGateway.reportsMicrophoneOpened = false
+        val coordinator = startCoordinator()
+        openListening()
+        advanceTimeBy(MICROPHONE_OPEN_TIMEOUT - 1.milliseconds)
+        captureGateway.emit(CaptureEvent.MicrophoneOpened)
+        runCurrent()
+
+        advanceTimeBy(SILENCE_TIMEOUT - 1.milliseconds)
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.Listening
+
+        advanceTimeBy(2.milliseconds)
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.SpeakingNotice
+        events shouldBe listOf(RatedSessionEvent.VoiceAnswerSilenceSkip)
+    }
+
+    @Test
+    fun `a microphone that does not open within 3 seconds pauses voice answering as a capture failure`() = runTest {
+        captureGateway.reportsMicrophoneOpened = false
+        val coordinator = startCoordinator()
+        openListening()
+
+        advanceTimeBy(MICROPHONE_OPEN_TIMEOUT - 1.milliseconds)
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+
+        advanceTimeBy(2.milliseconds)
+        captureGateway.isListening shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
+        captureGateway.listeningCueCount shouldBe 0
+        events shouldBe listOf(RatedSessionEvent.VoiceAnswerCaptureUnavailable)
+    }
+
+    @Test
+    fun `a pause while the microphone is being prepared cancels the preparation and stops listening`() = runTest {
+        val routeReady = CompletableDeferred<Unit>()
+        captureGateway.routeReadyGate = routeReady
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.pause()
+        runCurrent()
+        routeReady.complete(Unit)
+        advanceTimeBy(ROUTE_READY_TIMEOUT * 2)
+
+        captureGateway.stopListeningCount shouldBe 1
+        captureGateway.startListeningCount shouldBe 0
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+    }
+
+    @Test
+    fun `a microphone not prepared within 5 seconds pauses voice answering as a capture failure`() = runTest {
         captureGateway.routeReadyGate = CompletableDeferred()
         val coordinator = startCoordinator()
         openListening()
@@ -302,12 +379,12 @@ class RatedStudySessionCoordinatorTest {
         finishNotice()
 
         advanceTimeBy(NOTICE_TAIL - 1.milliseconds)
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
 
         advanceTimeBy(2.milliseconds)
         val syncIndex = playbackGateway.calls.indexOfLast { it is Call.UpdateQueue }
-        val advanceIndex = playbackGateway.calls.indexOf(Call.AdvanceAfterVoiceAnswer)
+        val advanceIndex = playbackGateway.calls.indexOf(Call.PresentQuestion(0))
         (syncIndex in 0 until advanceIndex) shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
     }
@@ -324,14 +401,14 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         advanceTimeBy(NOTICE_TAIL * 2)
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.isPausedAfterFeedback shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
 
         coordinator.play()
 
         playbackGateway.spokenNotices shouldBe List(2) { SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE) }
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         playbackGateway.playCount shouldBe 0
     }
 
@@ -346,13 +423,12 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         advanceTimeBy(NOTICE_TAIL * 2)
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
-        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+        playbackGateway.presentedQuestions.size shouldBe 0
 
         coordinator.play()
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
-        playbackGateway.playCount shouldBe 0
+        // The player only reads a presented question while playing, so moving on from a pause also plays.
+        playbackGateway.calls.takeLast(2) shouldBe listOf(Call.PresentQuestion(0), Call.Play)
     }
 
     // Pause in every phase
@@ -419,13 +495,13 @@ class RatedStudySessionCoordinatorTest {
 
         playbackGateway.calls shouldContain Call.StopFeedback
         playbackGateway.speakingNotices shouldBe listOf(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
 
         finishNotice()
         advanceTimeBy(NOTICE_TAIL + 1.milliseconds)
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
     }
 
@@ -441,7 +517,7 @@ class RatedStudySessionCoordinatorTest {
         advanceTimeBy(NOTICE_TAIL * 2)
 
         playbackGateway.calls.filterIsInstance<Call.UpdateQueue>().size shouldBe 1
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
         coordinator.runningSnapshot.currentCardRatings shouldBe emptyList()
     }
@@ -472,7 +548,6 @@ class RatedStudySessionCoordinatorTest {
             TransportCommandType.Stop,
             TransportCommandType.Next,
             TransportCommandType.Previous,
-            TransportCommandType.PreviousCard,
         )
         playbackGateway.sessionProgressUpdates.last() shouldBe FakeStudyVoicePlaybackGateway.SessionProgress(completedCount = 0, totalCount = 3)
 
@@ -510,7 +585,7 @@ class RatedStudySessionCoordinatorTest {
             completedCount shouldBe 1
         }
         playbackGateway.calls.filterIsInstance<Call.UpdateQueue>() shouldBe emptyList()
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
         playbackGateway.calls.last() shouldBe Call.Pause
     }
 
@@ -521,16 +596,18 @@ class RatedStudySessionCoordinatorTest {
         gradeAndReachAdvancePoint()
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -543,7 +620,7 @@ class RatedStudySessionCoordinatorTest {
         gradeAndReachAdvancePoint()
 
         playbackGateway.calls.drop(callCount).filterIsInstance<Call.Pause>() shouldBe emptyList()
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -555,18 +632,18 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.emitExternal(TransportCommand.Pause)
         runCurrent()
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
-        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 0
+        playbackGateway.presentedQuestions.size shouldBe 0
 
         coordinator.play()
         runCurrent()
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     @Test
@@ -589,7 +666,7 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
         events shouldContain RatedSessionEvent.ExternalTransportCommand(command)
     }
 
@@ -601,6 +678,7 @@ class RatedStudySessionCoordinatorTest {
         events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
 
         coordinator.releaseAdvance()
+        advanceTimeBy(RELEASE_LINGER)
         runCurrent()
 
         events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe false
@@ -621,6 +699,7 @@ class RatedStudySessionCoordinatorTest {
             runCurrent()
             coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe true
             coordinator.releaseAdvance()
+            advanceTimeBy(RELEASE_LINGER)
             runCurrent()
         }
         coordinator.holdAdvance()
@@ -633,14 +712,14 @@ class RatedStudySessionCoordinatorTest {
 
         coordinator.runningSnapshot.isHeldAtAdvancePoint shouldBe false
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
-        val advanceCount = playbackGateway.advanceAfterVoiceAnswerCount
+        val advanceCount = playbackGateway.presentedQuestions.size
 
         coordinator.releaseAdvance()
         coordinator.endTemporaryPause()
         runCurrent()
 
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe advanceCount
+        playbackGateway.presentedQuestions.size shouldBe advanceCount
         captureGateway.isVoiceAnsweringStarted shouldBe false
     }
 
@@ -698,12 +777,12 @@ class RatedStudySessionCoordinatorTest {
         finishNotice()
         advanceTimeBy(NOTICE_TAIL)
         runCurrent()
-        coordinator.runningSnapshot.isPausedAtAdvancePoint shouldBe true
+        playbackGateway.presentedQuestions.size shouldBe 0
 
         coordinator.endTemporaryPause()
         runCurrent()
 
-        playbackGateway.advanceAfterVoiceAnswerCount shouldBe 1
+        playbackGateway.presentedQuestions.size shouldBe 1
     }
 
     private fun TestScope.gradeAndReachAdvancePoint() {
@@ -732,7 +811,7 @@ class RatedStudySessionCoordinatorTest {
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.Silence
         permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Denied)
 
-        coordinator.resume()
+        coordinator.play()
         runCurrent()
 
         events.last() shouldBe RatedSessionEvent.MicPermissionRevoked
@@ -746,7 +825,7 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
 
-        coordinator.resume()
+        coordinator.play()
         runCurrent()
 
         coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
@@ -767,7 +846,7 @@ class RatedStudySessionCoordinatorTest {
         playbackGateway.state.value.isActive shouldBe false
         logger.entries.single().level shouldBe FakeDomainLogger.Level.Warn
 
-        coordinator.resume()
+        coordinator.play()
         runCurrent()
 
         coordinator.runningSnapshot.pauseReason shouldBe null
@@ -898,8 +977,8 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
         val stopsBeforeResume = playbackGateway.stopCount
 
-        coordinator.resume()
-        coordinator.resume()
+        coordinator.play()
+        coordinator.play()
         runCurrent()
 
         playbackGateway.startCalls.size shouldBe 2
@@ -941,18 +1020,29 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-2"
-        playbackGateway.calls.last() shouldBe Call.AdvanceAfterVoiceAnswer
+        playbackGateway.calls.last() shouldBe Call.PresentQuestion(0)
     }
 
     @Test
-    fun `external previous and previous card restart the question`() = runTest {
+    fun `an external previous restarts the question`() = runTest {
         startCoordinator()
 
         playbackGateway.emitExternal(TransportCommand.Previous)
+        runCurrent()
+
+        playbackGateway.presentedQuestions.size shouldBe 1
+    }
+
+    @Test
+    fun `an external previous card is ignored`() = runTest {
+        startCoordinator()
+        val callsBefore = playbackGateway.calls.size
+
         playbackGateway.emitExternal(TransportCommand.PreviousCard)
         runCurrent()
 
-        playbackGateway.restartCurrentCardCount shouldBe 2
+        playbackGateway.calls.size shouldBe callsBefore
+        events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 
     @Test
@@ -975,7 +1065,7 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
 
         coordinator.runningSnapshot.cards.firstOrNull()?.id shouldBe "card-1"
-        playbackGateway.calls shouldNotContain Call.AdvanceAfterVoiceAnswer
+        playbackGateway.calls shouldNotContain Call.PresentQuestion(0)
         events.filterIsInstance<RatedSessionEvent.ExternalTransportCommand>() shouldBe emptyList()
     }
 

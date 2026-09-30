@@ -37,10 +37,13 @@ Two rules decide where state lives:
   transport commands therefore reach the coordinator as `PlaybackEvent.ExternalCommand`; the player
   never acts on them itself.
 - **Timer rule.** Every timer that changes round or session state lives in the coordinator: the
-  silence timeout, the transcript dwell, the notice tail and the rewind threshold. The voice
-  implementation keeps only platform mechanics: the text-to-speech and capture engines, the route
-  handshake, the wake lock, audio-focus requests, string resolution, and the notice watchdog that
-  guarantees every spoken notice reports that it finished.
+  silence timeout, the transcript dwell, the notice tail, the rewind threshold, and Fast
+  read-aloud's pause between a question and its answer and pause between an answer and the next
+  card. The voice implementation keeps only platform mechanics: the text-to-speech and capture
+  engines, the route handshake, the capture and playback wake locks, audio-focus requests, string
+  resolution, and the notice watchdog that guarantees every spoken notice reports that it finished.
+  The Fast coordinator also owns the presented card: the player is told which part of which card to
+  present and never moves on by itself.
 
 One invariant follows: **a session never changes its delivery mode after it starts.** A Rated
 voice-answering session never becomes a manual one, and a Fast read-aloud session never becomes

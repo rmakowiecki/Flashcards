@@ -34,12 +34,22 @@ class FirestoreCurationRemoteDataSourceTest {
     private fun createDataSource() = FirestoreCurationRemoteDataSource(firestore, firebaseAuth)
 
     @Test
-    fun `a write the server never acknowledges counts as done after the offline timeout`() = runTest {
+    fun `a write the server never acknowledges is reported as queued after the offline timeout`() = runTest {
         every { document.set(any(), any<SetOptions>()) } returns pendingTask()
 
-        createDataSource().upsertCurationActions(CARD_ID, SUBCATEGORY_ID, setOf(CurationAction.Delete))
+        val result = createDataSource().upsertCurationActions(CARD_ID, SUBCATEGORY_ID, setOf(CurationAction.Delete))
 
+        result shouldBe CurationWriteResult.Queued
         currentTime shouldBe OFFLINE_WRITE_TIMEOUT.inWholeMilliseconds
+    }
+
+    @Test
+    fun `a write the server acknowledges is reported as confirmed`() = runTest {
+        every { document.set(any(), any<SetOptions>()) } returns completedTask()
+
+        val result = createDataSource().upsertCurationActions(CARD_ID, SUBCATEGORY_ID, setOf(CurationAction.Delete))
+
+        result shouldBe CurationWriteResult.Confirmed
     }
 
     @Test
@@ -56,6 +66,13 @@ class FirestoreCurationRemoteDataSourceTest {
 
     private fun pendingTask(): Task<Void> = mockk(relaxed = true) {
         every { isComplete } returns false
+    }
+
+    private fun completedTask(): Task<Void> = mockk {
+        every { isComplete } returns true
+        every { isCanceled } returns false
+        every { exception } returns null
+        every { result } returns null
     }
 
     private fun failedTask(exception: Exception): Task<Void> = mockk {

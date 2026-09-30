@@ -29,7 +29,7 @@ A bug surfaced during the original implementation: the voice-answering controlle
 ## Consequences
 
 - The voice round (`RatedSessionReducer`'s round, run by `RatedStudySessionCoordinator`) needs states/handling for: waiting-for-question-TTS-to-finish before listening starts, the 8s silence timeout, and pausing/ignoring capture during the grade-feedback notice.
-- `TtsPlayer` needs a Rated-mode playback shape (question-only mode: stop after the question and report `PlaybackEvent.QuestionFinished`, no auto-progress to answer) distinct from Fast mode's continuous auto-advance.
+- `TtsPlayer` stops after every part it reads and reports `PlaybackEvent.QuestionFinished` (or `AnswerFinished`); it never moves on by itself. The Rated coordinator opens the listening window on `QuestionFinished` and never asks for the answer to be read, while the Fast coordinator runs its own question, pause, answer, pause loop on the same reports ([ADR-0012](0012-tts-mediasession-stack-for-fast-mode.md)).
 - `StudySessionScreen.kt`'s `BottomSheetScaffold` content, gated only on `state.isVoiceActive`, needs to branch on Fast vs. Rated-voice-answering-on (different controls, different `sheetPeekHeight` semantics) — it can no longer assume "voice active" means "Fast mode."
 - `functions/src/lib/grading.ts`'s Gemini prompt needs updating to: instruct inclusion of the full acceptable answer in feedback when the grade is Failed/Partial, and keep Correct feedback to a short affirmation.
 - Grade-to-band mapping needs to live somewhere shared enough that both feedback-content logic and the rating-write logic (ADR-0026) reuse it without drift.

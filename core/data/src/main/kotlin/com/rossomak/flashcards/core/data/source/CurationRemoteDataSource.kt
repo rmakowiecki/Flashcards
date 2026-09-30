@@ -7,5 +7,5 @@ interface CurationRemoteDataSource {
 
     suspend fun getCurationRequests(cardIds: List<String>): Map<String, CurationRequestDto>
 
-    suspend fun upsertCurationActions(cardId: String, subcategoryId: String, actions: Set<CurationAction>)
+    suspend fun upsertCurationActions(cardId: String, subcategoryId: String, actions: Set<CurationAction>): CurationWriteResult
 }

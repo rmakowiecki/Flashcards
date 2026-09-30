@@ -53,9 +53,11 @@ data class CapturedUtterance(
  * back to the pocketed phone mic. On a mid-session route change it rebuilds the [AudioRecord] at the
  * next utterance boundary (an [AudioRecord] cannot change device live).
  *
- * Callers own the surrounding foreground-service + wake-lock lifecycle and the session route
- * (feature:study): they call [AudioRouteManager.acquireSessionRoute] before listening and
- * [AudioRouteManager.releaseSessionRoute] at session end.
+ * Callers own the surrounding foreground-service + wake-lock lifecycle and the route: they
+ * activate it per listening window ([AudioRouteManager.activateRoute] before listening,
+ * [AudioRouteManager.deactivateRoute] after), not per session. [VoiceCaptureEvent.MicrophoneOpened]
+ * reports the moment the microphone really records, after the Bluetooth warm-up, so a sound played
+ * in reaction to it cannot end the warm-up early.
  */
 @Singleton
 class VoiceCaptureEngine @Inject constructor(
@@ -241,6 +243,7 @@ class VoiceCaptureEngine @Inject constructor(
                 CaptureResult.Failed
             } else {
                 warmUpBluetoothRoute(audioRecord, route)
+                _events.emit(VoiceCaptureEvent.MicrophoneOpened)
                 captureFrames(audioRecord, maxUtteranceFrames) { routeChangePending.get() }
             }
         } catch (exception: SecurityException) {
