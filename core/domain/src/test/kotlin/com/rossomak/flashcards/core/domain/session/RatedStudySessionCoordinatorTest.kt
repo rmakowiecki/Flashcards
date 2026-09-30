@@ -205,24 +205,76 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `the silence timer starts only once the route is ready`() = runTest {
+    fun `a listening window prepares the microphone, then opens it and plays the cue once`() = runTest {
         val routeReady = CompletableDeferred<Unit>()
         captureGateway.routeReadyGate = routeReady
         val coordinator = startCoordinator()
         openListening()
 
-        advanceTimeBy(ROUTE_READY_TIMEOUT - 1.milliseconds)
-        captureGateway.isListening shouldBe false
+        captureGateway.prepareListeningCount shouldBe 1
+        captureGateway.startListeningCount shouldBe 0
+        coordinator.runningSnapshot.round.isMicrophoneOpen shouldBe false
         routeReady.complete(Unit)
         runCurrent()
-        captureGateway.isListening shouldBe true
-        advanceTimeBy(SILENCE_TIMEOUT - 1.milliseconds)
 
-        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.Listening
+        captureGateway.startListeningCount shouldBe 1
+        coordinator.runningSnapshot.round.isMicrophoneOpen shouldBe true
+        captureGateway.listeningCueCount shouldBe 1
     }
 
     @Test
-    fun `a route that is not ready within 5 seconds pauses voice answering as a capture failure`() = runTest {
+    fun `the silence timer starts only once the microphone opens`() = runTest {
+        captureGateway.reportsMicrophoneOpened = false
+        val coordinator = startCoordinator()
+        openListening()
+        advanceTimeBy(MICROPHONE_OPEN_TIMEOUT - 1.milliseconds)
+        captureGateway.emit(CaptureEvent.MicrophoneOpened)
+        runCurrent()
+
+        advanceTimeBy(SILENCE_TIMEOUT - 1.milliseconds)
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.Listening
+
+        advanceTimeBy(2.milliseconds)
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.SpeakingNotice
+        events shouldBe listOf(RatedSessionEvent.VoiceAnswerSilenceSkip)
+    }
+
+    @Test
+    fun `a microphone that does not open within 3 seconds pauses voice answering as a capture failure`() = runTest {
+        captureGateway.reportsMicrophoneOpened = false
+        val coordinator = startCoordinator()
+        openListening()
+
+        advanceTimeBy(MICROPHONE_OPEN_TIMEOUT - 1.milliseconds)
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+
+        advanceTimeBy(2.milliseconds)
+        captureGateway.isListening shouldBe false
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe VoiceAnswerPauseReason.CaptureFailed
+        captureGateway.listeningCueCount shouldBe 0
+        events shouldBe listOf(RatedSessionEvent.VoiceAnswerCaptureUnavailable)
+    }
+
+    @Test
+    fun `a pause while the microphone is being prepared cancels the preparation and stops listening`() = runTest {
+        val routeReady = CompletableDeferred<Unit>()
+        captureGateway.routeReadyGate = routeReady
+        val coordinator = startCoordinator()
+        openListening()
+
+        coordinator.pause()
+        runCurrent()
+        routeReady.complete(Unit)
+        advanceTimeBy(ROUTE_READY_TIMEOUT * 2)
+
+        captureGateway.stopListeningCount shouldBe 1
+        captureGateway.startListeningCount shouldBe 0
+        coordinator.runningSnapshot.voiceAnswerPauseReason shouldBe null
+        coordinator.runningSnapshot.round.phase shouldBe VoiceAnswerPhase.WaitingForQuestion
+    }
+
+    @Test
+    fun `a microphone not prepared within 5 seconds pauses voice answering as a capture failure`() = runTest {
         captureGateway.routeReadyGate = CompletableDeferred()
         val coordinator = startCoordinator()
         openListening()

@@ -154,11 +154,13 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun stopVoiceAnswering() = voiceCaptureSession.stop()
 
-        suspend fun awaitRouteReady() = voiceCaptureSession.awaitRouteReady()
+        suspend fun prepareListening() = voiceCaptureSession.prepareListening()
 
         fun startListening() = voiceCaptureSession.startListening()
 
         fun stopListening() = voiceCaptureSession.stopListening()
+
+        fun playListeningCue() = voiceCaptureSession.playListeningCue()
 
         fun stopPlayback() = this@StudySessionVoiceService.stopPlayback()
     }

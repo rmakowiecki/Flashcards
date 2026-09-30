@@ -46,6 +46,8 @@ data class RatedStudySessionScreenState(
     val speechRate: Float = VoicePlaybackState.DEFAULT_SPEECH_RATE,
     val isVoiceAnswerEnabled: Boolean = false,
     val voiceAnswerPhase: VoiceAnswerPhase = VoiceAnswerPhase.Idle,
+    // The listening window's microphone records; until then the window is still being prepared.
+    val isVoiceMicrophoneOpen: Boolean = false,
     val voiceAnswerSanitizedTranscript: String? = null,
     // Continuous display state, not a one-shot event: mirrors the current round's grade for as
     // long as VoiceAnswerPhase.SpeakingNotice is reading it aloud, rendered in the bottom sheet
@@ -93,6 +95,7 @@ data class RatedStudySessionScreenState(
         get() = voiceSheetModeOf(
             isVoiceAnswerEnabled = isVoiceAnswerEnabled,
             voiceAnswerPhase = voiceAnswerPhase,
+            isMicrophoneOpen = isVoiceMicrophoneOpen,
             isVoiceAnswerPaused = isVoiceAnswerPaused || isVoiceRoundPaused,
             isShortNoticeSpeaking = isVoiceShortNoticeSpeaking,
             sanitizedTranscript = voiceAnswerSanitizedTranscript,

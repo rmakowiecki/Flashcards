@@ -56,17 +56,26 @@ data class CaptureRoute(
  * Owns microphone *routing* for voice answering — a separable concern from the capture loop in
  * [VoiceCaptureEngine]. Implements the BLE-first, SCO-fallback, Bluetooth-strict policy (ADR-0027):
  *
- * - **BLE-first:** when an LE Audio headset (`TYPE_BLE_HEADSET`) is a communication device it wins —
- *   mic + hi-fi output on one session-long link, no per-turn toggling. Classic SCO
- *   (`TYPE_BLUETOOTH_SCO`) is the fallback only when LE Audio is unavailable.
+ * - **BLE-first:** when an LE Audio headset (`TYPE_BLE_HEADSET`) is a communication device it wins.
+ *   Classic SCO (`TYPE_BLUETOOTH_SCO`) is the fallback only when LE Audio is unavailable.
  * - **Bluetooth-strict:** when a mic-capable BT device is connected but the link is not yet ready,
  *   the route is [CaptureRouteType.Waiting] and callers must NOT capture on the phone mic. The phone
  *   mic is only ever [CaptureRouteType.Phone] when no mic-capable BT device is present (A2DP-only
  *   output does not count).
- * - **Session-level:** [acquireSessionRoute] runs the handshake once per session; the route is held
- *   until [releaseSessionRoute], never toggled per card. Mid-session connect/disconnect is observed
- *   via [AudioDeviceCallback] (API 23+) and the pre-31 SCO-state receiver, re-resolved, and signalled
- *   through [routeChanges] so the engine can switch at an utterance boundary.
+ * - **Per listening window:** [startSession] only starts watching the devices; the route is
+ *   activated by [activateRoute] when a listening window opens and deactivated by [deactivateRoute]
+ *   as soon as it closes. While a call-type Bluetooth link (SCO) is up, the Bluetooth stack drops
+ *   the headset's media buttons (AVRCP passthrough) and plays everything over the narrowband call
+ *   link, so holding it only while listening keeps the headset buttons and media-quality playback
+ *   in every other phase. The price is the link's setup, about a second, before every answer. LE
+ *   Audio takes the same per-window path on purpose: few phone and headset pairs support it, it
+ *   cannot be tested here, and a second, session-long path is not worth its risk.
+ * - **Phone route untouched:** without a mic-capable Bluetooth device, activating and deactivating
+ *   never touches the audio mode or the communication device; the phone microphone just records.
+ * - **Device changes:** connect/disconnect is observed for the whole session via
+ *   [AudioDeviceCallback] (API 23+), the pre-31 SCO-state receiver and the communication-device
+ *   listener. While a route is active it is re-resolved and signalled through [routeChanges], so the
+ *   engine can switch at an utterance boundary; otherwise the next [activateRoute] resolves afresh.
  *
  * `setCommunicationDevice`/`clearCommunicationDevice`/`communicationDevice` are API 31+; below that
  * (minSdk 26) only Classic SCO via `startBluetoothSco`/`stopBluetoothSco` is reachable — LE Audio is
@@ -100,32 +109,49 @@ class AudioRouteManager @Inject constructor(
     private var communicationDeviceListener: AudioManager.OnCommunicationDeviceChangedListener? = null
     private var isSessionActive = false
 
+    @Volatile
+    private var isRouteActive = false
+
+    /** This manager set the call audio mode and a Bluetooth link, so it must undo them. */
+    @Volatile
+    private var isBluetoothLinkActive = false
+
+    /** Starts watching the audio devices. Touches neither the audio mode nor the routing. Idempotent. */
+    fun startSession() {
+        if (isSessionActive) return
+        isSessionActive = true
+        registerDeviceCallback()
+        registerScoStateReceiver()
+        registerCommunicationDeviceListener()
+    }
+
     /**
-     * Resolve and activate the capture route for a listening session. Suspends through the BT
-     * handshake (timeout + retry). Idempotent while a session is active. Registers the dynamic
-     * device callbacks on first call.
+     * Resolves and activates the capture route for one listening window. Suspends through the BT
+     * handshake (timeout + retry). The call audio mode and the Bluetooth link are only set up when a
+     * mic-capable Bluetooth device is present.
      */
-    suspend fun acquireSessionRoute(): CaptureRoute {
-        if (!isSessionActive) {
-            isSessionActive = true
-            registerDeviceCallback()
-            registerScoStateReceiver()
-            registerCommunicationDeviceListener()
-        }
+    suspend fun activateRoute(): CaptureRoute {
+        isRouteActive = true
         return resolveAndActivate()
     }
 
     /** Suspends until the route settles to a capturable one (past any [CaptureRouteType.Waiting]). */
     suspend fun awaitRouteReady(): CaptureRoute = route.first { it.isCapturable }
 
-    /** Tear down routing at session end: clear the communication device / stop SCO, unregister callbacks. */
-    fun releaseSessionRoute() {
+    /** Undoes [activateRoute]: releases the Bluetooth link and the call audio mode, if set. Safe when nothing is active. */
+    fun deactivateRoute() {
+        isRouteActive = false
+        releaseBluetoothLink()
+        _route.value = CaptureRoute(CaptureRouteType.None)
+    }
+
+    /** Ends the session: stops watching the devices, then [deactivateRoute]. */
+    fun releaseSession() {
         isSessionActive = false
         unregisterDeviceCallback()
         unregisterScoStateReceiver()
         unregisterCommunicationDeviceListener()
         deactivateRoute()
-        _route.value = CaptureRoute(CaptureRouteType.None)
     }
 
     private suspend fun resolveAndActivate(): CaptureRoute = resolveMutex.withLock {
@@ -135,6 +161,11 @@ class AudioRouteManager @Inject constructor(
             } else {
                 resolveLegacyScoRoute()
             }
+        // Deactivated while resolving: undo what the handshake set up rather than publish it.
+        if (!isRouteActive) {
+            releaseBluetoothLink()
+            return@withLock CaptureRoute(CaptureRouteType.None)
+        }
         Log.i(TAG, "route resolved -> ${resolved.type} (device=${resolved.device?.type})")
         _route.value = resolved
         resolved
@@ -148,13 +179,14 @@ class AudioRouteManager @Inject constructor(
         val scoDevice = communicationDevices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
         val target = bleDevice ?: scoDevice ?: run {
             // No mic-capable BT communication device (A2DP-only or nothing) -> phone mic allowed.
-            audioManager.clearCommunicationDevice()
-            audioManager.mode = AudioManager.MODE_NORMAL
+            // Undoes a link only when a headset dropped during an active window.
+            releaseBluetoothLink()
             return CaptureRoute(CaptureRouteType.Phone)
         }
         // setCommunicationDevice() is documented to require MODE_IN_COMMUNICATION/MODE_IN_CALL to
         // behave correctly; without it OEM audio HALs commonly apply inconsistent onset gating/AGC
         // on the BT link — swallowed first syllable on every utterance, not just at session start.
+        isBluetoothLinkActive = true
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         val ready = requestCommunicationDevice(target)
         if (!ready) return CaptureRoute(CaptureRouteType.Waiting)
@@ -186,13 +218,20 @@ class AudioRouteManager @Inject constructor(
     /** Pre-31: Classic SCO only. Start SCO and await CONNECTED before treating BT as capturable. */
     @SuppressLint("DEPRECATION")
     private suspend fun resolveLegacyScoRoute(): CaptureRoute {
-        if (!isBluetoothAudioConnected() || !audioManager.isBluetoothScoAvailableOffCall) {
-            runCatching { audioManager.stopBluetoothSco() }
-            audioManager.mode = AudioManager.MODE_NORMAL
+        // SCO only, per the class KDoc: A2DP is output-only and never mic-capable, so an A2DP-only
+        // headphone must fall through to the phone mic rather than get stuck awaiting a SCO link that
+        // isBluetoothScoAvailableOffCall() (a system-wide capability flag, not per-device) would
+        // otherwise make this method wait on indefinitely.
+        val isScoOutputConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+        }
+        if (!isScoOutputConnected || !audioManager.isBluetoothScoAvailableOffCall) {
+            releaseBluetoothLink()
             return CaptureRoute(CaptureRouteType.Phone)
         }
         // See resolveCommunicationRoute(): SCO needs MODE_IN_COMMUNICATION for the onset of capture
         // not to be gated/AGC-chewed by the platform's default (non-communication) audio policy.
+        isBluetoothLinkActive = true
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         val connected = awaitScoConnected()
         if (!connected) {
@@ -223,20 +262,13 @@ class AudioRouteManager @Inject constructor(
         }
     }
 
-    // SCO only, per the class KDoc: A2DP is output-only and never mic-capable, so an A2DP-only
-    // headphone must fall through to the phone mic rather than get stuck awaiting a SCO link that
-    // isBluetoothScoAvailableOffCall() (a system-wide capability flag, not per-device) would
-    // otherwise make this method wait on indefinitely.
-    private fun isBluetoothAudioConnected(): Boolean =
-        audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
-            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-        }
-
     private fun matchingInputDevice(type: Int): AudioDeviceInfo? =
         audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.type == type }
 
     @SuppressLint("DEPRECATION") // stopBluetoothSco is the only teardown path below API 31.
-    private fun deactivateRoute() {
+    private fun releaseBluetoothLink() {
+        if (!isBluetoothLinkActive) return
+        isBluetoothLinkActive = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             audioManager.clearCommunicationDevice()
         } else {
@@ -300,9 +332,12 @@ class AudioRouteManager @Inject constructor(
         communicationDeviceListener = null
     }
 
-    /** A device connect/disconnect happened — re-resolve the route and signal a switch if it changed. */
+    /**
+     * A device connect/disconnect happened. With a route active, re-resolve it and signal a switch if
+     * it changed; otherwise only the next [activateRoute] sees it.
+     */
     private fun onDevicesChanged() {
-        if (!isSessionActive) return
+        if (!isSessionActive || !isRouteActive) return
         scope.launch {
             val previous = _route.value
             val resolved = resolveAndActivate()

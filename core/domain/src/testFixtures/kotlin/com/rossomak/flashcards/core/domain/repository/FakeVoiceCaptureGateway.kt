@@ -15,8 +15,11 @@ class FakeVoiceCaptureGateway : VoiceCaptureGateway {
     /** Drops an emission while nothing collects it. */
     override val rawVoiceLevel = MutableSharedFlow<Float>()
 
-    /** When set, [awaitRouteReady] suspends until it completes, like a Bluetooth route still settling. */
+    /** When set, [prepareListening] suspends until it completes, like a Bluetooth headset still connecting. */
     var routeReadyGate: CompletableDeferred<Unit>? = null
+
+    /** When `false`, [startListening] does not report [CaptureEvent.MicrophoneOpened], like a microphone that never opens. */
+    var reportsMicrophoneOpened = true
 
     var isVoiceAnsweringStarted = false
         private set
@@ -26,7 +29,13 @@ class FakeVoiceCaptureGateway : VoiceCaptureGateway {
         private set
     var isListening = false
         private set
+    var prepareListeningCount = 0
+        private set
     var startListeningCount = 0
+        private set
+    var stopListeningCount = 0
+        private set
+    var listeningCueCount = 0
         private set
 
     fun emit(event: CaptureEvent) {
@@ -44,16 +53,23 @@ class FakeVoiceCaptureGateway : VoiceCaptureGateway {
         isListening = false
     }
 
-    override suspend fun awaitRouteReady() {
+    override suspend fun prepareListening() {
+        prepareListeningCount++
         routeReadyGate?.await()
     }
 
     override fun startListening() {
         startListeningCount++
         isListening = true
+        if (reportsMicrophoneOpened) emit(CaptureEvent.MicrophoneOpened)
     }
 
     override fun stopListening() {
+        stopListeningCount++
         isListening = false
+    }
+
+    override fun playListeningCue() {
+        listeningCueCount++
     }
 }

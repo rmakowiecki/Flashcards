@@ -64,6 +64,18 @@ private fun RatedStudySessionVoiceTransportPausedPreview() {
 
 @Preview
 @Composable
+private fun RatedStudySessionVoicePreparingMicrophonePreview() {
+    RatedStudySessionVoicePreview(
+        state = RatedStudySessionScreenState(
+            isVoicePlaying = true,
+            voiceAnswerPhase = VoiceAnswerPhase.Listening,
+            isVoiceMicrophoneOpen = false,
+        ),
+    )
+}
+
+@Preview
+@Composable
 private fun RatedStudySessionVoiceListeningPreview() {
     RatedStudySessionVoicePreview(
         state = RatedStudySessionScreenState(

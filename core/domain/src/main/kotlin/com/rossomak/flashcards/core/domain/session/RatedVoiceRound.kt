@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // one transition per voice-answering input of the reducer.
+
 package com.rossomak.flashcards.core.domain.session
 
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
@@ -30,9 +32,10 @@ internal fun RatedTransitionBuilder.onQuestionFinished(cardId: String) {
     if (!state.isVoiceAnsweringActive || !isForHead || state.speakingNotices.isNotEmpty()) return
     when (state.round.phase) {
         WaitingForQuestion -> openListeningWindow(cardId)
-        // The question was read again while the microphone was open: restart the window.
+        // The question was read again while the window was open: close it, so the microphone is
+        // never open while a question is read, and open a fresh one.
         Listening, SpeechDetected -> if (state.round.cardId == cardId) {
-            emit(CancelSilenceTimer)
+            emit(StopListening)
             openListeningWindow(cardId)
         }
         VoiceAnswerPhase.Idle, Grading, SpeakingNotice -> Unit
@@ -42,6 +45,29 @@ internal fun RatedTransitionBuilder.onQuestionFinished(cardId: String) {
 private fun RatedTransitionBuilder.openListeningWindow(cardId: String) {
     state = state.copy(round = VoiceAnswerRound(phase = Listening, cardId = cardId))
     emit(RatedSessionEffect.OpenListeningWindow(cardId))
+}
+
+/**
+ * The window's microphone records: the silence timer starts and the listening cue plays, once per
+ * window. A repeat, such as after the capture switched devices, or a late report after the window
+ * closed changes nothing.
+ */
+internal fun RatedTransitionBuilder.onMicrophoneOpened() {
+    if (state.round.phase != Listening || state.round.isMicrophoneOpen) return
+    state = state.copy(round = state.round.copy(isMicrophoneOpen = true))
+    emit(RatedSessionEffect.StartSilenceTimer)
+    emit(RatedSessionEffect.PlayListeningCue)
+}
+
+/**
+ * The player stopped on its own, such as for another app's sound. An open window closes as for a
+ * user pause, so the microphone is never open while the question is read again, and the next
+ * finished question opens a fresh one.
+ */
+internal fun RatedTransitionBuilder.onPlayerStopped() {
+    if (state.round.phase != Listening && state.round.phase != SpeechDetected) return
+    emit(StopListening)
+    state = state.copy(round = state.idleRound())
 }
 
 internal fun RatedTransitionBuilder.onSpeechStarted() {

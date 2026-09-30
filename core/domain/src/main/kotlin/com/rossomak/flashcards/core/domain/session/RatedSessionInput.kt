@@ -25,6 +25,9 @@ sealed interface RatedSessionInput {
     /** "Previous", from the app or from outside it: restart the presented card's question. */
     data object PreviousRequested : RatedSessionInput
     data class QuestionFinished(val cardId: String) : RatedSessionInput
+
+    /** The microphone is recording for the open listening window. May repeat within one window. */
+    data object MicrophoneOpened : RatedSessionInput
     data object SpeechStarted : RatedSessionInput
     data object SpeechEnded : RatedSessionInput
 

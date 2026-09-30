@@ -9,8 +9,8 @@ and a short-notice flag:
 | Mode | When | Shows |
 |---|---|---|
 | `Transport` | question being read, no round running, or paused | transport row + voice-settings cog |
-| `Listening` | `Listening`, `SpeechDetected` | live microphone indicator, centered |
-| `Pending` | `Grading` without a transcript; any short notice | progress disc, centered |
+| `Listening` | `Listening` once the microphone records, `SpeechDetected` | live microphone indicator, centered |
+| `Pending` | `Listening` while the microphone is still being prepared; `Grading` without a transcript; any short notice | progress disc, centered |
 | `GradingWithTranscript` | `Grading` with the sanitized transcript | disc left, "Grading", "Your answer" + transcript |
 | `Graded` | `SpeakingNotice` with a grade | Rating circle left, Rating name, "Your answer rating" + rationale |
 
