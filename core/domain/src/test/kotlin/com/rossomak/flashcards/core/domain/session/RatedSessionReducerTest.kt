@@ -221,6 +221,38 @@ class RatedSessionReducerTest {
     }
 
     @Test
+    fun `the player starting on its own while waiting for the question presents it again`() {
+        val stopped = voiceSession().listening().after(
+            MicrophoneOpened,
+            PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)),
+        )
+
+        val transition = reducer.reduce(stopped, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+
+        transition.effects shouldBe listOf(PresentHeadQuestion)
+    }
+
+    @Test
+    fun `a start the session asked for does not present the question a second time`() {
+        val paused = voiceSession().paused()
+        val played = reducer.reduce(paused, PlayRequested)
+        played.effects shouldBe listOf(Play)
+
+        val transition = reducer.reduce(played.state, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
+    fun `the player starting on its own during a notice does not present the question`() {
+        val speaking = voiceSession().speakingFeedback().after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
+
+        val transition = reducer.reduce(speaking, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
+
+        transition.effects.shouldBeEmpty()
+    }
+
+    @Test
     fun `a finished question while grading is ignored`() {
         val grading = voiceSession().grading()
 

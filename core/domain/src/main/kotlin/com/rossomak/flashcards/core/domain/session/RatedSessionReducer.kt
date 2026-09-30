@@ -232,12 +232,28 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
     private fun RatedTransitionBuilder.onPlaybackChanged(input: PlaybackChanged) {
         val playback = input.playback
         val startedPlaying = playback.isPlaying && !state.isPlaying
+        val isUnsolicitedStart = startedPlaying && !state.isPlayerStartExpected
         if (!playback.isPlaying && state.isPlaying) onPlayerStopped()
         state = state.copy(
             isPlaying = playback.isPlaying,
+            isPlayerStartExpected = if (playback.isPlaying != state.isPlaying) false else state.isPlayerStartExpected,
             isPausedAtAdvancePoint = state.isPausedAtAdvancePoint && !startedPlaying,
             isPausedTemporarily = state.isPausedTemporarily && !startedPlaying,
         )
+        if (isUnsolicitedStart && isWaitingForQuestion()) emit(PresentHeadQuestion)
+    }
+
+    /**
+     * The player started by itself, such as on an audio-focus gain after a loss that closed the
+     * listening window: the round waits for a question that nothing else will read.
+     */
+    private fun RatedTransitionBuilder.isWaitingForQuestion(): Boolean = with(state) {
+        isVoiceAnsweringActive &&
+            !isComplete &&
+            round.phase == VoiceAnswerPhase.WaitingForQuestion &&
+            speakingNotices.isEmpty() &&
+            pauseReason == null &&
+            voiceAnswerPauseReason == null
     }
 
     /**
@@ -322,8 +338,17 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
 internal class RatedTransitionBuilder(var state: RatedSessionState, val random: Random) {
     private val effects = mutableListOf<RatedSessionEffect>()
 
+    /**
+     * Also keeps [RatedSessionState.isPlayerStartExpected]: an effect that makes the player start
+     * expects its report, and one that stops it withdraws the expectation.
+     */
     fun emit(effect: RatedSessionEffect) {
         effects += effect
+        when (effect) {
+            Play, RatedSessionEffect.ResumeWithoutReading, RestartVoiceStack -> state = state.copy(isPlayerStartExpected = true)
+            PausePlayback, RatedSessionEffect.StopVoiceStack -> state = state.copy(isPlayerStartExpected = false)
+            else -> Unit
+        }
     }
 
     fun build(): RatedSessionTransition = RatedSessionTransition(state, effects.toList())
