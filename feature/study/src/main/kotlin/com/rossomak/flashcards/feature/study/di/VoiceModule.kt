@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.study.di
 
+import com.rossomak.flashcards.core.domain.repository.AudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
 import com.rossomak.flashcards.feature.study.voice.data.DefaultStudySessionVoiceGateway
@@ -9,7 +10,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ViewModelComponent
 
 /**
- * Both study voice seams resolve to the one [DefaultStudySessionVoiceGateway] a ViewModel gets: the class
+ * All three study voice seams resolve to the one [DefaultStudySessionVoiceGateway] a ViewModel gets: the class
  * itself is `@ViewModelScoped`, so these bindings stay unscoped. Scoping each binding instead would
  * make two separate instances.
  */
@@ -22,4 +23,7 @@ abstract class VoiceModule {
 
     @Binds
     abstract fun bindVoiceCaptureGateway(gateway: DefaultStudySessionVoiceGateway): VoiceCaptureGateway
+
+    @Binds
+    abstract fun bindAudioInterruptionGateway(gateway: DefaultStudySessionVoiceGateway): AudioInterruptionGateway
 }

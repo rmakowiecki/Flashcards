@@ -1,10 +1,6 @@
 package com.rossomak.flashcards.feature.study.voice.data
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -47,13 +43,16 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * [voiceState] carries the transport state the coordinator reads, without the Media3 types.
  *
- * It makes no session decision. Audio-focus auto-pause and auto-resume are the one behavior it
- * still runs by itself. Each utterance starts with a [PlaybackPreroll], so headset buttons reach this
- * session and Bluetooth speech starts unclipped.
+ * It makes no session decision and starts and stops only on the coordinator's orders: what another
+ * app's audio does to the session is decided by the coordinators from the signals of the
+ * [AudioEnvironmentMonitor], which also holds the audio focus this player requests when it starts
+ * reading. Each utterance starts with a [PlaybackPreroll], so headset buttons reach this session
+ * and Bluetooth speech starts unclipped.
  */
 @UnstableApi
 class TtsPlayer(
     context: Context,
+    private val audioEnvironment: AudioEnvironmentMonitor,
     private val onEvent: (PlaybackEvent) -> Unit,
 ) : SimpleBasePlayer(Looper.getMainLooper()) {
 
@@ -62,13 +61,6 @@ class TtsPlayer(
 
     private val handler = Handler(Looper.getMainLooper())
     private val playbackPreroll = PlaybackPreroll()
-
-    private val audioManager = context.getSystemService(AudioManager::class.java)
-    private var audioFocusRequest: AudioFocusRequest? = null
-    private var wasPlayingBeforeFocusLoss = false
-
-    // Whether the transient focus loss came while playing between parts, with nothing being read.
-    private var wasIdleBeforeFocusLoss = false
 
     private var ttsReady = false
 
@@ -83,9 +75,6 @@ class TtsPlayer(
     private var index = 0
     private var phase = VoicePhase.Question
     private var isPlaying = false
-
-    // An utterance is in flight; false while playing between parts.
-    private var isSpeaking = false
     private var speechRate = VoiceSettings.DEFAULT_SPEECH_RATE
     private var pendingVoiceId: String? = null
     private var subcategoryName = ""
@@ -119,43 +108,6 @@ class TtsPlayer(
             }
         } else {
             onEvent(PlaybackEvent.EngineUnavailable)
-        }
-    }
-
-    /**
-     * Media3 manages audio focus only for [androidx.media3.exoplayer.ExoPlayer]; a custom
-     * [SimpleBasePlayer] must do it manually. Focus is requested once and held for the playback
-     * lifetime (never abandoned on pause — abandoning lets a defensively-paused app such as Spotify
-     * grab the slot), then auto-pauses on loss and auto-resumes on the following gain.
-     *
-     * A permanent [AudioManager.AUDIOFOCUS_LOSS] is the exception: the system drops our request from
-     * the focus stack, so it is forgotten here and the next play requests focus again. It never
-     * auto-resumes. A gain after a loss between parts resumes without reading, so the coordinator
-     * decides the next step; a loss mid-part reads that part again.
-     */
-    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                if (wasPlayingBeforeFocusLoss) {
-                    wasPlayingBeforeFocusLoss = false
-                    if (wasIdleBeforeFocusLoss) resumeWithoutReading() else doPlay()
-                }
-            }
-
-            AudioManager.AUDIOFOCUS_LOSS -> {
-                audioFocusRequest = null
-                wasPlayingBeforeFocusLoss = false
-                if (isPlaying) doPause()
-            }
-
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                if (isPlaying) {
-                    wasPlayingBeforeFocusLoss = true
-                    wasIdleBeforeFocusLoss = !isSpeaking
-                    doPause() // stay registered — AUDIOFOCUS_GAIN fires when the other app releases
-                }
-            }
         }
     }
 
@@ -239,9 +191,8 @@ class TtsPlayer(
      */
     fun resumeWithoutReading() {
         if (cards.isEmpty()) return
-        wasPlayingBeforeFocusLoss = false
         isPlaying = true
-        requestAudioFocus()
+        audioEnvironment.requestFocus()
         publishState()
     }
 
@@ -270,17 +221,14 @@ class TtsPlayer(
 
     /**
      * Starts or resumes reading the part being presented, from its start. Named apart from
-     * [Player.play], which the Media3 session routes to [handleSetPlayWhenReady]. Clears an
-     * auto-resume pending from a transient focus loss: the user decided.
+     * [Player.play], which the Media3 session routes to [handleSetPlayWhenReady].
      */
     fun startReading() {
-        wasPlayingBeforeFocusLoss = false
         doPlay()
     }
 
     /** Pauses reading; the counterpart of [startReading]. */
     fun pauseReading() {
-        wasPlayingBeforeFocusLoss = false
         doPause()
     }
 
@@ -342,7 +290,7 @@ class TtsPlayer(
         startWhenReady = false
         generation++
         stopUtterance()
-        abandonAudioFocus()
+        audioEnvironment.abandonFocus()
         cards = emptyList()
         index = 0
         transportCommands = TransportCommandType.entries.toSet()
@@ -374,9 +322,8 @@ class TtsPlayer(
         val card = cards.getOrNull(index) ?: return
         phase = VoicePhase.Question
         isPlaying = true
-        isSpeaking = true
         val generationId = ++generation
-        requestAudioFocus()
+        audioEnvironment.requestFocus()
         publishState()
         playbackPreroll.play()
         if (!isVoiceApplied) applyVoice(pendingVoiceId)
@@ -392,9 +339,8 @@ class TtsPlayer(
         val card = cards.getOrNull(index) ?: return
         phase = VoicePhase.Answer
         isPlaying = true
-        isSpeaking = true
         val generationId = ++generation
-        requestAudioFocus()
+        audioEnvironment.requestFocus()
         publishState()
         onEvent(PlaybackEvent.AnswerRevealed(card.cardId))
         playbackPreroll.play()
@@ -428,7 +374,6 @@ class TtsPlayer(
         val generationId = utteranceId.substringAfterLast(SEPARATOR).toIntOrNull() ?: return
         if (generationId != generation) return
         generation++
-        isSpeaking = false
         isPlaying = false
         publishState()
     }
@@ -436,7 +381,6 @@ class TtsPlayer(
     private fun onUtteranceDone(utteranceId: String) {
         val generationId = utteranceId.substringAfterLast(SEPARATOR).toIntOrNull() ?: return
         if (generationId != generation) return // superseded by a newer command/utterance
-        isSpeaking = false
         val card = cards.getOrNull(index) ?: return
         when (utteranceId.substringBefore(SEPARATOR)) {
             TAG_QUESTION -> onEvent(PlaybackEvent.QuestionFinished(card.cardId))
@@ -446,14 +390,13 @@ class TtsPlayer(
 
     private fun stopUtterance() {
         generation++ // invalidate the in-flight utterance callback
-        isSpeaking = false
         if (ttsReady) tts.stop()
     }
 
     private fun releaseEngine() {
         generation++
         handler.removeCallbacksAndMessages(null)
-        abandonAudioFocus()
+        audioEnvironment.abandonFocus()
         playbackPreroll.release()
         runCatching {
             tts.stop()
@@ -468,43 +411,6 @@ class TtsPlayer(
             isPlaying = isPlaying,
         )
         invalidateState()
-    }
-
-    /** Request focus once and keep it; a no-op if already held (guards against per-utterance churn). */
-    private fun requestAudioFocus() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (audioFocusRequest != null) return
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
-                .setWillPauseWhenDucked(true)
-                .setAcceptsDelayedFocusGain(true) // queue instead of fail when another app holds focus
-                .setOnAudioFocusChangeListener(audioFocusListener, handler)
-                .build()
-            audioFocusRequest = request
-            audioManager.requestAudioFocus(request)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                audioFocusListener,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN,
-            )
-        }
-    }
-
-    private fun abandonAudioFocus() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(audioFocusListener)
-        }
     }
 
     private companion object {

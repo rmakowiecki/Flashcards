@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
@@ -47,6 +48,9 @@ class VoiceCaptureSession @Inject constructor(
 
     /** 0 whenever the engine is not listening. Computed on the device and never logged, stored or uploaded. */
     val rawVoiceLevel: Flow<Float> = voiceCaptureEngine.inputLevel
+
+    // Closed by the coordinator only; read by the engine's capture loop for every frame.
+    private val captureGate = MutableStateFlow(false)
 
     private var isStarted = false
     private var captureEventsJob: Job? = null
@@ -110,7 +114,12 @@ class VoiceCaptureSession @Inject constructor(
     @SuppressLint("MissingPermission")
     fun startListening() {
         acquireWakeLock()
-        voiceCaptureEngine.startListening()
+        voiceCaptureEngine.startListening(captureGate = captureGate)
+    }
+
+    /** See [com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway.setCaptureGate]. */
+    fun setCaptureGate(closed: Boolean) {
+        captureGate.value = closed
     }
 
     fun stopListening() {

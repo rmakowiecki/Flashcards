@@ -15,6 +15,7 @@ import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal
 import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
@@ -38,8 +39,10 @@ import kotlinx.coroutines.launch
  * Media3 [MediaSessionService] that reads flashcards aloud, with background playback capabilities. It owns a
  * [TtsPlayer] (TextToSpeech wrapped as a Media3 `Player`) and a [MediaSession]; Media3 provides the
  * lock-screen / Bluetooth / notification transport controls, media-button routing and foreground
- * lifecycle. Audio focus is managed inside [TtsPlayer] because Media3 only auto-handles focus for
- * `ExoPlayer`, which we cannot use because it does not support TTS OOTB.
+ * lifecycle. Audio focus is requested by the [AudioEnvironmentMonitor] on behalf of [TtsPlayer]
+ * because Media3 only auto-handles focus for `ExoPlayer`, which we cannot use because it does not
+ * support TTS OOTB. The monitor also reports what other apps do to the audio; the coordinators
+ * decide what that means.
  *
  * [DefaultStudySessionVoiceGateway] binds via [LocalBinder] (custom [ACTION_BIND_LOCAL] intent) to push the
  * card queue and drive playback, and observes [LocalBinder.state] — which carries the TTS-specific
@@ -70,6 +73,9 @@ class StudySessionVoiceService : MediaSessionService() {
     @Inject
     lateinit var voiceCaptureSession: VoiceCaptureSession
 
+    @Inject
+    lateinit var audioEnvironmentMonitor: AudioEnvironmentMonitor
+
     private val binder = LocalBinder()
 
     // Single collector (the gateway); unlimited so nothing reported before it subscribes is lost.
@@ -99,6 +105,8 @@ class StudySessionVoiceService : MediaSessionService() {
         val captureEvents: Flow<CaptureEvent> get() = voiceCaptureSession.events
 
         val rawVoiceLevel: Flow<Float> get() = voiceCaptureSession.rawVoiceLevel
+
+        val audioSignals: Flow<AudioEnvironmentSignal> get() = audioEnvironmentMonitor.signals
 
         fun loadSession(cards: List<VoiceFlashcard>, startIndex: Int, sessionTitle: String, isVoiceAnsweringSession: Boolean) {
             this@StudySessionVoiceService.isVoiceAnsweringSession = isVoiceAnsweringSession
@@ -156,6 +164,8 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun playListeningCue() = voiceCaptureSession.playListeningCue()
 
+        fun setCaptureGate(closed: Boolean) = voiceCaptureSession.setCaptureGate(closed)
+
         fun stopPlayback() = this@StudySessionVoiceService.stopPlayback()
     }
 
@@ -165,7 +175,8 @@ class StudySessionVoiceService : MediaSessionService() {
         // own shutdown() call by a beat (async unbind), and would otherwise pin the whole Service
         // (MediaSession, CoroutineScope, VoiceCaptureSession) alive past onDestroy() (leak). Both
         // engines start here, so both initialize as soon as the voice stack starts.
-        player = TtsPlayer(applicationContext) { event -> playbackEvents.trySend(event) }
+        audioEnvironmentMonitor.start()
+        player = TtsPlayer(applicationContext, audioEnvironmentMonitor) { event -> playbackEvents.trySend(event) }
         noticeSpeaker = NoticeSpeaker(
             scope = serviceScope,
             resolveText = applicationContext::spokenText,
@@ -263,6 +274,7 @@ class StudySessionVoiceService : MediaSessionService() {
     override fun onDestroy() {
         voiceCaptureSession.release()
         noticeSpeaker.release()
+        audioEnvironmentMonitor.release()
         serviceScope.cancel()
         playbackWakeLock.release()
         mediaSession.release()
