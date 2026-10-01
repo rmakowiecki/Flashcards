@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.domain.repository.FakeAppShortcutsRepository
@@ -22,7 +23,6 @@ import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsCo
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
@@ -607,8 +607,8 @@ class CategoryDetailsViewModelTest {
 
             viewModel.state.assertValue {
                 isProgressResolved shouldBe true
-                progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 2, masteredCount = 1)
-                progressFor("sub-2") shouldBe SubcategoryProgress.Resolved(studiedCount = 3, masteredCount = 3)
+                progressFor("sub-1") shouldBe SubcategoryProgressState.Resolved(studiedCount = 2, masteredCount = 1)
+                progressFor("sub-2") shouldBe SubcategoryProgressState.Resolved(studiedCount = 3, masteredCount = 3)
             }
         }
 
@@ -625,7 +625,7 @@ class CategoryDetailsViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.assertValue {
-                progressFor("sub-2") shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+                progressFor("sub-2") shouldBe SubcategoryProgressState.Resolved(studiedCount = 0, masteredCount = 0)
             }
         }
 
@@ -643,7 +643,7 @@ class CategoryDetailsViewModelTest {
             viewModel.state.assertValue {
                 isProgressResolved shouldBe true
                 subcategories.forEach { subcategory ->
-                    progressFor(subcategory.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+                    progressFor(subcategory.id) shouldBe SubcategoryProgressState.Resolved(studiedCount = 0, masteredCount = 0)
                 }
             }
         }
@@ -666,7 +666,7 @@ class CategoryDetailsViewModelTest {
         advanceUntilIdle()
 
         subcategories.forEach { subcategory ->
-            val progress = viewModel.state.value.progressFor(subcategory.id) as SubcategoryProgress.Resolved
+            val progress = viewModel.state.value.progressFor(subcategory.id) as SubcategoryProgressState.Resolved
             (progress.masteredCount <= progress.studiedCount) shouldBe true
         }
     }
@@ -682,7 +682,7 @@ class CategoryDetailsViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 2, masteredCount = 1)
+            viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgressState.Resolved(studiedCount = 2, masteredCount = 1)
 
             // Mirrors a session finishing (or connectivity returning) after the screen is already
             // showing the subcategory list — the listener re-fires and the ring updates in place.
@@ -693,7 +693,7 @@ class CategoryDetailsViewModelTest {
 
             viewModel.state.assertValue {
                 content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
-                progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 5, masteredCount = 3)
+                progressFor("sub-1") shouldBe SubcategoryProgressState.Resolved(studiedCount = 5, masteredCount = 3)
             }
         }
 
@@ -714,13 +714,13 @@ class CategoryDetailsViewModelTest {
 
         viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
         viewModel.state.value.isProgressResolved shouldBe false
-        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Unresolved
+        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgressState.Unresolved
 
         summaryGate.complete(Unit)
         advanceUntilIdle()
 
         viewModel.state.value.isProgressResolved shouldBe true
-        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgress.Resolved(studiedCount = 1, masteredCount = 0)
+        viewModel.state.value.progressFor("sub-1") shouldBe SubcategoryProgressState.Resolved(studiedCount = 1, masteredCount = 0)
     }
 
     @Test
@@ -739,7 +739,7 @@ class CategoryDetailsViewModelTest {
 
             // Subcategory list is in, summary is still parked: rows exist but every one is unresolved.
             viewModel.state.value.content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
-            subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgress.Unresolved }
+            subcategories.forEach { viewModel.state.value.progressFor(it.id) shouldBe SubcategoryProgressState.Unresolved }
 
             summaryGate.complete(Unit)
             advanceUntilIdle()

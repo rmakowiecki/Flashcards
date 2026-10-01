@@ -4,7 +4,7 @@ import com.google.firebase.Timestamp
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
-import com.rossomak.flashcards.core.data.model.SubcategoryProgressDto
+import com.rossomak.flashcards.core.data.model.SubcategoryProgressDetailsDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
@@ -273,7 +273,7 @@ class PendingSessionProjectorTest {
         pendingSessionQueue.seed(sessionResult.toDto(uid))
     }
 
-    private fun remoteProgress(vararg cards: Pair<String, FlashcardStudyProgressState>) = SubcategoryProgressDto(
+    private fun remoteProgress(vararg cards: Pair<String, FlashcardStudyProgressState>) = SubcategoryProgressDetailsDto(
         categoryId = CATEGORY_ID,
         cards = cards.associate { (cardId, state) -> cardId to CardProgressEntryDto(state = state.name, firstStudiedAt = Timestamp(Date.from(SESSION_ONE_START))) },
     )

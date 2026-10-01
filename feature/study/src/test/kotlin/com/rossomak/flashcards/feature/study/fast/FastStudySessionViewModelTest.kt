@@ -27,7 +27,7 @@ import com.rossomak.flashcards.core.domain.session.QUESTION_TO_ANSWER_PAUSE
 import com.rossomak.flashcards.core.domain.session.RELEASE_LINGER
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressDetailsUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -85,8 +85,8 @@ class FastStudySessionViewModelTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val getFlashcards = GetFlashcardsUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
-    private val getSubcategoryProgress = GetSubcategoryProgressUseCase(cardProgressRepository)
-    private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress)
+    private val getSubcategoryProgressDetails = GetSubcategoryProgressDetailsUseCase(cardProgressRepository)
+    private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgressDetails)
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val interruptionGateway = FakeAudioInterruptionGateway()
     private val clock = MutableClock(FIXED_INSTANT)

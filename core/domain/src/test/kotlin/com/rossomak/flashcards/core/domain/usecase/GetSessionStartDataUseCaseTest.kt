@@ -3,7 +3,7 @@ package com.rossomak.flashcards.core.domain.usecase
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import io.kotest.matchers.shouldBe
@@ -14,7 +14,7 @@ import org.junit.Test
 
 /**
  * [GetSessionStartDataUseCase] is a pure fan-out/merge composition of [GetFlashcardsUseCase] and
- * [GetSubcategoryProgressUseCase] — every rule about *what* each one returns is pinned on their own
+ * [GetSubcategoryProgressDetailsUseCase] — every rule about *what* each one returns is pinned on their own
  * tests; this file only covers the composing itself.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -24,7 +24,7 @@ class GetSessionStartDataUseCaseTest {
     private val cardProgressRepository = FakeCardProgressRepository()
     private val useCase = GetSessionStartDataUseCase(
         GetFlashcardsUseCase(flashcardRepository),
-        GetSubcategoryProgressUseCase(cardProgressRepository),
+        GetSubcategoryProgressDetailsUseCase(cardProgressRepository),
     )
 
     private fun flashcard(id: String, subcategoryId: String): Flashcard = Flashcard(
@@ -79,14 +79,14 @@ class GetSessionStartDataUseCaseTest {
     fun `merges prior progress entries from every subcategory into one map keyed by card id`() = runTest {
         val firstStudiedAt = Instant.parse("2026-09-06T10:00:00Z")
         cardProgressRepository.seed(
-            SubcategoryProgress(
+            SubcategoryProgressDetails(
                 subcategoryId = "sub-1",
                 categoryId = "cat-1",
                 cards = mapOf("card-1" to CardProgressEntry(state = FlashcardStudyProgressState.Mastered, firstStudiedAt = firstStudiedAt, masteredAt = firstStudiedAt)),
             ),
         )
         cardProgressRepository.seed(
-            SubcategoryProgress(
+            SubcategoryProgressDetails(
                 subcategoryId = "sub-2",
                 categoryId = "cat-1",
                 cards = mapOf("card-2" to CardProgressEntry(state = FlashcardStudyProgressState.Failed, firstStudiedAt = firstStudiedAt, masteredAt = null)),

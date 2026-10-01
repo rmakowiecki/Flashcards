@@ -3,7 +3,7 @@ package com.rossomak.flashcards.core.data.repository
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.source.ProgressSummaryRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.scoring.SubcategoryProgressDelta
@@ -42,7 +42,7 @@ class DefaultCardProgressRepository @Inject constructor(
 ) : CardProgressRepository {
 
     /** See [PendingSessionProjector.projectCardProgress] for when a failed remote read still succeeds. */
-    override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgress?> = pendingSessionProjector.projectCardProgress(subcategoryId)
+    override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> = pendingSessionProjector.projectCardProgress(subcategoryId)
 
     /**
      * Completes when the remote summary flow completes (on sign-out), even though the queue is still

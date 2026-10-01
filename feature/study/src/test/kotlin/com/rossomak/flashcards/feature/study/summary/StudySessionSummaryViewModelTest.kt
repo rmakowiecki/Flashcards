@@ -9,7 +9,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.StudyMode
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
@@ -405,7 +405,7 @@ class StudySessionSummaryViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             // The route says card-0 was not previously Mastered; the prior Card Progress says it was.
             cardProgressRepository.seed(
-                SubcategoryProgress(
+                SubcategoryProgressDetails(
                     subcategoryId = "sub-1",
                     categoryId = "cat-1",
                     cards = mapOf("card-0" to CardProgressEntry(FlashcardStudyProgressState.Mastered, firstStudiedAt = Instant.EPOCH, masteredAt = Instant.EPOCH)),

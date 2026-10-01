@@ -1178,6 +1178,19 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
+    fun `a quick route without a pool shows no topics while the pool is loading`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+
+            val viewModel = createViewModel()
+
+            viewModel.state.value.isLoading shouldBe true
+            viewModel.state.value.subcategoryNames shouldBe emptyList()
+            advanceUntilIdle()
+            viewModel.state.value.subcategoryNames.isNotEmpty() shouldBe true
+        }
+
+    @Test
     fun `a fetched pool is sampled within the seeded subcategoryCountRange`() =
         runTest(mainDispatcherRule.testDispatcher) {
             seedPoolLessQuickSession()

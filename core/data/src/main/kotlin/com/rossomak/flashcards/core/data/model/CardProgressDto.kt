@@ -2,7 +2,7 @@ package com.rossomak.flashcards.core.data.model
 
 import com.google.firebase.Timestamp
 
-data class SubcategoryProgressDto(
+data class SubcategoryProgressDetailsDto(
     val categoryId: String = "",
     val cards: Map<String, CardProgressEntryDto> = emptyMap(),
 )

@@ -15,7 +15,7 @@ data class SubcategoryProgressSummary(
  * The User's per-Subcategory progress-summary (ADR-0016):
  * `users/{uid}/progress/summary`. One document answers every ring on Category Details, Browse Screen and the
  * Home screen's progress displays, whatever the Category — the alternative, reading each
- * Subcategory's packed [SubcategoryProgress], would cost one read per subcategory instead of one per screen.
+ * Subcategory's packed [SubcategoryProgressDetails], would cost one read per subcategory instead of one per screen.
  *
  * A Subcategory absent from [subcategories] has never been studied; a `null` [ProgressSummary] itself
  * means the User has never finished a session at all. Both render as an empty ring — the display's concern, not this type's.

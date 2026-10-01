@@ -13,7 +13,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
@@ -208,7 +208,7 @@ class SubmitStudySessionUseCaseTest {
     @Test
     fun `a card with no prior entry counts as new, a card with one does not`() = runTest {
         cardProgressRepository.seed(
-            SubcategoryProgress(subcategoryId = "sub-1", categoryId = "cat-1", cards = mapOf("card-2" to priorEntry())),
+            SubcategoryProgressDetails(subcategoryId = "sub-1", categoryId = "cat-1", cards = mapOf("card-2" to priorEntry())),
         )
         val session = ratedSessionResult(
             cardResults = listOf(
@@ -328,7 +328,7 @@ class SubmitStudySessionUseCaseTest {
     @Test
     fun `a card Mastered in the prior Card Progress scores as defended, whatever the session's own flag says`() = runTest {
         cardProgressRepository.seed(
-            SubcategoryProgress(subcategoryId = SUBCATEGORY_ID, categoryId = CATEGORY_ID, cards = mapOf(CARD_ID to priorEntry(FlashcardStudyProgressState.Mastered))),
+            SubcategoryProgressDetails(subcategoryId = SUBCATEGORY_ID, categoryId = CATEGORY_ID, cards = mapOf(CARD_ID to priorEntry(FlashcardStudyProgressState.Mastered))),
         )
         val session = ratedSessionResult(cardResults = listOf(ratedEntry(cardId = CARD_ID, state = FlashcardStudyProgressState.Mastered)))
 

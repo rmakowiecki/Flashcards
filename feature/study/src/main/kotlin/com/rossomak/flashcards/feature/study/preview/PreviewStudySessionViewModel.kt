@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.Flashcard
@@ -72,7 +73,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * The Quick Session's candidate pool (id to name), held so every re-randomise samples the same
      * pool and a name lookup is indexed once rather than re-scanned per sampled id. Seeded from the
      * route's parallel id/name lists when the caller supplied them; otherwise null until
-     * [resampleSubcategories] fetches it once (ADR-0056). Always null for a non-Quick session.
+     * [resampleSubcategories] fetches it once (ADR-0056). Never fetched for a non-Quick session.
      */
     private var candidatePool: Map<String, String>? =
         route.subcategoryIds.zip(route.subcategoryNames).toMap().takeIf { it.isNotEmpty() }
@@ -484,9 +485,10 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * Samples a fresh Quick Session subcategory subset and holds it in state. Called on load and
-     * on Re-randomise only — every other selection reuses what's already there, which is what
-     * keeps the sample stable while the user adjusts a filter, the length or the sort (ADR-0040).
+     * Samples a fresh Quick Session subcategory subset and holds it in state. Called on load, on
+     * Re-randomise, and on Retry when no pool is held yet — every other selection reuses what's
+     * already there, which is what keeps the sample stable while the user adjusts a filter, the
+     * length or the sort (ADR-0040).
      *
      * Fetches the Category's Subcategories as the pool first when the route supplied none, and
      * only once: a held pool is reused (ADR-0056).
@@ -495,9 +497,8 @@ class PreviewStudySessionViewModel @Inject constructor(
      */
     private suspend fun resampleSubcategories(): Boolean {
         val pool = candidatePool ?: run {
-            _state.update { it.copy(isLoading = true, error = null) }
             getSubcategories(route.categoryId)
-                .onFailure { error -> logw(error) { "Failed to fetch Subcategories for Quick Session pool" } }
+                .onFailure { error -> loge(error) { "Failed to fetch Subcategories for Quick Session pool" } }
                 .getOrNull()
                 ?.associate { subcategory -> subcategory.id to subcategory.name }
                 ?.also { fetchedPool -> candidatePool = fetchedPool }

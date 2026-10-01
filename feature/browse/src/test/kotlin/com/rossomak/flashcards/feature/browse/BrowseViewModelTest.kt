@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
@@ -13,7 +14,6 @@ import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserFavoritesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SearchCategoriesUseCase
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -277,7 +277,7 @@ class BrowseViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.isProgressResolved shouldBe true
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 4, masteredCount = 2)
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Resolved(studiedCount = 4, masteredCount = 2)
         }
 
     @Test
@@ -292,7 +292,7 @@ class BrowseViewModelTest {
             viewModel.onSearchQueryChange("compose")
             advanceUntilIdle()
 
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Resolved(studiedCount = 0, masteredCount = 0)
         }
 
     @Test
@@ -317,13 +317,13 @@ class BrowseViewModelTest {
             status.shouldBeInstanceOf<SearchStatus.Results>()
             status.results.subcategories shouldContainExactly listOf(compose)
             viewModel.state.value.isProgressResolved shouldBe false
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Unresolved
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Unresolved
 
             summaryGate.complete(Unit)
             advanceUntilIdle()
 
             viewModel.state.value.isProgressResolved shouldBe true
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 4, masteredCount = 2)
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Resolved(studiedCount = 4, masteredCount = 2)
         }
 
     @Test
@@ -338,7 +338,7 @@ class BrowseViewModelTest {
             advanceUntilIdle()
             viewModel.onSearchQueryChange("compose")
             advanceUntilIdle()
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 1, masteredCount = 0)
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Resolved(studiedCount = 1, masteredCount = 0)
 
             // Mirrors a session finishing (or connectivity returning) after the screen is already
             // showing search results — the listener re-fires and the ring updates in place.
@@ -347,7 +347,7 @@ class BrowseViewModelTest {
             )
             advanceUntilIdle()
 
-            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgress.Resolved(studiedCount = 4, masteredCount = 2)
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Resolved(studiedCount = 4, masteredCount = 2)
         }
 
     @Test
@@ -386,7 +386,7 @@ class BrowseViewModelTest {
         viewModel.onSearchQueryChange("compose")
         advanceUntilIdle()
 
-        val progress = viewModel.state.value.progressFor(compose.id) as SubcategoryProgress.Resolved
+        val progress = viewModel.state.value.progressFor(compose.id) as SubcategoryProgressState.Resolved
         (progress.masteredCount <= progress.studiedCount) shouldBe true
     }
 

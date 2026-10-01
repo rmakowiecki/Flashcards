@@ -51,6 +51,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Resolved
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Unresolved
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
@@ -78,8 +81,6 @@ import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsCo
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.PreviewStudySession
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryPreviewStudySession
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Resolved
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress.Unresolved
 import com.rossomak.flashcards.feature.browse.rememberProgressFor
 
 @Composable
@@ -461,7 +462,7 @@ private fun SubcategoryList(
     isSelectionMode: Boolean,
     selectedSubcategoryIds: Set<String>,
     favorites: UserFavorites,
-    progressFor: (String) -> SubcategoryProgress,
+    progressFor: (String) -> SubcategoryProgressState,
     onSubcategorySelect: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
     onSubcategoryLongPress: (String) -> Unit,
@@ -503,7 +504,7 @@ private const val PROGRESS_PERCENT_SCALE = 100
  * [CategoryDetailsRowSubtitle] drops the segment rather than showing "— studied" or "0 studied".
  */
 @Composable
-private fun SubcategoryProgress.studiedLabel(): String? =
+private fun SubcategoryProgressState.studiedLabel(): String? =
     when (this) {
         Unresolved -> null
         is Resolved -> if (studiedCount > 0) stringResource(R.string.category_details_topic_studied_label, studiedCount) else null
@@ -511,10 +512,10 @@ private fun SubcategoryProgress.studiedLabel(): String? =
 
 /**
  * Names Studied, never a number in the unknown state. [cardCount] is the ring's denominator — kept
- * separate from [SubcategoryProgress] itself, which only ever holds the summary's raw counts.
+ * separate from [SubcategoryProgressState] itself, which only ever holds the summary's raw counts.
  */
 @Composable
-private fun SubcategoryProgress.ringContentDescription(cardCount: Int): String =
+private fun SubcategoryProgressState.ringContentDescription(cardCount: Int): String =
     when (this) {
         Unresolved -> stringResource(R.string.category_details_topic_progress_unavailable_cd)
         is Resolved -> stringResource(
@@ -522,10 +523,6 @@ private fun SubcategoryProgress.ringContentDescription(cardCount: Int): String =
             (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).toInt(),
         )
     }
-
-/** The ring's fill, `0f` for a subcategory with no cards rather than dividing by zero. */
-private fun Resolved.studiedFraction(cardCount: Int): Float =
-    if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 
 /**
  * A subcategory (topic) row, shaped by [isSelectionMode]:
@@ -550,7 +547,7 @@ private fun SubcategoryRow(
     isSelectionMode: Boolean,
     isSelected: Boolean,
     isFavorited: Boolean,
-    progress: SubcategoryProgress,
+    progress: SubcategoryProgressState,
     onSelect: (Subcategory) -> Unit,
     onSessionStart: (Subcategory) -> Unit,
     onLongPress: (String) -> Unit,

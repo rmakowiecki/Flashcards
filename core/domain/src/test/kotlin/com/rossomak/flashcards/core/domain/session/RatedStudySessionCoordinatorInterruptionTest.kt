@@ -32,7 +32,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeVoiceAnswerGradingRepo
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressDetailsUseCase
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
@@ -63,7 +63,7 @@ class RatedStudySessionCoordinatorInterruptionTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val getSessionStartData = GetSessionStartDataUseCase(
         GetFlashcardsUseCase(flashcardRepository),
-        GetSubcategoryProgressUseCase(FakeCardProgressRepository()),
+        GetSubcategoryProgressDetailsUseCase(FakeCardProgressRepository()),
     )
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val captureGateway = FakeVoiceCaptureGateway()

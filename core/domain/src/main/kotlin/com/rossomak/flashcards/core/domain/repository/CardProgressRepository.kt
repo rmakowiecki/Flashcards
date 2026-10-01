@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.Flow
  */
 interface CardProgressRepository {
     /** `null` when the User has never studied a card in this Subcategory yet. */
-    suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgress?>
+    suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgressDetails?>
 
     /**
      * A live Firestore listener on the summary singleton, not a one-shot read — re-emits on every
