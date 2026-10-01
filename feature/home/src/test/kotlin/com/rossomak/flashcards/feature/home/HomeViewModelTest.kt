@@ -1,8 +1,5 @@
 package com.rossomak.flashcards.feature.home
 
-import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
-import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
-import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,16 +12,12 @@ class HomeViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val flashcardRepository = FakeFlashcardRepository()
-    private val userFavoritesRepository = FakeUserFavoritesRepository()
-    private val observeFavoriteItems = ObserveFavoriteItemsUseCase(userFavoritesRepository, flashcardRepository)
-
-    private fun createViewModel(): HomeViewModel = HomeViewModel(observeFavoriteItems)
+    private fun createViewModel(): HomeViewModel = HomeViewModel()
 
     @Test
-    fun `initial state exposes the default home screen state`() {
+    fun `initial state reports progress as unresolved`() {
         val viewModel = createViewModel()
 
-        viewModel.state.value shouldBe HomeScreenState()
+        viewModel.state.value.isProgressResolved shouldBe false
     }
 }
