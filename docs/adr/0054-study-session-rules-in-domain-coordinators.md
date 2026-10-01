@@ -65,9 +65,37 @@ classifies each signal by severity and decides nothing about playback:
   and never resume on their own;
 - a headset disconnect is a user pause, and never resumes on the device speaker by itself.
 
-While a call rings or runs, no play starts anything, and a user play is answered with a message
-instead. Signals carry no time; the coordinator stamps each with its time source when it arrives, and
-the 60 s window is checked from those stamps at the end of the interruption, so it needs no timer.
+While a call rings or runs, no transport command is on offer anywhere. Both reducer states return an
+empty `availableTransportCommands` set, so the in-app buttons are disabled, the media notification
+shows none, and Media3 refuses what a headset or the notification still sends. The notification
+hides its buttons rather than greying them: Media3 has no disabled state for a command. A command
+that still reaches a coordinator is dropped before the reducer, silently, because the notification
+cannot show a refusal. The reducers keep their own check as a backstop: a play that races the block
+starts nothing and answers with a message. The reducer also emits that message once, when the audio
+mode first turns call-blocking, so the user learns why the controls went dark; the ViewModel maps it
+like any other session event.
+
+A session that opens during a call is blocked from the start: the platform adapter reads the live
+audio mode when it starts and takes it as the baseline later changes are compared with, so the end
+of the ring is seen as well. A call known only by its audio mode starts no interruption, because the
+session never held focus to lose; if the player plays anyway, the reducer pauses the session as for
+a user pause, so only the user's play resumes it, also after the call ends. The pause is triggered by
+the player's report and not by the mode alone, because during a session the mode arrives just before
+the focus loss that holds the session, and pausing on the mode would end the auto-resume of a ring
+that is declined. A part that starts inside that gap does pause the session, so a declined ring then
+leaves it paused until the user plays: the narrow price of never playing over a ring.
+
+A blocked session cannot play, so nothing would ask for focus and see the call end. The adapter
+therefore queues a focus request when the session opens during a call; the system grants it once the
+call lets go of focus, and every focus change makes the adapter read the mode again. Below Android 12
+(API 31) the platform has no audio-mode callback and the app does not poll: there the adapter also
+reads the mode when any app's playback starts or stops (API 26 and later), which is how the end of a
+ringtone is seen. Below API 26 a call that ends without a focus change stays unseen until the next
+signal, and the close button leaves the session. A ring that no audio mode reports (a messaging app's
+own ringtone, or a silent ring) cannot be blocked.
+
+Signals carry no time; the coordinator stamps each with its time source when it arrives, and the
+60 s window is checked from those stamps at the end of the interruption, so it needs no timer.
 
 One invariant follows: **a session never changes its delivery mode after it starts.** A Rated
 voice-answering session never becomes a manual one, and a Fast read-aloud session never becomes

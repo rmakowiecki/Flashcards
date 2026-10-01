@@ -314,6 +314,35 @@ class FastSessionReducerInterruptionTest {
     // The call block
 
     @Test
+    fun `a call that starts reports it once, however the call then moves on`() {
+        val ringing = readingQuestion().reduce(signal(AudioModeChanged(AudioMode.Ringtone)))
+        val pickedUp = ringing.state.reduce(signal(AudioModeChanged(AudioMode.InCall)))
+        val ended = pickedUp.state.reduce(signal(AudioModeChanged(AudioMode.Normal)))
+        val ringingAgain = ended.state.reduce(signal(AudioModeChanged(AudioMode.Ringtone)))
+
+        ringing.effects shouldContain Emit(FastSessionEvent.PlayIgnoredDuringCall)
+        pickedUp.effects shouldNotContain Emit(FastSessionEvent.PlayIgnoredDuringCall)
+        ended.effects shouldNotContain Emit(FastSessionEvent.PlayIgnoredDuringCall)
+        ringingAgain.effects shouldContain Emit(FastSessionEvent.PlayIgnoredDuringCall)
+    }
+
+    @Test
+    fun `a player that starts reading under a ringing call is paused, and stays paused when the call ends`() {
+        val ringing = session.after(signal(AudioModeChanged(AudioMode.Ringtone)))
+
+        val started = ringing.reduce(playback(true))
+        val ended = started.state.after(playback(false)).reduce(signal(AudioModeChanged(AudioMode.Normal)))
+
+        started.effects shouldContain PausePlayback
+        ended.effects shouldNotContain Play
+    }
+
+    @Test
+    fun `a player that starts reading with no call is left alone`() {
+        session.reduce(playback(true)).effects shouldNotContain PausePlayback
+    }
+
+    @Test
     fun `a play after an engine failure starts no voice stack while a call rings`() {
         val failed = readingQuestion().after(PlaybackEngineUnavailable, signal(AudioModeChanged(AudioMode.Ringtone)))
 

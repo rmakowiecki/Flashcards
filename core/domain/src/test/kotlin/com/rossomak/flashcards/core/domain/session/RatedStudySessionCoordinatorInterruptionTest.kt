@@ -34,7 +34,9 @@ import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
@@ -413,17 +415,63 @@ class RatedStudySessionCoordinatorInterruptionTest {
     }
 
     @Test
-    fun `a play during a call does nothing but tell the user`() = runTest {
+    fun `a call that starts tells the user once`() = runTest {
+        startCoordinator()
+        emit(AudioModeChanged(AudioMode.InCall))
+        emit(FocusChange.LossTransient)
+
+        events.count { it == RatedSessionEvent.PlayIgnoredDuringCall } shouldBe 1
+    }
+
+    @Test
+    fun `a play from the app during a call starts nothing and tells the user again`() = runTest {
         val coordinator = startCoordinator()
         emit(AudioModeChanged(AudioMode.InCall))
         emit(FocusChange.LossTransient)
 
         coordinator.play()
-        playbackGateway.emitExternal(TransportCommand.Play)
         runCurrent()
 
         playbackGateway.playCount shouldBe 0
         events.count { it == RatedSessionEvent.PlayIgnoredDuringCall } shouldBe 2
+    }
+
+    @Test
+    fun `a play from a headset during a call is dropped without a message`() = runTest {
+        startCoordinator()
+        emit(AudioModeChanged(AudioMode.InCall))
+        emit(FocusChange.LossTransient)
+
+        playbackGateway.emitExternal(TransportCommand.Play)
+        runCurrent()
+
+        playbackGateway.playCount shouldBe 0
+        events.count { it == RatedSessionEvent.PlayIgnoredDuringCall } shouldBe 1
+    }
+
+    @Test
+    fun `no transport command is offered during a call`() = runTest {
+        val coordinator = startCoordinator()
+        emit(AudioModeChanged(AudioMode.InCall))
+        emit(FocusChange.LossTransient)
+
+        coordinator.runningSnapshot.availableTransportCommands shouldBe emptySet()
+        playbackGateway.availableCommandsUpdates.last() shouldBe emptySet()
+    }
+
+    @Test
+    fun `a session opened while a call rings is paused, told once, and offers nothing`() = runTest {
+        interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+        val coordinator = startCoordinator()
+
+        playbackGateway.pauseCount shouldBeGreaterThan 0
+        playbackGateway.playCount shouldBe 0
+        events.count { it == RatedSessionEvent.PlayIgnoredDuringCall } shouldBe 1
+        coordinator.runningSnapshot.availableTransportCommands shouldBe emptySet()
+
+        emit(AudioModeChanged(AudioMode.Normal))
+        playbackGateway.playCount shouldBe 0
+        coordinator.runningSnapshot.availableTransportCommands.shouldNotBeEmpty()
     }
 
     @Test

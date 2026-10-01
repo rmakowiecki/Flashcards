@@ -10,6 +10,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.media.AudioRecordingConfiguration
 import android.os.Build
 import android.os.Handler
@@ -56,9 +57,15 @@ import kotlinx.coroutines.launch
  *   callback's payload: a callback for the session's own mode change can arrive after the session
  *   released its Bluetooth link. The communication mode the session sets on that link is reported
  *   as [AudioMode.Normal].
+ * - **The mode a session opens in** is read once when the monitor starts, and is the baseline later
+ *   changes are compared with. A call already ringing then reaches the session, and its end is
+ *   seen as a change back to normal. While that mode is not normal, a focus request waits in the
+ *   system's queue even though the blocked session cannot play: the system grants it once the call
+ *   lets go of focus, and that grant is what makes the monitor read the mode again.
  * - **Mode changes without a focus change** come from the mode listener (API 31+). Older releases
- *   report none, so the mode is only read when a focus change or a mode callback arrives: a call
- *   picked up while focus is already lost stays unseen until focus returns.
+ *   have none, so the mode is read when a focus change arrives and when any app's playback starts
+ *   or stops (API 26+), which is how the end of a ringtone reaches a session that never held focus.
+ *   Below API 26 a call picked up while focus is already lost stays unseen until focus returns.
  * - **A silenced microphone** (API 29+) is watched through the session's own recording. When the
  *   recording ends while silenced, the state is kept until the next recording starts or until no
  *   app records any more, because a recording that no longer exists cannot report that it is
@@ -113,6 +120,16 @@ class AudioEnvironmentMonitor @Inject constructor(
         }
     }
 
+    // No mode callback below API 31: the ringtone player starting or stopping is the nearest event.
+    private val playbackCallback: AudioManager.AudioPlaybackCallback? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            object : AudioManager.AudioPlaybackCallback() {
+                override fun onPlaybackConfigChanged(configs: List<AudioPlaybackConfiguration>) = reportLiveMode()
+            }
+        } else {
+            null
+        }
+
     private val recordingCallback: AudioManager.AudioRecordingCallback? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             object : AudioManager.AudioRecordingCallback() {
@@ -130,7 +147,12 @@ class AudioEnvironmentMonitor @Inject constructor(
         audioManager.registerAudioDeviceCallback(deviceCallback, handler)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) registerModeListener()
         registerRecordingCallback()
+        registerPlaybackCallback()
         scope.launch { voiceCaptureEngine.audioSessionId.collect(::onAudioSessionId) }
+        // After the listeners, so no change slips between the read and the registration.
+        reportLiveMode()
+        // A session that opens during a call cannot play, so nothing else would ask for focus and see the call end.
+        if (lastReportedMode != AudioMode.Normal) requestFocus()
     }
 
     /** Stops watching and gives up focus. Safe to call more than once. */
@@ -141,6 +163,7 @@ class AudioEnvironmentMonitor @Inject constructor(
             audioManager.unregisterAudioDeviceCallback(deviceCallback)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) unregisterModeListener()
             unregisterRecordingCallback()
+            unregisterPlaybackCallback()
         }
         abandonFocus()
         scope.cancel()
@@ -199,6 +222,16 @@ class AudioEnvironmentMonitor @Inject constructor(
 
     private fun isNearOwnLinkRelease(): Boolean =
         SystemClock.elapsedRealtime() - audioRouteManager.lastBluetoothLinkReleaseElapsedMillis < OWN_LINK_RELEASE_GRACE.inWholeMilliseconds
+
+    @SuppressLint("NewApi") // the callback is null outside API 26..30.
+    private fun registerPlaybackCallback() {
+        playbackCallback?.let { audioManager.registerAudioPlaybackCallback(it, handler) }
+    }
+
+    @SuppressLint("NewApi")
+    private fun unregisterPlaybackCallback() {
+        playbackCallback?.let { audioManager.unregisterAudioPlaybackCallback(it) }
+    }
 
     @SuppressLint("NewApi") // callers check the SDK level; the callback is null below API 29.
     private fun registerRecordingCallback() {

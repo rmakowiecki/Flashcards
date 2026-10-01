@@ -28,7 +28,7 @@ sealed interface RatedSessionStateSnapshot {
      * @param isPausedAfterFeedback the session is paused on the graded card; play reads the
      * feedback again.
      * @param availableTransportCommands what the in-app row, the notification and a headset may
-     * offer now.
+     * offer now. Empty while a call rings or runs, and once the session is complete.
      */
     data class Running(
         val cards: List<Flashcard> = emptyList(),
@@ -69,7 +69,7 @@ sealed interface FastSessionStateSnapshot {
      * @param isHeldAtAdvancePoint a requested hold stopped read-aloud at the auto-advance point, on
      * the card it just finished.
      * @param availableTransportCommands what the in-app row, the notification and a headset may
-     * offer now.
+     * offer now. Empty while a call rings or runs.
      */
     data class Running(
         val cards: List<Flashcard> = emptyList(),

@@ -13,7 +13,8 @@ interface AudioInterruptionGateway {
     /**
      * Unconflated, in the order things happened, so the end of an interruption can never be lost.
      * Single collector: a signal is delivered once, including one reported before collection started.
-     * The live audio mode is always reported before the focus change that arrives with it.
+     * The live audio mode is always reported before the focus change that arrives with it, and the mode
+     * the session opens in comes first of all, so a call already ringing is known from the start.
      */
     val signals: Flow<AudioEnvironmentSignal>
 }

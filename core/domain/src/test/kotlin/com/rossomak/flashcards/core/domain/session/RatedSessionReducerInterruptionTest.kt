@@ -93,6 +93,13 @@ class RatedSessionReducerInterruptionTest {
         isVoiceAnsweringSession = true,
     ).let { reducer.reduce(it, playing(true)).state }
 
+    /** A voice session the player has not started reading yet. */
+    private fun unstartedVoiceSession(): RatedSessionState = reducer.seed(
+        cards = (1..CARD_COUNT).map { flashcard("card-$it") },
+        attemptsLimit = 3,
+        isVoiceAnsweringSession = true,
+    )
+
     private fun RatedSessionState.after(vararg inputs: RatedSessionInput): RatedSessionState =
         inputs.fold(this) { state, input -> reducer.reduce(state, input).state }
 
@@ -465,6 +472,38 @@ class RatedSessionReducerInterruptionTest {
     }
 
     // The call block
+
+    @Test
+    fun `a call that starts reports it once, however the call then moves on`() {
+        val voice = voiceSession()
+
+        val ringing = voice.reduce(signal(AudioModeChanged(AudioMode.Ringtone)))
+        val pickedUp = ringing.state.reduce(signal(AudioModeChanged(AudioMode.InCall)))
+        val ended = pickedUp.state.reduce(signal(AudioModeChanged(AudioMode.Normal)))
+        val ringingAgain = ended.state.reduce(signal(AudioModeChanged(AudioMode.Ringtone)))
+
+        ringing.effects shouldContain Emit(RatedSessionEvent.PlayIgnoredDuringCall)
+        pickedUp.effects shouldNotContain Emit(RatedSessionEvent.PlayIgnoredDuringCall)
+        ended.effects shouldNotContain Emit(RatedSessionEvent.PlayIgnoredDuringCall)
+        ringingAgain.effects shouldContain Emit(RatedSessionEvent.PlayIgnoredDuringCall)
+    }
+
+    @Test
+    fun `a player that starts reading under a ringing call is paused, and stays paused when the call ends`() {
+        val ringing = unstartedVoiceSession().after(signal(AudioModeChanged(AudioMode.Ringtone)))
+
+        val started = ringing.reduce(playing(true))
+        val ended = started.state.after(playing(false)).reduce(signal(AudioModeChanged(AudioMode.Normal)))
+
+        started.effects shouldContain PausePlayback
+        ended.effects shouldNotContain Play
+        ended.effects shouldNotContain ResumeWithoutReading
+    }
+
+    @Test
+    fun `a player that starts reading with no call is left alone`() {
+        unstartedVoiceSession().reduce(playing(true)).effects shouldNotContain PausePlayback
+    }
 
     @Test
     fun `a play while a call rings starts nothing and reports it`() {

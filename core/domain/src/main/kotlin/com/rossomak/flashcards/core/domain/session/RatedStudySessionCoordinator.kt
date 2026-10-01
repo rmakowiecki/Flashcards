@@ -312,6 +312,12 @@ class RatedStudySessionCoordinator @Inject constructor(
         if (isObservingVoiceStack) return
         isObservingVoiceStack = true
         val scope = requireNotNull(scope)
+        // First, so a call that was already ringing when the stack started is known before the player's first report.
+        scope.launch {
+            interruptionGateway.signals.collect { signal ->
+                dispatch(RatedSessionInput.AudioEnvironmentChanged(signal, timeSource.markNow()))
+            }
+        }
         scope.launch {
             playbackGateway.state.collect { playbackState ->
                 playback = playbackState
@@ -320,11 +326,6 @@ class RatedStudySessionCoordinator @Inject constructor(
         }
         scope.launch { playbackGateway.playbackEvents.collect(::onPlaybackEvent) }
         scope.launch { captureGateway.captureEvents.collect(::onCaptureEvent) }
-        scope.launch {
-            interruptionGateway.signals.collect { signal ->
-                dispatch(RatedSessionInput.AudioEnvironmentChanged(signal, timeSource.markNow()))
-            }
-        }
     }
 
     private fun onPlaybackEvent(event: PlaybackEvent) {

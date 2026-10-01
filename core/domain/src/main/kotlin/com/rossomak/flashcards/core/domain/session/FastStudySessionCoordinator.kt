@@ -12,6 +12,7 @@ import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.model.type
 import com.rossomak.flashcards.core.domain.repository.AudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelBlipTimer
@@ -256,6 +257,12 @@ class FastStudySessionCoordinator @Inject constructor(
         if (isObservingVoiceStack) return
         isObservingVoiceStack = true
         val scope = requireNotNull(scope)
+        // First, so a call that was already ringing when the stack started is known before the player's first report.
+        scope.launch {
+            interruptionGateway.signals.collect { signal ->
+                dispatch(FastSessionInput.AudioEnvironmentChanged(signal, timeSource.markNow()))
+            }
+        }
         scope.launch {
             playbackGateway.state.collect { playbackState ->
                 playback = playbackState
@@ -263,11 +270,6 @@ class FastStudySessionCoordinator @Inject constructor(
             }
         }
         scope.launch { playbackGateway.playbackEvents.collect(::onPlaybackEvent) }
-        scope.launch {
-            interruptionGateway.signals.collect { signal ->
-                dispatch(FastSessionInput.AudioEnvironmentChanged(signal, timeSource.markNow()))
-            }
-        }
     }
 
     private fun onPlaybackEvent(event: PlaybackEvent) {
@@ -284,11 +286,14 @@ class FastStudySessionCoordinator @Inject constructor(
 
     /**
      * Applied exactly like the matching in-app command. A controller's stop only pauses. A command
-     * that changed the session is then reported, so the screen can react to it. An ended session
-     * ignores them.
+     * the session does not offer right now, as during a call, is ignored: a controller can race the
+     * update of the offered set. A command that changed the session is then reported, so the screen
+     * can react to it. An ended session ignores them.
      */
     private fun onExternalCommand(command: TransportCommand) {
         if (hasEnded) return
+        val current = state ?: return
+        if (command.type !in current.availableTransportCommands) return
         val input = when (command) {
             TransportCommand.Play -> FastSessionInput.PlayRequested
             TransportCommand.Pause, TransportCommand.Stop -> FastSessionInput.PauseRequested

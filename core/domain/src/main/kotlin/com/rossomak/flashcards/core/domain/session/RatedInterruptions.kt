@@ -39,14 +39,34 @@ internal fun RatedTransitionBuilder.onAudioEnvironmentChanged(input: AudioEnviro
 }
 
 private fun RatedTransitionBuilder.applySignal(input: AudioEnvironmentChanged) {
+    val wasCallBlocking = state.episode.isCallBlocking
     val step = state.episode.onSignal(input.signal, input.at)
     state = state.copy(episode = step.episode)
+    // The controls go dark with the call, so the user is told once, as it starts.
+    if (!wasCallBlocking && state.episode.isCallBlocking) emit(Emit(RatedSessionEvent.PlayIgnoredDuringCall))
     when (val change = step.change) {
         is EpisodeChange.Started -> onEpisodeStarted(change.tier)
         is EpisodeChange.Escalated -> onEpisodeEscalated(change)
         is EpisodeChange.Ended -> onEpisodeEnded(change.end)
         null -> Unit
     }
+}
+
+/**
+ * The player starts playing while a call rings or runs, which no interruption holds: the session
+ * opened while the call rang, so it never held focus to lose, and the reducer knows the call only by
+ * the audio mode. The session pauses as for a user pause, and only the user's play resumes it. Only
+ * the player's report triggers this, not the mode alone: during a session the mode comes just
+ * before the focus loss that holds it, and pausing on the mode would end the ring's auto-resume.
+ * A part that starts inside that gap does pause the session as a user pause, so a declined ring
+ * then leaves it paused until the user plays: the narrow price of never playing over a ring.
+ */
+internal fun RatedTransitionBuilder.pausePlayingUnderCall() {
+    if (!state.episode.isCallBlocking || !state.isPlaying || state.episode.isHolding) return
+    logger.interruption { "the player plays under a call, the session pauses" }
+    pauseByUser()
+    // The player reports the pause later; a play request before that must still find the session paused.
+    state = state.copy(isPlaying = false)
 }
 
 private fun RatedTransitionBuilder.onEpisodeStarted(tier: InterruptionTier) {

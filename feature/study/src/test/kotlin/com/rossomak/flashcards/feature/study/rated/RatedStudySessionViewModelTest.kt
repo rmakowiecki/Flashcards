@@ -615,6 +615,44 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
+    fun `a call that starts shows the message once, and the next call shows it again`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createVoiceViewModel()
+
+        viewModel.messages.test {
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+            advanceUntilIdle()
+            awaitItem() shouldBe RatedStudySessionMessage.PlayIgnoredDuringCall
+            viewModel.state.value.availableTransportCommands shouldBe emptySet()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.InCall))
+            advanceUntilIdle()
+            expectNoEvents()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Normal))
+            advanceUntilIdle()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+            advanceUntilIdle()
+            awaitItem() shouldBe RatedStudySessionMessage.PlayIgnoredDuringCall
+        }
+    }
+
+    @Test
+    fun `a session opened while a call rings shows the message once and offers no command`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        enableVoiceAnswering()
+        interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            advanceUntilIdle()
+            awaitItem() shouldBe RatedStudySessionMessage.PlayIgnoredDuringCall
+            expectNoEvents()
+        }
+        viewModel.state.value.availableTransportCommands shouldBe emptySet()
+    }
+
+    @Test
     fun `an unavailable voice engine pauses the session on its voice sheet instead of falling back to manual`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createVoiceViewModel()
 

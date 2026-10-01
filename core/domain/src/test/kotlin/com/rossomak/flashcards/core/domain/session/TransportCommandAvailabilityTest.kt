@@ -1,8 +1,10 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.AudioMode
 import com.rossomak.flashcards.core.domain.model.FastSessionState
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
+import com.rossomak.flashcards.core.domain.model.InterruptionEpisode
 import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.JumpTo
@@ -29,6 +31,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SilenceTime
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import kotlin.random.Random
@@ -141,7 +144,45 @@ class TransportCommandAvailabilityTest {
         questionBeingRead.after(PlaybackEngineUnavailable).availableTransportCommands shouldBe setOf(Play)
     }
 
+    @Test
+    fun `a ringing or running call offers nothing, in every phase`() {
+        CALL_MODES.forEach { callMode ->
+            val callEpisode = InterruptionEpisode(mode = callMode)
+            listOf(questionBeingRead, listening, grading, feedback, questionBeingRead.paused()).forEach { session ->
+                session.copy(episode = callEpisode).availableTransportCommands shouldBe emptySet()
+            }
+        }
+    }
+
+    @Test
+    fun `an empty set means a call or a finished session, nothing else`() {
+        val sessionPhases = listOf(
+            questionBeingRead,
+            questionBeingRead.paused(),
+            listening,
+            grading,
+            grading.paused(),
+            feedback,
+            feedback.paused(),
+            feedback.after(AdvanceHoldRequested).noticesOver(),
+            listening.after(SilenceTimedOut),
+            listening.after(SilenceTimedOut).paused().noticesOver(),
+            questionBeingRead.after(PlaybackEngineUnavailable),
+            questionBeingRead.after(CaptureFailed(VoiceCaptureFailureReason.BluetoothMicUnavailable), playing(false)).noticesOver(),
+        )
+        sessionPhases.forEach { session -> session.availableTransportCommands.shouldNotBeEmpty() }
+        questionBeingRead.copy(queue = emptyList()).availableTransportCommands shouldBe emptySet()
+    }
+
     // Fast
+
+    @Test
+    fun `a ringing or running call offers nothing in a fast read-aloud session`() {
+        val fast = FastSessionState(cards = cards, isReadAloudSession = true)
+        CALL_MODES.forEach { callMode ->
+            fast.copy(episode = InterruptionEpisode(mode = callMode)).availableTransportCommands shouldBe emptySet()
+        }
+    }
 
     @Test
     fun `fast read-aloud offers every command until the last card's answer`() {
@@ -155,5 +196,6 @@ class TransportCommandAvailabilityTest {
     private companion object {
         const val FIXED_SEED = 42
         const val CARD_COUNT = 3
+        val CALL_MODES = listOf(AudioMode.Ringtone, AudioMode.InCall, AudioMode.InCommunication)
     }
 }

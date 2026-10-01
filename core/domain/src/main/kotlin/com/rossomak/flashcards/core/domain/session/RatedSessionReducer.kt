@@ -223,11 +223,15 @@ class RatedSessionReducer @Inject constructor(private val random: Random, privat
     /**
      * Only whether the player plays. The player follows the coordinator's orders and starts and
      * stops by nothing else, apart from a failed utterance, which closes an open listening window.
+     * The one order it does not follow is a start under a call: loading a session makes the player
+     * read at once, possibly before the reducer knew about a call that was already ringing, so a
+     * player that plays while a call rings or runs is paused here ([pausePlayingUnderCall]).
      */
     private fun RatedTransitionBuilder.onPlaybackChanged(input: PlaybackChanged) {
         val playback = input.playback
         if (!playback.isPlaying && state.isPlaying) onPlayerStopped()
         state = state.copy(isPlaying = playback.isPlaying)
+        pausePlayingUnderCall()
     }
 
     /**

@@ -601,6 +601,44 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
+    fun `a call that starts shows the message once, and the next call shows it again`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+
+        viewModel.messages.test {
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+            advanceUntilIdle()
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+            viewModel.state.value.availableTransportCommands shouldBe emptySet()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.InCall))
+            advanceUntilIdle()
+            expectNoEvents()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Normal))
+            advanceUntilIdle()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+            advanceUntilIdle()
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+        }
+    }
+
+    @Test
+    fun `a session opened while a call rings shows the message once and offers no command`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(readAloudEnabled = true))
+        loadThreeCards()
+        interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            advanceUntilIdle()
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+            expectNoEvents()
+        }
+        viewModel.state.value.availableTransportCommands shouldBe emptySet()
+    }
+
+    @Test
     fun `play after an engine failure restarts the voice stack at the presented card`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createReadAloudViewModel()
         moveToCard(1)

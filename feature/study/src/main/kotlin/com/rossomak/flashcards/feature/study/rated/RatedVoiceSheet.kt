@@ -116,6 +116,7 @@ internal fun RatedVoiceSheetContent(
             RatedVoiceSheetGroup.VoiceRound -> RatedVoiceRoundSheet(
                 voiceSheetMode = voiceSheetMode,
                 voiceBarsLevels = voiceBarsLevels,
+                isNextAvailable = TransportCommandType.Next in state.availableTransportCommands,
                 onFeedbackSkip = onVoiceFeedbackSkip,
             )
         }
@@ -158,13 +159,18 @@ private fun RatedVoiceTransportSheet(
  * across the grading modes, and only the slot animates its bounds when it moves to the left.
  *
  * While the feedback is read ([Graded]) a tap anywhere on the sheet skips it, with no visual hint;
- * TalkBack offers it as the sheet's click action.
+ * TalkBack offers it as the sheet's click action. Skipping is a next, so it follows the same availability as the next button: a call turns it off.
  */
 @Composable
-private fun RatedVoiceRoundSheet(voiceSheetMode: RatedVoiceSheetMode, voiceBarsLevels: StateFlow<ImmutableList<Float>>, onFeedbackSkip: () -> Unit) {
+private fun RatedVoiceRoundSheet(
+    voiceSheetMode: RatedVoiceSheetMode,
+    voiceBarsLevels: StateFlow<ImmutableList<Float>>,
+    isNextAvailable: Boolean,
+    onFeedbackSkip: () -> Unit,
+) {
     // Collected here, not at the screen root: a new level every wave interval recomposes only the round.
     val currentVoiceBarsLevels by voiceBarsLevels.collectAsStateWithLifecycle()
-    val isFeedbackSkippable = voiceSheetMode is Graded
+    val isFeedbackSkippable = voiceSheetMode is Graded && isNextAvailable
     val skipFeedbackLabel = stringResource(R.string.study_session_voice_feedback_skip_cd)
     val isListening = voiceSheetMode == Listening
     val isBadgeCentered = voiceSheetMode !is GradingWithTranscript && voiceSheetMode !is Graded

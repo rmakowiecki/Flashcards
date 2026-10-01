@@ -125,17 +125,34 @@ class FastSessionReducer @Inject constructor(private val logger: DomainLogger) {
     /**
      * Only whether the player plays. The player follows the coordinator's orders and starts and
      * stops by nothing else, apart from a failed utterance: the player stopping by itself inside a
-     * pause stops the pause, which the next resume then skips.
+     * pause stops the pause, which the next resume then skips. The one order it does not follow is a
+     * start under a call: loading a session makes the player read at once, possibly before the
+     * reducer knew about a call that was already ringing, so a player that plays while a call rings
+     * or runs is paused here ([pauseIfPlayingUnderCall]).
      */
     private fun onPlaybackChanged(state: FastSessionState, playback: VoicePlaybackState): FastSessionTransition {
         if (!playback.isActive) return FastSessionTransition(state.copy(isPlaying = false), emptyList())
         val stoppedPlaying = !playback.isPlaying && state.isPlaying
         val updated = state.copy(isPlaying = playback.isPlaying)
-        return if (stoppedPlaying && state.readAloudStep.isPause) {
-            FastSessionTransition(updated, listOf(CancelReadAloudPause))
-        } else {
-            FastSessionTransition(updated, emptyList())
-        }
+        val effects = if (stoppedPlaying && state.readAloudStep.isPause) listOf(CancelReadAloudPause) else emptyList()
+        return FastSessionTransition(updated, effects).pauseIfPlayingUnderCall()
+    }
+
+    /**
+     * The player starts playing while a call rings or runs, which no interruption holds: the session
+     * opened while the call rang, so it never held focus to lose, and the reducer knows the call only
+     * by the audio mode. The session pauses as for a user pause, and only the user's play resumes it.
+     * Only the player's report triggers this, not the mode alone: during a session the mode comes
+     * just before the focus loss that holds it, and pausing on the mode would end the ring's auto-resume.
+     * A part that starts inside that gap does pause the session as a user pause, so a declined ring
+     * then leaves it paused until the user plays: the narrow price of never playing over a ring.
+     */
+    private fun FastSessionTransition.pauseIfPlayingUnderCall(): FastSessionTransition {
+        if (!state.episode.isCallBlocking || !state.isPlaying || state.episode.isHolding) return this
+        logger.interruption { "the player plays under a call, the session pauses" }
+        val paused = onPauseRequested(state)
+        // The player reports the pause later; a play request before that must still find the session paused.
+        return FastSessionTransition(paused.state.copy(isPlaying = false), effects + paused.effects)
     }
 
     /** A part read in full starts the pause after it. A stale report (another card or part, or a paused session) does nothing. */
@@ -348,12 +365,15 @@ class FastSessionReducer @Inject constructor(private val logger: DomainLogger) {
         if (signal == MicSilenced || signal == MicUnsilenced) return FastSessionTransition(state, emptyList())
         val step = state.episode.onSignal(signal, input.at)
         val updated = state.copy(episode = step.episode)
-        return when (val change = step.change) {
+        val transition = when (val change = step.change) {
             is EpisodeChange.Started -> onEpisodeStarted(updated, change.tier)
             is EpisodeChange.Escalated -> onEpisodeEscalated(updated, change)
             is EpisodeChange.Ended -> onEpisodeEnded(updated, change.end)
             null -> FastSessionTransition(updated, emptyList())
         }
+        // The controls go dark with the call, so the user is told once, as it starts.
+        val isCallStarting = !state.episode.isCallBlocking && updated.episode.isCallBlocking
+        return if (isCallStarting) transition.prepend(listOf(FastSessionEffect.Emit(FastSessionEvent.PlayIgnoredDuringCall))) else transition
     }
 
     private fun onEpisodeStarted(state: FastSessionState, tier: InterruptionTier): FastSessionTransition {
