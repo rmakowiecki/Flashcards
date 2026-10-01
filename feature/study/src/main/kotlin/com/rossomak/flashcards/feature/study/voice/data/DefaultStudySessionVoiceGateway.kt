@@ -9,12 +9,14 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal
 import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.repository.AudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.VoiceCaptureGateway
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -39,16 +41,16 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
- * The study session's voice stack, as both [StudyVoicePlaybackGateway] and [VoiceCaptureGateway]:
- * one instance per ViewModel, over the [StudySessionVoiceService] binder. Commands issued before the
+ * The study session's voice stack, as [StudyVoicePlaybackGateway], [VoiceCaptureGateway] and
+ * [AudioInterruptionGateway]: one instance per ViewModel, over the [StudySessionVoiceService] binder. Commands issued before the
  * asynchronous bind completes are kept and replayed once it does.
  */
 @UnstableApi
 @ViewModelScoped
-@Suppress("TooManyFunctions") // one method per command of the two gateways it implements.
+@Suppress("TooManyFunctions") // one method per command of the gateways it implements.
 class DefaultStudySessionVoiceGateway @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) : StudyVoicePlaybackGateway, VoiceCaptureGateway {
+) : StudyVoicePlaybackGateway, VoiceCaptureGateway, AudioInterruptionGateway {
 
     private val _state = MutableStateFlow(VoicePlaybackState())
     override val state: StateFlow<VoicePlaybackState> = _state.asStateFlow()
@@ -59,6 +61,9 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
 
     private val captureEventChannel = Channel<CaptureEvent>(Channel.UNLIMITED)
     override val captureEvents: Flow<CaptureEvent> = captureEventChannel.receiveAsFlow()
+
+    private val audioSignalChannel = Channel<AudioEnvironmentSignal>(Channel.UNLIMITED)
+    override val signals: Flow<AudioEnvironmentSignal> = audioSignalChannel.receiveAsFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val voiceBinder = MutableStateFlow<StudySessionVoiceService.LocalBinder?>(null)
@@ -83,6 +88,7 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
     private var pendingSpeechRate: Float? = null
     private var pendingVoiceId: String? = null
     private var pendingVoiceAnswering: Boolean? = null
+    private var pendingCaptureGateClosed: Boolean? = null
 
     // Kept across stop(): a restarted voice stack binds again and gets them replayed.
     private var pendingTransportCommands: Set<TransportCommandType>? = null
@@ -106,6 +112,7 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
             pendingSpeechRate?.let { binder.setSpeechRate(it) }
             pendingVoiceId?.let { binder.setVoice(it) }
             binder.loadSession(pendingCards, pendingStartIndex, pendingSessionTitle, pendingIsVoiceAnsweringSession)
+            pendingCaptureGateClosed?.let { binder.setCaptureGate(it) }
             pendingVoiceAnswering?.let { if (it) binder.startVoiceAnswering() }
             pendingTransportCommands?.let { binder.setAvailableCommands(it) }
             pendingSessionProgress?.let { (completedCount, totalCount) -> binder.setSessionProgress(completedCount, totalCount) }
@@ -230,6 +237,11 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
         voiceBinder.value?.playListeningCue()
     }
 
+    override fun setCaptureGate(closed: Boolean) {
+        pendingCaptureGateClosed = closed
+        voiceBinder.value?.setCaptureGate(closed)
+    }
+
     private fun observe(binder: StudySessionVoiceService.LocalBinder) {
         binderJobs.forEach { it.cancel() }
         binderJobs = listOf(
@@ -250,6 +262,9 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
             },
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 binder.captureEvents.collect { captureEventChannel.trySend(it) }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                binder.audioSignals.collect { audioSignalChannel.trySend(it) }
             },
         )
     }

@@ -50,17 +50,24 @@ private fun RatedTransitionBuilder.openListeningWindow(cardId: String) {
 /**
  * The window's microphone records: the silence timer starts and the listening cue plays, once per
  * window. A repeat, such as after the capture switched devices, or a late report after the window
- * closed changes nothing.
+ * closed changes nothing. While the capture gate is closed the microphone hears nothing, so the
+ * timer and the cue wait for the gate to open.
  */
 internal fun RatedTransitionBuilder.onMicrophoneOpened() {
     if (state.round.phase != Listening || state.round.isMicrophoneOpen) return
     state = state.copy(round = state.round.copy(isMicrophoneOpen = true))
+    if (state.isCaptureGated) {
+        state = state.copy(isListeningCueHeld = true)
+        // Only ends the guard that waits for the microphone to open.
+        emit(CancelSilenceTimer)
+        return
+    }
     emit(RatedSessionEffect.StartSilenceTimer)
     emit(RatedSessionEffect.PlayListeningCue)
 }
 
 /**
- * The player stopped on its own, such as for another app's sound. An open window closes as for a
+ * The player stopped by itself, which only a failed utterance does. An open window closes as for a
  * user pause, so the microphone is never open while the question is read again, and the next
  * finished question opens a fresh one.
  */
@@ -118,6 +125,10 @@ internal fun RatedTransitionBuilder.onGraded(grade: VoiceAnswerGrade) {
     state = state.copy(round = state.round.copy(phase = SpeakingNotice, grade = grade))
     if (state.isPausedWhileGrading) {
         state = state.copy(isPausedWhileGrading = false, isPausedAfterFeedback = true)
+    } else if (escalateLongBlip()) {
+        // A blip that lasted long while nothing spoke is an interruption now: the feedback waits.
+        state = state.copy(isPausedAfterFeedback = true, isPlaying = false)
+        emit(RatedSessionEffect.PausePlayback)
     } else {
         speakNotice(SpokenNotice.Feedback(rating, grade.feedback))
     }
@@ -125,7 +136,8 @@ internal fun RatedTransitionBuilder.onGraded(grade: VoiceAnswerGrade) {
 
 /** Nothing heard: the card goes back unanswered, and the third silence in a row pauses voice answering. */
 internal fun RatedTransitionBuilder.onSilenceTimedOut() {
-    if (state.round.phase != Listening) return
+    // The gate closed after the timer already ran out and was dropped: the microphone heard nothing to time.
+    if (state.round.phase != Listening || state.isCaptureGated) return
     emit(StopListening)
     state = recordSilence(state, random).copy(
         consecutiveSilenceCount = state.consecutiveSilenceCount + 1,
@@ -297,6 +309,11 @@ internal fun RatedTransitionBuilder.onNoticeTailElapsed() {
     state = state.copy(round = state.idleRound())
     when {
         state.isComplete -> emit(SessionComplete)
+        // A blip that lasted long while nothing spoke is an interruption now: the next question waits.
+        state.isPlaying && escalateLongBlip() -> {
+            state = state.copy(isPausedAtAdvancePoint = true, isPlaying = false)
+            emit(RatedSessionEffect.PausePlayback)
+        }
         state.isPlaying -> emit(RatedSessionEffect.PresentHeadQuestion)
         else -> state = state.copy(isPausedAtAdvancePoint = true)
     }

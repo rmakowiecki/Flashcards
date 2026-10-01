@@ -34,11 +34,12 @@ import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPau
 import com.rossomak.flashcards.core.domain.session.FastSessionInput.TemporaryPauseRequested
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
 import org.junit.Test
 
 class FastSessionReducerTest {
 
-    private val reducer = FastSessionReducer()
+    private val reducer = FastSessionReducer(mockk(relaxed = true))
 
     private fun flashcard(id: String): Flashcard = Flashcard(
         id = id,
@@ -294,10 +295,13 @@ class FastSessionReducerTest {
     }
 
     @Test
-    fun `the player starting to play ends a user pause`() {
+    fun `the player starting to play by itself does not end a user pause`() {
         val paused = playing.after(PauseRequested, PlaybackChanged(playback(isPlaying = false)))
 
-        paused.after(PlaybackChanged(playback())).pauseReason shouldBe null
+        val transition = reducer.reduce(paused, PlaybackChanged(playback()))
+
+        transition.state.pauseReason shouldBe FastPauseReason.User
+        transition.effects.shouldBeEmpty()
     }
 
     // Resuming inside a read-aloud pause goes on to the next step
@@ -355,19 +359,19 @@ class FastSessionReducerTest {
     }
 
     @Test
-    fun `the player playing again by itself in a read-aloud pause goes on to the next step, without a play`() {
-        val lostFocusInQuestionPause = inQuestionPause(0).after(PlaybackChanged(playback(isPlaying = false)))
-        val lostFocusInAdvancePause = inAdvancePause(0).after(PlaybackChanged(playback(isPlaying = false)))
+    fun `the player playing again by itself in a read-aloud pause takes no step`() {
+        val stoppedInQuestionPause = inQuestionPause(0).after(PlaybackChanged(playback(isPlaying = false)))
+        val stoppedInAdvancePause = inAdvancePause(0).after(PlaybackChanged(playback(isPlaying = false)))
 
-        reducer.reduce(lostFocusInQuestionPause, PlaybackChanged(playback())).effects shouldBe listOf(PresentAnswer(0))
-        reducer.reduce(lostFocusInAdvancePause, PlaybackChanged(playback())).effects shouldBe listOf(PresentQuestion(1))
+        reducer.reduce(stoppedInQuestionPause, PlaybackChanged(playback())).effects.shouldBeEmpty()
+        reducer.reduce(stoppedInAdvancePause, PlaybackChanged(playback())).effects.shouldBeEmpty()
     }
 
     @Test
-    fun `the player playing again by itself mid-part does nothing more, it reads that part again by itself`() {
-        val lostFocus = readingQuestion(0).after(PlaybackChanged(playback(isPlaying = false)))
+    fun `the player playing again by itself mid-part does nothing`() {
+        val stopped = readingQuestion(0).after(PlaybackChanged(playback(isPlaying = false)))
 
-        reducer.reduce(lostFocus, PlaybackChanged(playback())).effects.shouldBeEmpty()
+        reducer.reduce(stopped, PlaybackChanged(playback())).effects.shouldBeEmpty()
     }
 
     @Test

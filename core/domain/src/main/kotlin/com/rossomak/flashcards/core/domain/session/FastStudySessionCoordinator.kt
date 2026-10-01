@@ -12,7 +12,10 @@ import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.model.type
+import com.rossomak.flashcards.core.domain.repository.AudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.StudyVoicePlaybackGateway
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelBlipTimer
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReadAloudPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.Emit
@@ -23,6 +26,7 @@ import com.rossomak.flashcards.core.domain.session.FastSessionEffect.PresentQues
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartAdvancePause
+import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartBlipTimer
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartQuestionPause
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.FastSessionEffect.StopVoiceStack
@@ -54,11 +58,16 @@ import kotlinx.coroutines.launch
  * two pauses between parts are timers here. While [holdAdvance] is in place, the loop stops on the
  * presented card at the auto-advance point. A read-aloud session never falls back to tap-through: an
  * unavailable voice engine pauses it, and [play] restarts the voice stack.
+ *
+ * What other apps' audio does to the session ([AudioInterruptionGateway]) is decided by the reducer
+ * from each signal and the time this coordinator stamps it with; this only runs the blip timer and
+ * writes the log lines.
  */
 @Suppress("TooManyFunctions") // one command per session action.
 class FastStudySessionCoordinator @Inject constructor(
     private val getSessionStartData: GetSessionStartDataUseCase,
     private val playbackGateway: StudyVoicePlaybackGateway,
+    private val interruptionGateway: AudioInterruptionGateway,
     private val reducer: FastSessionReducer,
     clock: Clock,
     private val timeSource: TimeSource.WithComparableMarks,
@@ -88,6 +97,7 @@ class FastStudySessionCoordinator @Inject constructor(
     private var pushedTransportCommands: Set<TransportCommandType>? = null
     private var readAloudPauseJob: Job? = null
     private val releaseLingerTimer = ReleaseLingerTimer { dispatch(FastSessionInput.ReleaseLingerElapsed) }
+    private val interruptionTimers = InterruptionTimers(onBlipElapsed = { dispatch(FastSessionInput.BlipElapsed) })
 
     // When the presented card last started or restarted, for the rewind threshold.
     private var presentedCardStartedAt: ComparableTimeMark = timeSource.markNow()
@@ -112,6 +122,7 @@ class FastStudySessionCoordinator @Inject constructor(
     fun stop() {
         readAloudPauseJob?.cancel()
         releaseLingerTimer.cancel()
+        interruptionTimers.cancelAll()
         playbackGateway.stop()
     }
 
@@ -246,6 +257,12 @@ class FastStudySessionCoordinator @Inject constructor(
         if (isObservingVoiceStack) return
         isObservingVoiceStack = true
         val scope = requireNotNull(scope)
+        // First, so a call that was already ringing when the stack started is known before the player's first report.
+        scope.launch {
+            interruptionGateway.signals.collect { signal ->
+                dispatch(FastSessionInput.AudioEnvironmentChanged(signal, timeSource.markNow()))
+            }
+        }
         scope.launch {
             playbackGateway.state.collect { playbackState ->
                 playback = playbackState
@@ -269,11 +286,14 @@ class FastStudySessionCoordinator @Inject constructor(
 
     /**
      * Applied exactly like the matching in-app command. A controller's stop only pauses. A command
-     * that changed the session is then reported, so the screen can react to it. An ended session
-     * ignores them.
+     * the session does not offer right now, as during a call, is ignored: a controller can race the
+     * update of the offered set. A command that changed the session is then reported, so the screen
+     * can react to it. An ended session ignores them.
      */
     private fun onExternalCommand(command: TransportCommand) {
         if (hasEnded) return
+        val current = state ?: return
+        if (command.type !in current.availableTransportCommands) return
         val input = when (command) {
             TransportCommand.Play -> FastSessionInput.PlayRequested
             TransportCommand.Pause, TransportCommand.Stop -> FastSessionInput.PauseRequested
@@ -344,6 +364,8 @@ class FastStudySessionCoordinator @Inject constructor(
             is Emit -> eventChannel.trySend(effect.event)
             // The last card's answer is read in full before this fires, never when it merely started.
             SessionComplete -> end(abandoned = false)
+            is StartBlipTimer -> interruptionTimers.startBlip(requireNotNull(scope), effect.duration)
+            CancelBlipTimer -> interruptionTimers.cancelBlip()
         }
     }
 

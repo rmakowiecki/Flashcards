@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.domain.session
 
 import com.rossomak.flashcards.core.domain.model.FastSessionState
+import com.rossomak.flashcards.core.domain.model.InterruptionEpisode
 import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Next
@@ -19,10 +20,14 @@ private val PAUSE_ONLY = setOf(Pause, Stop)
  * A Rated session's transport commands, by the phase of its voice round. Pause is on offer in every
  * phase that plays; while listening, grading or speaking a short notice it is the only command.
  * Jumping to a card is never offered: the queue decides the order.
+ *
+ * While a call rings or runs ([InterruptionEpisode.isCallBlocking]) no surface offers any command,
+ * so the set is empty, exactly as it is once the session is complete. Screens that need to tell the
+ * two apart look at whether cards remain.
  */
 val RatedSessionState.availableTransportCommands: Set<TransportCommandType>
     get() = when {
-        isComplete -> emptySet()
+        isComplete || episode.isCallBlocking -> emptySet()
         pauseReason != null -> setOf(Play)
         isShortNoticeSpeaking -> PAUSE_ONLY
         voiceAnswerPauseReason != null -> if (isPlaying) PAUSE_ONLY else setOf(Play)
@@ -39,7 +44,12 @@ val RatedSessionState.availableTransportCommands: Set<TransportCommandType>
 
 /**
  * A Fast read-aloud session offers every command, except Next at the last card's answer: the
- * session ends only once that answer has been read in full.
+ * session ends only once that answer has been read in full. While a call rings or runs
+ * ([InterruptionEpisode.isCallBlocking]) it offers none.
  */
 val FastSessionState.availableTransportCommands: Set<TransportCommandType>
-    get() = if (isReadAloudNextAvailable) TransportCommandType.entries.toSet() else TransportCommandType.entries.toSet() - Next
+    get() = when {
+        episode.isCallBlocking -> emptySet()
+        isReadAloudNextAvailable -> TransportCommandType.entries.toSet()
+        else -> TransportCommandType.entries.toSet() - Next
+    }

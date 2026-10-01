@@ -38,6 +38,13 @@ class FakeVoiceCaptureGateway : VoiceCaptureGateway {
     var listeningCueCount = 0
         private set
 
+    /** Whether the capture gate is closed now. */
+    var isCaptureGateClosed = false
+        private set
+
+    /** Every value [setCaptureGate] was called with, in order. */
+    val captureGateHistory = mutableListOf<Boolean>()
+
     fun emit(event: CaptureEvent) {
         eventChannel.trySend(event)
     }
@@ -71,5 +78,10 @@ class FakeVoiceCaptureGateway : VoiceCaptureGateway {
 
     override fun playListeningCue() {
         listeningCueCount++
+    }
+
+    override fun setCaptureGate(closed: Boolean) {
+        isCaptureGateClosed = closed
+        captureGateHistory += closed
     }
 }

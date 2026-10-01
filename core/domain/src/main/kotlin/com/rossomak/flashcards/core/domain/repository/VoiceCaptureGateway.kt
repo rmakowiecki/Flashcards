@@ -41,4 +41,11 @@ interface VoiceCaptureGateway {
 
     /** Plays the short sound that tells the user the microphone records. */
     fun playListeningCue()
+
+    /**
+     * While [closed], the microphone keeps recording but drops every frame before it reaches speech
+     * detection or the answer being captured, so a sound from another app never ends up in the
+     * user's answer. The state outlives listening windows until the next call.
+     */
+    fun setCaptureGate(closed: Boolean)
 }

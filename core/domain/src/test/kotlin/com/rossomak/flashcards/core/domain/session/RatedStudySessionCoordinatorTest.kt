@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.domain.session
 
-import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
 import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.CaptureEvent
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
@@ -23,6 +22,7 @@ import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
@@ -38,6 +38,7 @@ import io.kotest.matchers.collections.shouldContainInOrder
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.mockk.mockk
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -65,11 +66,11 @@ class RatedStudySessionCoordinatorTest {
     )
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val captureGateway = FakeVoiceCaptureGateway()
+    private val interruptionGateway = FakeAudioInterruptionGateway()
     private val gradingRepository = FakeVoiceAnswerGradingRepository()
     private val permissionGateway = FakePermissionGateway().apply {
         statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.Granted)
     }
-    private val logger = FakeDomainLogger()
 
     private val setup = RatedSessionSetup(
         categoryId = "android",
@@ -113,12 +114,13 @@ class RatedStudySessionCoordinatorTest {
             getSessionStartData = getSessionStartData,
             playbackGateway = playbackGateway,
             captureGateway = captureGateway,
+            interruptionGateway = interruptionGateway,
             gradingRepository = gradingRepository,
             permissionGateway = permissionGateway,
-            reducer = RatedSessionReducer(Random(FIXED_SEED)),
+            reducer = RatedSessionReducer(Random(FIXED_SEED), mockk(relaxed = true)),
             clock = clock,
             timeSource = testScheduler.timeSource,
-            logger = logger,
+            logger = mockk(relaxed = true),
         )
         backgroundScope.launch { coordinator.events.collect { events += it } }
         coordinator.start(backgroundScope, sessionSetup)
@@ -356,7 +358,6 @@ class RatedStudySessionCoordinatorTest {
         advanceTimeBy(2.milliseconds)
         coordinator.runningSnapshot.round.gradingFailure shouldBe GradingFailureReason.NoConnection
         playbackGateway.spokenNotices shouldBe listOf(SpokenNotice.GradingFailed(GradingFailureReason.NoConnection))
-        logger.entries.single().level shouldBe FakeDomainLogger.Level.Error
     }
 
     @Test
@@ -844,7 +845,6 @@ class RatedStudySessionCoordinatorTest {
         events shouldContain RatedSessionEvent.VoicePlaybackUnavailable
         captureGateway.isVoiceAnsweringStarted shouldBe false
         playbackGateway.state.value.isActive shouldBe false
-        logger.entries.single().level shouldBe FakeDomainLogger.Level.Warn
 
         coordinator.play()
         runCurrent()

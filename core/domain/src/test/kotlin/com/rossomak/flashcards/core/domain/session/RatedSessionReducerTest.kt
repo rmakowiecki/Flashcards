@@ -67,12 +67,13 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.mockk.mockk
 import kotlin.random.Random
 import org.junit.Test
 
 class RatedSessionReducerTest {
 
-    private val reducer = RatedSessionReducer(Random(FIXED_SEED))
+    private val reducer = RatedSessionReducer(Random(FIXED_SEED), mockk(relaxed = true))
 
     private fun flashcard(id: String): Flashcard = Flashcard(
         id = id,
@@ -221,7 +222,7 @@ class RatedSessionReducerTest {
     }
 
     @Test
-    fun `the player starting on its own while waiting for the question presents it again`() {
+    fun `the player starting on its own while waiting for the question changes nothing but whether it plays`() {
         val stopped = voiceSession().listening().after(
             MicrophoneOpened,
             PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)),
@@ -229,7 +230,8 @@ class RatedSessionReducerTest {
 
         val transition = reducer.reduce(stopped, PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true)))
 
-        transition.effects shouldBe listOf(PresentHeadQuestion)
+        transition.effects.shouldBeEmpty()
+        transition.state shouldBe stopped.copy(isPlaying = true)
     }
 
     @Test
@@ -576,12 +578,12 @@ class RatedSessionReducerTest {
     }
 
     @Test
-    fun `playback starting by itself clears the advance point`() {
+    fun `playback starting by itself does not clear the advance point`() {
         val held = voiceSession().speakingFeedback()
             .after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = false)))
             .noticesOver()
 
-        held.after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true))).isPausedAtAdvancePoint shouldBe false
+        held.after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true))).isPausedAtAdvancePoint shouldBe true
     }
 
     // Transport commands

@@ -60,6 +60,7 @@ data class CapturedUtterance(
  * in reaction to it cannot end the warm-up early.
  */
 @Singleton
+@Suppress("TooManyFunctions") // one step of the capture loop each.
 class VoiceCaptureEngine @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val voiceActivityDetector: VoiceActivityDetector,
@@ -95,8 +96,20 @@ class VoiceCaptureEngine @Inject constructor(
     private val _actualMicDevice = MutableStateFlow<AudioDeviceInfo?>(null)
     val actualMicDevice: StateFlow<AudioDeviceInfo?> = _actualMicDevice.asStateFlow()
 
+    /**
+     * The audio session id of the [AudioRecord] that is recording right now, `null` whenever nothing
+     * is. Lets the platform tell this client's recording configuration from other apps'.
+     */
+    private val _audioSessionId = MutableStateFlow<Int?>(null)
+    val audioSessionId: StateFlow<Int?> = _audioSessionId.asStateFlow()
+
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var captureJob: Job? = null
+
+    // Set by startListening() and read by the capture loop on Dispatchers.Default.
+    @Volatile
+    internal var captureGate: StateFlow<Boolean> = ALWAYS_OPEN_GATE
+    private val captureFrameGate = CaptureFrameGate()
 
     // Raised by finishListening() and read by the capture loop on Dispatchers.Default, so atomic.
     private val finishRequested = AtomicBoolean(false)
@@ -112,11 +125,20 @@ class VoiceCaptureEngine @Inject constructor(
      * @param maxUtteranceDuration per-call override of the hard per-utterance cap, clamped to
      * [MAX_UTTERANCE_DURATION] so a caller can only tighten it, never loosen it beyond the
      * engine-wide default other callers (e.g. feature:study's continuous voice answering) rely on.
+     * @param captureGate while its value is `true`, every frame is read and dropped: it reaches
+     * neither the voice activity detector, nor the utterance being captured, nor the pre-roll, and
+     * the trailing-silence countdown that ends an utterance stands still, so an utterance spans the
+     * gate. The engine knows nothing about why it closes; the default never closes.
      */
     @RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
-    fun startListening(maxUtteranceDuration: Duration = MAX_UTTERANCE_DURATION) {
+    fun startListening(
+        maxUtteranceDuration: Duration = MAX_UTTERANCE_DURATION,
+        captureGate: StateFlow<Boolean> = ALWAYS_OPEN_GATE,
+    ) {
         if (captureJob?.isActive == true) return
         logd { "startListening" }
+        this.captureGate = captureGate
+        captureFrameGate.reset()
         voiceActivityDetector.reset()
         voiceObfuscator.randomizeSessionShift()
         finishRequested.set(false)
@@ -237,6 +259,7 @@ class VoiceCaptureEngine @Inject constructor(
         }
         return try {
             audioRecord.startRecording()
+            _audioSessionId.value = audioRecord.audioSessionId
             if (!isRouteHonored(audioRecord, route)) {
                 loge { "Capture not routed to Bluetooth microphone" }
                 _events.emit(CaptureFailed(VoiceCaptureFailureReason.CaptureNotRoutedToBluetooth))
@@ -259,6 +282,7 @@ class VoiceCaptureEngine @Inject constructor(
             _events.emit(CaptureFailed(VoiceCaptureFailureReason.CaptureLoopError(exception.message)))
             CaptureResult.Failed
         } finally {
+            _audioSessionId.value = null
             runCatching { audioRecord.stop() }
             audioRecord.release()
         }
@@ -287,18 +311,38 @@ class VoiceCaptureEngine @Inject constructor(
             val read = audioRecord.read(frame, 0, frame.size)
             if (read <= 0) continue
             updateActualMicDevice(audioRecord)
-            _inputLevel.value = inputLevelMeter.process(frame, read)
-            if (read < frame.size) frame.fill(0, read, frame.size)
-            val isSpeech = voiceActivityDetector.isSpeech(frame)
-            _isSpeechDetected.value = isSpeech
-            val routeChangeRequested = processFrame(frame, isSpeech, state, maxUtteranceFrames, isRouteChangePending)
+            val routeChangeRequested = handleFrame(frame, read, state, inputLevelMeter, maxUtteranceFrames, isRouteChangePending)
             if (routeChangeRequested) return CaptureResult.RouteChanged
         }
         return CaptureResult.Stopped
     }
 
+    /**
+     * One frame read off the microphone. While the capture gate is closed the frame is dropped and
+     * the level shows the microphone at rest. Returns true if a pending route change was honored.
+     */
+    internal suspend fun handleFrame(
+        frame: ShortArray,
+        read: Int,
+        state: UtteranceState,
+        inputLevelMeter: InputLevelMeter,
+        maxUtteranceFrames: Int,
+        isRouteChangePending: () -> Boolean,
+    ): Boolean {
+        if (captureFrameGate.shouldDrop(isClosed = captureGate.value, preRoll = state.preRoll)) {
+            _inputLevel.value = 0f
+            _isSpeechDetected.value = false
+            return false
+        }
+        _inputLevel.value = inputLevelMeter.process(frame, read)
+        if (read < frame.size) frame.fill(0, read, frame.size)
+        val isSpeech = voiceActivityDetector.isSpeech(frame)
+        _isSpeechDetected.value = isSpeech
+        return processFrame(frame, isSpeech, state, maxUtteranceFrames, isRouteChangePending)
+    }
+
     /** Mutable per-utterance buffers, kept together so [captureFrames] passes a single state object around. */
-    private class UtteranceState {
+    internal class UtteranceState {
         val preRoll = ArrayDeque<ShortArray>(PRE_ROLL_FRAMES)
         val frames = mutableListOf<ShortArray>()
         var isInUtterance = false
@@ -524,6 +568,9 @@ class VoiceCaptureEngine @Inject constructor(
         }
 
     companion object {
+        /** The gate of a caller that never drops frames, such as the onboarding demo. */
+        val ALWAYS_OPEN_GATE: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()
+
         const val SAMPLE_RATE_HZ = 16_000
         const val FRAME_DURATION_MS = 20
         const val FRAME_SIZE_SAMPLES = SAMPLE_RATE_HZ * FRAME_DURATION_MS / 1000

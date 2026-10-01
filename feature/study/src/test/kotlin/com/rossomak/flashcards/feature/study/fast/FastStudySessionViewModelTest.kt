@@ -2,15 +2,19 @@ package com.rossomak.flashcards.feature.study.fast
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import com.rossomak.flashcards.core.domain.logging.FakeDomainLogger
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.AudioModeChanged
+import com.rossomak.flashcards.core.domain.model.AudioEnvironmentSignal.FocusChanged
+import com.rossomak.flashcards.core.domain.model.AudioMode
 import com.rossomak.flashcards.core.domain.model.CurationAction
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
+import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -84,6 +88,7 @@ class FastStudySessionViewModelTest {
     private val getSubcategoryProgress = GetSubcategoryProgressUseCase(cardProgressRepository)
     private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress)
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
+    private val interruptionGateway = FakeAudioInterruptionGateway()
     private val clock = MutableClock(FIXED_INSTANT)
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
@@ -122,10 +127,11 @@ class FastStudySessionViewModelTest {
             FastStudySessionCoordinator(
                 getSessionStartData = getSessionStartData,
                 playbackGateway = playbackGateway,
-                reducer = FastSessionReducer(),
+                interruptionGateway = interruptionGateway,
+                reducer = FastSessionReducer(mockk(relaxed = true)),
                 clock = clock,
                 timeSource = mainDispatcherRule.testDispatcher.scheduler.timeSource,
-                logger = FakeDomainLogger(),
+                logger = mockk(relaxed = true),
             ),
             voiceSettingsController,
         )
@@ -576,6 +582,60 @@ class FastStudySessionViewModelTest {
             viewModel.state.value.isReadAloudMode shouldBe true
             viewModel.state.value.isVoiceEngineUnavailable shouldBe true
         }
+    }
+
+    @Test
+    fun `a play during a call is ignored and shows the paused during a call message`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+        interruptionGateway.emit(AudioModeChanged(AudioMode.InCall))
+        interruptionGateway.emit(FocusChanged(FocusChange.LossTransient))
+        advanceUntilIdle()
+
+        viewModel.messages.test {
+            viewModel.onVoicePlayPause()
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+        }
+        viewModel.state.value.isVoicePlaying shouldBe false
+    }
+
+    @Test
+    fun `a call that starts shows the message once, and the next call shows it again`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createReadAloudViewModel()
+
+        viewModel.messages.test {
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+            advanceUntilIdle()
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+            viewModel.state.value.availableTransportCommands shouldBe emptySet()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.InCall))
+            advanceUntilIdle()
+            expectNoEvents()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Normal))
+            advanceUntilIdle()
+
+            interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+            advanceUntilIdle()
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+        }
+    }
+
+    @Test
+    fun `a session opened while a call rings shows the message once and offers no command`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(readAloudEnabled = true))
+        loadThreeCards()
+        interruptionGateway.emit(AudioModeChanged(AudioMode.Ringtone))
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            advanceUntilIdle()
+            awaitItem() shouldBe FastStudySessionMessage.PlayIgnoredDuringCall
+            expectNoEvents()
+        }
+        viewModel.state.value.availableTransportCommands shouldBe emptySet()
     }
 
     @Test

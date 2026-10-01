@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.core.domain.session
 
+import kotlin.time.Duration
+
 /** What [FastStudySessionCoordinator] must do after a [FastSessionReducer] transition, in order. */
 sealed interface FastSessionEffect {
     data object Play : FastSessionEffect
@@ -31,4 +33,8 @@ sealed interface FastSessionEffect {
 
     /** The last card's answer has been shown or read in full; the session is over. */
     data object SessionComplete : FastSessionEffect
+
+    /** Wait [duration], then report [FastSessionInput.BlipElapsed]. Starting again restarts the wait. */
+    data class StartBlipTimer(val duration: Duration) : FastSessionEffect
+    data object CancelBlipTimer : FastSessionEffect
 }

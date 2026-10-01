@@ -61,6 +61,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationReportFailed
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.PlayIgnoredDuringCall
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingOffline
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerGradingPause
@@ -274,6 +275,7 @@ private fun RatedManualSheetContent(isAnswerRevealed: Boolean, onShowAnswer: () 
 private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
     VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
     CurationReportFailed -> context.getString(R.string.fast_study_session_report_failure_message)
+    PlayIgnoredDuringCall -> context.getString(R.string.study_session_play_ignored_during_call_message)
     VoiceAnswerGradingOffline -> context.getString(R.string.study_session_voice_answer_offline_message)
     VoiceAnswerGradingServiceError -> context.getString(R.string.study_session_voice_answer_service_error_message)
     VoiceAnswerSilenceSkip -> context.getString(R.string.study_session_voice_answer_skip_message)

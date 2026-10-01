@@ -1,6 +1,8 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.logging.DomainLogger
 import com.rossomak.flashcards.core.domain.model.Flashcard
+import com.rossomak.flashcards.core.domain.model.InterruptionTier
 import com.rossomak.flashcards.core.domain.model.RatedSessionCardRecord
 import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
@@ -19,9 +21,12 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHold
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AnswerRevealed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AttemptRated
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AudioEnvironmentChanged
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.BlipElapsed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.FeedbackSkipRequested
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GateTailElapsed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.MicrophoneOpened
@@ -61,9 +66,14 @@ data class RatedSessionTransition(val state: RatedSessionState, val effects: Lis
  * ADR-0025 invariant: [RatedSessionEffect.OpenListeningWindow] is only ever emitted in response to
  * [RatedSessionInput.QuestionFinished], and never while a question or a notice is being spoken.
  *
- * [random] draws the re-insertion gaps (ADR-0046). Tests pass a fixed seed.
+ * Another app's audio interrupts the round by severity ([com.rossomak.flashcards.core.domain.model.InterruptionEpisode]):
+ * a blip keeps the round going, gating the microphone while it listens; an interruption, a call
+ * and a takeover pause it as a user pause would; and no play starts while a call rings or runs.
+ *
+ * [random] draws the re-insertion gaps (ADR-0046). Tests pass a fixed seed. [logger] only records
+ * audio interruption decisions; it never affects the state or the effects.
  */
-class RatedSessionReducer @Inject constructor(private val random: Random) {
+class RatedSessionReducer @Inject constructor(private val random: Random, private val logger: DomainLogger) {
 
     /**
      * The first state: one [RatedSessionCardRecord] per card, stamped previously-mastered from
@@ -90,7 +100,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
 
     @Suppress("CyclomaticComplexMethod") // one branch per input, exhaustive over the sealed type.
     fun reduce(state: RatedSessionState, input: RatedSessionInput): RatedSessionTransition {
-        val transition = RatedTransitionBuilder(state, random)
+        val transition = RatedTransitionBuilder(state, random, logger)
         with(transition) {
             when (input) {
                 is AttemptRated -> onAttemptRated(input)
@@ -110,16 +120,19 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
                 is CaptureFailed -> onCaptureFailed()
                 is NoticeFinished -> onNoticeFinished(input.notice)
                 NoticeTailElapsed -> onNoticeTailElapsed()
-                PlayRequested -> onPlayRequested()
+                PlayRequested -> onUserPlayRequested()
                 PauseRequested -> onPauseRequested()
                 TemporaryPauseRequested -> onTemporaryPauseRequested()
-                TemporaryPauseEnded -> if (this.state.isPausedTemporarily) onPlayRequested()
+                TemporaryPauseEnded -> onTemporaryPauseEnded()
                 AdvanceHoldRequested -> onAdvanceHoldRequested()
                 AdvanceHoldReleased -> onAdvanceHoldReleased()
                 ReleaseLingerElapsed -> onReleaseLingerElapsed()
-                is ResumeRequested -> onResumeRequested(input.isMicrophoneGranted)
+                is ResumeRequested -> if (!isResumeBlockedByCall()) onResumeRequested(input.isMicrophoneGranted)
                 PlaybackEngineUnavailable -> onPlaybackEngineUnavailable()
                 is PlaybackChanged -> onPlaybackChanged(input)
+                is AudioEnvironmentChanged -> onAudioEnvironmentChanged(input)
+                BlipElapsed -> onBlipElapsed()
+                GateTailElapsed -> onGateTailElapsed()
             }
             dropStaleReleaseLinger()
         }
@@ -153,37 +166,10 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         }
     }
 
-    /**
-     * Play by what it resumes: the auto-advance point moves on, a paused feedback is read again from
-     * the start, and a pause while grading goes back to waiting for the grade, without reading.
-     */
-    private fun RatedTransitionBuilder.onPlayRequested() {
-        state = state.copy(isPausedTemporarily = false)
-        when {
-            state.isHeldAtAdvancePoint || state.isPausedAtAdvancePoint -> moveOnFromAdvancePoint()
-            state.isPausedAfterFeedback -> replayFeedback()
-            state.isPausedWhileGrading -> {
-                state = state.copy(isPausedWhileGrading = false)
-                emit(RatedSessionEffect.ResumeWithoutReading)
-            }
-            !state.isPlaying -> emit(Play)
-        }
-    }
-
-    /**
-     * A pause always reaches the player, so it also drops an auto-resume the player has pending. A
-     * pause at a hold turns it into a user pause at the auto-advance point, still on the answered
-     * card. Anywhere else the voice round reacts by its phase ([pauseVoiceRound]).
-     */
+    /** A pause from the user: what an audio interruption would have resumed is theirs to resume from now on. */
     private fun RatedTransitionBuilder.onPauseRequested() {
-        val wasHeld = state.isHeldAtAdvancePoint
-        state = state.copy(
-            isPausedTemporarily = false,
-            isPausedAtAdvancePoint = state.isPausedAtAdvancePoint || wasHeld,
-            isHeldAtAdvancePoint = false,
-        )
-        if (!wasHeld) pauseVoiceRound()
-        emit(PausePlayback)
+        cancelResumeOfEpisode()
+        pauseByUser()
     }
 
     /**
@@ -193,6 +179,11 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
      * question again.
      */
     private fun RatedTransitionBuilder.onTemporaryPauseRequested() {
+        if (state.episode.tier == InterruptionTier.Interruption && !state.episode.isResumeCancelled && !state.isPausedTemporarily) {
+            // A dialog opened while an interruption holds the session: the dialog closing plays again, not the end of the interruption.
+            state = state.copy(isPausedTemporarily = true, episode = state.episode.cancelResume())
+            return
+        }
         if (!state.isPlaying || state.isHeldAtAdvancePoint || state.isPausedTemporarily) return
         state = state.copy(isPausedTemporarily = true)
         pauseVoiceRound()
@@ -229,31 +220,18 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
         emit(CancelReleaseLinger)
     }
 
+    /**
+     * Only whether the player plays. The player follows the coordinator's orders and starts and
+     * stops by nothing else, apart from a failed utterance, which closes an open listening window.
+     * The one order it does not follow is a start under a call: loading a session makes the player
+     * read at once, possibly before the reducer knew about a call that was already ringing, so a
+     * player that plays while a call rings or runs is paused here ([pausePlayingUnderCall]).
+     */
     private fun RatedTransitionBuilder.onPlaybackChanged(input: PlaybackChanged) {
         val playback = input.playback
-        val startedPlaying = playback.isPlaying && !state.isPlaying
-        val isUnsolicitedStart = startedPlaying && !state.isPlayerStartExpected
         if (!playback.isPlaying && state.isPlaying) onPlayerStopped()
-        state = state.copy(
-            isPlaying = playback.isPlaying,
-            isPlayerStartExpected = if (playback.isPlaying != state.isPlaying) false else state.isPlayerStartExpected,
-            isPausedAtAdvancePoint = state.isPausedAtAdvancePoint && !startedPlaying,
-            isPausedTemporarily = state.isPausedTemporarily && !startedPlaying,
-        )
-        if (isUnsolicitedStart && isWaitingForQuestion()) emit(PresentHeadQuestion)
-    }
-
-    /**
-     * The player started by itself, such as on an audio-focus gain after a loss that closed the
-     * listening window: the round waits for a question that nothing else will read.
-     */
-    private fun RatedTransitionBuilder.isWaitingForQuestion(): Boolean = with(state) {
-        isVoiceAnsweringActive &&
-            !isComplete &&
-            round.phase == VoiceAnswerPhase.WaitingForQuestion &&
-            speakingNotices.isEmpty() &&
-            pauseReason == null &&
-            voiceAnswerPauseReason == null
+        state = state.copy(isPlaying = playback.isPlaying)
+        pausePlayingUnderCall()
     }
 
     /**
@@ -334,21 +312,53 @@ class RatedSessionReducer @Inject constructor(private val random: Random) {
     }
 }
 
+/**
+ * Play by what it resumes: the auto-advance point moves on, a paused feedback is read again from
+ * the start, and a pause while grading goes back to waiting for the grade, without reading.
+ */
+internal fun RatedTransitionBuilder.onPlayRequested() {
+    state = state.copy(isPausedTemporarily = false)
+    when {
+        state.isHeldAtAdvancePoint || state.isPausedAtAdvancePoint -> moveOnFromAdvancePoint()
+        state.isPausedAfterFeedback -> replayFeedback()
+        state.isPausedWhileGrading -> {
+            state = state.copy(isPausedWhileGrading = false)
+            emit(RatedSessionEffect.ResumeWithoutReading)
+        }
+        !state.isPlaying -> emit(Play)
+    }
+}
+
+/**
+ * A pause always reaches the player. A pause at a hold turns it into a user pause at the
+ * auto-advance point, still on the answered card. Anywhere else the voice round reacts by its
+ * phase ([pauseVoiceRound]).
+ */
+internal fun RatedTransitionBuilder.pauseByUser() {
+    val wasHeld = state.isHeldAtAdvancePoint
+    state = state.copy(
+        isPausedTemporarily = false,
+        isPausedAtAdvancePoint = state.isPausedAtAdvancePoint || wasHeld,
+        isHeldAtAdvancePoint = false,
+    )
+    if (!wasHeld) pauseVoiceRound()
+    emit(PausePlayback)
+}
+
 /** Mutable only while one [RatedSessionReducer.reduce] call builds its transition. */
-internal class RatedTransitionBuilder(var state: RatedSessionState, val random: Random) {
+internal class RatedTransitionBuilder(var state: RatedSessionState, val random: Random, val logger: DomainLogger) {
     private val effects = mutableListOf<RatedSessionEffect>()
 
     /**
-     * Also keeps [RatedSessionState.isPlayerStartExpected]: an effect that makes the player start
-     * expects its report, and one that stops it withdraws the expectation.
+     * The one choke point of the call block: no play starts anything while a call rings or runs,
+     * whatever asked for it. An effect that makes the session play again withdraws the resume an
+     * interruption was waiting to make.
      */
     fun emit(effect: RatedSessionEffect) {
+        val isPlay = effect == Play || effect == RatedSessionEffect.ResumeWithoutReading || effect == RestartVoiceStack
+        if (effect == Play && state.episode.isCallBlocking) return
         effects += effect
-        when (effect) {
-            Play, RatedSessionEffect.ResumeWithoutReading, RestartVoiceStack -> state = state.copy(isPlayerStartExpected = true)
-            PausePlayback, RatedSessionEffect.StopVoiceStack -> state = state.copy(isPlayerStartExpected = false)
-            else -> Unit
-        }
+        if (isPlay && state.episode.isHolding) state = state.copy(episode = state.episode.cancelResume())
     }
 
     fun build(): RatedSessionTransition = RatedSessionTransition(state, effects.toList())

@@ -9,6 +9,9 @@ sealed interface FastSessionEvent {
     /** A text-to-speech engine could not start; the session is paused until played again. */
     data object VoicePlaybackUnavailable : FastSessionEvent
 
+    /** The user asked to play while a call rings or runs, and nothing started. */
+    data object PlayIgnoredDuringCall : FastSessionEvent
+
     /**
      * A transport [command] from outside the app changed the session. Sent after it was applied,
      * and never for a command the session ignored.

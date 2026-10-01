@@ -76,9 +76,7 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
                     }
                     is VoiceGradingStreamEventDto.Graded -> {
                         // The stream contract guarantees the transcript chunk precedes the grade
-                        // (ADR-0028); a Graded event with no prior transcript is a protocol
-                        // violation and fails the answer as a service error, never an empty
-                        // transcript.
+                        // a Graded event with no prior transcript is a protocol violation and fails the answer as a service error, never an empty transcript.
                         val transcript = sanitizedTranscript
                             ?: error("Graded event arrived before any transcript chunk")
                         val grade = VoiceAnswerGrade(
