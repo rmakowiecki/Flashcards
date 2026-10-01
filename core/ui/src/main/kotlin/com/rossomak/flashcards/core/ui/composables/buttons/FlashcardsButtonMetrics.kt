@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Normal
@@ -172,7 +173,7 @@ internal fun RowScope.FlashcardsButtonContent(
             modifier = Modifier.padding(end = extraIconGap).size(ButtonDefaults.IconSize),
         )
     }
-    Text(text = text, style = metrics.textStyle)
+    Text(text = text, style = metrics.textStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
     if (icon != null && iconPosition == FlashcardsButtonIconPosition.Trailing) {
         Icon(
             imageVector = icon,
