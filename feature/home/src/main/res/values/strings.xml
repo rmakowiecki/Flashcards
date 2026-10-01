@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="favorites_section_title">Favorites</string>
+
+    <plurals name="favorites_category_topics">
+        <item quantity="one">%d topic</item>
+        <item quantity="other">%d topics</item>
+    </plurals>
+    <string name="favorites_category_quick_session_button">Quick session</string>
+    <string name="favorites_category_quick_session_cd">Quick session, %1$s</string>
+
+    <string name="favorites_subcategory_progress_label">%1$d%% studied</string>
+    <string name="favorites_subcategory_play_cd">Start session, %1$s</string>
+</resources>
