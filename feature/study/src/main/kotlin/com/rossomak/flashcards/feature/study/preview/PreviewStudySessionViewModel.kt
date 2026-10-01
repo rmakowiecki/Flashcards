@@ -11,6 +11,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
@@ -49,6 +50,7 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class PreviewStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val getSubcategories: GetSubcategoriesUseCase,
     private val selectSessionFlashcards: SelectSessionFlashcardsUseCase,
     private val sampleQuickSessionSubcategories: SampleQuickSessionSubcategoriesUseCase,
     private val observeStudySessionPreferences: ObserveStudySessionPreferencesUseCase,
@@ -60,11 +62,20 @@ class PreviewStudySessionViewModel @Inject constructor(
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
 
-    private val route = savedStateHandle.decodeRoute<PreviewStudySessionRoute>()
+    private val route = savedStateHandle.decodeRoute<PreviewStudySessionRoute>().also { decodedRoute ->
+        require(decodedRoute.isQuickSession || decodedRoute.subcategoryIds.isNotEmpty()) {
+            "A non-Quick Preview route must carry its Subcategory ids"
+        }
+    }
 
-    /** `route`'s parallel id/name lists, indexed once rather than re-scanned per sampled id. */
-    private val candidateSubcategoryNamesById: Map<String, String> =
-        route.subcategoryIds.zip(route.subcategoryNames).toMap()
+    /**
+     * The Quick Session's candidate pool (id to name), held so every re-randomise samples the same
+     * pool and a name lookup is indexed once rather than re-scanned per sampled id. Seeded from the
+     * route's parallel id/name lists when the caller supplied them; otherwise null until
+     * [resampleSubcategories] fetches it once (ADR-0056). Always null for a non-Quick session.
+     */
+    private var candidatePool: Map<String, String>? =
+        route.subcategoryIds.zip(route.subcategoryNames).toMap().takeIf { it.isNotEmpty() }
 
     private val _state = MutableStateFlow(
         PreviewStudySessionScreenState(
@@ -148,10 +159,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                     ),
                 )
             }
-            if (route.isQuickSession) {
-                resampleSubcategories()
-            }
-            selectCards()
+            selectCards(resampleQuickSession = route.isQuickSession)
         }
         // Warms the process-wide voice cache so the voice dialogs, here and in the session, open complete.
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
@@ -179,19 +187,22 @@ class PreviewStudySessionViewModel @Inject constructor(
         _state.update { it.copy(config = it.config.copy(voiceAnsweringEnabled = false)) }
     }
 
+    /**
+     * A Quick Session whose pool never loaded has nothing to draw from, so it re-attempts the pool
+     * fetch before drawing; every other retry only redoes the draw.
+     */
     fun onRetry() {
-        selectCards()
+        selectCards(resampleQuickSession = route.isQuickSession && candidatePool == null)
     }
 
     /**
      * Re-randomise: rerolls the Quick Session's subcategory sample and then the card draw within
-     * it. Every other selection reuses the held sample instead of re-rolling it (ADR-0040).
+     * it. Every other selection reuses the held sample instead of re-rolling it (ADR-0040). Does
+     * nothing while no pool is held: there is nothing to re-roll, and Retry owns the fetch.
      */
     fun onReshuffleSubcategories() {
-        viewModelScope.launch {
-            resampleSubcategories()
-            selectCards()
-        }
+        if (candidatePool == null) return
+        selectCards(resampleQuickSession = true)
     }
 
     /**
@@ -388,11 +399,19 @@ class PreviewStudySessionViewModel @Inject constructor(
      * button on it, and a resample or filter change needs that same gate — otherwise Start stays
      * clickable against a [selectedCardIds] that hasn't caught up with the Subcategory set just
      * written to `config.subcategoryIds` below.
+     *
+     * @param resampleQuickSession rerolls the Quick Session's Subcategory sample first, fetching the
+     * pool if none is held yet. A pool that cannot be fetched lands on the same error state a failed
+     * card draw does, with no draw attempted.
      */
-    private fun selectCards() {
+    private fun selectCards(resampleQuickSession: Boolean = false) {
         selectionJob?.cancel()
         selectionJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
+            if (resampleQuickSession && !resampleSubcategories()) {
+                _state.update { it.copy(isLoading = false, error = R.string.study_session_load_error_message) }
+                return@launch
+            }
             val resolved = resolveSubcategories()
             _state.update { state ->
                 state.copy(
@@ -452,14 +471,15 @@ class PreviewStudySessionViewModel @Inject constructor(
      * list the route carries. Quick is the only scenario where the Subcategory *set itself* can
      * change between resolutions, and it does so from the sample [resampleSubcategories] already
      * put in state — this never re-samples itself (ADR-0040). Sampled ids are mapped back to names
-     * through [candidateSubcategoryNamesById] — the pool the sample was drawn from.
+     * through [candidatePool] — the pool the sample was drawn from.
      */
     private fun resolveSubcategories(): ResolvedSubcategories {
         if (!route.isQuickSession) {
             return ResolvedSubcategories(route.subcategoryIds, route.subcategoryNames)
         }
         val sampledIds = _state.value.quickSessionSampledSubcategoryIds.orEmpty()
-        val sampledNames = sampledIds.map { id -> candidateSubcategoryNamesById.getValue(id) }
+        val pool = candidatePool.orEmpty()
+        val sampledNames = sampledIds.map { id -> pool.getValue(id) }
         return ResolvedSubcategories(sampledIds, sampledNames)
     }
 
@@ -467,14 +487,28 @@ class PreviewStudySessionViewModel @Inject constructor(
      * Samples a fresh Quick Session subcategory subset and holds it in state. Called on load and
      * on Re-randomise only — every other selection reuses what's already there, which is what
      * keeps the sample stable while the user adjusts a filter, the length or the sort (ADR-0040).
+     *
+     * Fetches the Category's Subcategories as the pool first when the route supplied none, and
+     * only once: a held pool is reused (ADR-0056).
+     *
+     * @return false when the pool could not be fetched, leaving the previous sample untouched.
      */
-    private suspend fun resampleSubcategories() {
+    private suspend fun resampleSubcategories(): Boolean {
+        val pool = candidatePool ?: run {
+            _state.update { it.copy(isLoading = true, error = null) }
+            getSubcategories(route.categoryId)
+                .onFailure { error -> logw(error) { "Failed to fetch Subcategories for Quick Session pool" } }
+                .getOrNull()
+                ?.associate { subcategory -> subcategory.id to subcategory.name }
+                ?.also { fetchedPool -> candidatePool = fetchedPool }
+        } ?: return false
         val sampledIds = sampleQuickSessionSubcategories(
             SampleQuickSessionSubcategoriesUseCase.Params(
-                candidateSubcategoryIds = route.subcategoryIds,
+                candidateSubcategoryIds = pool.keys.toList(),
                 countRange = _state.value.config.subcategoryCountRange,
             )
         )
         _state.update { it.copy(quickSessionSampledSubcategoryIds = sampledIds) }
+        return true
     }
 }

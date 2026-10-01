@@ -9,6 +9,20 @@ import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import kotlinx.serialization.Serializable
 
 /**
+ * [isQuickSession] and [subcategoryIds] together say how the Preview screen treats the Subcategories
+ * ([ADR-0056](../../../docs/adr/0056-preview-resolves-quick-session-candidate-pool.md)):
+ *
+ * | Quick | ids | Meaning |
+ * |---|---|---|
+ * | true | present | The caller's candidate pool; Preview samples it and makes no fetch |
+ * | true | empty | Preview fetches the Category's Subcategories itself, then samples them |
+ * | false | present | Custom or single-Subcategory: used literally |
+ * | false | empty | Invalid; the Preview screen rejects it |
+ *
+ * Quick ids mean "the Category's complete Subcategory list, or none". A partial list is not
+ * validated and would silently give a Quick Session over only that subset.
+ *
+ * @param subcategoryNames parallel to [subcategoryIds].
  * @param difficultyMin lower bound of the difficulty filter, flattened out of an `IntRange` because
  * androidx.navigation only derives a NavType for primitives and enums — the same reason
  * [FastStudySessionRoute] and [RatedStudySessionRoute] flatten their voice settings.

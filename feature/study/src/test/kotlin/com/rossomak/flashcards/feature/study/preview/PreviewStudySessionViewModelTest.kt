@@ -12,6 +12,7 @@ import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDen
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
+import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -20,6 +21,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreference
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
@@ -50,6 +52,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 import com.rossomak.flashcards.testutil.MainDispatcherRule
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
@@ -115,6 +118,25 @@ class PreviewStudySessionViewModelTest {
         isQuickSession = true,
     )
 
+    /** What Home hands Preview: the Category id alone, no pool. */
+    private val poolLessQuickSessionRoute = quickSessionRoute.copy(
+        subcategoryIds = emptyList(),
+        subcategoryNames = emptyList(),
+    )
+
+    /** The pool Preview fetches for [poolLessQuickSessionRoute], same ids and names as [quickSessionRoute]. */
+    private val fetchedPool = quickSessionRoute.subcategoryIds.zip(quickSessionRoute.subcategoryNames)
+        .mapIndexed { index, (id, name) ->
+            Subcategory(
+                id = id,
+                name = name,
+                categoryId = categoryId,
+                categoryName = categoryName,
+                order = index,
+                cardCount = 1,
+            )
+        }
+
     @Before
     fun setUp() {
         mockkObject(RouteDecoder)
@@ -137,6 +159,7 @@ class PreviewStudySessionViewModelTest {
      */
     private fun createViewModel(): PreviewStudySessionViewModel = PreviewStudySessionViewModel(
         savedStateHandle,
+        GetSubcategoriesUseCase(flashcardRepository),
         SelectSessionFlashcardsUseCase(
             getFlashcards = GetFlashcardsUseCase(flashcardRepository),
             filterFlashcards = FilterFlashcardsUseCase(),
@@ -1114,6 +1137,157 @@ class PreviewStudySessionViewModelTest {
 
             viewModel.state.value.config.subcategoryIds shouldBe listOf(subcategoryId)
             viewModel.state.value.subcategoryCount shouldBe 1
+        }
+
+    private fun seedPoolLessQuickSession() {
+        stubRoute(poolLessQuickSessionRoute)
+        flashcardRepository.subcategoriesToReturn = Result.success(fetchedPool)
+        fetchedPool.forEach { subcategory ->
+            flashcardRepository.flashcardsBySubcategory[subcategory.id] = Result.success(
+                (1..30).map { index -> flashcard(id = "${subcategory.id}-card-$index", subcategoryId = subcategory.id) },
+            )
+        }
+    }
+
+    @Test
+    fun `a quick route that supplies its pool makes no pool fetch`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(quickSessionRoute)
+
+        createViewModel()
+        advanceUntilIdle()
+
+        flashcardRepository.fetchedSubcategoryCategoryIds shouldBe emptyList()
+    }
+
+    @Test
+    fun `a quick route without a pool fetches the category's subcategories and samples them`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
+            val sampledIds = viewModel.state.value.config.subcategoryIds
+            (sampledIds.size in StudySessionConfig.DEFAULT_SUBCATEGORY_COUNT_RANGE) shouldBe true
+            sampledIds.forEach { id -> (id in quickSessionRoute.subcategoryIds) shouldBe true }
+            viewModel.state.value.subcategoryNames shouldBe
+                sampledIds.map { id -> fetchedPool.first { subcategory -> subcategory.id == id }.name }
+            viewModel.state.value.isLoading shouldBe false
+            viewModel.state.value.error shouldBe null
+        }
+
+    @Test
+    fun `a fetched pool is sampled within the seeded subcategoryCountRange`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+            studySessionPreferencesRepository.preferences.value = StudySessionPreferences(
+                subcategoryCountRange = narrowerSubcategoryCountRange,
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            (viewModel.state.value.config.subcategoryIds.size in narrowerSubcategoryCountRange) shouldBe true
+        }
+
+    @Test
+    fun `reshuffling a fetched pool changes the sample without fetching the pool again`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            val sampleBeforeReshuffle = viewModel.state.value.config.subcategoryIds
+
+            viewModel.onReshuffleSubcategories()
+            advanceUntilIdle()
+
+            viewModel.state.value.config.subcategoryIds shouldNotBe sampleBeforeReshuffle
+            flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
+        }
+
+    @Test
+    fun `a length or sort change on a fetched pool neither resamples nor fetches again`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            val sampledIds = viewModel.state.value.config.subcategoryIds
+
+            viewModel.onDialogEvent(Open(SessionCardCount(draftState = viewModel.state.value.config.length)))
+            viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = 10)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            viewModel.onDialogEvent(Open(SessionCardsSortingOrder(draftState = viewModel.state.value.config.sortOrder)))
+            viewModel.onDialogEvent(DraftChange(SessionCardsSortingOrder(draftState = FlashcardSortOrder.HardestFirst)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            viewModel.state.value.config.subcategoryIds shouldBe sampledIds
+            flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
+        }
+
+    @Test
+    fun `a non quick route without subcategory ids is rejected`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(poolLessQuickSessionRoute.copy(isQuickSession = false))
+
+        shouldThrow<IllegalArgumentException> { createViewModel() }
+    }
+
+    @Test
+    fun `a pool fetch failure shows the load error and retry fetches the pool again`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+            flashcardRepository.subcategoriesToReturn = Result.failure(IllegalStateException("boom"))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.isLoading shouldBe false
+
+            flashcardRepository.subcategoriesToReturn = Result.success(fetchedPool)
+            viewModel.onRetry()
+            advanceUntilIdle()
+
+            flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId, categoryId)
+            viewModel.state.value.error shouldBe null
+            viewModel.state.value.canStart shouldBe true
+            viewModel.state.value.config.subcategoryIds.isNotEmpty() shouldBe true
+        }
+
+    @Test
+    fun `reshuffling while the pool is unresolved does nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        seedPoolLessQuickSession()
+        flashcardRepository.subcategoriesToReturn = Result.failure(IllegalStateException("boom"))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onReshuffleSubcategories()
+        advanceUntilIdle()
+
+        flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
+        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+    }
+
+    @Test
+    fun `retry on a quick route that supplies its pool only redoes the draw`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(quickSessionRoute)
+            flashcardRepository.flashcardsToReturn = Result.failure(IllegalStateException("boom"))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            viewModel.onRetry()
+            advanceUntilIdle()
+
+            flashcardRepository.fetchedSubcategoryCategoryIds shouldBe emptyList()
+            viewModel.state.value.error shouldBe null
         }
 
     @Test
