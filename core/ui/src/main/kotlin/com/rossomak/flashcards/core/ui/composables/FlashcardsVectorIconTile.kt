@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.glyph.CachedGlyph.Ready
@@ -29,7 +30,7 @@ import com.rossomak.flashcards.core.ui.theme.AppSizes
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.toCategoryColor
+import com.rossomak.flashcards.core.ui.theme.toCategoryColorOrNull
 
 /**
  * Glyph shown when [iconSvg] is absent (not yet curated) or malformed (invalid SVG) — both cases
@@ -62,8 +63,7 @@ fun FlashcardsVectorIconTile(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
-    val tintColor = color?.let { runCatching { it.toCategoryColor() }.getOrNull() }
-        ?: MaterialTheme.colorScheme.onSecondaryContainer
+    val tintColor = color.toCategoryColorOrNull() ?: MaterialTheme.colorScheme.onSecondaryContainer
     val containerColor = tintColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
     val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = ICON_CONTENT_SIZE)
 
@@ -92,7 +92,7 @@ fun FlashcardsVectorIconTile(
     }
 }
 
-/** Diameter of [FlashcardsInlineCategoryGlyph] — reuses the compact metadata-badge icon token. */
+/** Default diameter of [FlashcardsInlineCategoryGlyph] — reuses the compact metadata-badge icon token. */
 private val INLINE_GLYPH_SIZE = AppSizes.metadataBadgeIconCompact
 
 /**
@@ -103,6 +103,12 @@ private val INLINE_GLYPH_SIZE = AppSizes.metadataBadgeIconCompact
  * color reads [FlashcardsVectorIconTile] instead. [iconSvg] absent or malformed both land on the
  * same generic fallback glyph, no crash either way — same handling [FlashcardsVectorIconTile]
  * gives its tile, just without the container.
+ *
+ * @param size the glyph's side. The cached raster is rendered at this size, so a large decorative
+ * use stays crisp.
+ * @param reserveSpaceWhileLoading `true` keeps [size] of layout space while the glyph decodes, so a
+ * text line doesn't shift when it arrives. `false` draws nothing and takes no space until the glyph
+ * is ready, for a decorative glyph that must not affect layout.
  */
 @Composable
 fun FlashcardsInlineCategoryGlyph(
@@ -110,20 +116,21 @@ fun FlashcardsInlineCategoryGlyph(
     tint: Color,
     contentDescription: String?,
     modifier: Modifier = Modifier,
+    size: Dp = INLINE_GLYPH_SIZE,
+    reserveSpaceWhileLoading: Boolean = true,
 ) {
-    when (val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = INLINE_GLYPH_SIZE)) {
-        // Still loading: reserve the glyph's space so the text line doesn't shift when it arrives.
-        null -> Spacer(modifier = modifier.size(INLINE_GLYPH_SIZE))
+    when (val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = size)) {
+        null -> if (reserveSpaceWhileLoading) Spacer(modifier = modifier.size(size))
         Unavailable -> Icon(
             imageVector = FallbackIcon,
             contentDescription = contentDescription,
-            modifier = modifier.size(INLINE_GLYPH_SIZE),
+            modifier = modifier.size(size),
             tint = tint,
         )
         is Ready -> Image(
             bitmap = glyphCache.glyph,
             contentDescription = contentDescription,
-            modifier = modifier.size(INLINE_GLYPH_SIZE),
+            modifier = modifier.size(size),
             colorFilter = rememberTintFilter(tint),
         )
     }

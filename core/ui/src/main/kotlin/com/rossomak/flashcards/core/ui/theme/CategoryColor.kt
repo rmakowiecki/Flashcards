@@ -12,8 +12,8 @@ private const val OPAQUE_ALPHA_MASK = 0xFF000000.toInt()
  * when present — into a Compose [Color]. This is a strict parser: category color is hand-curated,
  * authored data (not user input), so a malformed value throws [IllegalArgumentException] rather
  * than degrading to a fallback. [Category.color] itself is nullable (icon/color art can lag a
- * category's creation), so callers wrap this in `runCatching { ... }.getOrNull()` for graceful
- * degradation rather than this function handling null/fallback itself.
+ * category's creation), so callers use [toCategoryColorOrNull] for graceful degradation rather than this
+ * function handling null/fallback itself.
  *
  * Implemented as plain hex parsing rather than `android.graphics.Color.parseColor()` — the latter
  * is a stubbed Android-framework call that throws "not mocked" in this project's plain-JVM,
@@ -25,3 +25,9 @@ fun String.toCategoryColor(): Color {
     val rgb = substring(1).toInt(radix = 16)
     return Color(rgb or OPAQUE_ALPHA_MASK)
 }
+
+/**
+ * Null-tolerant [toCategoryColor]: `null` (no curated color yet) and a malformed value both give `null`,
+ * so the caller falls back to its own default tint.
+ */
+fun String?.toCategoryColorOrNull(): Color? = this?.let { runCatching { it.toCategoryColor() }.getOrNull() }
