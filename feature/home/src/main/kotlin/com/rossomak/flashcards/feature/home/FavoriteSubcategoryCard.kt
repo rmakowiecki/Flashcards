@@ -18,8 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -44,8 +46,8 @@ private const val PERCENT_SCALE = 100
  * Studied, and a play button.
  *
  * The body is one button; the play button is a separate node with its own description. An
- * [SubcategoryProgressState.Unresolved] [progress] omits the label and bar, but the bottom row keeps
- * the play button's height, so the card does not resize when the progress arrives.
+ * [SubcategoryProgressState.Unresolved] [progress] lays out the label and bar but draws and announces
+ * nothing, so the card's layout does not shift when the progress arrives at any font scale.
  */
 @Composable
 internal fun FavoriteSubcategoryCard(
@@ -99,14 +101,13 @@ internal fun FavoriteSubcategoryCard(
                     .heightIn(min = playButtonSize),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (progress is Resolved) {
-                    StudiedProgress(
-                        studiedFraction = progress.studiedFraction(subcategory.cardCount),
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                val studiedFraction = (progress as? Resolved)?.studiedFraction(subcategory.cardCount)
+                StudiedProgress(
+                    studiedFraction = studiedFraction ?: 0f,
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(if (studiedFraction == null) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier),
+                )
                 Spacer(modifier = Modifier.width(playButtonSize + MaterialTheme.spacing.normal))
             }
         }
