@@ -17,6 +17,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
@@ -25,23 +26,18 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSiz
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
 import kotlin.math.roundToInt
 
 private const val PROGRESS_PERCENT_SCALE = 100
-
-/** The ring's fill, `0f` for a subcategory with no cards rather than dividing by zero. */
-private fun SubcategoryProgress.Resolved.studiedFraction(cardCount: Int): Float =
-    if (cardCount > 0) studiedCount / cardCount.toFloat() else 0f
 
 /**
  * Names Studied, never a number in the unknown state — mirrors CategoryDetailsScreen's own ring
  * content description, own key per ADR-0023 (see the `browse_search_topic_progress_*` strings).
  */
 @Composable
-internal fun SubcategoryProgress.searchRingContentDescription(cardCount: Int): String = when (this) {
-    SubcategoryProgress.Unresolved -> stringResource(R.string.browse_search_topic_progress_unavailable_cd)
-    is SubcategoryProgress.Resolved -> stringResource(
+internal fun SubcategoryProgressState.searchRingContentDescription(cardCount: Int): String = when (this) {
+    SubcategoryProgressState.Unresolved -> stringResource(R.string.browse_search_topic_progress_unavailable_cd)
+    is SubcategoryProgressState.Resolved -> stringResource(
         R.string.browse_search_topic_progress_cd,
         (studiedFraction(cardCount) * PROGRESS_PERCENT_SCALE).roundToInt(),
     )
@@ -58,9 +54,9 @@ internal fun SubcategoryProgress.searchRingContentDescription(cardCount: Int): S
  * shared with [CategoryDetailsRowSubtitle] and the chip line in BrowseScreen.
  */
 @Composable
-internal fun Subcategory.searchResultCardsStudiedText(progress: SubcategoryProgress, separator: String): AnnotatedString {
+internal fun Subcategory.searchResultCardsStudiedText(progress: SubcategoryProgressState, separator: String): AnnotatedString {
     val cardCountLabel = pluralStringResource(R.plurals.browse_card_count_label, cardCount, cardCount)
-    val studiedCount = (progress as? SubcategoryProgress.Resolved)?.studiedCount ?: 0
+    val studiedCount = (progress as? SubcategoryProgressState.Resolved)?.studiedCount ?: 0
     if (studiedCount <= 0) return buildAnnotatedString { append(cardCountLabel) }
 
     val studiedText = stringResource(R.string.category_details_topic_studied_label, studiedCount)
@@ -109,13 +105,13 @@ private fun SearchResultSubtitle(iconSvg: String?, categoryName: String, text: A
 internal fun SubcategorySearchResultRow(
     modifier: Modifier,
     subcategory: Subcategory,
-    progress: SubcategoryProgress,
+    progress: SubcategoryProgressState,
     iconSvg: String?,
     isFavorited: Boolean,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
-    val ringFraction = (progress as? SubcategoryProgress.Resolved)?.studiedFraction(subcategory.cardCount)
+    val ringFraction = (progress as? SubcategoryProgressState.Resolved)?.studiedFraction(subcategory.cardCount)
     val ringContentDescription = progress.searchRingContentDescription(subcategory.cardCount)
     val cardsStudiedText = subcategory.searchResultCardsStudiedText(
         progress = progress,

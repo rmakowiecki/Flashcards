@@ -10,7 +10,7 @@ import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.repository.XpConfigRepository
@@ -73,7 +73,7 @@ class PendingSessionProjector @Inject constructor(
      * changes between the two reads, the queue and the remote document may belong to different Users,
      * so the read fails rather than projecting one User's sessions over the other's progress.
      */
-    suspend fun projectCardProgress(subcategoryId: String): Result<SubcategoryProgress?> {
+    suspend fun projectCardProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> {
         val uidAtStart = signedInUid()
         val pendingSessions = pendingSessions().filter { session -> session.touches(subcategoryId) }
         val remoteProgress = readRemoteProgress(subcategoryId)
@@ -146,7 +146,7 @@ class PendingSessionProjector @Inject constructor(
      * no current reader looks at the stamps closely enough to tell the difference.
      */
     private fun replay(
-        baselineBySubcategory: Map<String, SubcategoryProgress?>,
+        baselineBySubcategory: Map<String, SubcategoryProgressDetails?>,
         pendingSessions: List<SessionResult>,
         scoringState: ScoringState = ScoringState(),
         config: XpConfig = XpConfig(),
@@ -164,7 +164,7 @@ class PendingSessionProjector @Inject constructor(
             scoring.cardProgressMerge.cardUpdatesBySubcategory.forEach { (subcategoryId, cardUpdates) ->
                 val prior = progressBySubcategory[subcategoryId]
                 val updatedCards = cardUpdates.mapValues { (cardId, update) -> update.applyTo(prior?.cards?.get(cardId), session.startedAt) }
-                progressBySubcategory[subcategoryId] = SubcategoryProgress(
+                progressBySubcategory[subcategoryId] = SubcategoryProgressDetails(
                     subcategoryId = subcategoryId,
                     categoryId = prior?.categoryId ?: session.categoryId,
                     cards = prior?.cards.orEmpty() + updatedCards,
@@ -180,19 +180,19 @@ class PendingSessionProjector @Inject constructor(
     }
 
     /** The cached server Card Progress of every Subcategory [pendingSessions] touch, `null` where unreadable or absent. */
-    private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgress?> = coroutineScope {
+    private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDetails?> = coroutineScope {
         pendingSessions.flatMap { session -> session.touchedSubcategoryIds() }.toSet().map { subcategoryId ->
             async { subcategoryId to readRemoteProgress(subcategoryId).orEmptyBaseline(subcategoryId) }
         }.awaitAll().toMap()
     }
 
     /** A failed read projects over no record instead of failing, so the Pending Session results still show. */
-    private fun Result<SubcategoryProgress?>.orEmptyBaseline(subcategoryId: String): SubcategoryProgress? = getOrElse { exception ->
+    private fun Result<SubcategoryProgressDetails?>.orEmptyBaseline(subcategoryId: String): SubcategoryProgressDetails? = getOrElse { exception ->
         logw(exception) { "Card Progress for $subcategoryId unreadable, projecting pending sessions over an empty baseline" }
         null
     }
 
-    private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgress?> =
+    private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> =
         runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
 
     private suspend fun readRemoteScoringState(): Result<ScoringState?> =
@@ -222,7 +222,7 @@ class PendingSessionProjector @Inject constructor(
      * projected scoring state.
      */
     private data class Replay(
-        val progressBySubcategory: Map<String, SubcategoryProgress>,
+        val progressBySubcategory: Map<String, SubcategoryProgressDetails>,
         val summaryDeltas: Map<String, SubcategoryProgressDelta>,
         val scoringState: ScoringState,
     )

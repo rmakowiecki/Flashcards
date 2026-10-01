@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,11 +10,11 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.yield
 
 class FakeCardProgressRepository : CardProgressRepository {
-    private val progressBySubcategoryId: MutableMap<String, SubcategoryProgress> = mutableMapOf()
+    private val progressBySubcategoryId: MutableMap<String, SubcategoryProgressDetails> = mutableMapOf()
     private val summaryUpdates = MutableStateFlow<ProgressSummary?>(null)
 
     /** Overrides every [getProgress] call when set, success or failure alike. */
-    var resultToReturn: Result<SubcategoryProgress?>? = null
+    var resultToReturn: Result<SubcategoryProgressDetails?>? = null
 
     /**
      * When set, [observeProgressSummary] suspends on this before its first emission — lets a test
@@ -27,7 +27,7 @@ class FakeCardProgressRepository : CardProgressRepository {
     /** Every Subcategory id [getProgress] was actually called with, in call order. */
     val requestedSubcategoryIds: MutableList<String> = mutableListOf()
 
-    fun seed(progress: SubcategoryProgress) {
+    fun seed(progress: SubcategoryProgressDetails) {
         progressBySubcategoryId[progress.subcategoryId] = progress
     }
 
@@ -45,7 +45,7 @@ class FakeCardProgressRepository : CardProgressRepository {
      * genuine `withContext(Dispatchers.IO)` dispatcher hop — the same reasoning as
      * [FakeSessionSubmissionRepository]'s own [yield].
      */
-    override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgress?> {
+    override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> {
         requestedSubcategoryIds.add(subcategoryId)
         yield()
         return resultToReturn ?: Result.success(progressBySubcategoryId[subcategoryId])

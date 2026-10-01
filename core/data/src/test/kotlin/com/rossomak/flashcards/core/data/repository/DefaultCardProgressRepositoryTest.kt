@@ -6,7 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ProgressSummaryDto
-import com.rossomak.flashcards.core.data.model.SubcategoryProgressDto
+import com.rossomak.flashcards.core.data.model.SubcategoryProgressDetailsDto
 import com.rossomak.flashcards.core.data.model.SubcategoryProgressSummaryDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
@@ -56,7 +56,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress maps the dto to domain keyed by the requested subcategory id`() = runTest {
         val subcategoryId = "sub-1"
-        val dto = SubcategoryProgressDto(
+        val dto = SubcategoryProgressDetailsDto(
             categoryId = "cat-1",
             cards = mapOf(
                 "card-1" to CardProgressEntryDto(
@@ -367,7 +367,7 @@ class DefaultCardProgressRepositoryTest {
         pendingSessionQueue.seed(sessionResult.toDto(uid))
     }
 
-    private fun remoteProgress(vararg cards: Pair<String, FlashcardStudyProgressState>) = SubcategoryProgressDto(
+    private fun remoteProgress(vararg cards: Pair<String, FlashcardStudyProgressState>) = SubcategoryProgressDetailsDto(
         categoryId = CATEGORY_ID,
         cards = cards.associate { (cardId, state) -> cardId to CardProgressEntryDto(state = state.name, firstStudiedAt = Timestamp(Date.from(REMOTE_STAMP))) },
     )

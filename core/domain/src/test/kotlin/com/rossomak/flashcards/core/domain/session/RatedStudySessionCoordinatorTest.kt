@@ -13,7 +13,7 @@ import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
@@ -32,7 +32,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeVoiceAnswerGradingRepo
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressDetailsUseCase
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainInOrder
 import io.kotest.matchers.collections.shouldNotContain
@@ -62,7 +62,7 @@ class RatedStudySessionCoordinatorTest {
     private val cardProgressRepository = FakeCardProgressRepository()
     private val getSessionStartData = GetSessionStartDataUseCase(
         GetFlashcardsUseCase(flashcardRepository),
-        GetSubcategoryProgressUseCase(cardProgressRepository),
+        GetSubcategoryProgressDetailsUseCase(cardProgressRepository),
     )
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val captureGateway = FakeVoiceCaptureGateway()
@@ -1103,7 +1103,7 @@ class RatedStudySessionCoordinatorTest {
     @Test
     fun `the prior progress read is recorded, and a card with no entry is new`() = runTest {
         cardProgressRepository.seed(
-            SubcategoryProgress(
+            SubcategoryProgressDetails(
                 subcategoryId = SUBCATEGORY_ID,
                 categoryId = "android",
                 cards = mapOf("card-2" to CardProgressEntry(state = FlashcardStudyProgressState.Mastered, firstStudiedAt = START_INSTANT, masteredAt = START_INSTANT)),

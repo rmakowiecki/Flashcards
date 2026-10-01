@@ -129,7 +129,7 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    /** Every Subcategory in the Category, sampled by the Preview screen — not honoured literally. */
+    /** The Category's complete Subcategory list, as the candidate pool the Preview screen samples from. */
     fun onQuickSessionStart() {
         val subcategories = (_state.value.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return
         emitPreviewSession(subcategories = subcategories, isQuickSession = true)

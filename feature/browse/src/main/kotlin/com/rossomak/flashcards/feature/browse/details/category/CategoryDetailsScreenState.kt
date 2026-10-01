@@ -3,7 +3,9 @@ package com.rossomak.flashcards.feature.browse.details.category
 import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.UserFavorites
+import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
 
 /**
  * @param selectedSubcategoryIds **one nullable field, not a boolean plus a set.** `null` means
@@ -58,14 +60,14 @@ data class CategoryDetailsScreenState(
         get() = subcategories.isNotEmpty() && selectedCount == subcategories.size
 
     /**
-     * One subcategory's ring/subtitle data, per ADR-0016's "two measures": [SubcategoryProgress.Resolved.studiedCount]
+     * One subcategory's ring/subtitle data, per ADR-0016's "two measures": [SubcategoryProgressState.Resolved.studiedCount]
      * over the subcategory's card count is what the ring draws and the subtitle names.
-     * [SubcategoryProgress.Resolved.masteredCount] isn't shown by the UI today — kept for a future use of
+     * [SubcategoryProgressState.Resolved.masteredCount] isn't shown by the UI today — kept for a future use of
      * it — so it round-trips through this type unread by CategoryDetailsScreen. A subcategory absent from
      * [progressSummary] — or a User with no summary document at all — resolves to all-zero, the
      * same normal (not "unknown") rendering as any other subcategory.
      */
-    fun progressFor(subcategoryId: String): SubcategoryProgress = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
+    fun progressFor(subcategoryId: String): SubcategoryProgressState = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
 }
 
 /**
@@ -82,25 +84,4 @@ sealed interface CategoryDetailsContentState {
     data class SubcategoriesList(val subcategories: List<Subcategory>) : CategoryDetailsContentState
 
     data class Error(@param:StringRes val messageRes: Int) : CategoryDetailsContentState
-}
-
-sealed interface SubcategoryProgress {
-    /** The summary read hasn't resolved yet, or failed — renders as an unknown ring and dashes. */
-    data object Unresolved : SubcategoryProgress
-
-    data class Resolved(val studiedCount: Int, val masteredCount: Int) : SubcategoryProgress
-}
-
-/**
- * Resolves one subcategory's [SubcategoryProgress] against a per-user summary — shared by
- * [CategoryDetailsScreenState.progressFor] and [com.rossomak.flashcards.feature.browse.BrowseScreenState.progressFor] so Category Details'
- * rings and Browse's search-result rings agree on the same unresolved/absent-summary rules.
- */
-fun ProgressSummary?.subcategoryProgressFor(subcategoryId: String, isResolved: Boolean): SubcategoryProgress {
-    if (!isResolved) return SubcategoryProgress.Unresolved
-    val summary = this?.subcategories?.get(subcategoryId)
-    return SubcategoryProgress.Resolved(
-        studiedCount = summary?.studiedCount ?: 0,
-        masteredCount = summary?.masteredCount ?: 0,
-    )
 }

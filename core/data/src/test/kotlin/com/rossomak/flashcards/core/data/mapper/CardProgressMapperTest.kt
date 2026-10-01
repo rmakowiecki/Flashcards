@@ -2,7 +2,7 @@ package com.rossomak.flashcards.core.data.mapper
 
 import com.google.firebase.Timestamp
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
-import com.rossomak.flashcards.core.data.model.SubcategoryProgressDto
+import com.rossomak.flashcards.core.data.model.SubcategoryProgressDetailsDto
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import io.kotest.matchers.shouldBe
 import java.util.Date
@@ -14,7 +14,7 @@ class CardProgressMapperTest {
     fun `toDomain maps a card entry with both timestamps present`() {
         val firstStudiedAt = Timestamp(Date(1_000L))
         val masteredAt = Timestamp(Date(2_000L))
-        val dto = SubcategoryProgressDto(
+        val dto = SubcategoryProgressDetailsDto(
             categoryId = "cat-1",
             cards = mapOf(
                 "card-1" to CardProgressEntryDto(
@@ -37,7 +37,7 @@ class CardProgressMapperTest {
 
     @Test
     fun `toDomain maps a never-mastered card entry with a null masteredAt`() {
-        val dto = SubcategoryProgressDto(
+        val dto = SubcategoryProgressDetailsDto(
             categoryId = "cat-1",
             cards = mapOf(
                 "card-1" to CardProgressEntryDto(
@@ -55,7 +55,7 @@ class CardProgressMapperTest {
 
     @Test
     fun `toDomain drops an entry with an unrecognized state instead of crashing`() {
-        val dto = SubcategoryProgressDto(
+        val dto = SubcategoryProgressDetailsDto(
             categoryId = "cat-1",
             cards = mapOf("card-1" to CardProgressEntryDto(state = "NotAState", firstStudiedAt = Timestamp(Date(1_000L)))),
         )
@@ -67,7 +67,7 @@ class CardProgressMapperTest {
 
     @Test
     fun `toDomain drops an entry with no firstStudiedAt instead of crashing`() {
-        val dto = SubcategoryProgressDto(
+        val dto = SubcategoryProgressDetailsDto(
             categoryId = "cat-1",
             cards = mapOf("card-1" to CardProgressEntryDto(state = FlashcardStudyProgressState.Seen.name, firstStudiedAt = null)),
         )

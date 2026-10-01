@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Thin wrapper around [CardProgressRepository.observeProgressSummary], mirroring
- * [GetSubcategoryProgressUseCase]'s shape. Category Details and Browse each collect this once per
+ * [GetSubcategoryProgressDetailsUseCase]'s shape. Category Details and Browse each collect this once per
  * screen open to draw every subcategory's ring and subtitle from the one summary document, rather
  * than reading each subcategory's packed progress document individually.
  */

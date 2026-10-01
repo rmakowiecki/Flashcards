@@ -54,7 +54,9 @@ import com.rossomak.flashcards.core.domain.model.CategorySearchResults
 import com.rossomak.flashcards.core.domain.model.CategoryWithSubcategorySummary
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.UserFavorites
+import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
@@ -66,8 +68,6 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsDetailedListR
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
-import com.rossomak.flashcards.feature.browse.details.category.subcategoryProgressFor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -239,7 +239,7 @@ fun BrowseContent(
  * recomposition.
  */
 @Composable
-internal fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressResolved: Boolean): (String) -> SubcategoryProgress =
+internal fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressResolved: Boolean): (String) -> SubcategoryProgressState =
     remember(progressSummary, isProgressResolved) {
         { subcategoryId -> progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved) }
     }
@@ -337,7 +337,7 @@ private fun ExpandedSearchContent(
     searchStatus: SearchStatus,
     categories: List<Category>,
     favorites: UserFavorites,
-    progressFor: (String) -> SubcategoryProgress,
+    progressFor: (String) -> SubcategoryProgressState,
     onCategoryClick: (String, String) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
@@ -453,7 +453,7 @@ internal fun SearchResults(
     results: CategorySearchResults,
     categories: List<Category>,
     favorites: UserFavorites,
-    progressFor: (String) -> SubcategoryProgress,
+    progressFor: (String) -> SubcategoryProgressState,
     onCategoryClick: (String, String) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
@@ -494,7 +494,7 @@ private fun SubcategoryListGroup(
     subcategories: List<Subcategory>,
     categories: List<Category>,
     favorites: UserFavorites,
-    progressFor: (String) -> SubcategoryProgress,
+    progressFor: (String) -> SubcategoryProgressState,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
@@ -646,11 +646,11 @@ private fun BrowseContentPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun SearchResultsPreview() {
-    val previewProgressFor: (String) -> SubcategoryProgress = { subcategoryId ->
+    val previewProgressFor: (String) -> SubcategoryProgressState = { subcategoryId ->
         if (subcategoryId == previewAndroidSubcategories.first().id) {
-            SubcategoryProgress.Resolved(studiedCount = 25, masteredCount = 10)
+            SubcategoryProgressState.Resolved(studiedCount = 25, masteredCount = 10)
         } else {
-            SubcategoryProgress.Resolved(studiedCount = 0, masteredCount = 0)
+            SubcategoryProgressState.Resolved(studiedCount = 0, masteredCount = 0)
         }
     }
     SearchResults(

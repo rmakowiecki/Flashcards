@@ -9,7 +9,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 /**
- * Composes [GetFlashcardsUseCase] and [GetSubcategoryProgressUseCase] into the
+ * Composes [GetFlashcardsUseCase] and [GetSubcategoryProgressDetailsUseCase] into the
  * one fan-out both Study Session ViewModels need at load time: one read of each kind per
  * Subcategory in [params], all fired in parallel, merged into
  * [SessionStartData]. Replaces what used to be a near-identical fan-out/merge block duplicated
@@ -22,12 +22,12 @@ import kotlinx.coroutines.coroutineScope
  */
 class GetSessionStartDataUseCase @Inject constructor(
     private val getFlashcards: GetFlashcardsUseCase,
-    private val getSubcategoryProgress: GetSubcategoryProgressUseCase,
+    private val getSubcategoryProgressDetails: GetSubcategoryProgressDetailsUseCase,
 ) : UseCase<List<String>, SessionStartData> {
 
     override suspend operator fun invoke(params: List<String>): SessionStartData = coroutineScope {
         val flashcardsDeferred = params.map { subcategoryId -> async { getFlashcards(subcategoryId) } }
-        val progressDeferred = params.map { subcategoryId -> async { getSubcategoryProgress(subcategoryId) } }
+        val progressDeferred = params.map { subcategoryId -> async { getSubcategoryProgressDetails(subcategoryId) } }
         val flashcardResults = flashcardsDeferred.awaitAll()
         val progressResults = progressDeferred.awaitAll()
 

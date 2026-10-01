@@ -18,7 +18,7 @@ import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgress
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
@@ -44,7 +44,7 @@ import com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator
 import com.rossomak.flashcards.core.domain.session.SILENCE_TIMEOUT
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressDetailsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveVoiceAnswerLevelUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
@@ -118,8 +118,8 @@ class RatedStudySessionViewModelTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val getFlashcards = GetFlashcardsUseCase(flashcardRepository)
     private val cardProgressRepository = FakeCardProgressRepository()
-    private val getSubcategoryProgress = GetSubcategoryProgressUseCase(cardProgressRepository)
-    private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgress)
+    private val getSubcategoryProgressDetails = GetSubcategoryProgressDetailsUseCase(cardProgressRepository)
+    private val getSessionStartData = GetSessionStartDataUseCase(getFlashcards, getSubcategoryProgressDetails)
     private val playbackGateway = FakeStudyVoicePlaybackGateway()
     private val captureGateway = FakeVoiceCaptureGateway()
     private val interruptionGateway = FakeAudioInterruptionGateway()
@@ -308,7 +308,7 @@ class RatedStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             cardProgressRepository.seed(
-                SubcategoryProgress(
+                SubcategoryProgressDetails(
                     subcategoryId = subcategoryId,
                     categoryId = "android",
                     cards = mapOf("card-1" to CardProgressEntry(state = FlashcardStudyProgressState.Mastered, firstStudiedAt = FIXED_INSTANT, masteredAt = FIXED_INSTANT)),
@@ -336,7 +336,7 @@ class RatedStudySessionViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             cardProgressRepository.seed(
-                SubcategoryProgress(
+                SubcategoryProgressDetails(
                     subcategoryId = subcategoryId,
                     categoryId = "android",
                     cards = mapOf("card-1" to CardProgressEntry(state = FlashcardStudyProgressState.Failed, firstStudiedAt = FIXED_INSTANT, masteredAt = null)),

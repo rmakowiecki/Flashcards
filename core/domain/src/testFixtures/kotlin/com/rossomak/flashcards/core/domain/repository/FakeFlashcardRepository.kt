@@ -19,6 +19,9 @@ class FakeFlashcardRepository : FlashcardRepository {
     /** Every prefix [searchSubcategories] was called with, in call order. */
     val searchedPrefixes: MutableList<String> = mutableListOf()
 
+    /** Every category id [fetchSubcategories] was called with, in call order. */
+    val fetchedSubcategoryCategoryIds: MutableList<String> = mutableListOf()
+
     /** Every subcategory id [fetchFlashcards] was called with, in call order. */
     val fetchedSubcategoryIds: MutableList<String> = mutableListOf()
 
@@ -30,7 +33,10 @@ class FakeFlashcardRepository : FlashcardRepository {
 
     override suspend fun fetchCategories(): Result<List<Category>> = categoriesToReturn
 
-    override suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>> = subcategoriesToReturn
+    override suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>> {
+        fetchedSubcategoryCategoryIds += categoryId
+        return subcategoriesToReturn
+    }
 
     override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> = categoriesByIdsToReturn
 

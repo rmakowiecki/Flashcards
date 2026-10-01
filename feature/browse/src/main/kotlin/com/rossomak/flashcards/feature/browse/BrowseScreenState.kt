@@ -4,10 +4,10 @@ import androidx.compose.runtime.Immutable
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CategorySearchResults
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.UserFavorites
+import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
 import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
-import com.rossomak.flashcards.feature.browse.details.category.SubcategoryProgress
-import com.rossomak.flashcards.feature.browse.details.category.subcategoryProgressFor
 
 sealed interface BrowseNavigationDestination : NavigationEvent {
     data class CategoryDetails(val categoryId: String, val categoryName: String) : BrowseNavigationDestination
@@ -101,5 +101,5 @@ data class BrowseScreenState(
 ) {
 
     /** One matched subcategory's ring/subtitle data — see [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressFor]. */
-    fun progressFor(subcategoryId: String): SubcategoryProgress = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
+    fun progressFor(subcategoryId: String): SubcategoryProgressState = progressSummary.subcategoryProgressFor(subcategoryId, isProgressResolved)
 }

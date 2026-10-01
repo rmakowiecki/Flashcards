@@ -5,7 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
-import com.rossomak.flashcards.core.data.model.SubcategoryProgressDto
+import com.rossomak.flashcards.core.data.model.SubcategoryProgressDetailsDto
 import javax.inject.Inject
 import kotlinx.coroutines.tasks.await
 
@@ -36,7 +36,7 @@ class CardProgressRemoteDataSource @Inject constructor(
         .document(DETAILS_DOCUMENT_ID)
         .collection(SUBCATEGORIES_COLLECTION_ID)
 
-    suspend fun getProgress(subcategoryId: String, source: Source = Source.DEFAULT): SubcategoryProgressDto? {
+    suspend fun getProgress(subcategoryId: String, source: Source = Source.DEFAULT): SubcategoryProgressDetailsDto? {
         val document = collection().document(subcategoryId).get(source).await()
         if (!document.exists()) return null
 
@@ -54,7 +54,7 @@ class CardProgressRemoteDataSource @Inject constructor(
             )
         }.toMap()
 
-        return SubcategoryProgressDto(categoryId = categoryId, cards = cards)
+        return SubcategoryProgressDetailsDto(categoryId = categoryId, cards = cards)
     }
 
     private companion object {
