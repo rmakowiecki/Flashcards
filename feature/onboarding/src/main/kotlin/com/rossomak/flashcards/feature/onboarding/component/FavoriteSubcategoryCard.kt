@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.ui.composables
+package com.rossomak.flashcards.feature.onboarding.component
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -27,7 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.composables.DEFAULT_CONTAINER_ALPHA
+import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
@@ -36,14 +37,14 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Side of this card's leading glyph tile — smaller than the shared
- * [FlashcardsIconTile] (40dp): the grid packs six-plus
+ * [com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile] (40dp): the grid packs six-plus
  * cards on screen at once, so the standard tile reads oversized here.
  */
 private val SubcategoryIconTileSize = 28.dp
 
 /** Fixed card size used only in the previews below — the real grid sizes cards via [Modifier.weight]. */
-private val ShowcaseCardWidth = 140.dp
-private val ShowcaseCardHeight = 96.dp
+private val PreviewCardWidth = 140.dp
+private val PreviewCardHeight = 96.dp
 
 /**
  * A subcategory the user can favourite during onboarding: a leading category glyph, the subcategory name, its
@@ -59,7 +60,7 @@ private val ShowcaseCardHeight = 96.dp
  * the bookmark is decoration and TalkBack announces the card once.
  */
 @Composable
-fun FavoriteSubcategoryCard(
+internal fun FavoriteSubcategoryCard(
     name: String,
     categoryName: String,
     iconSvg: String?,
@@ -128,9 +129,9 @@ fun FavoriteSubcategoryCard(
 }
 
 /**
- * A [SubcategoryIconTileSize] glyph tile — see that constant for why this isn't [FlashcardsIconTile].
+ * A [SubcategoryIconTileSize] glyph tile — see that constant for why this isn't [com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile].
  * Renders [iconSvg] via [FlashcardsInlineCategoryGlyph] (fallback glyph if absent/malformed),
- * tinted [contentColor] — same fallback handling [FlashcardsVectorIconTile] gives category tiles
+ * tinted [contentColor] — same fallback handling [com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile] gives category tiles
  * elsewhere, just without its own container: [containerColor] is this card's own selected/
  * unselected surface treatment, not derived from the icon's tint.
  */
@@ -158,9 +159,9 @@ private fun SubcategoryIconTile(
     }
 }
 
-@ShowkaseComposable(name = "Favorite subcategory card", group = "Onboarding")
+@PreviewLightDark
 @Composable
-fun FavoriteSubcategoryCardShowcase() {
+private fun FavoriteSubcategoryCardPreview() {
     FlashcardsTheme {
         Row(
             modifier = Modifier
@@ -174,7 +175,7 @@ fun FavoriteSubcategoryCardShowcase() {
                 iconSvg = null,
                 selected = false,
                 onSelectedChange = {},
-                modifier = Modifier.size(ShowcaseCardWidth, ShowcaseCardHeight),
+                modifier = Modifier.size(PreviewCardWidth, PreviewCardHeight),
             )
             FavoriteSubcategoryCard(
                 name = "Coroutines",
@@ -182,14 +183,8 @@ fun FavoriteSubcategoryCardShowcase() {
                 iconSvg = null,
                 selected = true,
                 onSelectedChange = {},
-                modifier = Modifier.size(ShowcaseCardWidth, ShowcaseCardHeight),
+                modifier = Modifier.size(PreviewCardWidth, PreviewCardHeight),
             )
         }
     }
-}
-
-@PreviewLightDark
-@Composable
-private fun FavoriteSubcategoryCardPreview() {
-    FavoriteSubcategoryCardShowcase()
 }

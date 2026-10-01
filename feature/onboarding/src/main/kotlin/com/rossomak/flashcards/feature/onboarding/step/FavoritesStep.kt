@@ -21,7 +21,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.rossomak.flashcards.core.ui.composables.FavoriteSubcategoryCard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsScrollFadeHeight
@@ -31,6 +30,7 @@ import com.rossomak.flashcards.core.ui.composables.flashcardsGridScrollFade
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
+import com.rossomak.flashcards.feature.onboarding.component.FavoriteSubcategoryCard
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
 import kotlinx.collections.immutable.ImmutableList

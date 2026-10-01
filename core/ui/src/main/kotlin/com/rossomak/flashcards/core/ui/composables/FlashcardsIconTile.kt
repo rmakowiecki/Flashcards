@@ -24,10 +24,10 @@ import com.rossomak.flashcards.core.ui.theme.sizes
 
 /**
  * Opacity of [MaterialTheme.colorScheme.secondaryContainer] used as the tile's default fill.
- * Internal (not private) so [FlashcardsVectorIconTile] can derive its container tint from the
- * same constant rather than redefining it.
+ * Public (not private) so [FlashcardsVectorIconTile] and feature-owned tiles can derive their
+ * container tint from the same constant rather than redefining it.
  */
-internal const val DEFAULT_CONTAINER_ALPHA = 0.12f
+const val DEFAULT_CONTAINER_ALPHA = 0.12f
 
 /**
  * Rounded, tinted square that hosts a leading icon in settings and category rows. Callers
