@@ -58,13 +58,13 @@ import kotlinx.coroutines.launch
  * parts, which the coordinator times in this process.
  *
  * Media3 only ever starts the foreground service with the `mediaPlayback` type, and drops the
- * foreground state on every pause. Without an active `microphone` type, a background app records
- * silence. So for a voice-answering session, [onUpdateNotification] never delegates to Media3: the
- * service builds Media3's notification itself and holds both types from the first update, made
- * with the app visible, until [stopPlayback]. Android 14+ refuses to add the `microphone` type from
- * the background, so the type set never shrinks mid-session, not even while voice answering is
- * paused. The notification cannot be swiped away for the whole session. Fast sessions keep
- * Media3's default behavior.
+ * foreground state on every pause, which makes a paused notification swipeable. So once a session
+ * is loaded, [onUpdateNotification] never delegates to Media3: the service builds Media3's
+ * notification itself, marks it ongoing and holds the foreground from the first update until
+ * [stopPlayback]. The notification cannot be swiped away for the whole session, in Fast and Rated
+ * sessions alike. A voice-answering session holds the `microphone` type as well, because without it
+ * a background app records silence. Android 14+ refuses to add that type from the background, so the
+ * type set never shrinks mid-session, not even while voice answering is paused.
  */
 @UnstableApi
 @AndroidEntryPoint
@@ -94,7 +94,10 @@ class StudySessionVoiceService : MediaSessionService() {
     // Fixed when the session loads, never by stopVoiceAnswering: a pause stops voice answering, and
     // the microphone type must survive it for a background resume to be able to listen.
     private var isVoiceAnsweringSession = false
-    private var isStartedForVoiceAnswering = false
+
+    // From the load of a session until stopPlayback: the service owns the foreground and the notification.
+    private var isSessionForegroundHeld = false
+    private var isStartedAsForeground = false
 
     @Suppress("TooManyFunctions") // one method per voice-stack command the gateway forwards.
     inner class LocalBinder : Binder() {
@@ -110,10 +113,11 @@ class StudySessionVoiceService : MediaSessionService() {
 
         fun loadSession(cards: List<VoiceFlashcard>, startIndex: Int, sessionTitle: String, isVoiceAnsweringSession: Boolean) {
             this@StudySessionVoiceService.isVoiceAnsweringSession = isVoiceAnsweringSession
+            isSessionForegroundHeld = true
             player.loadAndStartSession(cards, startIndex, sessionTitle)
             // Right away, while the study screen that loads the session is still visible: the
             // microphone type can only be acquired from the foreground.
-            if (isVoiceAnsweringSession) startForegroundWithMicrophone(mediaSession)
+            startSessionForeground(mediaSession)
         }
 
         fun updateQueue(cards: List<VoiceFlashcard>) = player.updateQueue(cards)
@@ -151,7 +155,7 @@ class StudySessionVoiceService : MediaSessionService() {
             voiceCaptureSession.start()
             // Voice answering starts only after loadSession, which drops a refused microphone type
             // while capture is not started yet; retry so a refusal reaches the capture events.
-            if (isVoiceAnsweringSession) startForegroundWithMicrophone(mediaSession)
+            if (isVoiceAnsweringSession) startSessionForeground(mediaSession)
         }
 
         fun stopVoiceAnswering() = voiceCaptureSession.stop()
@@ -199,55 +203,61 @@ class StudySessionVoiceService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
-        if (isVoiceAnsweringSession) {
-            startForegroundWithMicrophone(session)
+        if (isSessionForegroundHeld) {
+            startSessionForeground(session)
         } else {
             super.onUpdateNotification(session, startInForegroundRequired)
         }
     }
 
-    private fun startForegroundWithMicrophone(session: MediaSession) {
+    private fun startSessionForeground(session: MediaSession) {
         val mediaNotification = notificationProvider.createNotification(
             session,
             session.mediaButtonPreferences,
             notificationActionFactory,
         ) { updatedNotification ->
             ContextCompat.getMainExecutor(this).execute {
-                if (isVoiceAnsweringSession) postForegroundNotification(session, updatedNotification)
+                if (isSessionForegroundHeld) postForegroundNotification(session, updatedNotification)
             }
         }
         postForegroundNotification(session, mediaNotification)
     }
 
-    // Runs on every notification update, paused or not: each startForeground call must carry both
-    // types, since passing mediaPlayback alone would drop the microphone type for good.
+    // Runs on every notification update, paused or not: each startForeground call must carry every
+    // type of the session, since passing mediaPlayback alone would drop the microphone type for good.
     @SuppressLint("InlinedApi") // ServiceCompat drops the types a platform release does not know
     private fun postForegroundNotification(session: MediaSession, mediaNotification: MediaNotification) {
         mediaNotification.notification.extras.putParcelable(Notification.EXTRA_MEDIA_SESSION, session.platformToken)
+        // Android 14+ lets the user dismiss a foreground service's notification unless it is ongoing.
+        mediaNotification.notification.flags = mediaNotification.notification.flags or Notification.FLAG_ONGOING_EVENT
         try {
-            if (!isStartedForVoiceAnswering) {
+            if (!isStartedAsForeground) {
                 // Started, not only bound, like Media3's own foreground path. A plain start: a
                 // foreground-service start would crash the app if startForeground below then threw.
                 startService(Intent(this, StudySessionVoiceService::class.java))
-                isStartedForVoiceAnswering = true
+                isStartedAsForeground = true
             }
-            ServiceCompat.startForeground(
-                this,
-                mediaNotification.notificationId,
-                mediaNotification.notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-            )
+            ServiceCompat.startForeground(this, mediaNotification.notificationId, mediaNotification.notification, foregroundServiceTypes())
         } catch (exception: IllegalStateException) {
             // ForegroundServiceStartNotAllowedException: the app was already in the background.
-            onMicrophoneForegroundRefused(exception)
+            onForegroundRefused(exception)
         } catch (exception: SecurityException) {
-            onMicrophoneForegroundRefused(exception)
+            onForegroundRefused(exception)
         }
     }
 
-    private fun onMicrophoneForegroundRefused(exception: RuntimeException) {
-        loge(exception) { "Voice answering session refused the microphone foreground-service type" }
-        voiceCaptureSession.reportCaptureFailure(VoiceCaptureFailureReason.CaptureLoopError(exception.message))
+    @SuppressLint("InlinedApi") // ServiceCompat drops the types a platform release does not know
+    private fun foregroundServiceTypes(): Int = when {
+        isVoiceAnsweringSession -> ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+    }
+
+    private fun onForegroundRefused(exception: RuntimeException) {
+        loge(exception) { "Session refused its foreground-service types" }
+        // A refused microphone type means capture would record silence; a refused media type costs only the notification.
+        if (isVoiceAnsweringSession) {
+            voiceCaptureSession.reportCaptureFailure(VoiceCaptureFailureReason.CaptureLoopError(exception.message))
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? =
@@ -261,8 +271,9 @@ class StudySessionVoiceService : MediaSessionService() {
 
     private fun stopPlayback() {
         voiceCaptureSession.stop()
-        if (isVoiceAnsweringSession) {
+        if (isSessionForegroundHeld) {
             // Hands the notification back to Media3's default path before the queue empties.
+            isSessionForegroundHeld = false
             isVoiceAnsweringSession = false
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         }

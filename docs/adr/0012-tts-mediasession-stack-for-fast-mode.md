@@ -2,7 +2,7 @@
 
 ## Decision
 
-Voice playback (Fast mode read-aloud, and the question read-out of Rated voice answering) uses Android's system `TextToSpeech` engine wrapped in a Media3 `SimpleBasePlayer` (`TtsPlayer`), hosted by a Media3 `MediaSessionService` (`StudySessionVoiceService`). Media3 provides the media notification, lock-screen and Bluetooth transport controls, and media-button handling. Fast sessions keep Media3's default notification and foreground behavior; a Rated voice-answering session overrides it to hold the `microphone` foreground-service type (see [ADR-0027](0027-bluetooth-mic-capture-le-audio-first-sco-fallback-bt-strict-screen-off.md), decision 5).
+Voice playback (Fast mode read-aloud, and the question read-out of Rated voice answering) uses Android's system `TextToSpeech` engine wrapped in a Media3 `SimpleBasePlayer` (`TtsPlayer`), hosted by a Media3 `MediaSessionService` (`StudySessionVoiceService`). Media3 provides the media notification, lock-screen and Bluetooth transport controls, and media-button handling. Media3 drops the foreground state on every pause, which makes a paused notification swipeable, so once a session is loaded the service builds Media3's notification itself, marks it ongoing and holds the foreground until the session stops: the notification of a Fast session and of a Rated one cannot be swiped away. A Rated voice-answering session also holds the `microphone` foreground-service type (see [ADR-0027](0027-bluetooth-mic-capture-le-audio-first-sco-fallback-bt-strict-screen-off.md), decision 5).
 
 ## Context
 
