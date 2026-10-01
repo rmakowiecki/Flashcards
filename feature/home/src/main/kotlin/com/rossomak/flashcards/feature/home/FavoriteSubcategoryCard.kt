@@ -107,7 +107,7 @@ internal fun FavoriteSubcategoryCard(
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.width(playButtonSize + MaterialTheme.spacing.small))
+                Spacer(modifier = Modifier.width(playButtonSize + MaterialTheme.spacing.normal))
             }
         }
         FlashcardsFilledIconButton(
