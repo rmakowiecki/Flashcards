@@ -23,7 +23,8 @@ sealed interface CategoryDetailsDestination : NavigationEvent {
     /**
      * Both of Category Details' CTAs land here — [CategoryDetailsViewModel.onQuickSessionStart]
      * and [CategoryDetailsViewModel.onCustomSessionStart] — distinguished only by [isQuickSession]
-     * and by which [subcategoryIds] they carry: every subcategory for Quick, exactly the selection for
+     * and by which [subcategoryIds] they carry: the Category's complete Subcategory list for Quick,
+     * as the caller's candidate pool the Preview screen samples from, exactly the selection for
      * Custom.
      */
     data class PreviewStudySession(

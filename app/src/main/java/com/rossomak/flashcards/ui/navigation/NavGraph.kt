@@ -124,9 +124,10 @@ private fun NavHostController.navigateToPreviewStudySessionWithSelection(
 }
 
 /**
- * Category Details' two session CTAs both land here. **Quick** hands over every Subcategory the
- * category lists as the *candidate pool*, and the Preview screen samples a bounded subset from it
- * (ADR-0040) rather than starting a session across all of them. **Custom** hands over exactly the
+ * Category Details' two session CTAs both land here. **Quick** hands over the Category's complete
+ * Subcategory list as the *candidate pool*, and the Preview screen samples a bounded subset from it
+ * (ADR-0040) rather than starting a session across all of them. A caller without the list can
+ * leave the ids empty and let the Preview screen fetch the pool itself (ADR-0056). **Custom** hands over exactly the
  * Subcategories the user selected, and [isQuickSession] is `false`, so the Preview screen honours
  * them literally rather than sampling. Either way — unlike [navigateToPreviewStudySession] — the
  * subcategories pass through as the lists the route already models rather than wrapping a single
