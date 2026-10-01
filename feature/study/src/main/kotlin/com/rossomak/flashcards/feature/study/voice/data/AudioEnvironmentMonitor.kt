@@ -49,6 +49,9 @@ import kotlinx.coroutines.launch
  * and a headset disconnect. It decides nothing and never pauses or resumes anything; the study
  * session coordinators do.
  *
+ * One instance serves one service lifetime: [release] cancels its scope, so it cannot be started
+ * again. A restarted service gets a new instance.
+ *
  * - **Focus** is requested on play, held while paused (abandoning it would let a defensively paused
  *   app grab the slot) and requested again after a permanent loss, which drops the request from the
  *   system's stack. It asks to be paused when ducked, so the platform always reports the duck

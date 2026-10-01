@@ -618,6 +618,24 @@ class RatedSessionReducerInterruptionTest {
     }
 
     @Test
+    fun `an output disconnect during a blip while listening keeps the gate closed until the blip ends`() {
+        val gated = voiceSession().listening().after(focus(FocusChange.LossCanDuck))
+
+        val disconnected = gated.reduce(signal(OutputDisconnected))
+        disconnected.effects shouldContain StopListening
+        disconnected.effects shouldNotContain SetCaptureGate(closed = false)
+        disconnected.state.isCaptureGated shouldBe true
+
+        val gain = disconnected.state.reduce(focus(FocusChange.Gain, after = 700.milliseconds))
+        gain.effects shouldContain StartGateTail
+
+        val reopened = gain.state.reduce(GateTailElapsed)
+        reopened.effects shouldContain SetCaptureGate(closed = false)
+        reopened.effects shouldNotContain StartSilenceTimer
+        reopened.state.isCaptureGated shouldBe false
+    }
+
+    @Test
     fun `a silence timeout during the gate is ignored`() {
         val gated = voiceSession().listening().after(focus(FocusChange.LossCanDuck))
 

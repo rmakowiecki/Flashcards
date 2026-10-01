@@ -165,7 +165,9 @@ data class InterruptionEpisode(
             at - requireNotNull(startedAt) <= AUTO_RESUME_WINDOW -> EpisodeEnd.AutoResume
             else -> EpisodeEnd.Expired
         }
-        InterruptionTier.Call, InterruptionTier.Takeover, null -> EpisodeEnd.CallEnded
+        InterruptionTier.Call -> EpisodeEnd.CallEnded
+        // settle() never ends a takeover, and an episode that ends has had a tier since it started.
+        InterruptionTier.Takeover, null -> error("An episode with tier $tier cannot end")
     }
 
     companion object {
