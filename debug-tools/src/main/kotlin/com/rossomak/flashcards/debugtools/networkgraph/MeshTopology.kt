@@ -1,6 +1,6 @@
 @file:Suppress("LoopWithTooManyJumpStatements")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.flashcards.debugtools.networkgraph
 
 /**
  * Safety cap on [enforceMinDegree]'s repair rounds. Every pair can be added and removed at most once

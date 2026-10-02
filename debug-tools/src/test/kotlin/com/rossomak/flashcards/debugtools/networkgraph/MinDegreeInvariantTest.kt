@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.flashcards.debugtools.networkgraph
 
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan

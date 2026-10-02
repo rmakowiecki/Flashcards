@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Widgets
@@ -60,6 +61,7 @@ fun DebugScreen(
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
     onNavigateToVoiceIndicatorDebug: () -> Unit,
+    onNavigateToNetworkGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -82,6 +84,7 @@ fun DebugScreen(
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
+        onNetworkGraphPrototypeClick = onNavigateToNetworkGraphPrototype,
     )
 }
 
@@ -96,6 +99,7 @@ private fun DebugContent(
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
+    onNetworkGraphPrototypeClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -152,6 +156,20 @@ private fun DebugContent(
                             messageRes = R.string.debug_replay_onboarding_message,
                             icon = Icons.Default.Refresh,
                             onClick = onReplayOnboardingClick,
+                        ),
+                    )
+                    add(
+                        FlashcardsListGroupItem.Row(
+                            title = stringResource(R.string.debug_network_graph_prototype_label),
+                            onClick = onNetworkGraphPrototypeClick,
+                            secondaryText = stringResource(R.string.debug_network_graph_prototype_message),
+                            leading = {
+                                FlashcardsIconTile(
+                                    icon = Icons.Default.Hub,
+                                    contentDescription = null,
+                                )
+                            },
+                            trailing = { FlashcardsChevron() },
                         ),
                     )
                     // Absent when Showkase is not on the classpath, which is every non-debug build
@@ -228,6 +246,7 @@ private fun DebugContentPreview() {
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
             onReplayOnboardingClick = {},
+            onNetworkGraphPrototypeClick = {},
         )
     }
 }

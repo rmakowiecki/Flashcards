@@ -3,7 +3,7 @@
 // that turns 0..1 into -1..1), which naming individually would only bury.
 @file:Suppress("MagicNumber", "LoopWithTooManyJumpStatements", "TooManyFunctions", "LongParameterList")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.flashcards.debugtools.networkgraph
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
