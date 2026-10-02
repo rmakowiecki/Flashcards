@@ -1,5 +1,5 @@
-// Firestore Security Rules tests, covering the server-authoritative client-read-only rules (ADR-0049)
-// and the server-owned XP configuration.
+// Firestore Security Rules tests, covering the server-authoritative client-read-only rules (ADR-0049),
+// the recents projection and the server-owned XP configuration.
 // Small and standalone on purpose — this is a guard against a specific class of production-only failure
 // (there is no other way to verify a rule without deploying it), not a second test framework for the
 // project. Run via `npm test` in this directory, which starts the Firestore emulator (see
@@ -31,6 +31,9 @@ const xpConfigDoc = { cardMastered: 100 };
 
 /** A minimal, syntactically valid scoring-state document — rules don't inspect its shape. */
 const scoringStateDoc = { xp: 0, level: 1, xpIntoCurrentLevel: 0, currentStreak: 0, bestStreak: 0, lastStudyDate: '', goalMetDate: '' };
+
+/** A minimal recents document — rules don't inspect its shape. */
+const recentsStateDoc = { entries: {} };
 
 let testEnv;
 
@@ -203,6 +206,44 @@ describe('users/{uid}/progress/user-stats (scoring state, client-read-only, ADR-
 
     await assertFails(getDoc(anonRef));
     await assertFails(setDoc(anonRef, scoringStateDoc));
+  });
+});
+
+describe('users/{uid}/recents/state (client-read-only projection)', () => {
+  it('the owning user can read their own recents document', async () => {
+    await seedAsAdmin(`users/${OWNER_UID}/recents/state`, recentsStateDoc);
+    const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
+
+    await assertSucceeds(getDoc(doc(ownerDb, `users/${OWNER_UID}/recents/state`)));
+  });
+
+  it('the owning user cannot create, update or delete their own recents document', async () => {
+    const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
+    const ownRef = doc(ownerDb, `users/${OWNER_UID}/recents/state`);
+
+    await assertFails(setDoc(ownRef, recentsStateDoc));
+
+    await seedAsAdmin(`users/${OWNER_UID}/recents/state`, recentsStateDoc);
+    await assertFails(setDoc(ownRef, { entries: { forged: {} } }));
+    await assertFails(deleteDoc(ownRef));
+  });
+
+  it('a different authenticated user cannot read or write it', async () => {
+    await seedAsAdmin(`users/${OWNER_UID}/recents/state`, recentsStateDoc);
+    const otherDb = testEnv.authenticatedContext(OTHER_UID).firestore();
+    const foreignRef = doc(otherDb, `users/${OWNER_UID}/recents/state`);
+
+    await assertFails(getDoc(foreignRef));
+    await assertFails(setDoc(foreignRef, recentsStateDoc));
+  });
+
+  it('an unauthenticated request cannot read or write it', async () => {
+    await seedAsAdmin(`users/${OWNER_UID}/recents/state`, recentsStateDoc);
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    const anonRef = doc(anonDb, `users/${OWNER_UID}/recents/state`);
+
+    await assertFails(getDoc(anonRef));
+    await assertFails(setDoc(anonRef, recentsStateDoc));
   });
 });
 
