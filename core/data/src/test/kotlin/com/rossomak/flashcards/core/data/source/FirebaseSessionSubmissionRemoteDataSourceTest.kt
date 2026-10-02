@@ -109,6 +109,8 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         payload["subcategoryIds"] shouldBe session.subcategoryIds
         payload["subcategoryNames"] shouldBe session.subcategoryNames
         payload["sourceType"] shouldBe session.sourceType.name
+        payload["voiceAnswering"] shouldBe session.voiceAnsweringEnabled
+        payload.containsKey("readAloud") shouldBe false
         payload["studyDate"] shouldBe session.studyDate
         payload["studyDateUtcOffsetMinutes"] shouldBe session.studyDateUtcOffsetMinutes
         payload["dailyGoalMinutes"] shouldBe session.dailyGoalMinutes
@@ -136,6 +138,20 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val payloadCardResult = (payload["cardResults"] as List<Map<String, Any>>).single()
         payloadCardResult.keys shouldBe setOf("cardId", "subcategoryId", "state")
         payloadCardResult["state"] shouldBe session.cardResults.single().state.name
+    }
+
+    @Test
+    fun `submitSession sends a Fast session's source type and read-aloud setting without voiceAnswering`() = runTest {
+        val session = fastSessionResult()
+        val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
+
+        createApi().submitSession(OWNER_UID, session)
+
+        @Suppress("UNCHECKED_CAST")
+        val payload = payloadSlot.captured as Map<String, Any>
+        payload["sourceType"] shouldBe session.sourceType.name
+        payload["readAloud"] shouldBe session.readAloudEnabled
+        payload.containsKey("voiceAnswering") shouldBe false
     }
 
     @Test
