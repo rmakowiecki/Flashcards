@@ -54,6 +54,7 @@ const DEFAULT_DAILY_GOAL_MINUTES = 999999;
 const DEFAULT_STREAK_BONUS = 250; // 1 * DEFAULT_XP_CONFIG.streakPerDay
 const MAX_UTC_OFFSET_MINUTES = 14 * 60;
 const DEFAULT_OWNER_UID = "owner-uid";
+const INVALID_SOURCE_TYPE_MESSAGE = /sourceType must be SingleSubcategory, Quick or Custom/;
 
 function rawRatedRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -67,6 +68,7 @@ function rawRatedRequest(overrides: Record<string, unknown> = {}): Record<string
     categoryName: "Category One",
     subcategoryIds: ["sub-1"],
     subcategoryNames: ["Subcategory One"],
+    sourceType: "SingleSubcategory",
     cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false }],
     studyDateUtcOffsetMinutes: 0,
     dailyGoalMinutes: DEFAULT_DAILY_GOAL_MINUTES,
@@ -187,6 +189,21 @@ describe("validateSubmitStudySessionRequest", () => {
     assert.throws(() => validateSubmitStudySessionRequest(rawRatedRequest({ dailyGoalMinutes: 0 })), /dailyGoalMinutes/);
     assert.throws(() => validateSubmitStudySessionRequest(rawRatedRequest({ dailyGoalMinutes: -5 })), /dailyGoalMinutes/);
   });
+
+  it("rejects a payload missing sourceType", () => {
+    const { sourceType, ...withoutSourceType } = rawRatedRequest();
+    assert.throws(() => validateSubmitStudySessionRequest(withoutSourceType), INVALID_SOURCE_TYPE_MESSAGE);
+  });
+
+  it("rejects an unknown sourceType", () => {
+    assert.throws(() => validateSubmitStudySessionRequest(rawRatedRequest({ sourceType: "Composite" })), INVALID_SOURCE_TYPE_MESSAGE);
+  });
+
+  for (const sourceType of ["SingleSubcategory", "Quick", "Custom"]) {
+    it(`accepts a payload from a ${sourceType} session`, () => {
+      assert.equal(validateSubmitStudySessionRequest(rawRatedRequest({ sourceType })).sourceType, sourceType);
+    });
+  }
 
   it("accepts a structurally valid Rated payload", () => {
     const validated = validateSubmitStudySessionRequest(rawRatedRequest());

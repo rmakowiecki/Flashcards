@@ -58,6 +58,7 @@ const FIELD_CARDS_DEMASTERED = "cardsDemastered";
 const FIELD_CARD_SUBCATEGORY_ID = "subcategoryId";
 const FIELD_ATTEMPTS_USED = "attemptsUsed";
 const FIELD_WAS_PREVIOUSLY_MASTERED = "wasPreviouslyMastered";
+const FIELD_SOURCE_TYPE = "sourceType";
 
 // A `sessions/{sessionId}` document field only, no longer a trusted request-body field: the
 // "today's total minutes" query below filters the session collection on this same name, but the
@@ -110,6 +111,11 @@ const FIELD_XP_DAILY_GOAL_BONUS = "dailyGoalBonus";
 const FIELD_XP_STREAK_BONUS = "streakBonus";
 const FIELD_XP_TOTAL = "xpTotal";
 
+const VALID_SOURCE_TYPES = ["SingleSubcategory", "Quick", "Custom"] as const;
+
+/** The Study Creation entry point a session came from, as the client's `SessionSourceType.name`. */
+export type SessionSourceType = (typeof VALID_SOURCE_TYPES)[number];
+
 export interface SubmitStudySessionCardResult {
   cardId: string;
   subcategoryId: string;
@@ -135,6 +141,7 @@ export interface ValidatedSubmitStudySessionRequest {
   categoryName: string;
   subcategoryIds: string[];
   subcategoryNames: string[];
+  sourceType: SessionSourceType;
   cardResults: SubmitStudySessionCardResult[];
   /**
    * Minutes east of UTC for the device's timezone offset at `startedAtEpochMillis` — the
@@ -306,6 +313,10 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
   const subcategoryNames = requireStringArray(body.subcategoryNames, "subcategoryNames");
   if (subcategoryIds.length !== subcategoryNames.length) fail("subcategoryIds and subcategoryNames must be the same length");
   subcategoryIds.forEach((id, index) => requireFirestoreSafeId(id, `subcategoryIds[${index}]`));
+  const sourceType = body.sourceType;
+  if (typeof sourceType !== "string" || !VALID_SOURCE_TYPES.includes(sourceType as SessionSourceType)) {
+    fail("sourceType must be SingleSubcategory, Quick or Custom");
+  }
 
   if (!Array.isArray(body.cardResults) || body.cardResults.length === 0) fail("cardResults must be a non-empty array");
   if (body.cardResults.length > MAX_CARD_RESULTS) fail(`cardResults must not exceed ${MAX_CARD_RESULTS} entries`);
@@ -343,6 +354,7 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
     categoryName,
     subcategoryIds,
     subcategoryNames,
+    sourceType: sourceType as SessionSourceType,
     cardResults,
     studyDateUtcOffsetMinutes,
     dailyGoalMinutes,
@@ -588,6 +600,7 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
       [FIELD_CATEGORY_NAME]: request.categoryName,
       [FIELD_SUBCATEGORY_IDS]: request.subcategoryIds,
       [FIELD_SUBCATEGORY_NAMES]: request.subcategoryNames,
+      [FIELD_SOURCE_TYPE]: request.sourceType,
       [FIELD_STUDY_DATE]: derivedStudyDate,
       [FIELD_CARD_COUNT]: request.cardResults.length,
       [FIELD_NEW_CARDS_STUDIED]: newCardsStudied,
