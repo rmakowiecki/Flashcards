@@ -247,6 +247,7 @@ class RatedStudySessionCoordinator @Inject constructor(
                 categoryName = setup.categoryName,
                 subcategoryIds = setup.subcategoryIds,
                 subcategoryNames = setup.subcategoryNames,
+                sourceType = setup.sourceType,
                 cardResults = cardResults,
                 // studyDate and dailyGoalMinutes are never read from here: the Summary screen
                 // computes the real values when it rebuilds the result. The UTC offset is the real

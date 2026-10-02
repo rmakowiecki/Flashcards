@@ -108,6 +108,7 @@ class SessionSubmissionDeliveryWorkerTest {
         categoryName = "Category",
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryIds.map { "Name of $it" },
+        sourceType = "SingleSubcategory",
         cardResults = listOf(
             PendingFlashcardResultDto(cardId = "card-1", subcategoryId = SUBCATEGORY_ID, state = "Mastered", attemptsUsed = 1, wasPreviouslyMastered = false),
         ),

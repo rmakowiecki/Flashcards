@@ -82,6 +82,9 @@ sealed interface SessionResult {
     /** carried alongside their ids, same reason as [categoryName] (ADR-0014). */
     val subcategoryNames: List<String>
 
+    /** how the session was created (its Study Creation entry point), set before Preview and carried unchanged. */
+    val sourceType: SessionSourceType
+
     /** one [FlashcardResult] per Studied card. */
     val cardResults: List<FlashcardResult>
 
@@ -131,6 +134,7 @@ sealed interface SessionResult {
         override val categoryName: String,
         override val subcategoryIds: List<String>,
         override val subcategoryNames: List<String>,
+        override val sourceType: SessionSourceType,
         override val cardResults: List<FlashcardResult.Rated>,
         override val studyDate: String,
         override val studyDateUtcOffsetMinutes: Int,
@@ -157,6 +161,7 @@ sealed interface SessionResult {
         override val categoryName: String,
         override val subcategoryIds: List<String>,
         override val subcategoryNames: List<String>,
+        override val sourceType: SessionSourceType,
         override val cardResults: List<FlashcardResult.Fast>,
         override val studyDate: String,
         override val studyDateUtcOffsetMinutes: Int,

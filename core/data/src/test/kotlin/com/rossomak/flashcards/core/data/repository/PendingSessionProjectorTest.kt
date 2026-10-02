@@ -15,6 +15,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState.Mas
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState.Seen
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
@@ -287,6 +288,7 @@ class PendingSessionProjectorTest {
         categoryName = "Category",
         subcategoryIds = listOf(SUBCATEGORY_ID),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardStates.map { (cardId, state) ->
             FlashcardResult.Rated(cardId = cardId, subcategoryId = SUBCATEGORY_ID, state = state, attemptsUsed = 1, wasPreviouslyMastered = false)
         },
@@ -304,6 +306,7 @@ class PendingSessionProjectorTest {
         categoryName = "Category",
         subcategoryIds = listOf(SUBCATEGORY_ID),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardIds.map { cardId -> FlashcardResult.Fast(cardId = cardId, subcategoryId = SUBCATEGORY_ID, state = Seen) },
         studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,

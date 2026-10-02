@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.data.model
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import java.time.Instant
 
@@ -20,6 +21,7 @@ object PendingSessionSubmissionMapper {
         categoryName = categoryName,
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryNames,
+        sourceType = sourceType.name,
         cardResults = cardResults.map { it.toDto() },
         studyDate = studyDate,
         dailyGoalMinutes = dailyGoalMinutes,
@@ -45,6 +47,7 @@ object PendingSessionSubmissionMapper {
             categoryName = categoryName,
             subcategoryIds = subcategoryIds,
             subcategoryNames = subcategoryNames,
+            sourceType = SessionSourceType.valueOf(sourceType),
             cardResults = cardResults.map { it.toRatedDomain() },
             studyDate = studyDate,
             dailyGoalMinutes = dailyGoalMinutes,
@@ -59,6 +62,7 @@ object PendingSessionSubmissionMapper {
             categoryName = categoryName,
             subcategoryIds = subcategoryIds,
             subcategoryNames = subcategoryNames,
+            sourceType = SessionSourceType.valueOf(sourceType),
             cardResults = cardResults.map { it.toFastDomain() },
             studyDate = studyDate,
             dailyGoalMinutes = dailyGoalMinutes,

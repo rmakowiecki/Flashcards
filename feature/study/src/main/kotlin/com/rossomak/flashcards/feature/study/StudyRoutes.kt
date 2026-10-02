@@ -153,6 +153,8 @@ data class RatedStudySessionRoute(
  * document shape (ADR-0014) — and `null` for a Fast route, not lists of zeroes and falses for cards
  * that have neither concept.
  *
+ * [sourceType] is always present, for both modes.
+ *
  * [startedAtEpochSecond] flattens `SessionResult.startedAt` (a `java.time.Instant`, not itself a
  * primitive `androidx.navigation` can carry) to the one `Long` that reconstructs it.
  *
@@ -180,6 +182,7 @@ data class StudySessionSummaryRoute(
     val categoryName: String,
     val subcategoryIds: List<String>,
     val subcategoryNames: List<String>,
+    val sourceType: SessionSourceType,
     val cardIds: List<String>,
     val cardSubcategoryIds: List<String>,
     val cardStates: List<FlashcardStudyProgressState>,

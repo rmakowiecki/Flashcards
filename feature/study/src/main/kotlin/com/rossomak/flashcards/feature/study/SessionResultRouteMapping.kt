@@ -25,6 +25,7 @@ fun SessionResult.toSummaryRoute(): StudySessionSummaryRoute = StudySessionSumma
     categoryName = categoryName,
     subcategoryIds = subcategoryIds,
     subcategoryNames = subcategoryNames,
+    sourceType = sourceType,
     cardIds = cardResults.map { it.cardId },
     cardSubcategoryIds = cardResults.map { it.subcategoryId },
     cardStates = cardResults.map { it.state },
@@ -72,6 +73,7 @@ private fun StudySessionSummaryRoute.toSessionResult(
         categoryName = categoryName,
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryNames,
+        sourceType = sourceType,
         cardResults = cardIds.indices.map { index ->
             FlashcardResult.Rated(
                 cardId = cardIds[index],
@@ -96,6 +98,7 @@ private fun StudySessionSummaryRoute.toSessionResult(
         categoryName = categoryName,
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryNames,
+        sourceType = sourceType,
         cardResults = cardIds.indices.map { index ->
             FlashcardResult.Fast(
                 cardId = cardIds[index],

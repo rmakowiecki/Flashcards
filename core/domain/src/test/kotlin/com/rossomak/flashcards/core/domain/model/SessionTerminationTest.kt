@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.domain.model
 
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 import org.junit.Test
@@ -26,6 +27,7 @@ class SessionTerminationTest {
             categoryName = "Category",
             subcategoryIds = listOf("sub-1"),
             subcategoryNames = listOf("Subcategory"),
+            sourceType = SingleSubcategory,
             cardResults = cardResults,
             studyDate = "2026-09-06",
             dailyGoalMinutes = 20,

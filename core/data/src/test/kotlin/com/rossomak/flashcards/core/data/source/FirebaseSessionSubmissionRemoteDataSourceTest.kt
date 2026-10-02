@@ -12,6 +12,8 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -53,6 +55,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = Quick,
         cardResults = listOf(
             FlashcardResult.Rated(
                 cardId = "card-1",
@@ -76,6 +79,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = Custom,
         cardResults = listOf(FlashcardResult.Fast(cardId = "card-1", subcategoryId = "sub-1", state = FlashcardStudyProgressState.Seen)),
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,

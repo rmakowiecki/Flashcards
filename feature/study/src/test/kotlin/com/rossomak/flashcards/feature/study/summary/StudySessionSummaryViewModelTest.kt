@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
@@ -105,6 +106,7 @@ class StudySessionSummaryViewModelTest {
             categoryName = "Category",
             subcategoryIds = listOf("sub-1"),
             subcategoryNames = listOf("Subcategory"),
+            sourceType = SingleSubcategory,
             cardIds = cardIds,
             cardSubcategoryIds = cardIds.map { "sub-1" },
             cardStates = cardStates,
@@ -158,6 +160,7 @@ class StudySessionSummaryViewModelTest {
                     categoryName = "Category",
                     subcategoryIds = listOf("sub-1"),
                     subcategoryNames = listOf("Subcategory"),
+                    sourceType = SingleSubcategory,
                     cardIds = cardIds,
                     cardSubcategoryIds = cardIds.map { "sub-1" },
                     cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
@@ -227,6 +230,7 @@ class StudySessionSummaryViewModelTest {
                     categoryName = "Category",
                     subcategoryIds = listOf("sub-1"),
                     subcategoryNames = listOf("Subcategory"),
+                    sourceType = SingleSubcategory,
                     cardIds = cardIds,
                     cardSubcategoryIds = cardIds.map { "sub-1" },
                     cardStates = cardIds.map { FlashcardStudyProgressState.Seen },

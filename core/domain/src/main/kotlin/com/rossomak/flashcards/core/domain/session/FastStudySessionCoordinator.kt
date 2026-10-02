@@ -212,6 +212,7 @@ class FastStudySessionCoordinator @Inject constructor(
                 categoryName = setup.categoryName,
                 subcategoryIds = setup.subcategoryIds,
                 subcategoryNames = setup.subcategoryNames,
+                sourceType = setup.sourceType,
                 cardResults = cardResults,
                 // As in the Rated coordinator: only the UTC offset is a real value here.
                 studyDate = "",
