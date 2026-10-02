@@ -12,16 +12,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.LayoutDirection
 import com.rossomak.flashcards.core.domain.model.Category
@@ -32,6 +28,7 @@ import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
+import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 import java.time.Instant
@@ -63,14 +60,9 @@ internal fun FavoritesCarousel(
     listState: LazyListState = rememberLazyListState(),
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
+        FlashcardsOverlineLabel(
             text = stringResource(R.string.favorites_section_title),
-            modifier = Modifier
-                .padding(horizontal = MaterialTheme.spacing.normal)
-                .padding(bottom = MaterialTheme.spacing.small)
-                .semantics { heading() },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(bottom = MaterialTheme.spacing.small),
         )
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
