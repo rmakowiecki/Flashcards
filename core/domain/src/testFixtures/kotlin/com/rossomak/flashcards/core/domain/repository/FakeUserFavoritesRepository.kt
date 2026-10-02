@@ -23,8 +23,12 @@ class FakeUserFavoritesRepository : UserFavoritesRepository {
      */
     var favoritesReadGate: CompletableDeferred<Unit>? = null
 
+    /** When set, [observeFavorites] throws this before its first emission, like a failing snapshot listener. */
+    var favoritesReadFailure: Throwable? = null
+
     override fun observeFavorites(): Flow<UserFavorites> = flow {
         favoritesReadGate?.await() ?: yield()
+        favoritesReadFailure?.let { throw it }
         emitAll(favorites)
     }
 
