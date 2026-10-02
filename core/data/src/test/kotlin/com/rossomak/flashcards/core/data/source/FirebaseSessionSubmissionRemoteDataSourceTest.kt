@@ -108,6 +108,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         payload["categoryName"] shouldBe session.categoryName
         payload["subcategoryIds"] shouldBe session.subcategoryIds
         payload["subcategoryNames"] shouldBe session.subcategoryNames
+        payload["sourceType"] shouldBe session.sourceType.name
         payload["studyDate"] shouldBe session.studyDate
         payload["studyDateUtcOffsetMinutes"] shouldBe session.studyDateUtcOffsetMinutes
         payload["dailyGoalMinutes"] shouldBe session.dailyGoalMinutes

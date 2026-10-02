@@ -71,6 +71,7 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         FIELD_CATEGORY_NAME to categoryName,
         FIELD_SUBCATEGORY_IDS to subcategoryIds,
         FIELD_SUBCATEGORY_NAMES to subcategoryNames,
+        FIELD_SOURCE_TYPE to sourceType.name,
         FIELD_CARD_RESULTS to cardResults.map { entry -> entry.toPayload() },
         FIELD_STUDY_DATE to studyDate,
         FIELD_STUDY_DATE_UTC_OFFSET_MINUTES to studyDateUtcOffsetMinutes,
@@ -186,6 +187,7 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val FIELD_CATEGORY_NAME = "categoryName"
         const val FIELD_SUBCATEGORY_IDS = "subcategoryIds"
         const val FIELD_SUBCATEGORY_NAMES = "subcategoryNames"
+        const val FIELD_SOURCE_TYPE = "sourceType"
         const val FIELD_CARD_RESULTS = "cardResults"
         const val FIELD_CARD_ID = "cardId"
         const val FIELD_CARD_SUBCATEGORY_ID = "subcategoryId"
