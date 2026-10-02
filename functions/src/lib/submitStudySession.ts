@@ -59,6 +59,9 @@ const FIELD_CARD_SUBCATEGORY_ID = "subcategoryId";
 const FIELD_ATTEMPTS_USED = "attemptsUsed";
 const FIELD_WAS_PREVIOUSLY_MASTERED = "wasPreviouslyMastered";
 const FIELD_SOURCE_TYPE = "sourceType";
+// Rated-only and Fast-only respectively: each is absent from the other mode's session document.
+const FIELD_VOICE_ANSWERING = "voiceAnswering";
+const FIELD_READ_ALOUD = "readAloud";
 
 // A `sessions/{sessionId}` document field only, no longer a trusted request-body field: the
 // "today's total minutes" query below filters the session collection on this same name, but the
@@ -116,6 +119,12 @@ const VALID_SOURCE_TYPES = ["SingleSubcategory", "Quick", "Custom"] as const;
 /** The Study Creation entry point a session came from, as the client's `SessionSourceType.name`. */
 export type SessionSourceType = (typeof VALID_SOURCE_TYPES)[number];
 
+/**
+ * How the session was delivered, chosen on Preview: Voice Answering for a Rated session, read-aloud for
+ * a Fast one. Holds only the session's own mode's flag, so writing it never stores the other's.
+ */
+export type SessionDelivery = { [FIELD_VOICE_ANSWERING]: boolean } | { [FIELD_READ_ALOUD]: boolean };
+
 export interface SubmitStudySessionCardResult {
   cardId: string;
   subcategoryId: string;
@@ -142,6 +151,7 @@ export interface ValidatedSubmitStudySessionRequest {
   subcategoryIds: string[];
   subcategoryNames: string[];
   sourceType: SessionSourceType;
+  delivery: SessionDelivery;
   cardResults: SubmitStudySessionCardResult[];
   /**
    * Minutes east of UTC for the device's timezone offset at `startedAtEpochMillis` — the
@@ -295,6 +305,18 @@ function validateCardResult(raw: unknown, studyMode: StudyMode, index: number): 
   return { cardId, subcategoryId, state: state as CardState, attemptsUsed, wasPreviouslyMastered };
 }
 
+/** Requires the session's own mode's delivery flag and rejects the other mode's, even as `false`. */
+function validateDelivery(body: Record<string, unknown>, studyMode: StudyMode): SessionDelivery {
+  if (studyMode === "Rated") {
+    if (typeof body.voiceAnswering !== "boolean") fail("voiceAnswering must be a boolean for a Rated session");
+    if (body.readAloud !== undefined) fail("readAloud must not be present on a Rated session");
+    return { [FIELD_VOICE_ANSWERING]: body.voiceAnswering as boolean };
+  }
+  if (typeof body.readAloud !== "boolean") fail("readAloud must be a boolean for a Fast session");
+  if (body.voiceAnswering !== undefined) fail("voiceAnswering must not be present on a Fast session");
+  return { [FIELD_READ_ALOUD]: body.readAloud as boolean };
+}
+
 /** Rejects a structurally invalid payload before any transaction opens. */
 export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmitStudySessionRequest {
   if (typeof data !== "object" || data === null) fail("request body must be an object");
@@ -317,6 +339,7 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
   if (typeof sourceType !== "string" || !VALID_SOURCE_TYPES.includes(sourceType as SessionSourceType)) {
     fail("sourceType must be SingleSubcategory, Quick or Custom");
   }
+  const delivery = validateDelivery(body, studyMode);
 
   if (!Array.isArray(body.cardResults) || body.cardResults.length === 0) fail("cardResults must be a non-empty array");
   if (body.cardResults.length > MAX_CARD_RESULTS) fail(`cardResults must not exceed ${MAX_CARD_RESULTS} entries`);
@@ -355,6 +378,7 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
     subcategoryIds,
     subcategoryNames,
     sourceType: sourceType as SessionSourceType,
+    delivery,
     cardResults,
     studyDateUtcOffsetMinutes,
     dailyGoalMinutes,
@@ -601,6 +625,7 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
       [FIELD_SUBCATEGORY_IDS]: request.subcategoryIds,
       [FIELD_SUBCATEGORY_NAMES]: request.subcategoryNames,
       [FIELD_SOURCE_TYPE]: request.sourceType,
+      ...request.delivery,
       [FIELD_STUDY_DATE]: derivedStudyDate,
       [FIELD_CARD_COUNT]: request.cardResults.length,
       [FIELD_NEW_CARDS_STUDIED]: newCardsStudied,

@@ -69,9 +69,21 @@ function rawRatedRequest(overrides: Record<string, unknown> = {}): Record<string
     subcategoryIds: ["sub-1"],
     subcategoryNames: ["Subcategory One"],
     sourceType: "SingleSubcategory",
+    voiceAnswering: false,
     cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false }],
     studyDateUtcOffsetMinutes: 0,
     dailyGoalMinutes: DEFAULT_DAILY_GOAL_MINUTES,
+    ...overrides,
+  };
+}
+
+function rawFastRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const { voiceAnswering, ...ratedWithoutVoiceAnswering } = rawRatedRequest();
+  return {
+    ...ratedWithoutVoiceAnswering,
+    studyMode: "Fast",
+    readAloud: false,
+    cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Seen" }],
     ...overrides,
   };
 }
@@ -116,7 +128,7 @@ describe("validateSubmitStudySessionRequest", () => {
   });
 
   it("rejects a Fast cardResults entry with a non-Seen state", () => {
-    const request = rawRatedRequest({ studyMode: "Fast", cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Mastered" }] });
+    const request = rawFastRequest({ cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Mastered" }] });
     assert.throws(() => validateSubmitStudySessionRequest(request), /must be Seen/);
   });
 
@@ -199,9 +211,33 @@ describe("validateSubmitStudySessionRequest", () => {
     assert.throws(() => validateSubmitStudySessionRequest(rawRatedRequest({ sourceType: "Composite" })), INVALID_SOURCE_TYPE_MESSAGE);
   });
 
+  it("rejects a Rated payload missing voiceAnswering", () => {
+    const { voiceAnswering, ...withoutVoiceAnswering } = rawRatedRequest();
+    assert.throws(() => validateSubmitStudySessionRequest(withoutVoiceAnswering), /voiceAnswering must be a boolean for a Rated session/);
+  });
+
+  it("rejects a Rated payload carrying readAloud, even as false", () => {
+    assert.throws(() => validateSubmitStudySessionRequest(rawRatedRequest({ readAloud: false })), /readAloud must not be present on a Rated session/);
+  });
+
+  it("rejects a Fast payload missing readAloud", () => {
+    const { readAloud, ...withoutReadAloud } = rawFastRequest();
+    assert.throws(() => validateSubmitStudySessionRequest(withoutReadAloud), /readAloud must be a boolean for a Fast session/);
+  });
+
+  it("rejects a Fast payload carrying voiceAnswering, even as false", () => {
+    assert.throws(() => validateSubmitStudySessionRequest(rawFastRequest({ voiceAnswering: false })), /voiceAnswering must not be present on a Fast session/);
+  });
+
   for (const sourceType of ["SingleSubcategory", "Quick", "Custom"]) {
-    it(`accepts a payload from a ${sourceType} session`, () => {
-      assert.equal(validateSubmitStudySessionRequest(rawRatedRequest({ sourceType })).sourceType, sourceType);
+    it(`accepts a Rated and a Fast payload from a ${sourceType} session, each with only its own delivery flag`, () => {
+      const rated = validateSubmitStudySessionRequest(rawRatedRequest({ sourceType, voiceAnswering: true }));
+      assert.equal(rated.sourceType, sourceType);
+      assert.deepEqual(rated.delivery, { voiceAnswering: true });
+
+      const fast = validateSubmitStudySessionRequest(rawFastRequest({ sourceType, readAloud: true }));
+      assert.equal(fast.sourceType, sourceType);
+      assert.deepEqual(fast.delivery, { readAloud: true });
     });
   }
 
@@ -429,8 +465,7 @@ describe("submitStudySession", () => {
   it("a Fast submission's counts carry newCardsStudied only, with no Rated-only counts", async () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(
-      rawRatedRequest({
-        studyMode: "Fast",
+      rawFastRequest({
         durationSeconds: 125,
         cardResults: [
           { cardId: "card-1", subcategoryId: "sub-1", state: "Seen" },
