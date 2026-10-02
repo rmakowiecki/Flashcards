@@ -173,10 +173,7 @@ fun MainScreen(
         ) {
             navigation<HomeGraph>(startDestination = HomeRoot) {
                 composable<HomeRoot> {
-                    HomeScreen(
-                        onNavigateToCategoryDetails = onNavigateToCategoryDetails,
-                        onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
-                    )
+                    HomeScreen()
                 }
             }
             navigation<StudyGraph>(startDestination = StudyRoot) {
