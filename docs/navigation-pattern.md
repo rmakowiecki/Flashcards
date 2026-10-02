@@ -97,5 +97,5 @@ fun XxxScreen(
 }
 ```
 
-Screens whose navigation is a direct callback from a click handler (e.g. Home, CategoryDetails) don't
-need a ViewModel channel — they invoke the nav callback directly.
+Every screen whose ViewModel decides where to go (e.g. Home, CategoryDetails) uses this channel, even for
+a plain tap that maps to one destination; the Screen composable is the only place that calls the nav callbacks.

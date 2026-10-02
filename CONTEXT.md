@@ -43,7 +43,7 @@ A Flashcard created by a user. Follows a submission lifecycle: `private → subm
 _Avoid_: User card, Custom card
 
 **Favorite**:
-A Subcategory explicitly bookmarked by a User. Displayed on the Home screen as a carousel of cards showing Subcategory and parent Category names.
+A Category or a Subcategory explicitly bookmarked by a User; the two kinds are independent, so favoriting a Category does not favorite its Subcategories. Displayed on the Home screen as one snapping carousel of cards, most recently favorited first. A Category card shows the Category's name; its body opens Category Details and its Quick session button starts a Quick Session in that Category. A Subcategory card shows the Subcategory and parent Category names plus the User's **Studied** progress in it; its body opens Subcategory Details and its play button starts a single-subcategory session. As everywhere, the body browses and the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
 _Avoid_: Starred, Saved, Liked
 
 **Recent**:
@@ -133,8 +133,8 @@ _Avoid_: Flag Action, Curation Type, Curation Flag Action
 
 **Study Creation**:
 The flow a user goes through to start a Study Session. All entry points route through the **Preview Study Session Screen** before the session begins.
-- **Single-subcategory**: tap a Subcategory's **play button** on Category Details (or "Start session" in the bottom toolbar of Subcategory Details) → Preview Study Session Screen → session begins. Tapping the Subcategory row itself opens **Subcategory Details** and starts nothing — the row browses, the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
-- **Quick Session**: tap "Quick Session" on Category Details → system samples a random count of Subcategories — bounded by the user's `subcategoryCountRange` preference — then randomly selects that many Subcategories and draws Flashcards from them → Preview Study Session Screen → session begins. Re-randomize re-rolls the Subcategory sample itself, not just the card draw.
+- **Single-subcategory**: tap a Subcategory's **play button** on Category Details (or "Start session" in the bottom toolbar of Subcategory Details, or the play button on a Favorite Subcategory card on Home) → Preview Study Session Screen → session begins. Tapping the Subcategory row itself opens **Subcategory Details** and starts nothing — the row browses, the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
+- **Quick Session**: tap "Quick Session" on Category Details, or the Quick session button on a Favorite Category card on Home → system samples a random count of Subcategories — bounded by the user's `subcategoryCountRange` preference — then randomly selects that many Subcategories and draws Flashcards from them → Preview Study Session Screen → session begins. Re-randomize re-rolls the Subcategory sample itself, not just the card draw. Category Details hands Preview the Category's Subcategory list to sample from; Home sends only the Category, and Preview fetches that list itself ([ADR-0056](docs/adr/0056-preview-resolves-quick-session-candidate-pool.md)).
 - **Custom**: enter **Selection Mode** on Category Details (bottom-toolbar toggle, or long-press any Subcategory row) → user manually chooses every Subcategory that enters the session → taps "Custom session" → Preview Study Session Screen → session begins. A Composite session when multiple Subcategories are selected (see **Study Session**) — a single selection makes it a single-subcategory session instead. Not every Composite session is Custom — Quick is the other way in.
 _Avoid_: Composite Session (retired name for this entry point; Composite itself survives as the broader structural term)
 _Avoid_: "Start Custom Session" (retired label — never built; the entry point is the Selection Mode toggle, and the CTA it reveals reads "Custom session")
@@ -189,7 +189,7 @@ _Avoid_: Sessions finished, Sessions done
 - A finished **Study Session** is a **Pending Session** until the server records it; a Pending Session belongs to exactly one **User**
 - A **Study Session** draws **Flashcards** from one or more **Subcategories** within a single **Category**
 - A **Recent** is a past **Study Session** — single-subcategory if one Subcategory, composite if multiple
-- A **Favorite** is a bookmarked **Subcategory**
+- A **Favorite** is a bookmarked **Category** or **Subcategory**
 - An **Attempt** produces exactly one **Rating** *(Rated sessions only)*
 - **Voice Answering** is chosen up front for a **Rated** Study Session and fixed for its duration; its automatic grade produces a **Rating** the same way a manual tap does
 - A **Flashcard** in a **Rated** Study Session has at most as many **Attempts** as the User's configured limit (default 3, max 5)

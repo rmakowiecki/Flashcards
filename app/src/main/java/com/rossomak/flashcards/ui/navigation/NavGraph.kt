@@ -96,6 +96,22 @@ private fun NavHostController.navigateToPreviewStudySession(
 }
 
 /**
+ * A Quick Session started from a Category alone, with no Subcategory list in hand. The route carries
+ * empty lists and the Preview screen resolves the candidate pool itself before sampling (ADR-0056).
+ */
+private fun NavHostController.navigateToPreviewQuickSession(categoryId: String, categoryName: String) {
+    navigate(
+        PreviewStudySessionRoute(
+            categoryId = categoryId,
+            categoryName = categoryName,
+            subcategoryIds = emptyList(),
+            subcategoryNames = emptyList(),
+            isQuickSession = true,
+        )
+    )
+}
+
+/**
  * Subcategory Details is the one entry point that has a browsed card list behind it, so it is the
  * only one that carries a selection: the filters the user applied and the order they were looking
  * at, which the Preview screen honours over their saved default (ADR-0038).
@@ -291,6 +307,7 @@ fun FlashcardsNavGraph(
                         },
                         onNavigateToSubcategoryDetails = navController::navigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = navController::navigateToPreviewStudySession,
+                        onNavigateToPreviewQuickSession = navController::navigateToPreviewQuickSession,
                     )
                 }
                 composable<CategoryDetailsRoute> {

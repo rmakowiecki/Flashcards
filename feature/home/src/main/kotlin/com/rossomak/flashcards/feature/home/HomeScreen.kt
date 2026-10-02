@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,31 +38,115 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
+import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
+import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.feature.home.HomeDestination.CategoryDetails
+import com.rossomak.flashcards.feature.home.HomeDestination.QuickSessionPreviewStudySession
+import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryDetails
+import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewStudySession
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import java.time.Instant
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
+    onNavigateToCategoryDetails: (categoryId: String, categoryName: String) -> Unit,
+    onNavigateToSubcategoryDetails: (
+        categoryId: String,
+        categoryName: String,
+        subcategoryId: String,
+        subcategoryName: String,
+    ) -> Unit,
+    onNavigateToPreviewStudySession: (
+        categoryId: String,
+        categoryName: String,
+        subcategoryId: String,
+        subcategoryName: String,
+    ) -> Unit,
+    onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    observeAsEvents(viewModel.events) { destination ->
+        with(destination) {
+            when (this) {
+                is CategoryDetails -> onNavigateToCategoryDetails(
+                    categoryId,
+                    categoryName,
+                )
+
+                is SubcategoryDetails -> onNavigateToSubcategoryDetails(
+                    categoryId,
+                    categoryName,
+                    subcategoryId,
+                    subcategoryName,
+                )
+
+                is SubcategoryPreviewStudySession -> onNavigateToPreviewStudySession(
+                    categoryId,
+                    categoryName,
+                    subcategoryId,
+                    subcategoryName,
+                )
+
+                is QuickSessionPreviewStudySession -> onNavigateToPreviewQuickSession(
+                    categoryId,
+                    categoryName,
+                )
+            }
+        }
+    }
+
+    HomeContent(
+        modifier = modifier,
+        state = state,
+        onCategoryClick = viewModel::onFavoriteCategorySelect,
+        onCategoryQuickSessionClick = viewModel::onFavoriteCategoryQuickSessionStart,
+        onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
+        onSubcategoryPlayClick = viewModel::onFavoriteSubcategorySessionStart,
+    )
+}
+
+@Composable
+private fun HomeContent(
+    modifier: Modifier = Modifier,
+    state: HomeScreenState,
+    onCategoryClick: (Category) -> Unit,
+    onCategoryQuickSessionClick: (Category) -> Unit,
+    onSubcategoryClick: (Subcategory) -> Unit,
+    onSubcategoryPlayClick: (Subcategory) -> Unit,
+) {
     Column(modifier = modifier.fillMaxSize()) {
         HomeTopBar()
         UserGreetingSection(userName = "Ross")
-        if (state.favoriteItems.isNotEmpty()) {
-            FavoritesCarousel(
-                items = state.favoriteItems,
+        when (val favorites = state.favorites) {
+            Loading -> Unit
+            Empty -> HomeEmptyState(modifier = Modifier.weight(1f))
+            is Content -> FavoritesCarousel(
+                items = favorites.items,
                 progressSummary = state.progressSummary,
                 isProgressResolved = state.isProgressResolved,
+                onCategoryClick = onCategoryClick,
+                onCategoryQuickSessionClick = onCategoryQuickSessionClick,
+                onSubcategoryClick = onSubcategoryClick,
+                onSubcategoryPlayClick = onSubcategoryPlayClick,
             )
-        } else {
-            HomeEmptyState(modifier = Modifier.weight(1f))
         }
     }
 }
@@ -249,4 +332,67 @@ private fun EmptyStateIllustration() {
             )
         }
     }
+}
+
+private val previewCategory = Category(
+    id = "android",
+    name = "Android",
+    order = 0,
+    subcategoryCount = 14,
+    iconSvg = null,
+    color = "#2B6AA5",
+    featuredSubcategoryNames = emptyList(),
+)
+private val previewSubcategory = Subcategory(
+    id = "compose",
+    name = "Compose",
+    categoryId = previewCategory.id,
+    categoryName = previewCategory.name,
+    order = 0,
+    cardCount = 30,
+)
+
+@Composable
+private fun HomeContentPreviewHost(state: HomeScreenState) {
+    FlashcardsTheme {
+        HomeContent(
+            state = state,
+            onCategoryClick = {},
+            onCategoryQuickSessionClick = {},
+            onSubcategoryClick = {},
+            onSubcategoryPlayClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentLoadingPreview() {
+    HomeContentPreviewHost(state = HomeScreenState(favorites = Loading))
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentEmptyPreview() {
+    HomeContentPreviewHost(state = HomeScreenState(favorites = Empty))
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentFavoritesPreview() {
+    val favoritedAt = Instant.parse("2026-05-05T10:00:00Z")
+    HomeContentPreviewHost(
+        state = HomeScreenState(
+            favorites = Content(
+                listOf(
+                    FavoriteSubcategory(previewSubcategory, previewCategory, favoritedAt),
+                    FavoriteCategory(previewCategory, favoritedAt),
+                ),
+            ),
+            progressSummary = ProgressSummary(
+                subcategories = mapOf(previewSubcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
+            ),
+            isProgressResolved = true,
+        ),
+    )
 }

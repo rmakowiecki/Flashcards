@@ -6,22 +6,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.LayoutDirection
 import com.rossomak.flashcards.core.domain.model.Category
@@ -32,15 +27,13 @@ import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
+import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 import java.time.Instant
 
 /** How far the watermark drifts, as a share of the card width, when its card is one card-step from the snap position. */
 private const val PARALLAX_FACTOR = 0.3f
-
-/** Taps do nothing until Favorites navigation is wired; one shared instance keeps every card's callbacks stable. */
-private val NoOpClick: () -> Unit = {}
 
 /**
  * The Favorites section: a heading over a snapping row of [FavoriteItem] cards, most recently
@@ -51,26 +44,27 @@ private val NoOpClick: () -> Unit = {}
  * resolved here, per item, so a progress change recomposes only the cards whose own
  * [com.rossomak.flashcards.core.domain.model.SubcategoryProgressState] changed.
  *
- * @param listState hoisted so the scroll position can survive leaving and returning to Home.
+ * @param onCategoryClick the Category card's body was tapped.
+ * @param onCategoryQuickSessionClick the Category card's Quick session button was tapped.
+ * @param onSubcategoryClick the Subcategory card's body was tapped.
+ * @param onSubcategoryPlayClick the Subcategory card's play button was tapped.
+ * @param listState the row's scroll state. The default is saveable, so the position survives tab
+ * switches and process death.
  */
 @Composable
 internal fun FavoritesCarousel(
     items: List<FavoriteItem>,
     progressSummary: ProgressSummary?,
     isProgressResolved: Boolean,
+    onCategoryClick: (Category) -> Unit,
+    onCategoryQuickSessionClick: (Category) -> Unit,
+    onSubcategoryClick: (Subcategory) -> Unit,
+    onSubcategoryPlayClick: (Subcategory) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.favorites_section_title),
-            modifier = Modifier
-                .padding(horizontal = MaterialTheme.spacing.normal)
-                .padding(bottom = MaterialTheme.spacing.small)
-                .semantics { heading() },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+        FlashcardsOverlineLabel(text = stringResource(R.string.favorites_section_title))
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             state = listState,
@@ -85,21 +79,25 @@ internal fun FavoritesCarousel(
             ) { item ->
                 val cardModifier = Modifier.animateItem()
                 when (item) {
-                    is FavoriteCategory -> FavoriteCategoryCard(
-                        category = item.category,
-                        parallaxOffsetPx = rememberParallaxOffsetPx(listState, item.carouselKey()),
-                        onClick = NoOpClick,
-                        onQuickSessionClick = NoOpClick,
-                        modifier = cardModifier,
-                    )
-                    is FavoriteSubcategory -> FavoriteSubcategoryCard(
-                        subcategory = item.subcategory,
-                        parentCategory = item.parentCategory,
-                        progress = progressSummary.subcategoryProgressFor(item.subcategory.id, isProgressResolved),
-                        onClick = NoOpClick,
-                        onPlayClick = NoOpClick,
-                        modifier = cardModifier,
-                    )
+                    is FavoriteCategory -> with(item) {
+                        FavoriteCategoryCard(
+                            category = category,
+                            parallaxOffsetPx = rememberParallaxOffsetPx(listState, carouselKey()),
+                            onClick = { onCategoryClick(category) },
+                            onQuickSessionClick = { onCategoryQuickSessionClick(category) },
+                            modifier = cardModifier,
+                        )
+                    }
+                    is FavoriteSubcategory -> with(item) {
+                        FavoriteSubcategoryCard(
+                            subcategory = subcategory,
+                            parentCategory = parentCategory,
+                            progress = progressSummary.subcategoryProgressFor(subcategory.id, isProgressResolved),
+                            onClick = { onSubcategoryClick(subcategory) },
+                            onPlayClick = { onSubcategoryPlayClick(subcategory) },
+                            modifier = cardModifier,
+                        )
+                    }
                 }
             }
         }
@@ -172,6 +170,10 @@ private fun FavoritesCarouselPreview() {
                 subcategories = mapOf(subcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
             ),
             isProgressResolved = true,
+            onCategoryClick = {},
+            onCategoryQuickSessionClick = {},
+            onSubcategoryClick = {},
+            onSubcategoryPlayClick = {},
         )
     }
 }

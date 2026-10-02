@@ -24,6 +24,9 @@ class FakeCardProgressRepository : CardProgressRepository {
      */
     var summaryReadGate: CompletableDeferred<Unit>? = null
 
+    /** When set, [observeProgressSummary] throws this before its first emission, like a failing snapshot listener. */
+    var summaryReadFailure: Throwable? = null
+
     /** Every Subcategory id [getProgress] was actually called with, in call order. */
     val requestedSubcategoryIds: MutableList<String> = mutableListOf()
 
@@ -53,6 +56,7 @@ class FakeCardProgressRepository : CardProgressRepository {
 
     override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {
         summaryReadGate?.await() ?: yield()
+        summaryReadFailure?.let { throw it }
         emitAll(summaryUpdates)
     }
 }

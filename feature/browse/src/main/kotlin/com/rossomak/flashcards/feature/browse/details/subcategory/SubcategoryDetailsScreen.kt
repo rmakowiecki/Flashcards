@@ -281,6 +281,7 @@ private fun SubcategoryDetailsTopBar(
                         totalCount,
                     )
                 },
+                isHeading = false,
             )
         }
     }

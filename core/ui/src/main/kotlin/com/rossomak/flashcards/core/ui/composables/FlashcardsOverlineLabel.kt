@@ -14,9 +14,16 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
- * All-caps, muted overline label used as a header of list sections, dashboard stat cards, and form
- * field hints. The caller passes the human-readable [text]; the component applies the uppercase
- * treatment and, unless [isHeading] is false, marks the node as an accessibility heading.
+ * All-caps, muted overline label used as a header of list sections and as a count line under a top
+ * bar. The caller passes the human-readable [text]; the component applies the uppercase treatment
+ * and, unless [isHeading] is false, marks the node as an accessibility heading. Pass
+ * `isHeading = false` for a count or status line that does not head a section.
+ *
+ * The label owns all of its own spacing: the page gutter on both sides, the space above it that
+ * separates it from the previous section, and the space below it that ties it to its content.
+ * Callers add no padding or arrangement spacing around it and place it in a container that adds no
+ * horizontal padding of its own. The content below must use the same [com.rossomak.flashcards.core.ui.theme.Spacing.normal]
+ * gutter, so the label text lines up with the list's left edge.
  */
 @Composable
 fun FlashcardsOverlineLabel(
@@ -31,8 +38,10 @@ fun FlashcardsOverlineLabel(
         modifier = modifier
             .then(if (isHeading) Modifier.semantics { heading() } else Modifier)
             .padding(
-                horizontal = MaterialTheme.spacing.normal,
-                vertical = MaterialTheme.spacing.xsmall,
+                start = MaterialTheme.spacing.normal,
+                top = MaterialTheme.spacing.normal,
+                end = MaterialTheme.spacing.normal,
+                bottom = MaterialTheme.spacing.xsmall,
             ),
     )
 }
