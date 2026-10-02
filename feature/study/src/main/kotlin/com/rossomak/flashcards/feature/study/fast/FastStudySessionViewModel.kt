@@ -99,6 +99,7 @@ class FastStudySessionViewModel @Inject constructor(
                 sessionTitle = route.sessionTitle,
                 voiceSettings = route.voiceSettings,
                 readAloudEnabled = route.readAloudEnabled,
+                sourceType = route.sourceType,
             ),
         )
     }

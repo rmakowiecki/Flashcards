@@ -67,6 +67,7 @@ data class PreviewStudySessionRoute(
  * the same denormalize-alongside-the-id idiom `Subcategory`/`Category` already use
  * ([ADR-0014](../../../docs/adr/0014-session-stats-written-at-summary-screen.md)), and the same
  * reason [RatedStudySessionRoute] carries them.
+ * @param sourceType how the session was created (Study Creation entry point).
  */
 @Serializable
 data class FastStudySessionRoute(
@@ -81,6 +82,7 @@ data class FastStudySessionRoute(
     val voiceVariantIndex: Int? = null,
     val categoryName: String,
     val subcategoryNames: List<String>,
+    val sourceType: SessionSourceType,
 ) {
     val voiceSettings: VoiceSettings
         get() = VoiceSettings(speechRate = speechRate, voiceId = voiceId, voiceLabel = voiceLabel(voiceCountryCode, voiceVariantIndex))
@@ -112,6 +114,7 @@ data class FastStudySessionRoute(
  * termination can build a complete `SessionResult` without a second lookup —
  * the same denormalize-alongside-the-id idiom `Subcategory`/`Category` already use
  * ([ADR-0014](../../../docs/adr/0014-session-stats-written-at-summary-screen.md)).
+ * @param sourceType how the session was created (Study Creation entry point).
  */
 @Serializable
 data class RatedStudySessionRoute(
@@ -128,6 +131,7 @@ data class RatedStudySessionRoute(
     val voiceVariantIndex: Int? = null,
     val categoryName: String,
     val subcategoryNames: List<String>,
+    val sourceType: SessionSourceType,
 ) {
     val voiceSettings: VoiceSettings
         get() = VoiceSettings(speechRate = speechRate, voiceId = voiceId, voiceLabel = voiceLabel(voiceCountryCode, voiceVariantIndex))

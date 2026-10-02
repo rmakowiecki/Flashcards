@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
@@ -102,6 +103,7 @@ class FastStudySessionViewModelTest {
         cardIds = listOf("card-1", "card-2", "card-3"),
         categoryName = "Android",
         subcategoryNames = listOf("Compose"),
+        sourceType = SingleSubcategory,
     )
 
     @Before

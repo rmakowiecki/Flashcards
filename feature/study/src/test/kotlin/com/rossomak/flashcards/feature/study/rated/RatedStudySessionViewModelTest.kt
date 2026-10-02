@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
@@ -140,6 +141,7 @@ class RatedStudySessionViewModelTest {
         cardIds = listOf("card-1", "card-2", "card-3"),
         categoryName = "Android",
         subcategoryNames = listOf("Compose"),
+        sourceType = SingleSubcategory,
     )
 
     @Before

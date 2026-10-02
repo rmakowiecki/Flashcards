@@ -7,6 +7,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
@@ -57,6 +58,7 @@ class FastStudySessionCoordinatorTest {
         sessionTitle = "Compose",
         voiceSettings = VoiceSettings(speechRate = SPEECH_RATE),
         readAloudEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private val events = mutableListOf<FastSessionEvent>()

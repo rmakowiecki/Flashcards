@@ -15,6 +15,7 @@ import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.InterruptionEpisode
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
@@ -85,6 +86,7 @@ class RatedStudySessionCoordinatorInterruptionTest {
         voiceAnsweringEnabled = true,
         attemptsLimit = 3,
         partialRatingCardRequeueingEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private fun flashcard(id: String): Flashcard = Flashcard(

@@ -12,6 +12,7 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
@@ -83,6 +84,7 @@ class RatedStudySessionCoordinatorTest {
         voiceAnsweringEnabled = true,
         attemptsLimit = 3,
         partialRatingCardRequeueingEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private val events = mutableListOf<RatedSessionEvent>()

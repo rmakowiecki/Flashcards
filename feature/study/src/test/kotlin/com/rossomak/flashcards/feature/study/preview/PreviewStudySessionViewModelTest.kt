@@ -860,6 +860,39 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
+    fun `onStartSession carries the route's source type on the Rated route`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(quickSessionRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onStartSession()
+
+        viewModel.events.test {
+            val destination = awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            destination.route.sourceType shouldBe Quick
+        }
+    }
+
+    @Test
+    fun `onStartSession carries the route's source type on the Fast route`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(multiSubcategoryRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Fast)))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+        viewModel.onStartSession()
+
+        viewModel.events.test {
+            val destination = awaitItem() as PreviewStudySessionDestination.FastStudySession
+            destination.route.sourceType shouldBe Custom
+        }
+    }
+
+    @Test
     fun `onStartSession carries the confirmed voice settings and label on the route`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(singleSubcategoryRoute)
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
