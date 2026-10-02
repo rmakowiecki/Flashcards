@@ -57,6 +57,7 @@ class SessionResultRouteMappingTest {
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
+        voiceAnsweringEnabled = true,
     )
 
     private val fastResult = SessionResult.Fast(
@@ -76,6 +77,7 @@ class SessionResultRouteMappingTest {
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
+        readAloudEnabled = true,
     )
 
     @Test
@@ -99,6 +101,20 @@ class SessionResultRouteMappingTest {
         route.cardAttemptsUsed shouldBe null
         route.cardWasPreviouslyMastered shouldBe null
         route.toSessionResult(dailyGoalMinutes) shouldBe fastResult
+    }
+
+    @Test
+    fun `a Rated SessionResult flattens readAloudEnabled to null`() {
+        val route = ratedResult.toSummaryRoute()
+
+        route.readAloudEnabled shouldBe null
+    }
+
+    @Test
+    fun `a Fast SessionResult flattens voiceAnsweringEnabled to null`() {
+        val route = fastResult.toSummaryRoute()
+
+        route.voiceAnsweringEnabled shouldBe null
     }
 
     @Test

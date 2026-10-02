@@ -67,6 +67,7 @@ class SubmitStudySessionUseCaseTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastSessionResult(
@@ -86,6 +87,7 @@ class SubmitStudySessionUseCaseTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        readAloudEnabled = false,
     )
 
     private fun ratedEntry(
@@ -244,6 +246,7 @@ class SubmitStudySessionUseCaseTest {
             studyDate = "2026-09-08",
             dailyGoalMinutes = 20,
             studyDateUtcOffsetMinutes = 0,
+            voiceAnsweringEnabled = false,
         )
 
         val preview = createUseCase().invokeAndCapturePreview(session)

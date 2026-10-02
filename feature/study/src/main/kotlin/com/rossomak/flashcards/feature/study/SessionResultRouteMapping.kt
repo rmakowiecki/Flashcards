@@ -9,7 +9,8 @@ import java.time.ZoneOffset
 /**
  * Flattens [this] onto [StudySessionSummaryRoute] for the terminal navigation event — see that
  * type's KDoc for why the [SessionResult.cardResults] fields carry a `card` prefix, why
- * [cardAttemptsUsed]/[cardWasPreviouslyMastered] are `null` for a [SessionResult.Fast] result, why
+ * [cardAttemptsUsed]/[cardWasPreviouslyMastered] are `null` for a [SessionResult.Fast] result (and each
+ * delivery flag `null` for the other mode), why
  * [SessionResult.startedAt] becomes a `Long`, and why [SessionResult.studyDateUtcOffsetMinutes] (captured
  * at session start by the caller, unlike [SessionResult.studyDate]/[SessionResult.dailyGoalMinutes],
  * which really are unread placeholders here) is the one of the three actually carried through.
@@ -37,6 +38,8 @@ fun SessionResult.toSummaryRoute(): StudySessionSummaryRoute = StudySessionSumma
         is SessionResult.Rated -> cardResults.map { it.wasPreviouslyMastered }
         is SessionResult.Fast -> null
     },
+    voiceAnsweringEnabled = (this as? SessionResult.Rated)?.voiceAnsweringEnabled,
+    readAloudEnabled = (this as? SessionResult.Fast)?.readAloudEnabled,
 )
 
 /**
@@ -88,6 +91,7 @@ private fun StudySessionSummaryRoute.toSessionResult(
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
+        voiceAnsweringEnabled = requireNotNull(voiceAnsweringEnabled) { "a Rated route always carries voiceAnsweringEnabled" },
     )
     StudyMode.Fast -> SessionResult.Fast(
         id = sessionId,
@@ -109,5 +113,6 @@ private fun StudySessionSummaryRoute.toSessionResult(
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
+        readAloudEnabled = requireNotNull(readAloudEnabled) { "a Fast route always carries readAloudEnabled" },
     )
 }

@@ -32,6 +32,7 @@ class SessionTerminationTest {
             studyDate = "2026-09-06",
             dailyGoalMinutes = 20,
             studyDateUtcOffsetMinutes = 0,
+            voiceAnsweringEnabled = false,
         )
 
     @Test

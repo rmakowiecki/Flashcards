@@ -392,6 +392,7 @@ class DefaultCardProgressRepositoryTest {
         studyDate = "2026-09-06",
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = 20,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastSession(id: String, startedAt: Instant, vararg cardIds: String) = SessionResult.Fast(
@@ -408,6 +409,7 @@ class DefaultCardProgressRepositoryTest {
         studyDate = "2026-09-06",
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = 20,
+        readAloudEnabled = false,
     )
 
     private fun authUser(uid: String) = AuthUser(uid = uid, email = null, displayName = null, photoUrl = null)

@@ -16,6 +16,9 @@ import kotlinx.serialization.Serializable
  * unsurprising encoding this whole data layer already uses elsewhere. [sourceType] likewise holds
  * `SessionSourceType.name`, and has no default: a line without it fails to decode.
  *
+ * [voiceAnsweringEnabled] is present only for a `Rated` entry and [readAloudEnabled] only for a `Fast`
+ * one, each `null` for the other mode, the same split as [PendingFlashcardResultDto.attemptsUsed].
+ *
  * [uid] is the User who finished the session, stamped at append time. It is queue metadata, not part
  * of the domain [com.rossomak.flashcards.core.domain.model.SessionResult]:
  * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] delivers an entry only
@@ -50,6 +53,8 @@ data class PendingSessionSubmissionDto(
     val studyDate: String,
     val dailyGoalMinutes: Int,
     val studyDateUtcOffsetMinutes: Int,
+    val voiceAnsweringEnabled: Boolean? = null,
+    val readAloudEnabled: Boolean? = null,
 )
 
 /**

@@ -80,6 +80,7 @@ class DefaultSessionSubmissionRepositoryTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     @Test

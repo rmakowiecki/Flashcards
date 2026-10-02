@@ -1091,7 +1091,7 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `the ended result carries the setup's source type`() = runTest {
+    fun `the ended result carries the setup's source type and voice answering setting`() = runTest {
         val coordinator = startCoordinator(setup.copy(sourceType = Quick))
 
         coordinator.end(abandoned = true)
@@ -1099,10 +1099,22 @@ class RatedStudySessionCoordinatorTest {
 
         val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
         result.sourceType shouldBe Quick
+        result.voiceAnsweringEnabled shouldBe true
     }
 
     @Test
-    fun `leaving before the cards load still records the setup's source type`() = runTest {
+    fun `a manual session's ended result records voice answering as off`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
+        result.voiceAnsweringEnabled shouldBe false
+    }
+
+    @Test
+    fun `leaving before the cards load still records the setup's source type and voice answering setting`() = runTest {
         val coordinator = startCoordinator(setup.copy(sourceType = Custom), runsLoad = false)
 
         coordinator.end(abandoned = true)
@@ -1110,6 +1122,7 @@ class RatedStudySessionCoordinatorTest {
 
         val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
         result.sourceType shouldBe Custom
+        result.voiceAnsweringEnabled shouldBe true
     }
 
     @Test

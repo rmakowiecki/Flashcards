@@ -58,6 +58,7 @@ class CardProgressMergeTest(
                 studyDate = STUDY_DATE,
                 studyDateUtcOffsetMinutes = 0,
                 dailyGoalMinutes = DAILY_GOAL_MINUTES,
+                voiceAnsweringEnabled = false,
             )
             FAST_MODE -> SessionResult.Fast(
                 id = SESSION_ID,
@@ -75,6 +76,7 @@ class CardProgressMergeTest(
                 studyDate = STUDY_DATE,
                 studyDateUtcOffsetMinutes = 0,
                 dailyGoalMinutes = DAILY_GOAL_MINUTES,
+                readAloudEnabled = false,
             )
             else -> error("unknown study mode \"$studyMode\"")
         }

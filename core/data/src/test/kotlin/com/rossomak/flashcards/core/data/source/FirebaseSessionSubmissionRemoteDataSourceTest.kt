@@ -68,6 +68,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = -300,
+        voiceAnsweringEnabled = true,
     )
 
     private fun fastSessionResult(): SessionResult.Fast = SessionResult.Fast(
@@ -84,6 +85,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = -300,
+        readAloudEnabled = true,
     )
 
     @Test

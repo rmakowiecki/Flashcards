@@ -6,10 +6,12 @@ import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 import kotlinx.serialization.SerializationException
@@ -21,7 +23,7 @@ import org.junit.Test
 
 class PendingSessionSubmissionMapperTest {
 
-    private fun ratedSessionResult(sourceType: SessionSourceType = SingleSubcategory): SessionResult.Rated = SessionResult.Rated(
+    private fun ratedSessionResult(sourceType: SessionSourceType = SingleSubcategory, voiceAnsweringEnabled: Boolean = false): SessionResult.Rated = SessionResult.Rated(
         id = "session-1",
         startedAt = Instant.parse("2026-09-08T10:00:00Z"),
         durationSeconds = 60,
@@ -43,9 +45,10 @@ class PendingSessionSubmissionMapperTest {
         studyDate = "2026-09-08",
         studyDateUtcOffsetMinutes = -300,
         dailyGoalMinutes = 20,
+        voiceAnsweringEnabled = voiceAnsweringEnabled,
     )
 
-    private fun fastSessionResult(sourceType: SessionSourceType = SingleSubcategory): SessionResult.Fast = SessionResult.Fast(
+    private fun fastSessionResult(sourceType: SessionSourceType = SingleSubcategory, readAloudEnabled: Boolean = false): SessionResult.Fast = SessionResult.Fast(
         id = "session-2",
         startedAt = Instant.parse("2026-09-08T11:00:00Z"),
         durationSeconds = 30,
@@ -59,6 +62,7 @@ class PendingSessionSubmissionMapperTest {
         studyDate = "2026-09-08",
         studyDateUtcOffsetMinutes = -300,
         dailyGoalMinutes = 20,
+        readAloudEnabled = readAloudEnabled,
     )
 
     @Test
@@ -119,24 +123,28 @@ class PendingSessionSubmissionMapperTest {
     }
 
     @Test
-    fun `toDto then toDomain round-trips every source type of a Rated session`() {
+    fun `toDto then toDomain round-trips every source type and voice answering setting of a Rated session`() {
         SessionSourceType.entries.forEach { sourceType ->
-            val original = ratedSessionResult(sourceType = sourceType)
+            listOf(true, false).forEach { voiceAnsweringEnabled ->
+                val original = ratedSessionResult(sourceType = sourceType, voiceAnsweringEnabled = voiceAnsweringEnabled)
 
-            val roundTripped = original.toDto(UID).toDomain()
+                val roundTripped = original.toDto(UID).toDomain()
 
-            withClue(sourceType) { roundTripped shouldBe original }
+                withClue("$sourceType, voiceAnsweringEnabled=$voiceAnsweringEnabled") { roundTripped shouldBe original }
+            }
         }
     }
 
     @Test
-    fun `toDto then toDomain round-trips every source type of a Fast session`() {
+    fun `toDto then toDomain round-trips every source type and read-aloud setting of a Fast session`() {
         SessionSourceType.entries.forEach { sourceType ->
-            val original = fastSessionResult(sourceType = sourceType)
+            listOf(true, false).forEach { readAloudEnabled ->
+                val original = fastSessionResult(sourceType = sourceType, readAloudEnabled = readAloudEnabled)
 
-            val roundTripped = original.toDto(UID).toDomain()
+                val roundTripped = original.toDto(UID).toDomain()
 
-            withClue(sourceType) { roundTripped shouldBe original }
+                withClue("$sourceType, readAloudEnabled=$readAloudEnabled") { roundTripped shouldBe original }
+            }
         }
     }
 
@@ -150,8 +158,44 @@ class PendingSessionSubmissionMapperTest {
     }
 
     @Test
+    fun `toDto omits readAloudEnabled for a Rated session`() {
+        val voiceAnsweringEnabled = true
+
+        val dto = ratedSessionResult(voiceAnsweringEnabled = voiceAnsweringEnabled).toDto(UID)
+
+        dto.voiceAnsweringEnabled shouldBe voiceAnsweringEnabled
+        dto.readAloudEnabled.shouldBeNull()
+        Json.encodeToJsonElement(dto).jsonObject.containsKey("readAloudEnabled") shouldBe false
+    }
+
+    @Test
+    fun `toDto omits voiceAnsweringEnabled for a Fast session`() {
+        val readAloudEnabled = true
+
+        val dto = fastSessionResult(sourceType = Custom, readAloudEnabled = readAloudEnabled).toDto(UID)
+
+        dto.readAloudEnabled shouldBe readAloudEnabled
+        dto.voiceAnsweringEnabled.shouldBeNull()
+        Json.encodeToJsonElement(dto).jsonObject.containsKey("voiceAnsweringEnabled") shouldBe false
+    }
+
+    @Test
     fun `toDomain throws for an unknown source type`() {
         val malformedDto = fastSessionResult().toDto(UID).copy(sourceType = "Unknown")
+
+        shouldThrow<IllegalArgumentException> { malformedDto.toDomain() }
+    }
+
+    @Test
+    fun `toDomain throws for a Rated entry missing voiceAnsweringEnabled`() {
+        val malformedDto = ratedSessionResult().toDto(UID).copy(voiceAnsweringEnabled = null)
+
+        shouldThrow<IllegalArgumentException> { malformedDto.toDomain() }
+    }
+
+    @Test
+    fun `toDomain throws for a Fast entry missing readAloudEnabled`() {
+        val malformedDto = fastSessionResult().toDto(UID).copy(readAloudEnabled = null)
 
         shouldThrow<IllegalArgumentException> { malformedDto.toDomain() }
     }

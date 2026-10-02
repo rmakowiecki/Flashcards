@@ -26,6 +26,8 @@ object PendingSessionSubmissionMapper {
         studyDate = studyDate,
         dailyGoalMinutes = dailyGoalMinutes,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
+        voiceAnsweringEnabled = (this as? SessionResult.Rated)?.voiceAnsweringEnabled,
+        readAloudEnabled = (this as? SessionResult.Fast)?.readAloudEnabled,
     )
 
     /**
@@ -52,6 +54,7 @@ object PendingSessionSubmissionMapper {
             studyDate = studyDate,
             dailyGoalMinutes = dailyGoalMinutes,
             studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
+            voiceAnsweringEnabled = requireNotNull(voiceAnsweringEnabled) { "Rated pending session '$id' missing voiceAnsweringEnabled" },
         )
         StudyMode.Fast -> SessionResult.Fast(
             id = id,
@@ -67,6 +70,7 @@ object PendingSessionSubmissionMapper {
             studyDate = studyDate,
             dailyGoalMinutes = dailyGoalMinutes,
             studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
+            readAloudEnabled = requireNotNull(readAloudEnabled) { "Fast pending session '$id' missing readAloudEnabled" },
         )
     }
 

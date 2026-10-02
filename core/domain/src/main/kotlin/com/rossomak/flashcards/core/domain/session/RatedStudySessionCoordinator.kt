@@ -255,6 +255,7 @@ class RatedStudySessionCoordinator @Inject constructor(
                 studyDate = "",
                 studyDateUtcOffsetMinutes = timekeeper.utcOffsetMinutes,
                 dailyGoalMinutes = 0,
+                voiceAnsweringEnabled = setup.voiceAnsweringEnabled,
             )
         }
         eventChannel.trySend(RatedSessionEvent.SessionEnded(result))

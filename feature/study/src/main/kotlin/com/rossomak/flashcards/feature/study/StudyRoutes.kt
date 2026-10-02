@@ -153,7 +153,8 @@ data class RatedStudySessionRoute(
  * document shape (ADR-0014) — and `null` for a Fast route, not lists of zeroes and falses for cards
  * that have neither concept.
  *
- * [sourceType] is always present, for both modes.
+ * [sourceType] is always present. [voiceAnsweringEnabled] is Rated-only and [readAloudEnabled] is
+ * Fast-only, each `null` on the other mode's route, the same split as [cardAttemptsUsed].
  *
  * [startedAtEpochSecond] flattens `SessionResult.startedAt` (a `java.time.Instant`, not itself a
  * primitive `androidx.navigation` can carry) to the one `Long` that reconstructs it.
@@ -188,6 +189,8 @@ data class StudySessionSummaryRoute(
     val cardStates: List<FlashcardStudyProgressState>,
     val cardAttemptsUsed: List<Int>?,
     val cardWasPreviouslyMastered: List<Boolean>?,
+    val voiceAnsweringEnabled: Boolean?,
+    val readAloudEnabled: Boolean?,
 )
 
 private fun voiceLabel(countryCode: String?, variantIndex: Int?): VoiceLabel? =

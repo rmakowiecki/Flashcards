@@ -34,6 +34,7 @@ class SessionResultTest {
         studyDate = "2026-09-06",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastResult(cardResults: List<FlashcardResult.Fast>): SessionResult.Fast = SessionResult.Fast(
@@ -50,6 +51,7 @@ class SessionResultTest {
         studyDate = "2026-09-06",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        readAloudEnabled = false,
     )
 
     @Test

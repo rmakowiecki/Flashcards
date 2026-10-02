@@ -112,6 +112,8 @@ class StudySessionSummaryViewModelTest {
             cardStates = cardStates,
             cardAttemptsUsed = cardStates.map { 1 },
             cardWasPreviouslyMastered = cardStates.map { false },
+            voiceAnsweringEnabled = false,
+            readAloudEnabled = null,
         )
     }
 
@@ -167,6 +169,8 @@ class StudySessionSummaryViewModelTest {
                     // Rated-only (ADR-0014): null for a Fast route, not zero-filled lists.
                     cardAttemptsUsed = null,
                     cardWasPreviouslyMastered = null,
+                    voiceAnsweringEnabled = null,
+                    readAloudEnabled = false,
                 ),
             )
 
@@ -236,6 +240,8 @@ class StudySessionSummaryViewModelTest {
                     cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
                     cardAttemptsUsed = null,
                     cardWasPreviouslyMastered = null,
+                    voiceAnsweringEnabled = null,
+                    readAloudEnabled = false,
                 ),
             )
 

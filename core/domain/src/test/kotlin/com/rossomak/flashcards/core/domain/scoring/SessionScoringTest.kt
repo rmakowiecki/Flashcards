@@ -197,6 +197,7 @@ class SessionScoringTest {
         studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = DAILY_GOAL_MINUTES,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastSession(vararg cardIds: String) = SessionResult.Fast(
@@ -213,6 +214,7 @@ class SessionScoringTest {
         studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = DAILY_GOAL_MINUTES,
+        readAloudEnabled = false,
     )
 
     private companion object {

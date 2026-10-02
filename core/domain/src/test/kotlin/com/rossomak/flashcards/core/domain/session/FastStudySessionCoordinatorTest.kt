@@ -612,7 +612,7 @@ class FastStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `the ended result carries the setup's source type`() = runTest {
+    fun `the ended result carries the setup's source type and read-aloud setting`() = runTest {
         val coordinator = startCoordinator(setup.copy(sourceType = Quick))
 
         coordinator.end(abandoned = true)
@@ -620,17 +620,19 @@ class FastStudySessionCoordinatorTest {
 
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
         result.sourceType shouldBe Quick
+        result.readAloudEnabled shouldBe true
     }
 
     @Test
-    fun `leaving before the cards load still records the setup's source type`() = runTest {
-        val coordinator = startCoordinator(setup.copy(sourceType = Custom), runsLoad = false)
+    fun `leaving before the cards load still records the setup's source type and read-aloud setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Custom, readAloudEnabled = false), runsLoad = false)
 
         coordinator.end(abandoned = true)
         runCurrent()
 
         val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
         result.sourceType shouldBe Custom
+        result.readAloudEnabled shouldBe false
     }
 
     @Test

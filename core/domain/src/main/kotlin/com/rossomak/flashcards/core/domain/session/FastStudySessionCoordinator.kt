@@ -218,6 +218,7 @@ class FastStudySessionCoordinator @Inject constructor(
                 studyDate = "",
                 studyDateUtcOffsetMinutes = timekeeper.utcOffsetMinutes,
                 dailyGoalMinutes = 0,
+                readAloudEnabled = setup.readAloudEnabled,
             )
         }
         eventChannel.trySend(FastSessionEvent.SessionEnded(result))
