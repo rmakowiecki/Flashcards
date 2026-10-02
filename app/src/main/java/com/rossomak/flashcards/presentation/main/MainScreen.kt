@@ -134,6 +134,7 @@ fun MainScreen(
     onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
+    onNavigateToDebugTool: (route: Any) -> Unit,
 ) {
     val tabs = mainTabs()
     val tabNavController = rememberNavController()
@@ -213,6 +214,7 @@ fun MainScreen(
             debugNavGraphEntries(
                 navController = tabNavController,
                 onNavigateToOnboarding = onNavigateToOnboarding,
+                onNavigateToDebugTool = onNavigateToDebugTool,
             )
         }
     }

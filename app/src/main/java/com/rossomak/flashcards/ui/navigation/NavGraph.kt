@@ -34,6 +34,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionScreen
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionScreen
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScreen
 import com.rossomak.flashcards.presentation.main.MainScreen
+import com.rossomak.flashcards.presentation.main.debugFullScreenDestinations
 import com.rossomak.flashcards.presentation.splash.SplashScreen
 import com.rossomak.flashcards.ui.permission.PermissionLauncherHost
 import kotlinx.serialization.Serializable
@@ -308,8 +309,11 @@ fun FlashcardsNavGraph(
                         onNavigateToSubcategoryDetails = navController::navigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = navController::navigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = navController::navigateToPreviewQuickSession,
+                        onNavigateToDebugTool = { route -> navController.navigate(route) },
                     )
                 }
+                // Debug tools that need the whole screen, without the bottom bar; empty in release.
+                debugFullScreenDestinations(navController)
                 composable<CategoryDetailsRoute> {
                     CategoryDetailsScreen(
                         onNavigateBack = { navController.popBackStack() },

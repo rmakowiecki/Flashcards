@@ -10,6 +10,8 @@
     <string name="debug_replay_onboarding_message">Clears the flag and runs the real flow</string>
     <string name="debug_showcase_label">UI component showcase</string>
     <string name="debug_showcase_message">Browse the design system in Showkase</string>
+    <string name="debug_network_graph_prototype_label">Network graph prototype</string>
+    <string name="debug_network_graph_prototype_message">PROTOTYPE — animated network graph canvas background, OnSurface/OnGradient</string>
     <string name="debug_voice_harness_back_cd">Back to debug tools</string>
     <string name="debug_build_info_label">%1$s (%2$d) · %3$s</string>
 

@@ -12,11 +12,13 @@ import androidx.navigation.compose.navigation
 import com.rossomak.flashcards.BuildConfig
 import com.rossomak.flashcards.feature.debug.BuildInfo
 import com.rossomak.flashcards.feature.debug.DebugGraph
+import com.rossomak.flashcards.feature.debug.DebugNetworkGraphRoot
 import com.rossomak.flashcards.feature.debug.DebugRoot
 import com.rossomak.flashcards.feature.debug.DebugScreen
 import com.rossomak.flashcards.feature.debug.DebugVoiceIndicatorRoot
 import com.rossomak.flashcards.feature.debug.DebugVoiceRoot
 import com.rossomak.flashcards.feature.debug.R as DebugR
+import com.rossomak.flashcards.feature.debug.networkgraph.NetworkGraphPrototypeScreen
 import com.rossomak.flashcards.feature.debug.voice.VoiceDebugScreen
 import com.rossomak.flashcards.feature.debug.voiceindicator.VoiceIndicatorDebugScreen
 
@@ -45,6 +47,7 @@ internal fun debugTabs(): List<TabItem> = listOf(
 internal fun NavGraphBuilder.debugNavGraphEntries(
     navController: NavHostController,
     onNavigateToOnboarding: () -> Unit,
+    onNavigateToDebugTool: (route: Any) -> Unit,
 ) {
     navigation<DebugGraph>(startDestination = DebugRoot) {
         composable<DebugRoot> {
@@ -57,6 +60,7 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 onNavigateToOnboarding = onNavigateToOnboarding,
                 onNavigateToVoiceDebug = { navController.navigate(DebugVoiceRoot) },
                 onNavigateToVoiceIndicatorDebug = { navController.navigate(DebugVoiceIndicatorRoot) },
+                onNavigateToNetworkGraphPrototype = { onNavigateToDebugTool(DebugNetworkGraphRoot) },
             )
         }
         composable<DebugVoiceRoot> {
@@ -65,5 +69,16 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
         composable<DebugVoiceIndicatorRoot> {
             VoiceIndicatorDebugScreen(onNavigateBack = { navController.popBackStack() })
         }
+    }
+}
+
+/**
+ * Debug tools that want the whole screen rather than a tab's content area, registered on the app's
+ * outer graph so they render without the bottom bar. [DebugScreen] reaches them through
+ * `onNavigateToDebugTool`, which is how the route symbols stay inside the debug source set.
+ */
+internal fun NavGraphBuilder.debugFullScreenDestinations(navController: NavHostController) {
+    composable<DebugNetworkGraphRoot> {
+        NetworkGraphPrototypeScreen(onNavigateBack = { navController.popBackStack() })
     }
 }
