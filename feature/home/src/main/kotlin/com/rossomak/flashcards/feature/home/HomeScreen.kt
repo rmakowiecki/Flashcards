@@ -45,6 +45,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
 
 @Composable
 fun HomeScreen(
@@ -56,14 +59,14 @@ fun HomeScreen(
     Column(modifier = modifier.fillMaxSize()) {
         HomeTopBar()
         UserGreetingSection(userName = "Ross")
-        if (state.favoriteItems.isNotEmpty()) {
-            FavoritesCarousel(
-                items = state.favoriteItems,
+        when (val favorites = state.favorites) {
+            Loading -> Unit
+            Empty -> HomeEmptyState(modifier = Modifier.weight(1f))
+            is Content -> FavoritesCarousel(
+                items = favorites.items,
                 progressSummary = state.progressSummary,
                 isProgressResolved = state.isProgressResolved,
             )
-        } else {
-            HomeEmptyState(modifier = Modifier.weight(1f))
         }
     }
 }

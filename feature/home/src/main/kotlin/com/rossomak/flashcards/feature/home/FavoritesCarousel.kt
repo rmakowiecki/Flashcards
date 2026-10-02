@@ -51,7 +51,8 @@ private val NoOpClick: () -> Unit = {}
  * resolved here, per item, so a progress change recomposes only the cards whose own
  * [com.rossomak.flashcards.core.domain.model.SubcategoryProgressState] changed.
  *
- * @param listState hoisted so the scroll position can survive leaving and returning to Home.
+ * @param listState the row's scroll state. The default is saveable, so the position survives tab
+ * switches and process death.
  */
 @Composable
 internal fun FavoritesCarousel(
