@@ -13,7 +13,15 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, afterEach, before, describe, it } from "node:test";
 import * as admin from "firebase-admin";
-import { requireOwnerMatchesCaller, submitStudySession, validateSubmitStudySessionRequest } from "./submitStudySession";
+import {
+  MAX_RECENT_ENTRIES,
+  RecentEntry,
+  ValidatedSubmitStudySessionRequest,
+  nextRecentEntries,
+  requireOwnerMatchesCaller,
+  submitStudySession,
+  validateSubmitStudySessionRequest,
+} from "./submitStudySession";
 import { loadXpConfig, xpConfigDocRef } from "./xpConfig";
 import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 
@@ -54,6 +62,7 @@ const DEFAULT_DAILY_GOAL_MINUTES = 999999;
 const DEFAULT_STREAK_BONUS = 250; // 1 * DEFAULT_XP_CONFIG.streakPerDay
 const MAX_UTC_OFFSET_MINUTES = 14 * 60;
 const DEFAULT_OWNER_UID = "owner-uid";
+const MINUTE_MILLIS = 60_000;
 const INVALID_SOURCE_TYPE_MESSAGE = /sourceType must be SingleSubcategory, Quick or Custom/;
 
 function rawRatedRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -259,6 +268,82 @@ describe("requireOwnerMatchesCaller", () => {
   it("rejects a session owned by another User as unauthenticated", () => {
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
     assert.throws(() => requireOwnerMatchesCaller("other-uid", request), { code: "unauthenticated" });
+  });
+});
+
+describe("nextRecentEntries", () => {
+  const MAX_ENTRIES = 3;
+
+  function recentEntry(sessionId: string, startedAtMinute: number): RecentEntry {
+    return {
+      sessionId,
+      startTimestamp: admin.firestore.Timestamp.fromMillis(DEFAULT_STARTED_AT_EPOCH_MILLIS + startedAtMinute * MINUTE_MILLIS),
+      durationSeconds: 60,
+      studyMode: "Rated",
+      voiceAnswering: false,
+      sourceType: "SingleSubcategory",
+      categoryId: "cat-1",
+      subcategoryIds: ["sub-1"],
+      cardCount: 1,
+      xpTotal: 100,
+    };
+  }
+
+  function entriesOf(...entries: RecentEntry[]): Record<string, RecentEntry> {
+    return Object.fromEntries(entries.map((entry) => [entry.sessionId, entry]));
+  }
+
+  it("adds a new session's entry", () => {
+    const existing = entriesOf(recentEntry("a", 1));
+    const added = recentEntry("b", 2);
+
+    assert.deepEqual(nextRecentEntries(existing, added, MAX_ENTRIES), entriesOf(recentEntry("a", 1), added));
+  });
+
+  it("returns null for a session already present, whatever the new entry holds", () => {
+    const existing = entriesOf(recentEntry("a", 1));
+
+    assert.equal(nextRecentEntries(existing, { ...recentEntry("a", 5), xpTotal: 999 }, MAX_ENTRIES), null);
+  });
+
+  it("evicts the entry with the oldest startTimestamp once over the limit", () => {
+    const existing = entriesOf(recentEntry("a", 1), recentEntry("b", 2), recentEntry("c", 3));
+
+    assert.deepEqual(
+      nextRecentEntries(existing, recentEntry("d", 4), MAX_ENTRIES),
+      entriesOf(recentEntry("b", 2), recentEntry("c", 3), recentEntry("d", 4)),
+    );
+  });
+
+  it("orders by startTimestamp, not submission order: a late session in the middle is kept", () => {
+    const existing = entriesOf(recentEntry("a", 1), recentEntry("c", 3), recentEntry("d", 4));
+
+    assert.deepEqual(
+      nextRecentEntries(existing, recentEntry("b", 2), MAX_ENTRIES),
+      entriesOf(recentEntry("b", 2), recentEntry("c", 3), recentEntry("d", 4)),
+    );
+  });
+
+  it("returns null for a late session older than every kept entry, since it is evicted straight away", () => {
+    const existing = entriesOf(recentEntry("b", 2), recentEntry("c", 3), recentEntry("d", 4));
+
+    assert.equal(nextRecentEntries(existing, recentEntry("a", 1), MAX_ENTRIES), null);
+  });
+
+  it("breaks a startTimestamp tie by evicting the lower sessionId", () => {
+    const withLowerIdOldest = entriesOf(recentEntry("a", 1), recentEntry("c", 2), recentEntry("d", 3));
+    const withHigherIdOldest = entriesOf(recentEntry("b", 1), recentEntry("c", 2), recentEntry("d", 3));
+
+    assert.deepEqual(nextRecentEntries(withLowerIdOldest, recentEntry("b", 1), MAX_ENTRIES), withHigherIdOldest);
+    assert.equal(nextRecentEntries(withHigherIdOldest, recentEntry("a", 1), MAX_ENTRIES), null);
+  });
+
+  it("evicts an entry with a missing or malformed startTimestamp first", () => {
+    const missing = { ...recentEntry("x", 9), startTimestamp: undefined } as unknown as RecentEntry;
+    const malformed = { ...recentEntry("y", 9), startTimestamp: "2026-09-01" } as unknown as RecentEntry;
+    const existing = { ...entriesOf(recentEntry("b", 2)), x: missing, y: malformed };
+
+    assert.deepEqual(nextRecentEntries(existing, recentEntry("a", 1), 2), entriesOf(recentEntry("a", 1), recentEntry("b", 2)));
   });
 });
 
@@ -528,6 +613,197 @@ describe("submitStudySession", () => {
     // type, not just this assertion, is what closes the original finding.
     assert.equal("studyDate" in request, false);
     assert.equal(result.breakdown.streakBonus, DEFAULT_STREAK_BONUS, "still a fresh account's first-ever submission");
+  });
+});
+
+describe("submitStudySession — recents/state", () => {
+
+  function recentsStateDoc(uid: string): Promise<FirebaseFirestore.DocumentSnapshot> {
+    return admin.firestore().doc(`users/${uid}/recents/state`).get();
+  }
+
+  /** Submits a Rated session started [startedAtMinute] minutes after the default start, and returns its id. */
+  async function submitRatedSessionAt(uid: string, startedAtMinute: number): Promise<string> {
+    const request = validateSubmitStudySessionRequest(
+      rawRatedRequest({ startedAtEpochMillis: DEFAULT_STARTED_AT_EPOCH_MILLIS + startedAtMinute * MINUTE_MILLIS }),
+    );
+    await submitStudySession(uid, request);
+    return request.sessionId;
+  }
+
+  /** Submits [MAX_RECENT_ENTRIES] sessions one minute apart, starting at minute 10, and returns their ids oldest first. */
+  async function fillRecents(uid: string): Promise<string[]> {
+    const sessionIds: string[] = [];
+    for (let index = 0; index < MAX_RECENT_ENTRIES; index++) {
+      sessionIds.push(await submitRatedSessionAt(uid, 10 + index));
+    }
+    return sessionIds;
+  }
+
+  it("a User's first session creates recents/state holding exactly that session's entry", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(
+      rawRatedRequest({
+        sourceType: "Quick",
+        voiceAnswering: true,
+        subcategoryIds: ["sub-1", "sub-2"],
+        subcategoryNames: ["Subcategory One", "Subcategory Two"],
+        cardResults: [
+          { cardId: "card-1", subcategoryId: "sub-1", state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false },
+          { cardId: "card-2", subcategoryId: "sub-2", state: "Partial", attemptsUsed: 3, wasPreviouslyMastered: false },
+        ],
+      }),
+    );
+
+    const result = await submitStudySession(uid, request);
+
+    const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get();
+    const entries = (await recentsStateDoc(uid)).data()?.entries;
+    assert.deepEqual(Object.keys(entries), [request.sessionId]);
+    const { startTimestamp, ...entryWithoutStart } = entries[request.sessionId];
+    assert.ok(startTimestamp instanceof admin.firestore.Timestamp, "startTimestamp is stored as a Firestore Timestamp");
+    assert.ok(startTimestamp.isEqual(sessionDoc.data()?.startTimestamp), "the same start as the session document");
+    assert.deepEqual(entryWithoutStart, {
+      sessionId: request.sessionId,
+      durationSeconds: 60,
+      studyMode: "Rated",
+      voiceAnswering: true,
+      sourceType: "Quick",
+      categoryId: "cat-1",
+      subcategoryIds: ["sub-1", "sub-2"],
+      cardCount: sessionDoc.data()?.cardCount,
+      xpTotal: result.breakdown.xpTotal,
+    });
+    assert.equal(entryWithoutStart.cardCount, 2);
+  });
+
+  it("each new session adds one entry, and a negative xpTotal is stored as is", async () => {
+    const uid = randomUUID();
+    const firstSessionId = await submitRatedSessionAt(uid, 0);
+    // card-1 is Mastered after the first session; failing it now de-masters it. Abandoned, under a
+    // minute and on the same day, nothing else earns XP, so the session's total is the penalty alone.
+    const request = validateSubmitStudySessionRequest(
+      rawRatedRequest({
+        startedAtEpochMillis: DEFAULT_STARTED_AT_EPOCH_MILLIS + MINUTE_MILLIS,
+        durationSeconds: 0,
+        abandoned: true,
+        cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Failed", attemptsUsed: 3, wasPreviouslyMastered: true }],
+      }),
+    );
+
+    const result = await submitStudySession(uid, request);
+
+    const entries = (await recentsStateDoc(uid)).data()?.entries;
+    assert.deepEqual(Object.keys(entries).sort(), [firstSessionId, request.sessionId].sort());
+    assert.equal(result.breakdown.xpTotal, DEFAULT_XP_CONFIG.cardDemastered);
+    assert.equal(entries[request.sessionId].xpTotal, DEFAULT_XP_CONFIG.cardDemastered);
+  });
+
+  it("a Rated session stores sourceType and voiceAnswering on its session document and its entry, never readAloud", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest({ sourceType: "Custom", voiceAnswering: true }));
+
+    await submitStudySession(uid, request);
+
+    const sessionData = (await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get()).data() ?? {};
+    const entry = (await recentsStateDoc(uid)).data()?.entries?.[request.sessionId];
+    for (const stored of [sessionData, entry]) {
+      assert.equal(stored.sourceType, "Custom");
+      assert.equal(stored.voiceAnswering, true);
+      assert.equal("readAloud" in stored, false);
+    }
+  });
+
+  it("a Fast session stores sourceType and readAloud on its session document and its entry, never voiceAnswering", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawFastRequest({ sourceType: "Quick", readAloud: true }));
+
+    await submitStudySession(uid, request);
+
+    const sessionData = (await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get()).data() ?? {};
+    const entry = (await recentsStateDoc(uid)).data()?.entries?.[request.sessionId];
+    for (const stored of [sessionData, entry]) {
+      assert.equal(stored.sourceType, "Quick");
+      assert.equal(stored.readAloud, true);
+      assert.equal("voiceAnswering" in stored, false);
+    }
+    assert.equal(entry.studyMode, "Fast");
+  });
+
+  it("a retried submission leaves recents/state untouched", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+    await submitStudySession(uid, request);
+    const before = await recentsStateDoc(uid);
+
+    await submitStudySession(uid, request);
+
+    const after = await recentsStateDoc(uid);
+    assert.ok(after.updateTime?.isEqual(before.updateTime!), "the document must not be rewritten");
+    assert.deepEqual(after.data(), before.data());
+  });
+
+  it("two concurrent submissions of the same session produce exactly one entry", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    await Promise.all([submitStudySession(uid, request), submitStudySession(uid, request)]);
+
+    assert.deepEqual(Object.keys((await recentsStateDoc(uid)).data()?.entries), [request.sessionId]);
+  });
+
+  it(`the ${MAX_RECENT_ENTRIES + 1}th session evicts the oldest by startTimestamp`, async () => {
+    const uid = randomUUID();
+    const [oldestSessionId, ...keptSessionIds] = await fillRecents(uid);
+
+    const newestSessionId = await submitRatedSessionAt(uid, 100);
+
+    const entries = (await recentsStateDoc(uid)).data()?.entries;
+    assert.deepEqual(Object.keys(entries).sort(), [...keptSessionIds, newestSessionId].sort());
+    assert.equal(oldestSessionId in entries, false);
+  });
+
+  it(`a late-delivered session older than all ${MAX_RECENT_ENTRIES} entries is recorded but leaves recents/state unchanged`, async () => {
+    const uid = randomUUID();
+    await fillRecents(uid);
+    const before = await recentsStateDoc(uid);
+
+    const lateSessionId = await submitRatedSessionAt(uid, 0);
+
+    const after = await recentsStateDoc(uid);
+    assert.ok((await admin.firestore().doc(`users/${uid}/sessions/${lateSessionId}`).get()).exists, "the session itself is still recorded");
+    assert.ok(after.updateTime?.isEqual(before.updateTime!), "the document must not be rewritten");
+    assert.deepEqual(after.data(), before.data());
+  });
+
+  it("a late-delivered session in the middle is kept and the oldest evicted", async () => {
+    const uid = randomUUID();
+    const [oldestSessionId, ...keptSessionIds] = await fillRecents(uid);
+
+    // Starts between the 2nd and 3rd oldest sessions (minutes 11 and 12).
+    const lateSessionId = await submitRatedSessionAt(uid, 11.5);
+
+    const entries = (await recentsStateDoc(uid)).data()?.entries;
+    assert.deepEqual(Object.keys(entries).sort(), [...keptSessionIds, lateSessionId].sort());
+    assert.equal(oldestSessionId in entries, false);
+  });
+
+  /** The same three steps, in the same order, as the `submitStudySession` `onCall` handler in index.ts. */
+  async function submitAsCaller(callerUid: string, rawRequest: Record<string, unknown>): Promise<void> {
+    const request: ValidatedSubmitStudySessionRequest = validateSubmitStudySessionRequest(rawRequest);
+    requireOwnerMatchesCaller(callerUid, request);
+    await submitStudySession(callerUid, request);
+  }
+
+  it("a rejected submission writes no recents/state, while an accepted one by the same caller does", async () => {
+    const callerUid = randomUUID();
+
+    await assert.rejects(submitAsCaller(callerUid, rawRatedRequest({ ownerUid: callerUid, sourceType: "Bogus" })), { code: "invalid-argument" });
+    await assert.rejects(submitAsCaller(callerUid, rawRatedRequest({ ownerUid: "other-uid" })), { code: "unauthenticated" });
+    assert.equal((await recentsStateDoc(callerUid)).exists, false);
+
+    await submitAsCaller(callerUid, rawRatedRequest({ ownerUid: callerUid }));
+    assert.equal((await recentsStateDoc(callerUid)).exists, true);
   });
 });
 
