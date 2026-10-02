@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.browse
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -524,8 +523,7 @@ private fun ScrollableSectionColumn(content: @Composable () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(vertical = MaterialTheme.spacing.xsmall),
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+            .padding(bottom = MaterialTheme.spacing.xsmall),
     ) {
         content()
     }

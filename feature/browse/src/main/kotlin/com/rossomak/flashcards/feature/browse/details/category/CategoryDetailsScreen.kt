@@ -325,7 +325,7 @@ private fun CategoryDetailsOverline(isSelectionMode: Boolean, selectedCount: Int
             subcategoryCount,
         )
     }
-    FlashcardsOverlineLabel(text = text)
+    FlashcardsOverlineLabel(text = text, isHeading = false)
 }
 
 /**

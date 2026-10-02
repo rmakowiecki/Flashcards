@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -65,10 +64,7 @@ internal fun FavoritesCarousel(
     listState: LazyListState = rememberLazyListState(),
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        FlashcardsOverlineLabel(
-            text = stringResource(R.string.favorites_section_title),
-            modifier = Modifier.padding(bottom = MaterialTheme.spacing.small),
-        )
+        FlashcardsOverlineLabel(text = stringResource(R.string.favorites_section_title))
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             state = listState,

@@ -21,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsStepper
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
@@ -76,7 +75,11 @@ internal fun DailyGoalStep(
 @Composable
 private fun StreakExampleCard(modifier: Modifier = Modifier) {
     OnboardingCard(modifier = modifier) {
-        FlashcardsOverlineLabel(text = stringResource(R.string.daily_goal_example_label))
+        Text(
+            text = stringResource(R.string.daily_goal_example_label).uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
             text = stringResource(R.string.daily_goal_streak_label).uppercase(),
             style = MaterialTheme.typography.labelSmall,

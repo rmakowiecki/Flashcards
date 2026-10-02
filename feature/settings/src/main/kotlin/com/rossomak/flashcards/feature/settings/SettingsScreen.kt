@@ -152,19 +152,19 @@ private fun SettingsContent(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(
-                    horizontal = MaterialTheme.spacing.normal,
-                    vertical = MaterialTheme.spacing.small,
-                ),
+                .padding(bottom = MaterialTheme.spacing.small),
         ) {
             FlashcardsOverlineLabel(text = stringResource(R.string.settings_study_sessions_label))
-            FlashcardsListGroup(items = studySessionRows(state, onDialogEvent))
-
-            FlashcardsOverlineLabel(
-                text = stringResource(R.string.settings_voice_label),
-                modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
+            FlashcardsListGroup(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+                items = studySessionRows(state, onDialogEvent),
             )
-            FlashcardsListGroup(items = voiceRows(state, onDialogEvent))
+
+            FlashcardsOverlineLabel(text = stringResource(R.string.settings_voice_label))
+            FlashcardsListGroup(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+                items = voiceRows(state, onDialogEvent),
+            )
         }
     }
 }
