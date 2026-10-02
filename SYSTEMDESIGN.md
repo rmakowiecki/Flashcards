@@ -25,7 +25,7 @@ Root NavHost
     │       └── SettingsRoot
     ├── CategoryDetails(categoryId, categoryName)                    ← full-screen, no bottom nav; shared by Home + Study
     ├── SubcategoryDetails(categoryId, categoryName, subcategoryId, subcategoryName)  ← full-screen, no bottom nav; shared by Home + Study
-    ├── PreviewStudySession(categoryId, categoryName, subcategoryIds, subcategoryNames, filterTagIds, isQuickSession)
+    ├── PreviewStudySession(categoryId, categoryName, subcategoryIds, subcategoryNames, filterTagIds, isQuickSession)  ← subcategoryIds/subcategoryNames may be empty for a Quick Session; Preview then resolves the pool (ADR-0056)
     ├── RatedStudySession(categoryId, sessionTitle, subcategoryIds, cardIds, voiceAnsweringEnabled, attemptsPerCard, partialEndsCard)
     ├── FastStudySession(categoryId, sessionTitle, subcategoryIds, cardIds, readAloudEnabled, speechRate, voiceId)
     ├── StudySessionSummary(sessionId, result)  ← mandatory fresh-session egress for both Study Modes, natural end or premature exit; never used to view a past session (a future past-session detail view is a separate screen/route)
@@ -56,9 +56,9 @@ Home empty state CTA ("Start your first session") triggers a tab switch to Study
 - **Recents** carousel — past Study Sessions, read `users/{uid}/sessions orderBy(startTimestamp, DESCENDING) limit(n)`, two card variants (**designed, not yet built**: no `sessions` write, no query, no carousel code exists in `feature/home` today — see Session Termination):
   - *Single-subcategory*: shows Subcategory + Category name; taps into Subcategory Details
   - *Composite*: shows Category name only; taps into Category Details
-- **Favorites** carousel — bookmarked Subcategories; each card shows Subcategory + Category name; taps into Subcategory Details
+- **Favorites** carousel — bookmarked Categories and Subcategories in one snapping row, most recently favorited first. A Category card shows the Category name; its body taps into Category Details and its Quick session button opens Preview as a Quick Session in that Category. A Subcategory card shows Subcategory + Category name and the User's Studied progress in it; its body taps into Subcategory Details and its play button opens Preview for that single Subcategory. The body browses, the button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md))
 - Sections with no content are hidden individually
-- Empty state (both carousels empty): illustration + "Start your first session" CTA → navigates to Study tab
+- Empty state (no Favorites): illustration + "Start your first session" CTA → navigates to Study tab
 
 ## Study Screen
 
@@ -98,7 +98,7 @@ Home empty state CTA ("Start your first session") triggers a tab switch to Study
 
 ## Preview Study Session Screen
 
-Full-screen modal that precedes every Study Session. Receives `categoryId`, `categoryName`, `subcategoryIds`, `subcategoryNames`, `filterTagIds: List<String>` (empty by default), and `isQuickSession: Boolean` (false by default). A read-only hero shows session scope: card count, estimated duration, and topic count (multi-topic sessions only). Below it, a **plain column** (not yet the sheet chrome below) presents each adjustable setting as a summary row — each shows its current value and opens a focused `FlashcardsDialog`-based dialog. Rows and visibility, as actually built:
+Full-screen modal that precedes every Study Session. Receives `categoryId`, `categoryName`, `subcategoryIds`, `subcategoryNames`, `filterTagIds: List<String>` (empty by default), and `isQuickSession: Boolean` (false by default). `subcategoryIds`/`subcategoryNames` may be empty only for a Quick Session, in which case Preview fetches the Category's Subcategories itself and samples from them ([ADR-0056](docs/adr/0056-preview-resolves-quick-session-candidate-pool.md)). Entry points: Category Details and Subcategory Details, and Home's Favorite cards — the Category card's Quick session button sends a Quick route with empty Subcategory lists, the Subcategory card's play button a single-Subcategory route. A read-only hero shows session scope: card count, estimated duration, and topic count (multi-topic sessions only). Below it, a **plain column** (not yet the sheet chrome below) presents each adjustable setting as a summary row — each shows its current value and opens a focused `FlashcardsDialog`-based dialog. Rows and visibility, as actually built:
 
 - **Mode** — Rated | Fast (default Rated). Always shown.
 - **Voice answering** — On | Off. Rated sessions only.
@@ -119,7 +119,7 @@ This is the only place Study Mode (and, up front, Voice answering) is chosen for
 4. Apply scoring and selection (MVP: random shuffle; target: performance-weighted sort → pick top N — see "Flashcard Selection Algorithm" below for the scoring formula)
 5. Pass resolved `cardIds` to the chosen session route (`FastStudySession`/`RatedStudySession`); presentation order within the session is then set independently by the Preview screen's Sort row (Default/Easiest/Hardest), not by this selection step
 
-`filterTagIds` is only ever non-empty for single-subcategory sessions launched from Subcategory Details. All other entry points (Quick Session, fast-start, Custom) pass `filterTagIds = emptyList()`.
+`filterTagIds` is only ever non-empty for single-subcategory sessions launched from Subcategory Details. All other entry points (Quick Session, fast-start, Custom, Home's Favorite cards) pass `filterTagIds = emptyList()`.
 
 ## Study Session Flow
 

@@ -59,5 +59,5 @@ persistent state.
 
 - New `core:ui` primitives: `NavigationEvent` marker + `ObserveAsEvents` composable, reused by every feature.
 - `docs/navigation-pattern.md` rewritten to this pattern; `AGENTS.md` §Async navigation bullet updated to match.
-- Screens whose navigation is a direct callback from a click handler (Home, CategoryDetails) are unaffected —
-  they never held navigation in ViewModel state.
+- Every screen that navigates from a ViewModel handler (Home and CategoryDetails included) follows this
+  pattern; none holds navigation in ViewModel state.
