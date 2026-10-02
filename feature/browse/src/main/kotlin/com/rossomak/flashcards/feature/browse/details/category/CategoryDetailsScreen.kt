@@ -88,7 +88,12 @@ fun CategoryDetailsScreen(
     modifier: Modifier = Modifier,
     viewModel: CategoryDetailsViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
+    onNavigateToSubcategoryDetails: (
+        categoryId: String,
+        categoryName: String,
+        subcategoryId: String,
+        subcategoryName: String,
+    ) -> Unit,
     onNavigateToPreviewStudySession: (categoryId: String, categoryName: String, subcategoryId: String, subcategoryName: String) -> Unit,
     onNavigateToPreviewStudySessionForCategory: (
         categoryId: String,

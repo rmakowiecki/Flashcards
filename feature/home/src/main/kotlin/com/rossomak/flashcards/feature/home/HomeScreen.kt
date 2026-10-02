@@ -84,30 +84,32 @@ fun HomeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     observeAsEvents(viewModel.events) { destination ->
-        when (destination) {
-            is CategoryDetails -> onNavigateToCategoryDetails(
-                destination.categoryId,
-                destination.categoryName,
-            )
+        with(destination) {
+            when (this) {
+                is CategoryDetails -> onNavigateToCategoryDetails(
+                    categoryId,
+                    categoryName,
+                )
 
-            is SubcategoryDetails -> onNavigateToSubcategoryDetails(
-                destination.categoryId,
-                destination.categoryName,
-                destination.subcategoryId,
-                destination.subcategoryName,
-            )
+                is SubcategoryDetails -> onNavigateToSubcategoryDetails(
+                    categoryId,
+                    categoryName,
+                    subcategoryId,
+                    subcategoryName,
+                )
 
-            is SubcategoryPreviewStudySession -> onNavigateToPreviewStudySession(
-                destination.categoryId,
-                destination.categoryName,
-                destination.subcategoryId,
-                destination.subcategoryName,
-            )
+                is SubcategoryPreviewStudySession -> onNavigateToPreviewStudySession(
+                    categoryId,
+                    categoryName,
+                    subcategoryId,
+                    subcategoryName,
+                )
 
-            is QuickSessionPreviewStudySession -> onNavigateToPreviewQuickSession(
-                destination.categoryId,
-                destination.categoryName,
-            )
+                is QuickSessionPreviewStudySession -> onNavigateToPreviewQuickSession(
+                    categoryId,
+                    categoryName,
+                )
+            }
         }
     }
 

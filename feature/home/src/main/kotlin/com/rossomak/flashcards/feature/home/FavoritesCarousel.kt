@@ -79,21 +79,25 @@ internal fun FavoritesCarousel(
             ) { item ->
                 val cardModifier = Modifier.animateItem()
                 when (item) {
-                    is FavoriteCategory -> FavoriteCategoryCard(
-                        category = item.category,
-                        parallaxOffsetPx = rememberParallaxOffsetPx(listState, item.carouselKey()),
-                        onClick = { onCategoryClick(item.category) },
-                        onQuickSessionClick = { onCategoryQuickSessionClick(item.category) },
-                        modifier = cardModifier,
-                    )
-                    is FavoriteSubcategory -> FavoriteSubcategoryCard(
-                        subcategory = item.subcategory,
-                        parentCategory = item.parentCategory,
-                        progress = progressSummary.subcategoryProgressFor(item.subcategory.id, isProgressResolved),
-                        onClick = { onSubcategoryClick(item.subcategory) },
-                        onPlayClick = { onSubcategoryPlayClick(item.subcategory) },
-                        modifier = cardModifier,
-                    )
+                    is FavoriteCategory -> with(item) {
+                        FavoriteCategoryCard(
+                            category = category,
+                            parallaxOffsetPx = rememberParallaxOffsetPx(listState, carouselKey()),
+                            onClick = { onCategoryClick(category) },
+                            onQuickSessionClick = { onCategoryQuickSessionClick(category) },
+                            modifier = cardModifier,
+                        )
+                    }
+                    is FavoriteSubcategory -> with(item) {
+                        FavoriteSubcategoryCard(
+                            subcategory = subcategory,
+                            parentCategory = parentCategory,
+                            progress = progressSummary.subcategoryProgressFor(subcategory.id, isProgressResolved),
+                            onClick = { onSubcategoryClick(subcategory) },
+                            onPlayClick = { onSubcategoryPlayClick(subcategory) },
+                            modifier = cardModifier,
+                        )
+                    }
                 }
             }
         }

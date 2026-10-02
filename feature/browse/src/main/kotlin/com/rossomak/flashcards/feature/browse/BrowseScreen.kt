@@ -73,9 +73,19 @@ import kotlinx.coroutines.launch
 fun BrowseScreen(
     modifier: Modifier = Modifier,
     viewModel: BrowseViewModel = hiltViewModel(),
-    onNavigateToCategoryDetails: (String, String) -> Unit,
-    onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
-    onNavigateToPreviewStudySession: (String, String, String, String) -> Unit,
+    onNavigateToCategoryDetails: (categoryId: String, categoryName: String) -> Unit,
+    onNavigateToSubcategoryDetails: (
+        categoryId: String,
+        categoryName: String,
+        subcategoryId: String,
+        subcategoryName: String,
+    ) -> Unit,
+    onNavigateToPreviewStudySession: (
+        categoryId: String,
+        categoryName: String,
+        subcategoryId: String,
+        subcategoryName: String,
+    ) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
