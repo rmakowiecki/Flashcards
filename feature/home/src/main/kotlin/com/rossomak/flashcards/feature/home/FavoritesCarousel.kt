@@ -36,9 +36,6 @@ import java.time.Instant
 /** How far the watermark drifts, as a share of the card width, when its card is one card-step from the snap position. */
 private const val PARALLAX_FACTOR = 0.3f
 
-/** Taps do nothing until Favorites navigation is wired; one shared instance keeps every card's callbacks stable. */
-private val NoOpClick: () -> Unit = {}
-
 /**
  * The Favorites section: a heading over a snapping row of [FavoriteItem] cards, most recently
  * favorited first.
@@ -48,6 +45,10 @@ private val NoOpClick: () -> Unit = {}
  * resolved here, per item, so a progress change recomposes only the cards whose own
  * [com.rossomak.flashcards.core.domain.model.SubcategoryProgressState] changed.
  *
+ * @param onCategoryClick the Category card's body was tapped.
+ * @param onCategoryQuickSessionClick the Category card's Quick session button was tapped.
+ * @param onSubcategoryClick the Subcategory card's body was tapped.
+ * @param onSubcategoryPlayClick the Subcategory card's play button was tapped.
  * @param listState the row's scroll state. The default is saveable, so the position survives tab
  * switches and process death.
  */
@@ -56,6 +57,10 @@ internal fun FavoritesCarousel(
     items: List<FavoriteItem>,
     progressSummary: ProgressSummary?,
     isProgressResolved: Boolean,
+    onCategoryClick: (Category) -> Unit,
+    onCategoryQuickSessionClick: (Category) -> Unit,
+    onSubcategoryClick: (Subcategory) -> Unit,
+    onSubcategoryPlayClick: (Subcategory) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
@@ -81,16 +86,16 @@ internal fun FavoritesCarousel(
                     is FavoriteCategory -> FavoriteCategoryCard(
                         category = item.category,
                         parallaxOffsetPx = rememberParallaxOffsetPx(listState, item.carouselKey()),
-                        onClick = NoOpClick,
-                        onQuickSessionClick = NoOpClick,
+                        onClick = { onCategoryClick(item.category) },
+                        onQuickSessionClick = { onCategoryQuickSessionClick(item.category) },
                         modifier = cardModifier,
                     )
                     is FavoriteSubcategory -> FavoriteSubcategoryCard(
                         subcategory = item.subcategory,
                         parentCategory = item.parentCategory,
                         progress = progressSummary.subcategoryProgressFor(item.subcategory.id, isProgressResolved),
-                        onClick = NoOpClick,
-                        onPlayClick = NoOpClick,
+                        onClick = { onSubcategoryClick(item.subcategory) },
+                        onPlayClick = { onSubcategoryPlayClick(item.subcategory) },
                         modifier = cardModifier,
                     )
                 }
@@ -165,6 +170,10 @@ private fun FavoritesCarouselPreview() {
                 subcategories = mapOf(subcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
             ),
             isProgressResolved = true,
+            onCategoryClick = {},
+            onCategoryQuickSessionClick = {},
+            onSubcategoryClick = {},
+            onSubcategoryPlayClick = {},
         )
     }
 }

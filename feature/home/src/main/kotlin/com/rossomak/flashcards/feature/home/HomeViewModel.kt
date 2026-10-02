@@ -3,6 +3,8 @@ package com.rossomak.flashcards.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
@@ -10,10 +12,12 @@ import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -26,9 +30,56 @@ class HomeViewModel @Inject constructor(
     private val _state = MutableStateFlow(HomeScreenState())
     val state: StateFlow<HomeScreenState> = _state.asStateFlow()
 
+    private val eventChannel = Channel<HomeDestination>(Channel.BUFFERED)
+    val events = eventChannel.receiveAsFlow()
+
     init {
         collectFavoriteItems()
         collectProgressSummary()
+    }
+
+    /** The card body browses: it opens Category Details and starts nothing (ADR-0041). */
+    fun onFavoriteCategorySelect(category: Category) {
+        viewModelScope.launch {
+            eventChannel.send(HomeDestination.CategoryDetails(categoryId = category.id, categoryName = category.name))
+        }
+    }
+
+    /** The card body browses: it opens Subcategory Details and starts nothing (ADR-0041). */
+    fun onFavoriteSubcategorySelect(subcategory: Subcategory) {
+        viewModelScope.launch {
+            eventChannel.send(
+                HomeDestination.SubcategoryDetails(
+                    categoryId = subcategory.categoryId,
+                    categoryName = subcategory.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            )
+        }
+    }
+
+    /** Sends only the Category: Preview samples the Subcategories itself, so Home loads none (ADR-0056). */
+    fun onFavoriteCategoryQuickSessionStart(category: Category) {
+        viewModelScope.launch {
+            eventChannel.send(
+                HomeDestination.QuickSessionPreviewStudySession(categoryId = category.id, categoryName = category.name)
+            )
+        }
+    }
+
+    /** The card's play button studies: a single-subcategory session for just this Subcategory (ADR-0041). */
+    fun onFavoriteSubcategorySessionStart(subcategory: Subcategory) {
+        viewModelScope.launch {
+            eventChannel.send(
+                HomeDestination.SubcategoryPreviewStudySession(
+                    categoryId = subcategory.categoryId,
+                    categoryName = subcategory.categoryName,
+                    subcategoryId = subcategory.id,
+                    subcategoryName = subcategory.name,
+                )
+            )
+        }
     }
 
     /**

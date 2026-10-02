@@ -121,6 +121,7 @@ fun MainScreen(
     onNavigateToCategoryDetails: (String, String) -> Unit,
     onNavigateToSubcategoryDetails: (String, String, String, String) -> Unit,
     onNavigateToPreviewStudySession: (String, String, String, String) -> Unit,
+    onNavigateToPreviewQuickSession: (String, String) -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
 ) {
@@ -173,7 +174,12 @@ fun MainScreen(
         ) {
             navigation<HomeGraph>(startDestination = HomeRoot) {
                 composable<HomeRoot> {
-                    HomeScreen()
+                    HomeScreen(
+                        onNavigateToCategoryDetails = onNavigateToCategoryDetails,
+                        onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
+                        onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
+                        onNavigateToPreviewQuickSession = onNavigateToPreviewQuickSession,
+                    )
                 }
             }
             navigation<StudyGraph>(startDestination = StudyRoot) {

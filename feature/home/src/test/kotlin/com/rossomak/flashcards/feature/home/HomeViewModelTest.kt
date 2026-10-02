@@ -33,6 +33,7 @@ import org.junit.Test
 
 private const val COMPOSE_ID = "compose"
 private const val NAVIGATION_ID = "navigation"
+private const val DENORMALIZED_CATEGORY_NAME = "Android (denormalized)"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -63,11 +64,11 @@ class HomeViewModelTest {
         observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository),
     )
 
-    private fun subcategory(id: String) = Subcategory(
+    private fun subcategory(id: String, categoryName: String = parentCategory.name) = Subcategory(
         id = id,
         name = "Subcategory $id",
         categoryId = parentCategory.id,
-        categoryName = parentCategory.name,
+        categoryName = categoryName,
         order = 0,
         cardCount = 10,
     )
@@ -257,4 +258,74 @@ class HomeViewModelTest {
 
         viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
     }
+
+    @Test
+    fun `selecting a Favorite Category emits its Category Details destination`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onFavoriteCategorySelect(parentCategory)
+            advanceUntilIdle()
+
+            awaitItem() shouldBe HomeDestination.CategoryDetails(categoryId = parentCategory.id, categoryName = parentCategory.name)
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `selecting a Favorite Subcategory emits its Subcategory Details destination with the Subcategory's own category name`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategory = subcategory(COMPOSE_ID, categoryName = DENORMALIZED_CATEGORY_NAME)
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onFavoriteSubcategorySelect(subcategory)
+                advanceUntilIdle()
+
+                awaitItem() shouldBe HomeDestination.SubcategoryDetails(
+                    categoryId = parentCategory.id,
+                    categoryName = DENORMALIZED_CATEGORY_NAME,
+                    subcategoryId = COMPOSE_ID,
+                    subcategoryName = subcategory.name,
+                )
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `starting a Quick session from a Favorite Category emits a destination carrying only the Category`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onFavoriteCategoryQuickSessionStart(parentCategory)
+                advanceUntilIdle()
+
+                awaitItem() shouldBe HomeDestination.QuickSessionPreviewStudySession(
+                    categoryId = parentCategory.id,
+                    categoryName = parentCategory.name,
+                )
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `starting a session from a Favorite Subcategory emits a single-subcategory Preview destination`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategory = subcategory(COMPOSE_ID, categoryName = DENORMALIZED_CATEGORY_NAME)
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onFavoriteSubcategorySessionStart(subcategory)
+                advanceUntilIdle()
+
+                awaitItem() shouldBe HomeDestination.SubcategoryPreviewStudySession(
+                    categoryId = parentCategory.id,
+                    categoryName = DENORMALIZED_CATEGORY_NAME,
+                    subcategoryId = COMPOSE_ID,
+                    subcategoryName = subcategory.name,
+                )
+                expectNoEvents()
+            }
+        }
 }
