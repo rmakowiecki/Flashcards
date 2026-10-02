@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.browse.details.category
 
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
 
 sealed interface CategoryDetailsDestination : NavigationEvent {
@@ -22,16 +23,16 @@ sealed interface CategoryDetailsDestination : NavigationEvent {
 
     /**
      * Both of Category Details' CTAs land here — [CategoryDetailsViewModel.onQuickSessionStart]
-     * and [CategoryDetailsViewModel.onCustomSessionStart] — distinguished only by [isQuickSession]
+     * and [CategoryDetailsViewModel.onCustomSessionStart] — distinguished only by [sourceType]
      * and by which [subcategoryIds] they carry: the Category's complete Subcategory list for Quick,
      * as the caller's candidate pool the Preview screen samples from, exactly the selection for
-     * Custom.
+     * Custom (single-subcategory when only one is selected).
      */
     data class PreviewStudySession(
         val categoryId: String,
         val categoryName: String,
         val subcategoryIds: List<String>,
         val subcategoryNames: List<String>,
-        val isQuickSession: Boolean,
+        val sourceType: SessionSourceType,
     ) : CategoryDetailsDestination
 }

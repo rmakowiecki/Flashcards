@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.study
 
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.VoiceLabel
@@ -9,15 +10,15 @@ import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import kotlinx.serialization.Serializable
 
 /**
- * [isQuickSession] and [subcategoryIds] together say how the Preview screen treats the Subcategories
+ * [sourceType] and [subcategoryIds] together say how the Preview screen treats the Subcategories
  * ([ADR-0056](../../../docs/adr/0056-preview-resolves-quick-session-candidate-pool.md)):
  *
- * | Quick | ids | Meaning |
+ * | sourceType | ids | Meaning |
  * |---|---|---|
- * | true | present | The caller's candidate pool; Preview samples it and makes no fetch |
- * | true | empty | Preview fetches the Category's Subcategories itself, then samples them |
- * | false | present | Custom or single-Subcategory: used literally |
- * | false | empty | Invalid; the Preview screen rejects it |
+ * | Quick | present | The caller's candidate pool; Preview samples it and makes no fetch |
+ * | Quick | empty | Preview fetches the Category's Subcategories itself, then samples them |
+ * | SingleSubcategory / Custom | present | Used literally |
+ * | SingleSubcategory / Custom | empty | Invalid; the Preview screen rejects it |
  *
  * Quick ids mean "the Category's complete Subcategory list, or none". A partial list is not
  * validated and would silently give a Quick Session over only that subset.
@@ -42,7 +43,7 @@ data class PreviewStudySessionRoute(
     val difficultyMin: Int = StudySessionConfig.MIN_DIFFICULTY,
     val difficultyMax: Int = StudySessionConfig.MAX_DIFFICULTY,
     val sortOrder: FlashcardSortOrder? = null,
-    val isQuickSession: Boolean = false,
+    val sourceType: SessionSourceType,
 ) {
     val difficultyRange: IntRange get() = difficultyMin..difficultyMax
 }

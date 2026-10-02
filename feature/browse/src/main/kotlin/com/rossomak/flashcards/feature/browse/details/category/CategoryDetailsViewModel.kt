@@ -4,6 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
@@ -132,25 +136,27 @@ class CategoryDetailsViewModel @Inject constructor(
     /** The Category's complete Subcategory list, as the candidate pool the Preview screen samples from. */
     fun onQuickSessionStart() {
         val subcategories = (_state.value.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return
-        emitPreviewSession(subcategories = subcategories, isQuickSession = true)
+        emitPreviewSession(subcategories = subcategories, sourceType = Quick)
     }
 
     /**
      * Exactly the selected Subcategories, honoured literally — not sampled. Emitted in **list
      * order, not selection order**, so a session's subcategory order does not depend on the order the
-     * user happened to tap.
+     * user happened to tap. A single selection makes it a single-subcategory session instead of a
+     * Custom one.
      */
     fun onCustomSessionStart() {
         val state = _state.value
         val selectedIds = state.selectedSubcategoryIds ?: return
         val subcategories = (state.content as? CategoryDetailsContentState.SubcategoriesList)?.subcategories ?: return
+        val selectedSubcategories = subcategories.filter { it.id in selectedIds }
         emitPreviewSession(
-            subcategories = subcategories.filter { it.id in selectedIds },
-            isQuickSession = false,
+            subcategories = selectedSubcategories,
+            sourceType = if (selectedSubcategories.size == 1) SingleSubcategory else Custom,
         )
     }
 
-    private fun emitPreviewSession(subcategories: List<Subcategory>, isQuickSession: Boolean) {
+    private fun emitPreviewSession(subcategories: List<Subcategory>, sourceType: SessionSourceType) {
         viewModelScope.launch {
             eventChannel.send(
                 CategoryDetailsDestination.PreviewStudySession(
@@ -158,7 +164,7 @@ class CategoryDetailsViewModel @Inject constructor(
                     categoryName = route.categoryName,
                     subcategoryIds = subcategories.map { it.id },
                     subcategoryNames = subcategories.map { it.name },
-                    isQuickSession = isQuickSession,
+                    sourceType = sourceType,
                 )
             )
         }
