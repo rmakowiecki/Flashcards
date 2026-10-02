@@ -4,9 +4,11 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.model.UserFavoritesDto
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -79,11 +81,23 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
      * entry and the sibling map untouched. Creates `favorites/state` on a user's very first favorite
      * with no existence check needed first, and one call here is one write regardless of how many
      * ids are in [ids].
+     *
+     * Unfavoriting writes `null` instead of [FieldValue.delete]. The SDK's local view of pending
+     * writes loses an earlier pending nested-key delete as soon as a later write to the same
+     * document is composed, so an offline unfavorite could silently come back (even in the same
+     * session). A `null` value is an ordinary value to it, so the view stays right; the read side
+     * keeps only [Timestamp] values, so a `null` entry is simply not a favorite.
      */
     private suspend fun writeEntries(field: String, ids: Set<String>, isFavorite: Boolean) {
-        val value: Any = if (isFavorite) FieldValue.serverTimestamp() else FieldValue.delete()
+        val value: Any? = if (isFavorite) FieldValue.serverTimestamp() else null
         val update = mapOf(field to ids.associateWith { value })
-        awaitWithOfflineTimeout(document(uid).set(update, SetOptions.merge()))
+        val writeTask = document(uid).set(update, SetOptions.merge())
+        // Outlives the offline timeout below, so a write the server rejects after the caller has
+        // already stopped waiting is still reported rather than silently rolled back.
+        writeTask.addOnFailureListener { exception ->
+            loge(exception) { "Favorite write rejected: field=$field ids=$ids isFavorite=$isFavorite" }
+        }
+        awaitWithOfflineTimeout(writeTask)
     }
 
     /**
@@ -106,9 +120,15 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
         )
     }
 
+    /**
+     * Read with [ServerTimestampBehavior.ESTIMATE]: a favorite whose write the server has not
+     * acknowledged yet (always, while offline) holds a pending server timestamp, which the default
+     * behavior reads as `null` and this parse would drop. The estimate is the SDK's local-clock
+     * value, so the entry is visible at once and the server's value replaces it on acknowledgement.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun DocumentSnapshot.parseTimestampMap(field: String): Map<String, Timestamp> {
-        val raw = get(field) as? Map<String, Any> ?: return emptyMap()
+        val raw = get(field, ServerTimestampBehavior.ESTIMATE) as? Map<String, Any> ?: return emptyMap()
         return raw.mapNotNull { (key, value) -> (value as? Timestamp)?.let { key to it } }.toMap()
     }
 
