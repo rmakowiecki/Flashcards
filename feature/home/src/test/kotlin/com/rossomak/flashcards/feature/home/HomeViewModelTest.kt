@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
@@ -52,6 +53,7 @@ private const val NEWER_SESSION_ID = "newer-session"
 private const val NEWEST_SESSION_ID = "newest-session"
 private const val CUSTOM_PARTIAL_SESSION_ID = "custom-partial-session"
 private const val CUSTOM_EMPTY_SESSION_ID = "custom-empty-session"
+private const val RENAMED_CATEGORY_NAME = "Android (renamed)"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -122,6 +124,7 @@ class HomeViewModelTest {
         sourceType: SessionSourceType,
         subcategoryIds: List<String>,
         categoryId: String = parentCategory.id,
+        voiceAnsweringEnabled: Boolean = false,
     ) = RecentSession.Rated(
         id = id,
         startedAt = Instant.EPOCH,
@@ -131,7 +134,19 @@ class HomeViewModelTest {
         subcategoryIds = subcategoryIds,
         studiedCount = 10,
         xpTotal = 120,
-        voiceAnsweringEnabled = false,
+        voiceAnsweringEnabled = voiceAnsweringEnabled,
+    )
+
+    private fun fastRecentSession(sourceType: SessionSourceType, readAloudEnabled: Boolean) = RecentSession.Fast(
+        id = OLDER_SESSION_ID,
+        startedAt = Instant.EPOCH,
+        durationSeconds = 300,
+        sourceType = sourceType,
+        categoryId = parentCategory.id,
+        subcategoryIds = listOf(COMPOSE_ID),
+        studiedCount = 10,
+        xpTotal = 40,
+        readAloudEnabled = readAloudEnabled,
     )
 
     private fun stubTaxonomyFetches(vararg subcategoryIds: String) {
@@ -372,6 +387,89 @@ class HomeViewModelTest {
                     subcategoryName = subcategory.name,
                 )
                 expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `selecting a single-subcategory Rated Recent replays its Subcategory, mode and Voice Answering under the live Category name`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val renamedCategory = parentCategory.copy(name = RENAMED_CATEGORY_NAME)
+            val compose = subcategory(COMPOSE_ID)
+            val session = recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID), voiceAnsweringEnabled = true)
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onRecentSelect(RecentItem(session, renamedCategory, listOf(compose)))
+                advanceUntilIdle()
+
+                awaitItem() shouldBe HomeDestination.RecentPreviewStudySession(
+                    categoryId = parentCategory.id,
+                    categoryName = RENAMED_CATEGORY_NAME,
+                    sourceType = SingleSubcategory,
+                    subcategoryIds = listOf(compose.id),
+                    subcategoryNames = listOf(compose.name),
+                    studyMode = StudyMode.Rated,
+                    voiceAnsweringEnabled = true,
+                    readAloudEnabled = null,
+                )
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `selecting a Quick Fast Recent replays the whole Category with read-aloud`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onRecentSelect(RecentItem(fastRecentSession(Quick, readAloudEnabled = true), parentCategory, emptyList()))
+            advanceUntilIdle()
+
+            awaitItem() shouldBe HomeDestination.RecentPreviewStudySession(
+                categoryId = parentCategory.id,
+                categoryName = parentCategory.name,
+                sourceType = Quick,
+                subcategoryIds = emptyList(),
+                subcategoryNames = emptyList(),
+                studyMode = StudyMode.Fast,
+                voiceAnsweringEnabled = null,
+                readAloudEnabled = true,
+            )
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `selecting a Custom Recent replays exactly the Subcategories that resolved, in stored order`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val session = recentSession(CUSTOM_PARTIAL_SESSION_ID, Custom, listOf(NAVIGATION_ID, DELETED_ID, COMPOSE_ID))
+            val resolved = listOf(subcategory(NAVIGATION_ID), subcategory(COMPOSE_ID))
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onRecentSelect(RecentItem(session, parentCategory, resolved))
+                advanceUntilIdle()
+
+                val destination = awaitItem().shouldBeInstanceOf<HomeDestination.RecentPreviewStudySession>()
+                destination.sourceType shouldBe Custom
+                destination.subcategoryIds shouldBe listOf(NAVIGATION_ID, COMPOSE_ID)
+                destination.subcategoryNames shouldBe resolved.map { it.name }
+            }
+        }
+
+    @Test
+    fun `selecting a Custom Recent with nothing resolved still opens Preview with no Subcategories`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val session = recentSession(CUSTOM_EMPTY_SESSION_ID, Custom, listOf(DELETED_ID))
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onRecentSelect(RecentItem(session, parentCategory, emptyList()))
+                advanceUntilIdle()
+
+                val destination = awaitItem().shouldBeInstanceOf<HomeDestination.RecentPreviewStudySession>()
+                destination.sourceType shouldBe Custom
+                destination.subcategoryIds shouldBe emptyList()
+                destination.subcategoryNames shouldBe emptyList()
             }
         }
 

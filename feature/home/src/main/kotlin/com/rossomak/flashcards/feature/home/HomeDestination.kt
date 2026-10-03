@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.feature.home
 
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
 
 sealed interface HomeDestination : NavigationEvent {
@@ -33,5 +35,17 @@ sealed interface HomeDestination : NavigationEvent {
     data class QuickSessionPreviewStudySession(
         val categoryId: String,
         val categoryName: String,
+    ) : HomeDestination
+
+    /** A Recent row — [HomeViewModel.onRecentSelect]. Only the past mode's delivery flag is set. */
+    data class RecentPreviewStudySession(
+        val categoryId: String,
+        val categoryName: String,
+        val sourceType: SessionSourceType,
+        val subcategoryIds: List<String>,
+        val subcategoryNames: List<String>,
+        val studyMode: StudyMode,
+        val voiceAnsweringEnabled: Boolean?,
+        val readAloudEnabled: Boolean?,
     ) : HomeDestination
 }

@@ -37,6 +37,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.rossomak.flashcards.R
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.feature.browse.BrowseScreen
 import com.rossomak.flashcards.feature.home.HomeScreen
 import com.rossomak.flashcards.feature.settings.SettingsScreen
@@ -132,6 +134,16 @@ fun MainScreen(
         subcategoryName: String,
     ) -> Unit,
     onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
+    onNavigateToPreviewRecentSession: (
+        categoryId: String,
+        categoryName: String,
+        sourceType: SessionSourceType,
+        subcategoryIds: List<String>,
+        subcategoryNames: List<String>,
+        studyMode: StudyMode,
+        voiceAnsweringEnabled: Boolean?,
+        readAloudEnabled: Boolean?,
+    ) -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
 ) {
@@ -189,6 +201,7 @@ fun MainScreen(
                         onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = onNavigateToPreviewQuickSession,
+                        onNavigateToPreviewRecentSession = onNavigateToPreviewRecentSession,
                     )
                 }
             }

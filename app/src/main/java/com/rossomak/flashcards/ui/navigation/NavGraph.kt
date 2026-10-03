@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
@@ -111,6 +112,35 @@ private fun NavHostController.navigateToPreviewQuickSession(categoryId: String, 
             subcategoryIds = emptyList(),
             subcategoryNames = emptyList(),
             sourceType = Quick,
+        )
+    )
+}
+
+/**
+ * A Recent replays its past Study Mode and delivery as Preview's starting values. It carries no filters or
+ * sort: there is no browsed list behind a Recent, so Preview uses the saved defaults (ADR-0038).
+ */
+@Suppress("LongParameterList") // one primitive per route field: feature modules never build each other's routes.
+private fun NavHostController.navigateToPreviewRecentSession(
+    categoryId: String,
+    categoryName: String,
+    sourceType: SessionSourceType,
+    subcategoryIds: List<String>,
+    subcategoryNames: List<String>,
+    studyMode: StudyMode,
+    voiceAnsweringEnabled: Boolean?,
+    readAloudEnabled: Boolean?,
+) {
+    navigate(
+        PreviewStudySessionRoute(
+            categoryId = categoryId,
+            categoryName = categoryName,
+            subcategoryIds = subcategoryIds,
+            subcategoryNames = subcategoryNames,
+            sourceType = sourceType,
+            studyMode = studyMode,
+            voiceAnsweringEnabled = voiceAnsweringEnabled,
+            readAloudEnabled = readAloudEnabled,
         )
     )
 }
@@ -313,6 +343,7 @@ fun FlashcardsNavGraph(
                         onNavigateToSubcategoryDetails = navController::navigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = navController::navigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = navController::navigateToPreviewQuickSession,
+                        onNavigateToPreviewRecentSession = navController::navigateToPreviewRecentSession,
                     )
                 }
                 composable<CategoryDetailsRoute> {

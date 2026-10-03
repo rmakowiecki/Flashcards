@@ -51,6 +51,8 @@ import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.ui.R
@@ -61,6 +63,7 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.home.HomeDestination.CategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.QuickSessionPreviewStudySession
+import com.rossomak.flashcards.feature.home.HomeDestination.RecentPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
@@ -92,6 +95,16 @@ fun HomeScreen(
         subcategoryName: String,
     ) -> Unit,
     onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
+    onNavigateToPreviewRecentSession: (
+        categoryId: String,
+        categoryName: String,
+        sourceType: SessionSourceType,
+        subcategoryIds: List<String>,
+        subcategoryNames: List<String>,
+        studyMode: StudyMode,
+        voiceAnsweringEnabled: Boolean?,
+        readAloudEnabled: Boolean?,
+    ) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val now by produceState(initialValue = Instant.now()) {
@@ -127,6 +140,17 @@ fun HomeScreen(
                     categoryId,
                     categoryName,
                 )
+
+                is RecentPreviewStudySession -> onNavigateToPreviewRecentSession(
+                    categoryId,
+                    categoryName,
+                    sourceType,
+                    subcategoryIds,
+                    subcategoryNames,
+                    studyMode,
+                    voiceAnsweringEnabled,
+                    readAloudEnabled,
+                )
             }
         }
     }
@@ -139,7 +163,7 @@ fun HomeScreen(
         onCategoryQuickSessionClick = viewModel::onFavoriteCategoryQuickSessionStart,
         onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
         onSubcategoryPlayClick = viewModel::onFavoriteSubcategorySessionStart,
-        onRecentClick = {},
+        onRecentClick = viewModel::onRecentSelect,
     )
 }
 

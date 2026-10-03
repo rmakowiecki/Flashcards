@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.RecentSession.Fast
+import com.rossomak.flashcards.core.domain.model.RecentSession.Rated
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
@@ -83,6 +86,32 @@ class HomeViewModel @Inject constructor(
                     categoryName = subcategory.categoryName,
                     subcategoryId = subcategory.id,
                     subcategoryName = subcategory.name,
+                )
+            )
+        }
+    }
+
+    /**
+     * A Recent row has no browse target, so it opens Preview to study the same thing again (ADR-0041 exception).
+     * [RecentItem.subcategories] is already empty for Quick, so Preview samples the Category again.
+     */
+    fun onRecentSelect(item: RecentItem) {
+        val session = item.session
+        val (voiceAnsweringEnabled, readAloudEnabled) = when (session) {
+            is Rated -> session.voiceAnsweringEnabled to null
+            is Fast -> null to session.readAloudEnabled
+        }
+        viewModelScope.launch {
+            eventChannel.send(
+                HomeDestination.RecentPreviewStudySession(
+                    categoryId = item.category.id,
+                    categoryName = item.category.name,
+                    sourceType = session.sourceType,
+                    subcategoryIds = item.subcategories.map { it.id },
+                    subcategoryNames = item.subcategories.map { it.name },
+                    studyMode = session.mode,
+                    voiceAnsweringEnabled = voiceAnsweringEnabled,
+                    readAloudEnabled = readAloudEnabled,
                 )
             )
         }
