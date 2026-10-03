@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Icon
@@ -247,7 +247,7 @@ private fun FlashcardsEmptyStateErrorShowcase() {
         Surface {
             Box(modifier = Modifier.padding(MaterialTheme.spacing.normal)) {
                 FlashcardsEmptyState(
-                    icon = Icons.Filled.ErrorOutline,
+                    icon = Icons.Filled.CloudOff,
                     title = "Something went wrong",
                     supportingText = "Couldn't load your categories. Check your connection and try again.",
                     tone = Error,
@@ -297,7 +297,7 @@ private fun FlashcardsEmptyStateOnGradientErrorShowcase() {
                     .padding(MaterialTheme.spacing.normal),
             ) {
                 FlashcardsEmptyState(
-                    icon = Icons.Filled.ErrorOutline,
+                    icon = Icons.Filled.CloudOff,
                     title = "Something went wrong",
                     supportingText = "Couldn't load your categories. Check your connection and try again.",
                     tone = Error,

@@ -4,14 +4,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.RecentSession.Fast
+import com.rossomak.flashcards.core.domain.model.RecentSession.Rated
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Hidden as RecentsHidden
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +35,7 @@ import kotlinx.coroutines.launch
 class HomeViewModel @Inject constructor(
     private val observeFavoriteItems: ObserveFavoriteItemsUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
+    private val observeRecentSessions: ObserveRecentSessionsUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeScreenState())
@@ -37,8 +47,7 @@ class HomeViewModel @Inject constructor(
     init {
         collectFavoriteItems()
         collectProgressSummary()
-        // Hardcoded Recents shown until Home reads the User's real ones.
-        _state.update { it.copy(recents = HomeRecentsState.Content(sampleRecentItems(now = Instant.now()))) }
+        collectRecentSessions()
     }
 
     /** The card body browses: it opens Category Details and starts nothing (ADR-0041). */
@@ -86,6 +95,36 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
+     * A Recent row has no browse target, so it opens Preview to study the same thing again (ADR-0041 exception).
+     * Quick sends no Subcategories, so Preview samples the Category again.
+     */
+    fun onRecentSelect(item: RecentItem) {
+        val session = item.session
+        val (subcategoryIds, subcategoryNames) = when (session.sourceType) {
+            SingleSubcategory, Custom -> session.subcategoryIds to session.subcategoryNames
+            Quick -> emptyList<String>() to emptyList()
+        }
+        val (voiceAnsweringEnabled, readAloudEnabled) = when (session) {
+            is Rated -> session.voiceAnsweringEnabled to null
+            is Fast -> null to session.readAloudEnabled
+        }
+        viewModelScope.launch {
+            eventChannel.send(
+                HomeDestination.RecentPreviewStudySession(
+                    categoryId = session.categoryId,
+                    categoryName = session.categoryName,
+                    sourceType = session.sourceType,
+                    subcategoryIds = subcategoryIds,
+                    subcategoryNames = subcategoryNames,
+                    studyMode = session.mode,
+                    voiceAnsweringEnabled = voiceAnsweringEnabled,
+                    readAloudEnabled = readAloudEnabled,
+                )
+            )
+        }
+    }
+
+    /**
      * Both observed flows are live Firestore listeners that retry only a permission-denied error, so any
      * other failure is caught here instead of crashing out of [viewModelScope]. A failure before the
      * first emission degrades to [Hidden], the same rule the use case applies to a failed id fetch; a
@@ -118,6 +157,28 @@ class HomeViewModel @Inject constructor(
                 .catch { error -> loge(error) { "Observing the progress summary failed" } }
                 .collect { summary ->
                     _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+                }
+        }
+    }
+
+    /**
+     * Runs independently of [collectFavoriteItems] and [collectProgressSummary] so neither section gates the
+     * other. Like Favorites, a failure before the first emission degrades to [RecentsHidden], and a failure
+     * after one leaves the [RecentsContent] already shown alone.
+     */
+    private fun collectRecentSessions() {
+        viewModelScope.launch {
+            observeRecentSessions()
+                .catch { error ->
+                    loge(error) { "Observing Recents failed" }
+                    _state.update { current ->
+                        if (current.recents is RecentsLoading) current.copy(recents = RecentsHidden) else current
+                    }
+                }
+                .collect { recentItems ->
+                    _state.update { current ->
+                        current.copy(recents = if (recentItems.isEmpty()) RecentsHidden else RecentsContent(recentItems))
+                    }
                 }
         }
     }

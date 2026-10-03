@@ -141,12 +141,51 @@ class DefaultFlashcardRepositoryTest {
         val subcategoryId = "sub-1"
         val error = IllegalStateException("firestore down")
         coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) } throws error
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) } returns emptyList()
 
         val result = createRepository().fetchFlashcards(subcategoryId)
 
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) }
+    }
+
+    @Test
+    fun `fetchFlashcards serves cached cards when the server read fails`() = runTest {
+        val subcategoryId = "sub-1"
+        val dto = FlashcardDto(id = "card-1", question = "q", answer = "a", difficulty = 4)
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) } throws IllegalStateException("offline")
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) } returns listOf(dto)
+
+        val result = createRepository().fetchFlashcards(subcategoryId)
+
+        result.getOrThrow().single().id shouldBe dto.id
+    }
+
+    @Test
+    fun `fetchFlashcards tries the server again after serving cached cards for a failed server read`() = runTest {
+        val subcategoryId = "sub-1"
+        val dto = FlashcardDto(id = "card-1", question = "q", answer = "a", difficulty = 4)
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) } throws IllegalStateException("offline")
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) } returns listOf(dto)
+        val repository = createRepository()
+
+        repository.fetchFlashcards(subcategoryId)
+        repository.fetchFlashcards(subcategoryId)
+
+        coVerify(exactly = 2) { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) }
+    }
+
+    @Test
+    fun `fetchFlashcards reports the server failure when the cache read after it also fails`() = runTest {
+        val subcategoryId = "sub-1"
+        val error = IllegalStateException("offline")
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) } throws error
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) } throws IllegalStateException("no cache")
+
+        val result = createRepository().fetchFlashcards(subcategoryId)
+
+        result.exceptionOrNull() shouldBe error
     }
 
     @Test
@@ -268,11 +307,12 @@ class DefaultFlashcardRepositoryTest {
     }
 
     @Test
-    fun `fetchFlashcards retries the server after a failed read rather than falling through to cache`() = runTest {
+    fun `fetchFlashcards retries the server after a failed read with nothing cached`() = runTest {
         val subcategoryId = "sub-1"
         val dto = FlashcardDto(id = "card-1", question = "q", answer = "a", difficulty = 4)
         coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) } throws
             IllegalStateException("firestore down") andThen listOf(dto)
+        coEvery { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) } returns emptyList()
         val repository = createRepository()
 
         repository.fetchFlashcards(subcategoryId).isFailure shouldBe true
@@ -280,7 +320,7 @@ class DefaultFlashcardRepositoryTest {
 
         retried.getOrThrow().single().id shouldBe dto.id
         coVerify(exactly = 2) { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server) }
-        coVerify(exactly = 0) { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) }
+        coVerify(exactly = 1) { remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache) }
     }
 
     @Test

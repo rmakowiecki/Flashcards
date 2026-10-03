@@ -19,8 +19,6 @@
     <string name="study_session_voice_answer_skip_pause_message">No answer heard 3 times in a row, pausing the session.</string>
     <string name="study_session_voice_answer_grading_pause_spoken_message">Grading isn\'t working right now. Pausing.</string>
     <string name="study_session_voice_answer_grading_pause_message">Grading isn\'t working right now, pausing the session.</string>
-    <string name="study_session_no_cards_message">No cards available</string>
-    <string name="study_session_load_error_message">Could not load flashcards</string>
     <string name="fast_study_session_report_failure_message">Failed to submit report</string>
     <string name="study_session_curate_flashcard_cd">Curate flashcard</string>
     <string name="study_session_show_answer_button">Show Answer</string>

@@ -9,19 +9,17 @@ flowchart TD
 
     %% Legend: (Screen)  [/Action/]  {Decision}  ([Entry/Exit])
 
-    Home(HOME SCREEN\nGreeting · Recents carousel · Favorites carousel)
+    Home(HOME SCREEN\nGreeting · Favorites carousel · Recently studied list)
 
     %% ── Empty state ───────────────────────────────────────────────
-    Home -->|both carousels empty| EmptyCTA[/Tap 'Start your first session'/]
+    Home -->|no Favorites and no Recents| EmptyCTA[/Tap 'Start your first session'/]
     EmptyCTA -.->|tab switch · no stack push| StudyTab[📚 Study tab]
 
     %% ── Recents ───────────────────────────────────────────────────
-    Home --> TapRecent[/Tap Recent session card/]
-    TapRecent --> RecentType{Session scope?}
-    RecentType -->|Single-subcategory\nshows Subcategory + Category name| SubcatDetails(SUBCATEGORY DETAILS\nsee study.md)
-    RecentType -->|Composite\nshows Category name only| CatDetails(CATEGORY DETAILS\nsee study.md)
+    Home --> TapRecent[/Tap Recent row/]
+    TapRecent -->|replay: same Subcategory, fresh Quick sample,\nor the stored Custom Subcategories| Preview(PREVIEW STUDY SESSION\npast Study Mode and delivery preselected)
 
     %% ── Favorites ─────────────────────────────────────────────────
     Home --> TapFavorite[/Tap Favorite card\nshows Subcategory + Category name/]
-    TapFavorite --> SubcatDetails
+    TapFavorite --> SubcatDetails(SUBCATEGORY DETAILS\nsee study.md)
 ```
