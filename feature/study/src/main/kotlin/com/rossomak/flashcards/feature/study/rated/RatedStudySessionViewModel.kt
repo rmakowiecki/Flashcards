@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
-import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.LoadFailed
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.Loading
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.Running
@@ -134,8 +133,12 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun observeSnapshot() {
         viewModelScope.launch {
             coordinator.sessionState.collect { snapshot ->
-                // Nothing to study: Preview, underneath, owns the load error and its Retry.
-                if (snapshot == LoadFailed) eventChannel.send(RatedStudySessionDestination.Back) else _state.update { it.fromSnapshot(snapshot) }
+                when (snapshot) {
+                    Loading -> _state.update { it.copy(isLoading = true) }
+                    // No session started: return to Preview, which can load the cards again.
+                    LoadFailed -> eventChannel.send(RatedStudySessionDestination.Back)
+                    is Running -> _state.update { it.fromRunningSnapshot(snapshot) }
+                }
             }
         }
     }
@@ -169,19 +172,14 @@ class RatedStudySessionViewModel @Inject constructor(
      * the snapshot collector to run, keeps the screen in step with the tap that caused it.
      */
     private fun showSessionNow() {
-        _state.update { it.fromSnapshot(coordinator.sessionState.value) }
+        // Commands only reach a running session.
+        val snapshot = coordinator.sessionState.value as? Running ?: return
+        _state.update { it.fromRunningSnapshot(snapshot) }
     }
 
     private fun GradingFailureReason.toMessage(): RatedStudySessionMessage = when (this) {
         GradingFailureReason.NoConnection -> RatedStudySessionMessage.VoiceAnswerGradingOffline
         GradingFailureReason.ServiceError -> RatedStudySessionMessage.VoiceAnswerGradingServiceError
-    }
-
-    private fun RatedStudySessionScreenState.fromSnapshot(snapshot: RatedSessionStateSnapshot) = when (snapshot) {
-        Loading -> copy(isLoading = true)
-        // Never shown: the collector navigates back instead.
-        LoadFailed -> this
-        is Running -> fromRunningSnapshot(snapshot)
     }
 
     private fun RatedStudySessionScreenState.fromRunningSnapshot(snapshot: Running) = copy(

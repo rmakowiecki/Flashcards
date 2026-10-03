@@ -37,7 +37,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.CategoryUnavailable
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.LoadFailed
+import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.ReadFailed
 import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.SubcategoriesUnavailable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -468,7 +468,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                     }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, loadFailure = LoadFailed) }
+                    _state.update { it.copy(isLoading = false, loadFailure = ReadFailed) }
                 }
         }
     }
@@ -514,7 +514,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      *
      * Fetches the Category's Subcategories as the pool first when the route supplied none, and
      * only once: a held pool is reused (ADR-0056). A Category the server confirms is gone is
-     * [CategoryUnavailable]; one that merely could not be read is [LoadFailed], and Retry fetches again.
+     * [CategoryUnavailable]; one that merely could not be read is [ReadFailed], and Retry fetches again.
      *
      * @return false when the pool could not be fetched, with the reason in state and the previous
      * sample untouched.
@@ -529,7 +529,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                 return false
             }
             Unknown -> {
-                _state.update { it.copy(isLoading = false, loadFailure = LoadFailed) }
+                _state.update { it.copy(isLoading = false, loadFailure = ReadFailed) }
                 return false
             }
         }

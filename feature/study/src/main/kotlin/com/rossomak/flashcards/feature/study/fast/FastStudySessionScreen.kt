@@ -71,6 +71,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionDestination.Back
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionDestination.Summary
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.PlayIgnoredDuringCall
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
@@ -90,8 +92,8 @@ fun FastStudySessionScreen(
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is FastStudySessionDestination.Summary -> onNavigateToSummary(destination.route)
-            FastStudySessionDestination.Back -> onNavigateBack()
+            is Summary -> onNavigateToSummary(destination.route)
+            Back -> onNavigateBack()
         }
     }
 

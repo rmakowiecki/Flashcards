@@ -60,6 +60,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionDestination.Back
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionDestination.Summary
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.PlayIgnoredDuringCall
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
@@ -92,8 +94,8 @@ fun RatedStudySessionScreen(
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is RatedStudySessionDestination.Summary -> onNavigateToSummary(destination.route)
-            RatedStudySessionDestination.Back -> onNavigateBack()
+            is Summary -> onNavigateToSummary(destination.route)
+            Back -> onNavigateBack()
         }
     }
 

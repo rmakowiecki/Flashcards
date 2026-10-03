@@ -274,7 +274,7 @@ class PreviewStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.ReadFailed
         viewModel.state.value.canStart shouldBe false
     }
 
@@ -987,7 +987,7 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.ReadFailed
 
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
         viewModel.onRetry()
@@ -1310,7 +1310,7 @@ class PreviewStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.ReadFailed
         }
 
     @Test
@@ -1416,7 +1416,7 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.ReadFailed
             viewModel.state.value.isLoading shouldBe false
 
             flashcardRepository.subcategoriesToReturn = Result.success(fetchedPool)
@@ -1441,7 +1441,7 @@ class PreviewStudySessionViewModelTest {
         advanceUntilIdle()
 
         flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
-        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.ReadFailed
     }
 
     @Test
@@ -1452,7 +1452,7 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.ReadFailed
 
             flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
             viewModel.onRetry()

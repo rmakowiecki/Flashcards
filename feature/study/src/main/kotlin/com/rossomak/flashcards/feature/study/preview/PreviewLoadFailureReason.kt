@@ -4,7 +4,7 @@ package com.rossomak.flashcards.feature.study.preview
 sealed interface PreviewLoadFailureReason {
 
     /** A read failed, most often offline. Retry can recover. */
-    data object LoadFailed : PreviewLoadFailureReason
+    data object ReadFailed : PreviewLoadFailureReason
 
     /** The server confirms none of the session's Subcategories exist any more. Retry cannot recover. */
     data object SubcategoriesUnavailable : PreviewLoadFailureReason

@@ -35,7 +35,7 @@ private fun PreviewStudySessionErrorPreview() {
             categoryName = "Android",
             subcategoryNames = listOf("Compose"),
             isLoading = false,
-            loadFailure = PreviewLoadFailureReason.LoadFailed,
+            loadFailure = PreviewLoadFailureReason.ReadFailed,
         ),
         onNavigateBack = {},
         onRetry = {},

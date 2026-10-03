@@ -96,7 +96,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionV
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.CategoryUnavailable
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.LoadFailed
+import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.ReadFailed
 import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.SubcategoriesUnavailable
 import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.MicPermissionStillDenied
 import kotlin.time.Duration.Companion.milliseconds
@@ -334,7 +334,7 @@ fun PreviewStudySessionContent(
 }
 
 /**
- * Only [LoadFailed] offers Retry: the other reasons are confirmed by the server, so retrying cannot
+ * Only [ReadFailed] offers Retry: the other reasons are confirmed by the server, so retrying cannot
  * bring the content back, and the top bar's close action is the way out.
  */
 @Composable
@@ -345,7 +345,7 @@ private fun LoadFailureContent(
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         when (loadFailure) {
-            LoadFailed -> FlashcardsEmptyState(
+            ReadFailed -> FlashcardsEmptyState(
                 icon = Icons.Default.CloudOff,
                 title = stringResource(CoreUiR.string.common_load_error_title),
                 supportingText = stringResource(CoreUiR.string.common_flashcards_load_error_message),
