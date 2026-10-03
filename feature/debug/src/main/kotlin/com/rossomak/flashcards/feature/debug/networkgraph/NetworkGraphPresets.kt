@@ -3,6 +3,9 @@
 package com.rossomak.flashcards.feature.debug.networkgraph
 
 import androidx.compose.ui.graphics.Color
+import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon
+import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Uniform
 
 private val BrandIndigo = Color(0xFF2A2E8F)
 
@@ -16,14 +19,10 @@ private val BrandIndigo = Color(0xFF2A2E8F)
 object NetworkGraphPresets {
 
     private val ribbonFront = NetworkGraphLayerSpec(
-        uniformWeight = 0f,
-        ribbonWeight = 1f,
+        shapes = listOf(Ribbon(center = 0.62f, width = 0.4f)),
         density = 24f,
         jitter = 0.4f,
         driftAmplitude = 0.3f,
-        ribbonCenter = 0.62f,
-        ribbonWidth = 0.4f,
-        ribbonCurve = 0.1f,
         waveAmplitude = 0.03f,
         waveSpeed = 0.25f,
         maxEdgeFactor = 2.4f,
@@ -35,15 +34,11 @@ object NetworkGraphPresets {
 
     /** The far mesh of the two-layer references: sparser, bigger dimmer nodes, slower (parallax). */
     private val ribbonGhost = NetworkGraphLayerSpec(
-        uniformWeight = 0f,
-        ribbonWeight = 1f,
+        shapes = listOf(Ribbon(center = 0.55f, width = 0.7f, curve = 0.15f)),
         density = 12f,
         jitter = 0.45f,
         driftAmplitude = 0.35f,
         driftSpeed = 0.5f,
-        ribbonCenter = 0.55f,
-        ribbonWidth = 0.7f,
-        ribbonCurve = 0.15f,
         envelopeFloor = 0.05f,
         waveAmplitude = 0.02f,
         waveSpeed = 0.15f,
@@ -117,10 +112,8 @@ object NetworkGraphPresets {
         seed = 5,
         layers = listOf(
             NetworkGraphLayerSpec(
-                uniformWeight = 0f,
-                bloomWeight = 1f,
+                shapes = listOf(Bloom()),
                 density = 23f,
-                bloomReach = 0.8f,
                 envelopeFloor = 0.02f,
                 maxEdgeFactor = 2.4f,
                 minAngleDegrees = 14f,
@@ -185,19 +178,16 @@ object NetworkGraphPresets {
         nodeSizeVariance = 0.4f,
     )
 
+    private val morphRibbonShape = Ribbon(center = 0.62f, width = 0.42f)
+
     private val morphRibbon = morphBase.copy(
-        uniformWeight = 0f,
-        ribbonWeight = 1f,
-        ribbonCenter = 0.62f,
-        ribbonWidth = 0.42f,
+        shapes = listOf(morphRibbonShape),
         waveAmplitude = 0.03f,
         waveSpeed = 0.25f,
     )
 
     private val morphBloom = morphBase.copy(
-        uniformWeight = 0f,
-        bloomWeight = 1f,
-        bloomReach = 0.8f,
+        shapes = listOf(Bloom()),
         hotNodeShare = 0.15f,
         glowStrength = 0.35f,
     )
@@ -218,26 +208,61 @@ object NetworkGraphPresets {
         morphVariant(
             "Ribbon, high and narrow",
             "The band moved up, thinned and tilted",
-            morphRibbon.copy(ribbonCenter = 0.3f, ribbonWidth = 0.22f, ribbonTilt = -12f),
+            morphRibbon.copy(shapes = listOf(Ribbon(center = 0.3f, width = 0.22f, tilt = -12f))),
         ),
         morphVariant("Corner bloom", "Dense at the top-end corner, hot nodes glowing", morphBloom),
         morphVariant(
             "Bloom, bottom-start",
             "The bloom moved to the opposite corner and tightened",
-            morphBloom.copy(bloomX = 0f, bloomY = 1f, bloomReach = 0.6f),
+            morphBloom.copy(shapes = listOf(Bloom(x = 0f, y = 1f, reach = 0.6f))),
         ),
-        morphVariant("Ribbon + bloom", "Both shapes at once", morphRibbon.copy(bloomWeight = 0.9f, bloomReach = 0.5f)),
+        morphVariant("Ribbon + bloom", "Both shapes at once", morphRibbon.copy(shapes = listOf(morphRibbonShape, Bloom(weight = 0.9f, reach = 0.5f)))),
         morphVariant(
             "Uniform + ghost",
             "Even mesh over a faint, sparser back layer",
-            ribbonGhost.copy(uniformWeight = 1f, ribbonWeight = 0f),
+            ribbonGhost.copy(shapes = listOf(Uniform())),
             morphBase,
         ),
+        morphVariant(
+            "Centre disc",
+            "A hard-edged disc in the middle of the surface",
+            morphBloom.copy(shapes = listOf(Bloom(x = 0.5f, y = 0.5f, reach = 0.28f, plateau = 0.6f))),
+        ),
+        morphVariant(
+            "Corner pair",
+            "Blooms in the top-end and bottom-start corners at once",
+            morphBloom.copy(shapes = listOf(Bloom(reach = 0.55f), Bloom(x = 0f, y = 1f, reach = 0.55f))),
+        ),
+        morphVariant(
+            "Double ribbon",
+            "Two thin bands, one high, one low",
+            morphRibbon.copy(
+                shapes = listOf(
+                    Ribbon(center = 0.25f, width = 0.18f, curve = 0.06f, tilt = 6f),
+                    Ribbon(center = 0.75f, width = 0.18f, curve = 0.06f, tilt = -6f),
+                ),
+            ),
+        ),
     )
+
+    private fun morphVariantNamed(name: String) = morphFamily.first { it.name == name }
 
     /** The fake onboarding pager's backgrounds, one per page. */
     val onboardingPages: List<NetworkGraphSpec> = listOf(morphFamily[0], morphFamily[2], morphFamily[3])
 
+    /**
+     * The second fake onboarding pager's backgrounds: one shape splitting in two, two primitives of one
+     * kind turning into two of another, two merging into one, and a corner bloom crossing the surface.
+     */
+    val onboardingCometPages: List<NetworkGraphSpec> = listOf(
+        "Centre disc",
+        "Corner pair",
+        "Double ribbon",
+        "Centre disc",
+        "Corner bloom",
+        "Bloom, bottom-start",
+    ).map(::morphVariantNamed)
+
     /** What the tuning sheet inserts as a new back layer: [ribbonGhost]'s far-mesh look, over the whole surface. */
-    val defaultBackLayer = ribbonGhost.copy(uniformWeight = 1f, ribbonWeight = 0f)
+    val defaultBackLayer = ribbonGhost.copy(shapes = listOf(Uniform()))
 }

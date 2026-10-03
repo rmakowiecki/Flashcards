@@ -85,10 +85,11 @@ import kotlinx.coroutines.launch
  * promoted.
  *
  * One [NetworkGraphPresets] variant per pager page, each shown on the two aspect ratios a winner has
- * to hold up on: a wide, short top app bar strip and a tall hero. Two more pages follow the presets:
+ * to hold up on: a wide, short top app bar strip and a tall hero. Three more pages follow the presets:
  * a morph page that scrubs or times a morph between two [NetworkGraphPresets.morphFamily] variants,
- * and a fake onboarding pager whose background morphs with its scroll position and whose surface can
- * shrink and grow. Registered on the app's outer graph, so it runs full-screen without the bottom bar.
+ * and two fake onboarding pagers whose background morphs with their scroll position and whose surface
+ * can shrink and grow: the first between simple shapes, the second through splits, merges and
+ * crossings that send comets ([NetworkGraphPresets.onboardingCometPages]). Registered on the app's outer graph, so it runs full-screen without the bottom bar.
  *
  * The bottom overlay, laid out under the pages rather than over them, reseeds the page's layout,
  * flips the [FlashcardsComponentStyle] for every page, copies the page's current spec as Kotlin
@@ -101,13 +102,15 @@ import kotlinx.coroutines.launch
 fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit) {
     val specs = remember { NetworkGraphPresets.all.toMutableStateList() }
     val morphSpecs = remember { NetworkGraphPresets.morphFamily.toMutableStateList() }
-    val onboardingSpecs = remember { NetworkGraphPresets.onboardingPages.toMutableStateList() }
+    val onboardingDecks = listOf(
+        rememberOnboardingDeck(NetworkGraphPresets.onboardingPages),
+        rememberOnboardingDeck(NetworkGraphPresets.onboardingCometPages),
+    )
     val morphSelection = remember { MorphSelection() }
     var style by remember { mutableStateOf(FlashcardsComponentStyle.entries.first()) }
     var isTuning by remember { mutableStateOf(false) }
-    val pageCount = specs.size + EXTRA_PAGES
+    val pageCount = specs.size + 1 + onboardingDecks.size
     val pagerState = rememberPagerState(pageCount = { pageCount })
-    val onboardingPagerState = rememberPagerState(pageCount = { onboardingSpecs.size })
     val stats = remember { NetworkGraphFrameStats() }
     val layerStats = remember { NetworkGraphLayerStats() }
     var showViolations by remember { mutableStateOf(false) }
@@ -116,7 +119,8 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
 
     RecordFrameIntervals(stats)
     val currentPage = pagerState.currentPage
-    val slot = specSlotFor(currentPage, specs, morphSpecs, morphSelection, onboardingSpecs, onboardingPagerState.currentPage, coroutineScope)
+    val onboardingDeck = onboardingDecks.getOrNull(currentPage - specs.size - 1)
+    val slot = specSlotFor(currentPage, specs, morphSpecs, morphSelection, onboardingDeck, coroutineScope)
 
     // The overlay sits under the pager rather than over it, so it never hides a page's content.
     Column(modifier = modifier.fillMaxSize()) {
@@ -143,8 +147,7 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
                     onNavigateBack = onNavigateBack,
                 )
                 else -> OnboardingPage(
-                    specs = onboardingSpecs,
-                    pagerState = onboardingPagerState,
+                    deck = onboardingDecks[page - specs.size - 1],
                     stats = stats,
                     layerStats = pageLayerStats,
                     showViolations = showViolations,
@@ -194,14 +197,22 @@ private fun RecordFrameIntervals(stats: NetworkGraphFrameStats) {
     }
 }
 
-@Suppress("LongParameterList") // Prototype plumbing: every list a page's spec can live in.
+/** One fake onboarding pager: its steps' specs, editable in place, and its own pager. */
+private class OnboardingDeck(val specs: SnapshotStateList<NetworkGraphSpec>, val pagerState: PagerState)
+
+@Composable
+private fun rememberOnboardingDeck(pages: List<NetworkGraphSpec>): OnboardingDeck {
+    val specs = remember { pages.toMutableStateList() }
+    val pagerState = rememberPagerState(pageCount = { specs.size })
+    return remember(pagerState) { OnboardingDeck(specs, pagerState) }
+}
+
 private fun specSlotFor(
     page: Int,
     specs: SnapshotStateList<NetworkGraphSpec>,
     morphSpecs: SnapshotStateList<NetworkGraphSpec>,
     morphSelection: MorphSelection,
-    onboardingSpecs: SnapshotStateList<NetworkGraphSpec>,
-    onboardingPage: Int,
+    onboarding: OnboardingDeck?,
     coroutineScope: CoroutineScope,
 ): SpecSlot = when {
     page < specs.size -> SpecSlot(
@@ -222,11 +233,15 @@ private fun specSlotFor(
             )
         },
     )
-    else -> SpecSlot(
-        spec = onboardingSpecs[onboardingPage],
-        onSpecChange = { onboardingSpecs[onboardingPage] = it },
-        onReseed = { onboardingSpecs.reseedTogether() },
-    )
+    else -> {
+        val deck = checkNotNull(onboarding) { "Page $page is past the onboarding pages" }
+        val step = deck.pagerState.currentPage
+        SpecSlot(
+            spec = deck.specs[step],
+            onSpecChange = { deck.specs[step] = it },
+            onReseed = { deck.specs.reseedTogether() },
+        )
+    }
 }
 
 /** Copies [spec] as Kotlin source to the clipboard and logcat, ready to paste into [NetworkGraphPresets]. */
@@ -253,9 +268,6 @@ private fun TuningSheet(slot: SpecSlot, showViolations: Boolean, onShowViolation
         )
     }
 }
-
-/** The morph page and the onboarding page, after the presets. */
-private const val EXTRA_PAGES = 2
 
 /** The morph page starts on uniform field → corner bloom. */
 private const val MORPH_DEFAULT_TO_INDEX = 3
@@ -418,12 +430,13 @@ private fun MorphPicker(label: String, specs: List<NetworkGraphSpec>, selected: 
  */
 @Composable
 private fun OnboardingPage(
-    specs: List<NetworkGraphSpec>,
-    pagerState: PagerState,
+    deck: OnboardingDeck,
     stats: NetworkGraphFrameStats,
     layerStats: NetworkGraphLayerStats?,
     showViolations: Boolean,
 ) {
+    val specs = deck.specs
+    val pagerState = deck.pagerState
     var isShrunk by remember { mutableStateOf(false) }
     val heightFraction by animateFloatAsState(
         targetValue = if (isShrunk) ONBOARDING_SHRUNK_HEIGHT else 1f,

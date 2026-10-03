@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.feature.debug.networkgraph
 
+import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import kotlin.math.max
@@ -18,9 +20,12 @@ class MinDegreeInvariantTest {
 
     private val shapes: List<Pair<String, (NetworkGraphLayerSpec) -> NetworkGraphLayerSpec>> = listOf(
         "uniform" to { it },
-        "ribbon" to { it.copy(uniformWeight = 0f, ribbonWeight = 1f) },
-        "bloom" to { it.copy(uniformWeight = 0f, bloomWeight = 1f) },
-        "ribbon + bloom, tilted" to { it.copy(uniformWeight = 0f, ribbonWeight = 0.7f, bloomWeight = 1f, ribbonTilt = 20f, bloomX = 0.2f) },
+        "ribbon" to { it.copy(shapes = listOf(Ribbon())) },
+        "bloom" to { it.copy(shapes = listOf(Bloom())) },
+        "ribbon + bloom, tilted" to { it.copy(shapes = listOf(Ribbon(weight = 0.7f, tilt = 20f), Bloom(x = 0.2f))) },
+        "two ribbons + centre disc" to {
+            it.copy(shapes = listOf(Ribbon(center = 0.2f, width = 0.15f), Ribbon(center = 0.8f, width = 0.15f), Bloom(x = 0.5f, y = 0.5f, reach = 0.3f, plateau = 0.8f)))
+        },
     )
 
     private val extremes: List<Pair<String, (NetworkGraphLayerSpec) -> NetworkGraphLayerSpec>> = listOf(

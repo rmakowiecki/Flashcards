@@ -1,7 +1,10 @@
 package com.rossomak.flashcards.feature.debug.networkgraph
 
+import androidx.compose.ui.geometry.Offset
+import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.doubles.plusOrMinus as plusOrMinusDouble
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.floats.plusOrMinus
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -16,8 +19,8 @@ import org.junit.Test
 /**
  * Morphs and resizes on real [LayerField]s: both invariants must hold on every frame part way through
  * a morph, not only at its ends, and a resize must never move a node that already exists. A morph must
- * also be stable: every node switches at most once, in order of distance from the shape, and a scrub
- * back retraces it.
+ * also be stable: every node switches at most once, in order of distance from the shape, a node only a
+ * comet lights pulses once, and a scrub back retraces it.
  */
 class NetworkGraphMorphTest {
 
@@ -95,25 +98,20 @@ class NetworkGraphMorphTest {
     }
 
     /**
-     * Over every pair and surface — some 80 000 node morphs — this allows [CROSSING_FRONTS_BUDGET]
+     * Over every pair and surface — some 170 000 node morphs — this allows [CROSSING_FRONTS_BUDGET]
      * exceptions: where a pair's leaving and arriving fronts follow two different shapes, they can cross
-     * so that a node that stays briefly has neither its old edges nor its replacements yet.
+     * so that a node that stays briefly has neither its old edges nor its replacements yet. A node shown
+     * at neither end is one a comet lights, and may turn on and off once; [COMET_GLITCH_BUDGET] of them,
+     * out of some 6 000, drop out for a few frames as their neighbours light up after them.
      */
     @Test
-    fun `scrubbing any morph family pair end to end turns each node on or off at most once`() {
-        val flickering = morphFamilyPairs().flatMap { (from, to) ->
-            surfaces.flatMap { (width, height) ->
-                val run = MorphRun(from, to, width, height)
-                val visibility = scrubFrames().map { fraction -> run.visibility(fraction) }
-                visibility.first().keys.flatMap { layerSeed ->
-                    val layerVisibility = visibility.map { it.getValue(layerSeed) }
-                    layerVisibility.first().indices.filter { node -> layerVisibility.zipWithNext { before, after -> before[node] != after[node] }.count { it } > 1 }
-                        .map { node -> "${from.name} → ${to.name} ${width.toInt()}x${height.toInt()} layer $layerSeed node $node" }
-                }
-            }
-        }
+    fun `scrubbing any morph family pair end to end turns each node on or off at most once and each comet node on and off once`() {
+        val nodes = morphFamilyPairs().flatMap { (from, to) -> surfaces.flatMap { (width, height) -> scrubToggles(from, to, width, height) } }
+        val flickering = nodes.filter { it.shownAtAnEnd && it.toggles > 1 }
+        val cometGlitches = nodes.filter { !it.shownAtAnEnd && it.toggles > 2 }
 
         flickering.size shouldBeLessThanOrEqual CROSSING_FRONTS_BUDGET
+        cometGlitches.size shouldBeLessThanOrEqual COMET_GLITCH_BUDGET
     }
 
     /** Allows [CROSSING_FRONTS_BUDGET] exceptions, for the reason the test above gives. */
@@ -133,6 +131,81 @@ class NetworkGraphMorphTest {
         }
 
         dropped.size shouldBeLessThanOrEqual CROSSING_FRONTS_BUDGET
+    }
+
+    @Test
+    fun `a bloom crossing to the opposite corner sends a comet that lights the nodes between them once, half way`() {
+        val from = cometTestSpec(Bloom(reach = COMET_TEST_REACH))
+        val to = cometTestSpec(Bloom(x = 0f, y = 1f, reach = COMET_TEST_REACH))
+        val run = MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT)
+        val frames = scrubFrames()
+        val visibility = frames.map { fraction -> run.visibility(fraction).values.single() }
+        val field = run.singleField()
+        val cometNodes = visibility.first().indices.filter { node -> !visibility.first()[node] && !visibility.last()[node] && visibility.any { it[node] } }
+        val reach = COMET_TEST_REACH * TALL_HERO_HEIGHT
+        val pathMiddle = Offset(TALL_HERO_WIDTH / 2f, TALL_HERO_HEIGHT / 2f)
+        val middleNodes = cometNodes.filter { node -> (field.nodeHome(node) - pathMiddle).getDistance() < MIDDLE_RADIUS }
+        val middleLitAt = middleNodes.map { node -> frames.filterIndexed { frame, _ -> visibility[frame][node] }.average() }
+
+        run.advance(0.5f)
+        field.cometCount shouldBe 1
+        cometNodes.size shouldBeGreaterThan MIN_COMET_NODES
+        cometNodes.filter { node -> visibility.zipWithNext { before, after -> before[node] != after[node] }.count { it } > 2 }.shouldBeEmpty()
+        cometNodes.filter { node -> distanceToSegment(field.nodeHome(node), Offset(TALL_HERO_WIDTH, 0f), Offset(0f, TALL_HERO_HEIGHT)) > reach }.shouldBeEmpty()
+        middleNodes.size shouldBeGreaterThan 0
+        middleLitAt.forEach { litAt -> litAt shouldBe (0.5 plusOrMinusDouble MIDDLE_LIT_TOLERANCE) }
+    }
+
+    @Test
+    fun `a centre disc splitting into two corner blooms sends a comet to each`() {
+        val from = family.first { it.name == "Centre disc" }
+        val to = family.first { it.name == "Corner pair" }
+
+        val comets = cometsFor(from, to)
+
+        comets shouldHaveSize 2
+        comets.map { it.source }.distinct() shouldHaveSize 1
+        comets.map { it.target }.distinct() shouldHaveSize 2
+    }
+
+    @Test
+    fun `two ribbons merging into a centre disc each send a comet that meets the other on the disc`() {
+        val from = family.first { it.name == "Double ribbon" }
+        val to = family.first { it.name == "Centre disc" }
+
+        val comets = cometsFor(from, to)
+
+        comets shouldHaveSize 2
+        comets.map { it.source }.distinct() shouldHaveSize 2
+        comets.map { it.target }.distinct() shouldHaveSize 1
+        MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(0.5f) }.singleField().cometCount shouldBe 2
+    }
+
+    @Test
+    fun `a bloom nudged slightly sends no comet`() {
+        val from = cometTestSpec(Bloom())
+        val to = cometTestSpec(Bloom(x = 0.96f, y = 0.03f, reach = 0.78f))
+
+        cometsFor(from, to).shouldBeEmpty()
+        MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(0.5f) }.singleField().cometCount shouldBe 0
+    }
+
+    @Test
+    fun `both ends of a morph with comets draw exactly what each spec draws standing still`() {
+        val pairs = listOf("Centre disc" to "Corner pair", "Double ribbon" to "Centre disc", "Corner bloom" to "Bloom, bottom-start")
+            .map { (fromName, toName) -> family.first { it.name == fromName } to family.first { it.name == toName } }
+
+        pairs.forEach { (from, to) ->
+            surfaces.forEach { (width, height) ->
+                listOf(0f to from, 1f to to).forEach { (fraction, still) ->
+                    val morphing = MorphRun(from, to, width, height).also { it.advance(0.5f) }.also { it.advance(fraction) }.singleField()
+                    val standing = MorphRun(still, still, width, height).also { it.advance(0f) }.also { it.advance(0f) }.singleField()
+
+                    (0 until morphing.nodeCount).map(morphing::nodePresence) shouldBe (0 until standing.nodeCount).map(standing::nodePresence)
+                    morphing.topology.edges.sorted() shouldBe standing.topology.edges.sorted()
+                }
+            }
+        }
     }
 
     @Test
@@ -210,6 +283,44 @@ class NetworkGraphMorphTest {
         halfway.frames("retargeted half way", 0.5f, frameCount = 1).shouldBeEmpty()
     }
 
+    /** How often each node's dot turns on or off over a [scrubFrames] swipe from [from] to [to]. */
+    private fun scrubToggles(from: NetworkGraphSpec, to: NetworkGraphSpec, width: Float, height: Float): List<NodeToggles> {
+        val run = MorphRun(from, to, width, height)
+        val visibility = scrubFrames().map { fraction -> run.visibility(fraction) }
+        return visibility.first().keys.flatMap { layerSeed ->
+            val layerVisibility = visibility.map { it.getValue(layerSeed) }
+            layerVisibility.first().indices.map { node ->
+                NodeToggles(
+                    shownAtAnEnd = layerVisibility.first()[node] || layerVisibility.last()[node],
+                    toggles = layerVisibility.zipWithNext { before, after -> before[node] != after[node] }.count { it },
+                )
+            }
+        }
+    }
+
+    private class NodeToggles(val shownAtAnEnd: Boolean, val toggles: Int)
+
+    /** The comets a morph between the single-layer [from] and [to] sends on the tall surface. */
+    private fun cometsFor(from: NetworkGraphSpec, to: NetworkGraphSpec): List<Comet> {
+        val envelope = NetworkGraphEnvelope(morphLayers(from, from, 0f).single().seed)
+        return cometsBetween(
+            from = envelope.standIns(from.layers.single(), TALL_HERO_WIDTH, TALL_HERO_HEIGHT),
+            to = envelope.standIns(to.layers.single(), TALL_HERO_WIDTH, TALL_HERO_HEIGHT),
+            width = TALL_HERO_WIDTH,
+            height = TALL_HERO_HEIGHT,
+        )
+    }
+
+    /** A morph family member with the one primitive given, so corner to corner leaves a gap for a comet to cross. */
+    private fun cometTestSpec(primitive: ShapePrimitive) =
+        family.first { it.name == "Corner bloom" }.let { bloom -> bloom.copy(layers = listOf(bloom.layers.single().copy(shapes = listOf(primitive)))) }
+
+    private fun distanceToSegment(point: Offset, start: Offset, end: Offset): Float {
+        val along = end - start
+        val share = (((point - start).x * along.x + (point - start).y * along.y) / (along.x * along.x + along.y * along.y)).coerceIn(0f, 1f)
+        return (point - (start + along * share)).getDistance()
+    }
+
     /** Every ordered pair of distinct [family] variants. */
     private fun morphFamilyPairs(): List<Pair<NetworkGraphSpec, NetworkGraphSpec>> =
         family.flatMap { from -> family.filter { it != from }.map { to -> Pair(from, to) } }
@@ -280,7 +391,12 @@ class NetworkGraphMorphTest {
         const val FRAME_SECONDS = 1f / 60f
         const val SCRUB_STEPS = 20
         const val RESIZE_STEPS = 12
-        const val CROSSING_FRONTS_BUDGET = 6
+        const val CROSSING_FRONTS_BUDGET = 32
+        const val COMET_GLITCH_BUDGET = 32
+        const val COMET_TEST_REACH = 0.3f
+        const val MIN_COMET_NODES = 30
+        const val MIDDLE_RADIUS = 150f
+        const val MIDDLE_LIT_TOLERANCE = 0.15
         const val SWIPE_FRAMES = 120
         const val HOLD_FRAMES = 60
         const val ORDER_STEPS = 200
