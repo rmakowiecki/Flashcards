@@ -128,8 +128,11 @@ data class NetworkGraphLayerSpec(
     val edgeKeepChance: Float = 0.9f,
     /** Longest edge a node short of two edges may be repaired with, in multiples of [maxEdgeFactor]. */
     val repairReach: Float = 1.6f,
-    /** Every edge must sit in a drawn triangle: no strings of nodes, no bridges, only faces. */
-    val strictTriangles: Boolean = false,
+    /**
+     * Every face of the mesh is a triangle: no strings of nodes, no bridges, no polygon holes left by
+     * dropped diagonals, and no diagonal drawn fainter than its triangle's other sides.
+     */
+    val strictTriangles: Boolean = true,
     val strokeWidthDp: Float = 0.8f,
     val edgeAlpha: Float = 0.55f,
     /** How much dimmer an edge at max length is than a very short one. */

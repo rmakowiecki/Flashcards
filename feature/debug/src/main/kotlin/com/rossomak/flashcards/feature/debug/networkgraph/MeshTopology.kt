@@ -2,6 +2,7 @@
 
 package com.rossomak.flashcards.feature.debug.networkgraph
 
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -56,6 +57,10 @@ internal class MeshTopology(
  *    pruned when smaller than [MIN_GRAPH_NODES] and cut loose otherwise. Every separate graph smaller
  *    than [MIN_GRAPH_NODES] is pruned.
  *
+ * With [strictTriangles] and [triangles] (the Delaunay triangles the candidates come from), every
+ * triangle with all three corners kept and two of its edges also gets its third, so no face of the mesh
+ * is a polygon: a dropped diagonal comes back unless it is longer than [maxRepairLength].
+ *
  * Repair edges bypass the rule's keep chance and minimum-angle filters but not the length cap, so a
  * sparse area keeps its nodes connected while a far outlier disappears instead of growing a long line.
  * A pair removed during the call is never re-added, which is what makes the rounds converge. A final
@@ -69,6 +74,7 @@ internal fun enforceMinDegree(
     candidateEdges: LongArray,
     maxRepairLength: Float,
     strictTriangles: Boolean,
+    triangles: IntArray? = null,
     keepConnectivity: Boolean = true,
 ): MeshTopology {
     val graph = EnforcementGraph(count, xs, ys, candidateEdges, maxRepairLength)
@@ -76,7 +82,7 @@ internal fun enforceMinDegree(
     var converged = false
     var rounds = 0
     while (!converged && rounds < MAX_ENFORCEMENT_ROUNDS) {
-        converged = !graph.repairRound(strictTriangles, keepConnectivity)
+        converged = !graph.repairRound(strictTriangles, triangles, keepConnectivity)
         rounds++
     }
     while (graph.removalRound(strictTriangles, keepConnectivity)) Unit
@@ -91,6 +97,28 @@ internal fun connectivityViolations(count: Int, edges: LongArray): ConnectivityV
     val graph = EnforcementGraph(count, FloatArray(count), FloatArray(count), candidateEdges = LongArray(0), maxRepairLength = 0f)
     for (key in edges) graph.addBase(key)
     return ConnectivityViolations(smallGraphNodes = graph.smallGraphNodes(), cutNodes = graph.cutNodes().asList())
+}
+
+/** Every triangle of the graph of [edges] over [count] nodes, as node index triples, each once. */
+internal fun meshTriangles(count: Int, edges: LongArray): IntArray {
+    val neighbours = Array(count) { HashSet<Int>() }
+    for (key in edges) {
+        neighbours[edgeStart(key)] += edgeEnd(key)
+        neighbours[edgeEnd(key)] += edgeStart(key)
+    }
+    val triangles = ArrayList<Int>()
+    for (key in edges) {
+        val low = min(edgeStart(key), edgeEnd(key))
+        val high = max(edgeStart(key), edgeEnd(key))
+        // From the edge between each triangle's two lowest corners only.
+        for (apex in neighbours[low]) {
+            if (apex <= high || apex !in neighbours[high]) continue
+            triangles += low
+            triangles += high
+            triangles += apex
+        }
+    }
+    return triangles.toIntArray()
 }
 
 /** Every unique edge of [triangles] (vertex index triples), unfiltered. Repair candidates for Delaunay rules. */
@@ -170,8 +198,9 @@ private class EnforcementGraph(
     }
 
     /** One repair round of [enforceMinDegree]; true if it changed anything. */
-    fun repairRound(strictTriangles: Boolean, keepConnectivity: Boolean): Boolean {
+    fun repairRound(strictTriangles: Boolean, triangles: IntArray?, keepConnectivity: Boolean): Boolean {
         var changed = strictTriangles && closeOrDropOpenEdges()
+        if (strictTriangles && triangles != null) changed = closeFaces(triangles) || changed
         changed = repairShortNodes(strictTriangles) || changed
         changed = pruneShortNodes() || changed
         // Connectivity only once the degrees settle: its search costs more, and repairs move cut nodes.
@@ -236,6 +265,34 @@ private class EnforcementGraph(
         for (node in 0 until count) {
             if (!alive[node] || neighbours[node].size >= 2) continue
             prune(node)
+            changed = true
+        }
+        return changed
+    }
+
+    /** Strict mode: gives each triangle of [triangles] with all corners alive and two of its edges the third. */
+    fun closeFaces(triangles: IntArray): Boolean {
+        var changed = false
+        // Closing one face can give a neighbouring face its second edge, so repeat until none closes.
+        while (closeFacesOnce(triangles)) changed = true
+        return changed
+    }
+
+    private fun closeFacesOnce(triangles: IntArray): Boolean {
+        var changed = false
+        for (base in triangles.indices step TRIANGLE_CORNERS) {
+            val first = triangles[base]
+            val second = triangles[base + 1]
+            val third = triangles[base + 2]
+            if (!alive[first] || !alive[second] || !alive[third]) continue
+            val missing = when {
+                !isConnected(first, second) -> if (isConnected(second, third) && isConnected(third, first)) first to second else null
+                !isConnected(second, third) -> if (isConnected(third, first)) second to third else null
+                !isConnected(third, first) -> third to first
+                else -> null
+            } ?: continue
+            if (!canAdd(missing.first, missing.second)) continue
+            connect(missing.first, missing.second)
             changed = true
         }
         return changed

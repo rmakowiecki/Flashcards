@@ -146,6 +146,15 @@ private const val MAX_ALPHA_ROUNDS = 16
  */
 private const val VISIBLE_EDGE_MARGIN = 2f
 
+/**
+ * Cap on how many times a strict mesh re-settles without edges its own triangles leave too faint to
+ * see; each pass only drops edges, and one more is rarely needed.
+ */
+private const val MAX_VISIBILITY_PASSES = 3
+
+/** Cap on [LayerField]'s triangle fill rounds; one raise rarely enables another, so they settle fast. */
+private const val MAX_TRIANGLE_FILL_ROUNDS = 3
+
 /** An alpha round that lowers no dot by more than this counts as settled. */
 private const val ALPHA_SETTLE_EPSILON = 1e-4f
 
@@ -255,6 +264,10 @@ internal class LayerField(
 
     /** Each edge's current fade, kept while it fades out after leaving the set. */
     private val fadingEdges = HashMap<Long, FadingEdge>()
+
+    /** [fillDrawnTriangles]' triangles, and the drawn edges they were found for. */
+    private var triangleCache = IntArray(0)
+    private var triangleCacheKeys = LongArray(0)
 
     /** The edge-filter values [EdgeRule.FixedTriangulation] last settled with; a change re-settles it. */
     private val settledFilters = FloatArray(4)
@@ -650,7 +663,9 @@ internal class LayerField(
             val everyPresences = FloatArray(count) { index ->
                 max(max(startPresences[index], endPresences[index]), comets.peaks[index] * borderFactor(index, width, height))
             }
-            TransitMesh(settleTopology(homeX, homeY, everyMask, everyPresences, morph.to.nearestSpec), transitMask)
+            // Never strict: a comet's patch lights and darkens node by node, and with only triangle edges
+            // its nodes run short of visible ones and blink.
+            TransitMesh(settleTopology(homeX, homeY, everyMask, everyPresences, morph.to.nearestSpec.copy(strictTriangles = false)), transitMask)
         } else {
             null
         }
@@ -800,10 +815,26 @@ internal class LayerField(
             val length = sqrt(deltaX * deltaX + deltaY * deltaY)
             val lengthFactor = 1f - spec.lengthFalloff * (length / referenceLength).coerceIn(0f, 1f)
             val depthFactor = min(depthAlpha(start), depthAlpha(end))
-            val alpha = (spec.edgeAlpha * spec.alpha * lengthFactor * depthFactor * edgeFades[edge]).coerceIn(0f, 1f)
+            rawEdgeAlphas[edge] = (spec.edgeAlpha * spec.alpha * lengthFactor * depthFactor).coerceIn(0f, 1f)
+        }
+        if (spec.strictTriangles) fillDrawnTriangles()
+        for (edge in 0 until edgeCount) {
+            val alpha = rawEdgeAlphas[edge] * edgeFades[edge]
             rawEdgeAlphas[edge] = alpha
             edgeAlphas[edge] = alpha
         }
+    }
+
+    /**
+     * [fillTriangles] over the drawn edges, finding their triangles only when the drawn edges change,
+     * which for a mesh rebuilt every frame is still only when an edge flips.
+     */
+    private fun fillDrawnTriangles() {
+        if (!triangleCacheKeys.contentEquals(edgeKeys.copyOf(edgeCount))) {
+            triangleCacheKeys = edgeKeys.copyOf(edgeCount)
+            triangleCache = edgeTriangles(edgeKeys, edgeCount)
+        }
+        fillTriangles(triangleCache, rawEdgeAlphas)
     }
 
     /**
@@ -1313,6 +1344,78 @@ private fun restEdgeAlpha(key: Long, xs: FloatArray, ys: FloatArray, presence: F
     return min(edgeAlpha, dotAlpha)
 }
 
+/**
+ * Strict meshes: raises each edge's alpha before fades to the dimmer of the other two edges of any
+ * triangle it closes, so a long diagonal that length falloff would fade out of sight stays as visible
+ * as its triangle and no drawn face reads as a polygon. Depth dims an edge by its dimmer dot, so only
+ * length can leave an edge fainter than both other sides of its triangle; and each edge keeps its own
+ * fade, so an edge fading in or out still does. [triangles] holds edge index triples into [alphas].
+ */
+private fun fillTriangles(triangles: IntArray, alphas: FloatArray) {
+    var rounds = 0
+    var raised = true
+    while (raised && rounds < MAX_TRIANGLE_FILL_ROUNDS) {
+        raised = false
+        for (base in triangles.indices step 3) {
+            val first = triangles[base]
+            val second = triangles[base + 1]
+            val third = triangles[base + 2]
+            raised = alphas.raise(first, min(alphas[second], alphas[third])) || raised
+            raised = alphas.raise(second, min(alphas[first], alphas[third])) || raised
+            raised = alphas.raise(third, min(alphas[first], alphas[second])) || raised
+        }
+        rounds++
+    }
+}
+
+private fun FloatArray.raise(index: Int, value: Float): Boolean {
+    if (value <= this[index]) return false
+    this[index] = value
+    return true
+}
+
+/** The triangles of the first [edgeCount] of [edgeKeys], as triples of their indices there, each once. */
+private fun edgeTriangles(edgeKeys: LongArray, edgeCount: Int): IntArray {
+    val indexOf = HashMap<Long, Int>(edgeCount * 2)
+    val neighbours = HashMap<Int, MutableList<Int>>()
+    for (edge in 0 until edgeCount) {
+        val key = edgeKeys[edge]
+        indexOf[key] = edge
+        neighbours.getOrPut(edgeStart(key)) { ArrayList() } += edgeEnd(key)
+        neighbours.getOrPut(edgeEnd(key)) { ArrayList() } += edgeStart(key)
+    }
+    val triangles = ArrayList<Int>()
+    for (edge in 0 until edgeCount) {
+        val key = edgeKeys[edge]
+        // From the edge between each triangle's two lowest corners only; keys hold the lower end first.
+        for (apex in neighbours[edgeStart(key)].orEmpty()) {
+            if (apex <= edgeEnd(key)) continue
+            val toEnd = indexOf[edgeKey(edgeEnd(key), apex)] ?: continue
+            triangles += edge
+            triangles += indexOf.getValue(edgeKey(edgeStart(key), apex))
+            triangles += toEnd
+        }
+    }
+    return triangles.toIntArray()
+}
+
+/** [restAlphas] with each edge of [triangles] lifted to the dimmer of its triangle's other two, as [fillTriangles] does. */
+private fun liftedByTriangles(restAlphas: Map<Long, Float>, triangles: IntArray): Map<Long, Float> {
+    val lifted = HashMap(restAlphas)
+    for (base in triangles.indices step 3) {
+        val sides = longArrayOf(
+            edgeKey(triangles[base], triangles[base + 1]),
+            edgeKey(triangles[base + 1], triangles[base + 2]),
+            edgeKey(triangles[base + 2], triangles[base]),
+        )
+        for (side in 0 until 3) {
+            val others = min(restAlphas.getValue(sides[(side + 1) % 3]), restAlphas.getValue(sides[(side + 2) % 3]))
+            if (others > lifted.getValue(sides[side])) lifted[sides[side]] = others
+        }
+    }
+    return lifted
+}
+
 /** [edgeRule]'s filtered edges over the nodes in [mask] under [filters], with its repair candidates. */
 private fun ruleEdges(edgeRule: EdgeRule, mask: BooleanArray, xs: FloatArray, ys: FloatArray, filters: NetworkGraphLayerSpec, cell: Float, seed: Int): RuleEdges {
     val presentIndices = mask.indices.filter { mask[it] }.toIntArray()
@@ -1323,6 +1426,7 @@ private fun ruleEdges(edgeRule: EdgeRule, mask: BooleanArray, xs: FloatArray, ys
         return RuleEdges(
             base = proximityEdges(presentIndices, xs, ys, reach = filters.maxEdgeFactor * cell, keepChance = filters.edgeKeepChance, seed = seed),
             candidates = LongArray(nearest.size) { edge -> edgeKey(presentIndices[edgeStart(nearest[edge])], presentIndices[edgeEnd(nearest[edge])]) },
+            triangles = null,
         )
     }
     val triangles = Delaunay.triangulate(presentX, presentY, presentIndices.size)
@@ -1337,11 +1441,11 @@ private fun ruleEdges(edgeRule: EdgeRule, mask: BooleanArray, xs: FloatArray, ys
         keepChance = filters.edgeKeepChance,
         seed = seed,
     )
-    return RuleEdges(base, candidates = triangleEdgeKeys(triangles))
+    return RuleEdges(base, candidates = triangleEdgeKeys(triangles), triangles = triangles)
 }
 
-/** An edge rule's output for [enforceMinDegree]: its filtered edges and repair candidates. */
-private class RuleEdges(val base: LongArray, val candidates: LongArray)
+/** An edge rule's output for [enforceMinDegree]: its filtered edges, repair candidates and, for Delaunay rules, triangles. */
+private class RuleEdges(val base: LongArray, val candidates: LongArray, val triangles: IntArray?)
 
 /**
  * [enforceMinDegree] over [edges], keeping its connectivity rules when [keepConnectivity] and then
@@ -1369,9 +1473,27 @@ private fun enforceOnVisibleEdges(
             candidateEdges = edges.candidates.filter(visible).toLongArray(),
             maxRepairLength = filters.repairReach * filters.maxEdgeFactor * cell,
             strictTriangles = filters.strictTriangles,
+            triangles = edges.triangles,
             keepConnectivity = keepConnectivity,
         )
     }
     if (!keepConnectivity) return settle { true }
-    return settle { key -> restAlphaOf(key) >= visibleAlpha }
+    if (!filters.strictTriangles) return settle { key -> restAlphaOf(key) >= visibleAlpha }
+    val restAlphas = HashMap<Long, Float>()
+    for (key in edges.candidates) restAlphas[key] = restAlphaOf(key)
+    for (key in edges.base) restAlphas.getOrPut(key) { restAlphaOf(key) }
+    // Strict meshes lift a faint edge to its triangle's other sides (see [fillTriangles]). Which
+    // triangles the mesh keeps is known only once it settles, so this first guess counts every
+    // triangle, and an edge the settled mesh leaves faint after all is dropped and the mesh re-settled.
+    val liftedAlphas = edges.triangles?.let { liftedByTriangles(restAlphas, it) } ?: restAlphas
+    val faint = HashSet<Long>()
+    var passes = 0
+    while (true) {
+        val topology = settle { key -> key !in faint && liftedAlphas.getValue(key) >= visibleAlpha }
+        if (++passes == MAX_VISIBILITY_PASSES) return topology
+        val settled = liftedByTriangles(restAlphas, meshTriangles(count, topology.edges))
+        val newlyFaint = topology.edges.filter { settled.getValue(it) < visibleAlpha }
+        if (newlyFaint.isEmpty()) return topology
+        faint += newlyFaint
+    }
 }

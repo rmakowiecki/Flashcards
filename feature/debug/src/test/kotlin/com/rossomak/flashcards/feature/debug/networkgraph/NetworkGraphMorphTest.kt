@@ -362,10 +362,15 @@ class NetworkGraphMorphTest {
             }
         }
 
+        /**
+         * Every invariant violation over [frameCount] frames at [fraction]. Strict triangles are a still
+         * frame's rule only: mid-morph, the edges that carry a comet across the gap may be open.
+         */
         fun frames(label: String, fraction: Float, frameCount: Int): List<String> = (0 until frameCount).flatMap {
             advance(fraction).flatMap { layer ->
                 val field = fields.getValue(layer.seed)
-                frameViolations("$label ${width.toInt()}x${height.toInt()} layer ${layer.seed}", field, layer.spec.strictTriangles, timeSeconds)
+                val still = fraction <= 0f || fraction >= 1f
+                frameViolations("$label ${width.toInt()}x${height.toInt()} layer ${layer.seed}", field, layer.spec.strictTriangles && still, timeSeconds)
             }
         }
 
