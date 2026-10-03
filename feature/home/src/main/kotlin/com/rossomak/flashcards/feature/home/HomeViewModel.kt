@@ -7,6 +7,9 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.RecentSession.Fast
 import com.rossomak.flashcards.core.domain.model.RecentSession.Rated
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
@@ -93,10 +96,14 @@ class HomeViewModel @Inject constructor(
 
     /**
      * A Recent row has no browse target, so it opens Preview to study the same thing again (ADR-0041 exception).
-     * [RecentItem.subcategories] is already empty for Quick, so Preview samples the Category again.
+     * Quick sends no Subcategories, so Preview samples the Category again.
      */
     fun onRecentSelect(item: RecentItem) {
         val session = item.session
+        val (subcategoryIds, subcategoryNames) = when (session.sourceType) {
+            SingleSubcategory, Custom -> session.subcategoryIds to session.subcategoryNames
+            Quick -> emptyList<String>() to emptyList()
+        }
         val (voiceAnsweringEnabled, readAloudEnabled) = when (session) {
             is Rated -> session.voiceAnsweringEnabled to null
             is Fast -> null to session.readAloudEnabled
@@ -104,11 +111,11 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             eventChannel.send(
                 HomeDestination.RecentPreviewStudySession(
-                    categoryId = item.category.id,
-                    categoryName = item.category.name,
+                    categoryId = session.categoryId,
+                    categoryName = session.categoryName,
                     sourceType = session.sourceType,
-                    subcategoryIds = item.subcategories.map { it.id },
-                    subcategoryNames = item.subcategories.map { it.name },
+                    subcategoryIds = subcategoryIds,
+                    subcategoryNames = subcategoryNames,
                     studyMode = session.mode,
                     voiceAnsweringEnabled = voiceAnsweringEnabled,
                     readAloudEnabled = readAloudEnabled,

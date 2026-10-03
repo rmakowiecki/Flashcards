@@ -57,9 +57,15 @@ class FirestoreRecentsRemoteDataSource @Inject constructor(
         )
     }
 
-    /** Throws [IllegalArgumentException] when a required field is missing or has the wrong type. Firestore returns every integer as a `Long`. */
+    /**
+     * Throws [IllegalArgumentException] when a required field is missing or has the wrong type, or the
+     * Subcategory ids and names differ in length. Firestore returns every integer as a `Long`.
+     */
     private fun parseEntry(value: Any?): RecentSessionEntryDto {
         val fields = requireNotNull(value as? Map<*, *>) { "Non-object entry" }
+        val subcategoryIds = requireStringList(fields, FIELD_SUBCATEGORY_IDS)
+        val subcategoryNames = requireStringList(fields, FIELD_SUBCATEGORY_NAMES)
+        require(subcategoryIds.size == subcategoryNames.size) { "$FIELD_SUBCATEGORY_IDS and $FIELD_SUBCATEGORY_NAMES differ in length" }
         return RecentSessionEntryDto(
             sessionId = requireString(fields, FIELD_SESSION_ID),
             startTimestamp = requireNotNull(fields[FIELD_START_TIMESTAMP] as? Timestamp) { "Missing or non-timestamp $FIELD_START_TIMESTAMP" },
@@ -69,15 +75,20 @@ class FirestoreRecentsRemoteDataSource @Inject constructor(
             readAloud = fields[FIELD_READ_ALOUD] as? Boolean,
             sourceType = requireString(fields, FIELD_SOURCE_TYPE),
             categoryId = requireString(fields, FIELD_CATEGORY_ID),
-            subcategoryIds = requireNotNull(fields[FIELD_SUBCATEGORY_IDS] as? List<*>) { "Missing or non-list $FIELD_SUBCATEGORY_IDS" }.map { subcategoryId ->
-                requireNotNull(subcategoryId as? String) { "Non-string entry in $FIELD_SUBCATEGORY_IDS" }
-            },
+            categoryName = requireString(fields, FIELD_CATEGORY_NAME),
+            subcategoryIds = subcategoryIds,
+            subcategoryNames = subcategoryNames,
             cardCount = requireInt(fields, FIELD_CARD_COUNT),
             xpTotal = requireInt(fields, FIELD_XP_TOTAL),
         )
     }
 
     private fun requireString(fields: Map<*, *>, name: String): String = requireNotNull(fields[name] as? String) { "Missing or non-string $name" }
+
+    private fun requireStringList(fields: Map<*, *>, name: String): List<String> =
+        requireNotNull(fields[name] as? List<*>) { "Missing or non-list $name" }.map { element ->
+            requireNotNull(element as? String) { "Non-string entry in $name" }
+        }
 
     private fun requireInt(fields: Map<*, *>, name: String): Int = requireNotNull((fields[name] as? Number)?.toInt()) { "Missing or non-numeric $name" }
 
@@ -92,7 +103,9 @@ class FirestoreRecentsRemoteDataSource @Inject constructor(
         const val FIELD_READ_ALOUD = "readAloud"
         const val FIELD_SOURCE_TYPE = "sourceType"
         const val FIELD_CATEGORY_ID = "categoryId"
+        const val FIELD_CATEGORY_NAME = "categoryName"
         const val FIELD_SUBCATEGORY_IDS = "subcategoryIds"
+        const val FIELD_SUBCATEGORY_NAMES = "subcategoryNames"
         const val FIELD_CARD_COUNT = "cardCount"
         const val FIELD_XP_TOTAL = "xpTotal"
     }

@@ -20,7 +20,9 @@ data class RecentSessionEntryDto(
     val readAloud: Boolean?,
     val sourceType: String,
     val categoryId: String,
+    val categoryName: String,
     val subcategoryIds: List<String>,
+    val subcategoryNames: List<String>,
     val cardCount: Int,
     val xpTotal: Int,
 )

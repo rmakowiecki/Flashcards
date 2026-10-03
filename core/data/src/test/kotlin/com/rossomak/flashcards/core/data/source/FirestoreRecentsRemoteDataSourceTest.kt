@@ -65,13 +65,15 @@ class FirestoreRecentsRemoteDataSourceTest {
     }
 
     @Test
-    fun `an entry missing a required field or holding the wrong type is skipped and the rest still emit`() = runTest {
+    fun `an entry missing a required field, holding the wrong type or with mismatched Subcategory names is skipped and the rest still emit`() = runTest {
         val listenerSlot = listenToRecentsDocument()
         val snapshot = snapshotWithEntries(
             mapOf(
                 RATED_SESSION_ID to ratedEntryFields(),
                 "missing-category" to ratedEntryFields("missing-category") - "categoryId",
                 "string-card-count" to ratedEntryFields("string-card-count") + mapOf("cardCount" to "3"),
+                "missing-names" to ratedEntryFields("missing-names") - "categoryName" - "subcategoryNames",
+                "mismatched-names" to ratedEntryFields("mismatched-names") + mapOf("subcategoryNames" to listOf(SUBCATEGORY_NAME, "Extra")),
             ),
         )
 
@@ -131,7 +133,9 @@ class FirestoreRecentsRemoteDataSourceTest {
         "voiceAnswering" to true,
         "sourceType" to "SingleSubcategory",
         "categoryId" to CATEGORY_ID,
+        "categoryName" to CATEGORY_NAME,
         "subcategoryIds" to listOf(SUBCATEGORY_ID),
+        "subcategoryNames" to listOf(SUBCATEGORY_NAME),
         "cardCount" to CARD_COUNT.toLong(),
         "xpTotal" to XP_TOTAL.toLong(),
     )
@@ -145,7 +149,9 @@ class FirestoreRecentsRemoteDataSourceTest {
         readAloud = null,
         sourceType = "SingleSubcategory",
         categoryId = CATEGORY_ID,
+        categoryName = CATEGORY_NAME,
         subcategoryIds = listOf(SUBCATEGORY_ID),
+        subcategoryNames = listOf(SUBCATEGORY_NAME),
         cardCount = CARD_COUNT,
         xpTotal = XP_TOTAL,
     )
@@ -158,6 +164,8 @@ class FirestoreRecentsRemoteDataSourceTest {
         const val QUICK_SOURCE = "Quick"
         const val CATEGORY_ID = "android"
         const val SUBCATEGORY_ID = "compose"
+        const val CATEGORY_NAME = "Android"
+        const val SUBCATEGORY_NAME = "Compose"
         const val DURATION_SECONDS = 300
         const val CARD_COUNT = 12
         const val XP_TOTAL = -40

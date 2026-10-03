@@ -39,7 +39,9 @@ class ObserveRecentSessionsUseCaseTest {
         durationSeconds = 300,
         sourceType = SessionSourceType.Quick,
         categoryId = CATEGORY_ID,
+        categoryName = "Android",
         subcategoryIds = listOf(SUBCATEGORY_ID),
+        subcategoryNames = listOf("Compose"),
         studiedCount = 10,
         xpTotal = 120,
         readAloudEnabled = false,
@@ -48,7 +50,7 @@ class ObserveRecentSessionsUseCaseTest {
     private fun createUseCase() = ObserveRecentSessionsUseCase(recentSessionsRepository, flashcardRepository)
 
     @Test
-    fun `a Category fetch that fails once is retried and resolves the Recent`() = runTest {
+    fun `a Category fetch that fails once is retried and styles the Recent`() = runTest {
         recentSessionsRepository.setRecentSessions(listOf(quickSession))
         coEvery { flashcardRepository.fetchCategoriesByIds(setOf(CATEGORY_ID)) } returnsMany listOf(
             Result.failure(IllegalStateException("categories fetch failed")),
@@ -57,20 +59,20 @@ class ObserveRecentSessionsUseCaseTest {
 
         val recentItems = createUseCase()().first()
 
-        recentItems shouldBe listOf(RecentItem(quickSession, category, emptyList()))
+        recentItems shouldBe listOf(RecentItem(quickSession, category))
         coVerify(exactly = 2) { flashcardRepository.fetchCategoriesByIds(setOf(CATEGORY_ID)) }
         coVerify(exactly = 0) { flashcardRepository.fetchSubcategoriesByIds(any()) }
     }
 
     @Test
-    fun `a Category fetch that fails on every attempt drops the Recent after three attempts`() = runTest {
+    fun `a Category fetch that fails on every attempt keeps the Recent without a Category after three attempts`() = runTest {
         recentSessionsRepository.setRecentSessions(listOf(quickSession))
         coEvery { flashcardRepository.fetchCategoriesByIds(setOf(CATEGORY_ID)) } returns
             Result.failure(IllegalStateException("categories fetch failed"))
 
         val recentItems = createUseCase()().first()
 
-        recentItems shouldBe emptyList()
+        recentItems shouldBe listOf(RecentItem(quickSession, category = null))
         coVerify(exactly = 3) { flashcardRepository.fetchCategoriesByIds(setOf(CATEGORY_ID)) }
         coVerify(exactly = 0) { flashcardRepository.fetchSubcategoriesByIds(any()) }
     }

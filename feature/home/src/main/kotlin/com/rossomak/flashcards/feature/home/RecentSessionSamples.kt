@@ -6,7 +6,6 @@ import com.rossomak.flashcards.core.domain.model.RecentSession
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
-import com.rossomak.flashcards.core.domain.model.Subcategory
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -34,43 +33,15 @@ private val sampleAlgorithmsCategory = Category(
     color = null,
     featuredSubcategoryNames = emptyList(),
 )
-private val sampleComposeSubcategory = Subcategory(
-    id = "compose",
-    name = "Compose",
-    categoryId = sampleAndroidCategory.id,
-    categoryName = sampleAndroidCategory.name,
-    order = 0,
-    cardCount = 30,
-)
-private val sampleCoroutinesSubcategory = Subcategory(
-    id = "coroutines",
-    name = "Coroutines",
-    categoryId = sampleAndroidCategory.id,
-    categoryName = sampleAndroidCategory.name,
-    order = 1,
-    cardCount = 25,
-)
-private val sampleGraphsSubcategory = Subcategory(
-    id = "graphs",
-    name = "Graph traversal, shortest paths and minimum spanning trees in weighted graphs",
-    categoryId = sampleAlgorithmsCategory.id,
-    categoryName = sampleAlgorithmsCategory.name,
-    order = 0,
-    cardCount = 40,
-)
-private val sampleSortingSubcategory = Subcategory(
-    id = "sorting",
-    name = "Sorting",
-    categoryId = sampleAlgorithmsCategory.id,
-    categoryName = sampleAlgorithmsCategory.name,
-    order = 1,
-    cardCount = 20,
-)
+private val sampleComposeSubcategory = "compose" to "Compose"
+private val sampleCoroutinesSubcategory = "coroutines" to "Coroutines"
+private val sampleGraphsSubcategory = "graphs" to "Graph traversal, shortest paths and minimum spanning trees in weighted graphs"
+private val sampleSortingSubcategory = "sorting" to "Sorting"
 
 // Declared after the samples it reads: file-level properties initialize top to bottom.
 internal val previewRecentItems: List<RecentItem> = sampleRecentItems(now = previewRecentsNow)
 
-/** Newest first, covering each source type, Study Mode, hands-free flag and display edge case. */
+/** Newest first, covering each source type, Study Mode, hands-free flag and display edge case, including an unread Category. */
 @Suppress("MagicNumber", "LongMethod")
 internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
@@ -80,13 +51,14 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 480,
             sourceType = SingleSubcategory,
             categoryId = sampleAndroidCategory.id,
-            subcategoryIds = listOf(sampleComposeSubcategory.id),
+            categoryName = sampleAndroidCategory.name,
+            subcategoryIds = listOf(sampleComposeSubcategory.first),
+            subcategoryNames = listOf(sampleComposeSubcategory.second),
             studiedCount = 15,
             xpTotal = 140,
             voiceAnsweringEnabled = true,
         ),
         category = sampleAndroidCategory,
-        subcategories = listOf(sampleComposeSubcategory),
     ),
     RecentItem(
         session = RecentSession.Fast(
@@ -95,13 +67,14 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 720,
             sourceType = Quick,
             categoryId = sampleAndroidCategory.id,
-            subcategoryIds = listOf(sampleComposeSubcategory.id, sampleCoroutinesSubcategory.id, "navigation"),
+            categoryName = sampleAndroidCategory.name,
+            subcategoryIds = listOf(sampleComposeSubcategory.first, sampleCoroutinesSubcategory.first, "navigation"),
+            subcategoryNames = listOf(sampleComposeSubcategory.second, sampleCoroutinesSubcategory.second, "Navigation"),
             studiedCount = 20,
             xpTotal = 95,
             readAloudEnabled = true,
         ),
         category = sampleAndroidCategory,
-        subcategories = emptyList(),
     ),
     RecentItem(
         session = RecentSession.Rated(
@@ -110,13 +83,14 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 600,
             sourceType = Custom,
             categoryId = sampleAlgorithmsCategory.id,
-            subcategoryIds = listOf(sampleGraphsSubcategory.id, sampleSortingSubcategory.id),
+            categoryName = sampleAlgorithmsCategory.name,
+            subcategoryIds = listOf(sampleGraphsSubcategory.first, sampleSortingSubcategory.first),
+            subcategoryNames = listOf(sampleGraphsSubcategory.second, sampleSortingSubcategory.second),
             studiedCount = 12,
             xpTotal = 60,
             voiceAnsweringEnabled = false,
         ),
         category = sampleAlgorithmsCategory,
-        subcategories = listOf(sampleGraphsSubcategory, sampleSortingSubcategory),
     ),
     RecentItem(
         session = RecentSession.Fast(
@@ -125,13 +99,14 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 300,
             sourceType = SingleSubcategory,
             categoryId = sampleAlgorithmsCategory.id,
-            subcategoryIds = listOf(sampleGraphsSubcategory.id),
+            categoryName = sampleAlgorithmsCategory.name,
+            subcategoryIds = listOf(sampleGraphsSubcategory.first),
+            subcategoryNames = listOf(sampleGraphsSubcategory.second),
             studiedCount = 8,
             xpTotal = -20,
             readAloudEnabled = false,
         ),
         category = sampleAlgorithmsCategory,
-        subcategories = listOf(sampleGraphsSubcategory),
     ),
     RecentItem(
         session = RecentSession.Rated(
@@ -140,13 +115,14 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 45,
             sourceType = SingleSubcategory,
             categoryId = sampleAndroidCategory.id,
-            subcategoryIds = listOf(sampleCoroutinesSubcategory.id),
+            categoryName = sampleAndroidCategory.name,
+            subcategoryIds = listOf(sampleCoroutinesSubcategory.first),
+            subcategoryNames = listOf(sampleCoroutinesSubcategory.second),
             studiedCount = 1,
             xpTotal = 0,
             voiceAnsweringEnabled = false,
         ),
         category = sampleAndroidCategory,
-        subcategories = listOf(sampleCoroutinesSubcategory),
     ),
     RecentItem(
         session = RecentSession.Fast(
@@ -155,13 +131,14 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 1_500,
             sourceType = Custom,
             categoryId = sampleAndroidCategory.id,
-            subcategoryIds = listOf(sampleComposeSubcategory.id, sampleCoroutinesSubcategory.id),
+            categoryName = sampleAndroidCategory.name,
+            subcategoryIds = listOf(sampleComposeSubcategory.first, sampleCoroutinesSubcategory.first),
+            subcategoryNames = listOf(sampleComposeSubcategory.second, sampleCoroutinesSubcategory.second),
             studiedCount = 30,
             xpTotal = 210,
             readAloudEnabled = false,
         ),
         category = sampleAndroidCategory,
-        subcategories = listOf(sampleComposeSubcategory, sampleCoroutinesSubcategory),
     ),
     RecentItem(
         session = RecentSession.Rated(
@@ -170,12 +147,13 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
             durationSeconds = 900,
             sourceType = Quick,
             categoryId = sampleAlgorithmsCategory.id,
-            subcategoryIds = listOf(sampleGraphsSubcategory.id, sampleSortingSubcategory.id),
+            categoryName = sampleAlgorithmsCategory.name,
+            subcategoryIds = listOf(sampleGraphsSubcategory.first, sampleSortingSubcategory.first),
+            subcategoryNames = listOf(sampleGraphsSubcategory.second, sampleSortingSubcategory.second),
             studiedCount = 18,
             xpTotal = 120,
             voiceAnsweringEnabled = true,
         ),
-        category = sampleAlgorithmsCategory,
-        subcategories = emptyList(),
+        category = null,
     ),
 )

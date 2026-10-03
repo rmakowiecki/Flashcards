@@ -11,14 +11,16 @@ import org.junit.Test
 class RecentsMapperTest {
 
     @Test
-    fun `a Rated entry maps with its voice answering flag and the start as an Instant`() {
+    fun `a Rated entry maps with its names, its voice answering flag and the start as an Instant`() {
         ratedEntry().toDomainOrNull() shouldBe RecentSession.Rated(
             id = SESSION_ID,
             startedAt = Instant.ofEpochSecond(START_SECONDS),
             durationSeconds = DURATION_SECONDS,
             sourceType = Quick,
             categoryId = CATEGORY_ID,
+            categoryName = CATEGORY_NAME,
             subcategoryIds = listOf(SUBCATEGORY_ID),
+            subcategoryNames = listOf(SUBCATEGORY_NAME),
             studiedCount = CARD_COUNT,
             xpTotal = XP_TOTAL,
             voiceAnsweringEnabled = true,
@@ -61,7 +63,9 @@ class RecentsMapperTest {
         readAloud = null,
         sourceType = Quick.name,
         categoryId = CATEGORY_ID,
+        categoryName = CATEGORY_NAME,
         subcategoryIds = listOf(SUBCATEGORY_ID),
+        subcategoryNames = listOf(SUBCATEGORY_NAME),
         cardCount = CARD_COUNT,
         xpTotal = XP_TOTAL,
     )
@@ -70,6 +74,8 @@ class RecentsMapperTest {
         const val SESSION_ID = "session-1"
         const val CATEGORY_ID = "android"
         const val SUBCATEGORY_ID = "compose"
+        const val CATEGORY_NAME = "Android"
+        const val SUBCATEGORY_NAME = "Compose"
         const val START_SECONDS = 1_790_000_000L
         const val DURATION_SECONDS = 300
         const val CARD_COUNT = 12

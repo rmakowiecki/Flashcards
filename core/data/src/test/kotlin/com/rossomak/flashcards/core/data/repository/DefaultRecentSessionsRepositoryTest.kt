@@ -73,7 +73,9 @@ class DefaultRecentSessionsRepositoryTest {
                     durationSeconds = DURATION_SECONDS,
                     sourceType = Custom,
                     categoryId = CATEGORY_ID,
+                    categoryName = CATEGORY_NAME,
                     subcategoryIds = listOf(SUBCATEGORY_ID),
+                    subcategoryNames = listOf(SUBCATEGORY_NAME),
                     studiedCount = 1,
                     xpTotal = SERVER_XP_TOTAL,
                     readAloudEnabled = true,
@@ -84,7 +86,9 @@ class DefaultRecentSessionsRepositoryTest {
                     durationSeconds = DURATION_SECONDS,
                     sourceType = SingleSubcategory,
                     categoryId = CATEGORY_ID,
+                    categoryName = CATEGORY_NAME,
                     subcategoryIds = listOf(SUBCATEGORY_ID),
+                    subcategoryNames = listOf(SUBCATEGORY_NAME),
                     studiedCount = 1,
                     xpTotal = SERVER_XP_TOTAL,
                     voiceAnsweringEnabled = false,
@@ -123,7 +127,9 @@ class DefaultRecentSessionsRepositoryTest {
                     durationSeconds = DURATION_SECONDS,
                     sourceType = SingleSubcategory,
                     categoryId = CATEGORY_ID,
+                    categoryName = CATEGORY_NAME,
                     subcategoryIds = listOf(SUBCATEGORY_ID),
+                    subcategoryNames = listOf(SUBCATEGORY_NAME),
                     studiedCount = 1,
                     xpTotal = 540,
                     readAloudEnabled = false,
@@ -306,7 +312,9 @@ class DefaultRecentSessionsRepositoryTest {
         readAloud = null,
         sourceType = SingleSubcategory.name,
         categoryId = CATEGORY_ID,
+        categoryName = CATEGORY_NAME,
         subcategoryIds = listOf(SUBCATEGORY_ID),
+        subcategoryNames = listOf(SUBCATEGORY_NAME),
         cardCount = 1,
         xpTotal = SERVER_XP_TOTAL,
     )
@@ -317,9 +325,9 @@ class DefaultRecentSessionsRepositoryTest {
         durationSeconds = DURATION_SECONDS,
         abandoned = false,
         categoryId = CATEGORY_ID,
-        categoryName = "Category",
+        categoryName = CATEGORY_NAME,
         subcategoryIds = listOf(SUBCATEGORY_ID),
-        subcategoryNames = listOf("Subcategory"),
+        subcategoryNames = listOf(SUBCATEGORY_NAME),
         sourceType = SingleSubcategory,
         cardResults = cardIds.map { cardId -> FlashcardResult.Fast(cardId = cardId, subcategoryId = SUBCATEGORY_ID, state = Seen) },
         studyDate = STUDY_DATE,
@@ -335,6 +343,8 @@ class DefaultRecentSessionsRepositoryTest {
         const val OTHER_USER_ID = "user-2"
         const val CATEGORY_ID = "cat-1"
         const val SUBCATEGORY_ID = "sub-1"
+        const val CATEGORY_NAME = "Category"
+        const val SUBCATEGORY_NAME = "Subcategory"
         const val CARD_ID = "card-1"
         const val SESSION_ONE_ID = "session-1"
         const val SESSION_TWO_ID = "session-2"
