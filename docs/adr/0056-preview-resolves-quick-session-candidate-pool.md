@@ -56,8 +56,6 @@ offline, as Category Details already does. A cache-first read was rejected:
 **2026-10-03 — `isQuickSession` is now `sourceType`.** The route carries the session's
 `SessionSourceType` (SingleSubcategory, Quick or Custom) instead of a Quick flag, since the session
 records its entry point. Quick with no ids still means "Preview fetches the Category's Subcategories".
-The fetch now goes through `ResolveCategorySubcategoriesUseCase`, which tells a deleted Category apart
-from an unreadable one: a server-confirmed empty list shows "Category no longer available" with no
-Retry, and a failed read shows the connection error with Retry. A non-Quick route with no ids is no
-longer rejected at construction; Preview shows "Topics no longer available", which is how a Custom
-Recent whose Subcategories were all deleted replays.
+A failed or empty fetch shows the connection error with Retry. A non-Quick route must still carry its
+ids, and Preview uses them as given: Categories and Subcategories are never deleted, so Preview does not
+check that they exist. A Recent replay sends its stored Subcategories.

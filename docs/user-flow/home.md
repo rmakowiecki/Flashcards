@@ -17,7 +17,7 @@ flowchart TD
 
     %% ── Recents ───────────────────────────────────────────────────
     Home --> TapRecent[/Tap Recent row/]
-    TapRecent -->|replay: same Subcategory, fresh Quick sample,\nor Custom Subcategories that still resolve| Preview(PREVIEW STUDY SESSION\npast Study Mode and delivery preselected)
+    TapRecent -->|replay: same Subcategory, fresh Quick sample,\nor the stored Custom Subcategories| Preview(PREVIEW STUDY SESSION\npast Study Mode and delivery preselected)
 
     %% ── Favorites ─────────────────────────────────────────────────
     Home --> TapFavorite[/Tap Favorite card\nshows Subcategory + Category name/]

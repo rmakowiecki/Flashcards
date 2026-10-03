@@ -26,13 +26,14 @@ map keeps the 15 newest entries by `startTimestamp`, ties evicting the lower `se
 Ordering never depends on delivery order, so a Pending Session delivered late lands where it started
 and never pushes out a newer one.
 
-### Ids only; names resolve live
+### Names stored; the Category is looked up only for styling
 
-An entry repeats its session's ids, Study Mode, delivery flag, source type, card count, duration and
-`xpTotal`, but no names. `ObserveRecentSessionsUseCase` resolves the Category and Subcategories against
-the current taxonomy, as Favorites does. A row whose Category no longer resolves is dropped, as is a
-single-subcategory row whose Subcategory no longer resolves. A Custom row keeps the Subcategories that
-still resolve, possibly none. A Quick row resolves none, since replaying it samples the Category again.
+An entry repeats its session's ids and names, Study Mode, delivery flag, source type, card count,
+duration and `xpTotal`. Category and Subcategory names never change and are never deleted, so a stored
+name is always right, and a row never needs a taxonomy read to show or to replay. Pending Sessions
+carry the same names. `ObserveRecentSessionsUseCase` looks up each Category only for its color and
+icon, as Favorites does. A Category that cannot be read leaves the row without them; the row is never
+dropped.
 
 ### Pending Sessions are merged on the device
 
@@ -47,17 +48,18 @@ the merged list is capped at 15 after sorting.
   against one read on attach and one per change.
 - **An array of entries instead of a map.** Rejected: idempotency would need a manual scan for the
   session id, and the shape would differ from `favorites/state`.
-- **Denormalized names in each entry.** Rejected: a renamed Category or Subcategory would show its old
-  name until the entry aged out, and Favorites already resolve names live.
+- **Ids only, with names resolved live.** Rejected: offline, a Category or Subcategory that was never
+  cached would drop the row or replay a smaller session, although nothing was renamed or deleted.
+- **Category color and icon stored too.** Rejected: Pending Sessions do not carry them, so a lookup
+  is needed anyway, and repeating each icon in every entry costs bytes for no gain.
 
 ## Consequences
 
 - Home's Recents cost one read when the listener attaches and one per delivered session.
 - The document is a projection: it can be rebuilt from `sessions/*` at any time.
-- A row whose Category was deleted keeps its slot until newer sessions push it out, so the list can
-  show fewer than 15 rows.
-- Offline with a cold cache, a row whose Category or Subcategories were never cached cannot resolve and
-  is missing until the device is online.
+- Every row shows offline, with the names it was studied under. A row whose Category was never
+  cached shows without its color and icon.
+- Replay sends the stored Subcategories as they are; Preview no longer checks whether they exist.
 - When a session is delivered, its queue entry can be removed before the snapshot with its server
   entry arrives, so its row can briefly disappear and come back. Accepted.
 - A Recent row opens Preview rather than browsing, an exception recorded in

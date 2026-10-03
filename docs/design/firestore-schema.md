@@ -94,7 +94,7 @@ users/{uid}/favorites/state                           → { categories: { "<cate
 // → SessionSubmissionRemoteDataSource). Shape follows studyMode: RATED carries the four counters and full
 // cardResults entries below; FAST has none of the RATED-only fields at all — not zeroed, genuinely absent.
 users/{uid}/sessions/{sessionId}                      → { sessionId, startTimestamp, durationSeconds,
-                                                          studyMode: "rated"|"fast", isAbandoned,
+                                                          studyMode: "Rated"|"Fast", isAbandoned,
                                                           sourceType: "SingleSubcategory"|"Quick"|"Custom",
                                                           voiceAnswering,  // RATED only
                                                           readAloud,       // FAST only
@@ -127,19 +127,21 @@ users/{uid}/recents/state                             → { entries: { "<session
                                                             sessionId: string,
                                                             startTimestamp: Timestamp,
                                                             durationSeconds: number,
-                                                            studyMode: "rated"|"fast",
+                                                            studyMode: "Rated"|"Fast",
                                                             voiceAnswering: boolean,  // RATED only
                                                             readAloud: boolean,       // FAST only
                                                             sourceType: "SingleSubcategory"|"Quick"|"Custom",
                                                             categoryId: string,
+                                                            categoryName: string,
                                                             subcategoryIds: string[],
+                                                            subcategoryNames: string[],  // parallel to subcategoryIds
                                                             cardCount: number,
                                                             xpTotal: number  // signed
                                                           }, ... } }
 ```
 
 - **One document per User holding their latest 15 sessions**, so Home's Recently studied list costs one read on attach and one per change instead of a query over `sessions`. See [ADR-0057](../adr/0057-recents-state-projection.md).
-- Each entry repeats its session document's field names and values. It holds **no names**: Categories and Subcategories resolve live on the client, as for `favorites/state`, and a row whose Category no longer resolves is dropped.
+- Each entry repeats its session document's field names and values, **names included**: names never change, so a row shows and replays without any taxonomy read. The client looks up the Category only for its color and icon, and an entry missing its names, or whose `subcategoryIds` and `subcategoryNames` differ in length, is skipped.
 - Keyed by `sessionId`, so a retried submission is idempotent: an id already present leaves the document untouched. A new entry is added, then the map is trimmed to the 15 newest by `startTimestamp`, ties evicting the lower `sessionId` first. A late-delivered old session therefore never pushes out a newer one; one older than every kept entry is not written at all.
 - **Client-read-only**: the owner may read it; only the function (Admin SDK) writes it. See `firestore.rules`.
 
