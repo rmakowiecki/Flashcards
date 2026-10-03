@@ -6,7 +6,6 @@ import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
-import com.rossomak.flashcards.feature.study.R
 
 @Preview(showBackground = true)
 @Composable
@@ -36,7 +35,7 @@ private fun PreviewStudySessionErrorPreview() {
             categoryName = "Android",
             subcategoryNames = listOf("Compose"),
             isLoading = false,
-            error = R.string.study_session_load_error_message,
+            loadFailure = PreviewLoadFailureReason.LoadFailed,
         ),
         onNavigateBack = {},
         onRetry = {},

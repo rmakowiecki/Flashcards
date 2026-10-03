@@ -272,7 +272,9 @@ generation goes to the server; every read after that in the same generation is s
 on-device Firestore cache. An empty cache result falls through to the server rather than
 surfacing as an empty success — sound only because a Subcategory always contains at least one
 Flashcard (`CONTEXT.md`), so an empty cache result unambiguously means "not cached yet," never
-"genuinely empty." `invalidateFlashcardCache()` bumps the generation, re-arming the server read
+"genuinely empty." The reverse holds too: a failed server read, most often offline, is answered
+from the cache when it has cards, without marking the Subcategory fresh, so a Study Session survives
+offline process death. `invalidateFlashcardCache()` bumps the generation, re-arming the server read
 for every Subcategory. A server read in flight when a bump lands captures its starting generation
 before the network call and only stamps that Subcategory as current if the generation is still
 unchanged afterward — otherwise the response still returns to its own caller, but isn't trusted as

@@ -46,7 +46,6 @@ import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
@@ -275,7 +274,7 @@ class PreviewStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
         viewModel.state.value.canStart shouldBe false
     }
 
@@ -988,13 +987,13 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
 
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
         viewModel.onRetry()
         advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe null
+        viewModel.state.value.loadFailure shouldBe null
         viewModel.state.value.selectedCardCount shouldBe 1
     }
 
@@ -1223,7 +1222,7 @@ class PreviewStudySessionViewModelTest {
             viewModel.state.value.subcategoryNames shouldBe
                 sampledIds.map { id -> fetchedPool.first { subcategory -> subcategory.id == id }.name }
             viewModel.state.value.isLoading shouldBe false
-            viewModel.state.value.error shouldBe null
+            viewModel.state.value.loadFailure shouldBe null
         }
 
     @Test
@@ -1292,34 +1291,26 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
-    fun `a quick route whose category is gone shows the unavailable message and the load error`() =
+    fun `a quick route whose category is gone shows the category unavailable state`() =
         runTest(mainDispatcherRule.testDispatcher) {
             seedPoolLessQuickSession()
             flashcardRepository.categorySubcategoriesResolutionToReturn = CategorySubcategoriesResolution.Missing
             val viewModel = createViewModel()
+            advanceUntilIdle()
 
-            viewModel.messages.test {
-                advanceUntilIdle()
-
-                awaitItem() shouldBe PreviewStudySessionMessage.CategoryUnavailable
-            }
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.CategoryUnavailable
             viewModel.state.value.canStart shouldBe false
         }
 
     @Test
-    fun `a quick route whose pool cannot be read shows the load error without a message`() =
+    fun `a quick route whose pool cannot be read shows the load error`() =
         runTest(mainDispatcherRule.testDispatcher) {
             seedPoolLessQuickSession()
             flashcardRepository.categorySubcategoriesResolutionToReturn = CategorySubcategoriesResolution.Unknown
             val viewModel = createViewModel()
+            advanceUntilIdle()
 
-            viewModel.messages.test {
-                advanceUntilIdle()
-
-                expectNoEvents()
-            }
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
         }
 
     @Test
@@ -1359,52 +1350,26 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
-    fun `a route whose subcategories are all missing shows the unavailable message and draws nothing`() =
+    fun `a route whose subcategories are all missing shows the subcategories unavailable state and draws nothing`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(threeSubcategoryRoute)
             flashcardRepository.subcategoryAvailabilityToReturn = threeSubcategoryRoute.subcategoryIds.associateWith { Missing }
             val viewModel = createViewModel()
+            advanceUntilIdle()
 
-            viewModel.messages.test {
-                advanceUntilIdle()
-
-                awaitItem() shouldBe PreviewStudySessionMessage.SubcategoriesUnavailable
-            }
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.SubcategoriesUnavailable
             viewModel.state.value.canStart shouldBe false
             flashcardRepository.fetchedSubcategoryIds shouldBe emptyList()
         }
 
     @Test
-    fun `a non quick route without subcategory ids shows the unavailable message`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a non quick route without subcategory ids shows the subcategories unavailable state`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(poolLessQuickSessionRoute.copy(sourceType = Custom))
         val viewModel = createViewModel()
+        advanceUntilIdle()
 
-        viewModel.messages.test {
-            advanceUntilIdle()
-
-            awaitItem() shouldBe PreviewStudySessionMessage.SubcategoriesUnavailable
-        }
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.SubcategoriesUnavailable
         flashcardRepository.resolvedAvailabilitySubcategoryIds shouldBe emptyList()
-    }
-
-    @Test
-    fun `retry checks the subcategories again after they were all missing`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(threeSubcategoryRoute)
-        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
-        flashcardRepository.subcategoryAvailabilityToReturn = threeSubcategoryRoute.subcategoryIds.associateWith { Missing }
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        flashcardRepository.subcategoryAvailabilityToReturn = null
-        viewModel.onRetry()
-        advanceUntilIdle()
-
-        flashcardRepository.resolvedAvailabilitySubcategoryIds.size shouldBe 2
-        viewModel.state.value.error shouldBe null
-        viewModel.state.value.canStart shouldBe true
-        viewModel.state.value.config.subcategoryIds shouldBe threeSubcategoryRoute.subcategoryIds
     }
 
     @Test
@@ -1451,7 +1416,7 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
             viewModel.state.value.isLoading shouldBe false
 
             flashcardRepository.subcategoriesToReturn = Result.success(fetchedPool)
@@ -1459,7 +1424,7 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId, categoryId)
-            viewModel.state.value.error shouldBe null
+            viewModel.state.value.loadFailure shouldBe null
             viewModel.state.value.canStart shouldBe true
             viewModel.state.value.config.subcategoryIds.isNotEmpty() shouldBe true
         }
@@ -1476,7 +1441,7 @@ class PreviewStudySessionViewModelTest {
         advanceUntilIdle()
 
         flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
     }
 
     @Test
@@ -1487,14 +1452,14 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.loadFailure shouldBe PreviewLoadFailureReason.LoadFailed
 
             flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
             viewModel.onRetry()
             advanceUntilIdle()
 
             flashcardRepository.fetchedSubcategoryCategoryIds shouldBe emptyList()
-            viewModel.state.value.error shouldBe null
+            viewModel.state.value.loadFailure shouldBe null
         }
 
     @Test

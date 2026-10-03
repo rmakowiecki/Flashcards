@@ -85,6 +85,7 @@ private const val PRESENTED_CARD_INDEX = 0
 fun RatedStudySessionScreen(
     modifier: Modifier = Modifier,
     viewModel: RatedStudySessionViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit,
     onNavigateToSummary: (StudySessionSummaryRoute) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -92,6 +93,7 @@ fun RatedStudySessionScreen(
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             is RatedStudySessionDestination.Summary -> onNavigateToSummary(destination.route)
+            RatedStudySessionDestination.Back -> onNavigateBack()
         }
     }
 
@@ -225,7 +227,6 @@ fun RatedStudySessionContent(
         ) { innerPadding ->
             StudySessionBody(
                 isLoading = state.isLoading,
-                error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
                 currentCardIndex = PRESENTED_CARD_INDEX,
                 isAnswerRevealed = state.isAnswerRevealed,

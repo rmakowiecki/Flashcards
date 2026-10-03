@@ -83,6 +83,7 @@ private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 150.dp
 fun FastStudySessionScreen(
     modifier: Modifier = Modifier,
     viewModel: FastStudySessionViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit,
     onNavigateToSummary: (StudySessionSummaryRoute) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -90,6 +91,7 @@ fun FastStudySessionScreen(
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             is FastStudySessionDestination.Summary -> onNavigateToSummary(destination.route)
+            FastStudySessionDestination.Back -> onNavigateBack()
         }
     }
 
@@ -232,7 +234,6 @@ fun FastStudySessionContent(
         ) { innerPadding ->
             StudySessionBody(
                 isLoading = state.isLoading,
-                error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
                 currentCardIndex = state.currentCardIndex,
                 isAnswerRevealed = state.isAnswerRevealed,

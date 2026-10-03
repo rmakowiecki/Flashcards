@@ -33,10 +33,12 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
+import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.CategoryUnavailable
+import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.LoadFailed
+import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.SubcategoriesUnavailable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -413,17 +415,14 @@ class PreviewStudySessionViewModel @Inject constructor(
      * written to `config.subcategoryIds` below.
      *
      * @param resampleQuickSession rerolls the Quick Session's Subcategory sample first, fetching the
-     * pool if none is held yet. Subcategories that cannot be resolved land on the same error state a
-     * failed card draw does, with no draw attempted.
+     * pool if none is held yet. Subcategories that cannot be resolved put their own
+     * [PreviewLoadFailureReason] in state, with no draw attempted.
      */
     private fun selectCards(resampleQuickSession: Boolean = false) {
         selectionJob?.cancel()
         selectionJob = viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            val resolved = resolveSubcategories(resampleQuickSession) ?: run {
-                _state.update { it.copy(isLoading = false, error = R.string.study_session_load_error_message) }
-                return@launch
-            }
+            _state.update { it.copy(isLoading = true, loadFailure = null) }
+            val resolved = resolveSubcategories(resampleQuickSession) ?: return@launch
             _state.update { state ->
                 state.copy(
                     subcategoryNames = resolved.names,
@@ -450,7 +449,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                         val availableTags = if (state.isSingleSubcategory) plan.poolTags else emptyList()
                         state.copy(
                             isLoading = false,
-                            error = null,
+                            loadFailure = null,
                             selectedCardCount = plan.cards.size,
                             estimatedMinutes = plan.estimatedMinutes,
                             availableTags = availableTags,
@@ -469,7 +468,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                     }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, error = R.string.study_session_load_error_message) }
+                    _state.update { it.copy(isLoading = false, loadFailure = LoadFailed) }
                 }
         }
     }
@@ -487,7 +486,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * [resampleQuickSession] asks (ADR-0040). Sampled ids are mapped back to names through
      * [candidatePool] — the pool the sample was drawn from.
      *
-     * @return null when there is nothing to draw from; a route with no Subcategory left also tells the user.
+     * @return null when there is nothing to draw from, with the reason already in state.
      */
     private suspend fun resolveSubcategories(resampleQuickSession: Boolean): ResolvedSubcategories? {
         if (route.sourceType != Quick) {
@@ -496,7 +495,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                 ?.let { ids -> resolveSubcategoryAvailability(ids.toSet()) }
                 .orEmpty()
             val checked = route.withoutMissingSubcategories(availability)
-            if (checked == null) _messages.tryEmit(PreviewStudySessionMessage.SubcategoriesUnavailable)
+            if (checked == null) _state.update { it.copy(isLoading = false, loadFailure = SubcategoriesUnavailable) }
             if (availability.values.any { it != SubcategoryAvailability.Unknown }) routeSubcategories = checked
             return checked
         }
@@ -514,10 +513,11 @@ class PreviewStudySessionViewModel @Inject constructor(
      * length or the sort (ADR-0040).
      *
      * Fetches the Category's Subcategories as the pool first when the route supplied none, and
-     * only once: a held pool is reused (ADR-0056). A Category the server confirms is gone also
-     * tells the user; one that merely could not be read does not, and Retry fetches again.
+     * only once: a held pool is reused (ADR-0056). A Category the server confirms is gone is
+     * [CategoryUnavailable]; one that merely could not be read is [LoadFailed], and Retry fetches again.
      *
-     * @return false when the pool could not be fetched, leaving the previous sample untouched.
+     * @return false when the pool could not be fetched, with the reason in state and the previous
+     * sample untouched.
      */
     private suspend fun resampleSubcategories(): Boolean {
         val pool = candidatePool ?: when (val resolution = resolveCategorySubcategories(route.categoryId)) {
@@ -525,11 +525,13 @@ class PreviewStudySessionViewModel @Inject constructor(
                 .associate { subcategory -> subcategory.id to subcategory.name }
                 .also { fetchedPool -> candidatePool = fetchedPool }
             Missing -> {
-                _messages.tryEmit(PreviewStudySessionMessage.CategoryUnavailable)
+                _state.update { it.copy(isLoading = false, loadFailure = CategoryUnavailable) }
                 return false
             }
-            // The repository already logged a failed read; an empty cache-only answer is no failure.
-            Unknown -> return false
+            Unknown -> {
+                _state.update { it.copy(isLoading = false, loadFailure = LoadFailed) }
+                return false
+            }
         }
         val sampledIds = sampleQuickSessionSubcategories(
             SampleQuickSessionSubcategoriesUseCase.Params(

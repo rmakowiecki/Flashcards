@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.study.rated
 
-import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
@@ -31,7 +30,6 @@ data class RatedStudySessionScreenState(
     val isLoading: Boolean = false,
     val flashcards: List<Flashcard> = emptyList(),
     val isAnswerRevealed: Boolean = false,
-    @param:StringRes val error: Int? = null,
     // Routed at session start (RatedStudySessionRoute.voiceAnsweringEnabled) — known synchronously,
     // unlike isVoiceActive below, which only flips once the voice engine finishes binding. The
     // sheet must never show the manual-mode perspective for a voice session, even for the moment

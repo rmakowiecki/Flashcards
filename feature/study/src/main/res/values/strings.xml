@@ -19,8 +19,6 @@
     <string name="study_session_voice_answer_skip_pause_message">No answer heard 3 times in a row, pausing the session.</string>
     <string name="study_session_voice_answer_grading_pause_spoken_message">Grading isn\'t working right now. Pausing.</string>
     <string name="study_session_voice_answer_grading_pause_message">Grading isn\'t working right now, pausing the session.</string>
-    <string name="study_session_no_cards_message">No cards available</string>
-    <string name="study_session_load_error_message">Could not load flashcards</string>
     <string name="fast_study_session_report_failure_message">Failed to submit report</string>
     <string name="study_session_curate_flashcard_cd">Curate flashcard</string>
     <string name="study_session_show_answer_button">Show Answer</string>
@@ -121,8 +119,10 @@
     <string name="preview_session_mic_permission_empty_state_message">Voice answering needs the microphone. Allow it in system settings, then tap Start, or study this session with manual rating.</string>
     <string name="preview_session_mic_permission_open_settings_button">Open settings</string>
     <string name="preview_session_mic_permission_switch_to_manual_button">Switch to manual</string>
-    <string name="preview_session_subcategories_unavailable_message">These topics are no longer available</string>
-    <string name="preview_session_category_unavailable_message">This category is no longer available</string>
+    <string name="preview_session_subcategories_unavailable_title">Topics no longer available</string>
+    <string name="preview_session_subcategories_unavailable_message">These topics were removed, so there is nothing to study here</string>
+    <string name="preview_session_category_unavailable_title">Category no longer available</string>
+    <string name="preview_session_category_unavailable_message">This category was removed, so there is nothing to study here</string>
     <string name="preview_session_scope_quick_session_message">" auto-selected across "</string>
     <string name="preview_session_scope_single_subcategory_prefix_message">" from your "</string>
     <string name="preview_session_scope_single_subcategory_suffix_message">" deck."</string>

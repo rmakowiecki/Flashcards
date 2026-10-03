@@ -338,12 +338,14 @@ fun FlashcardsNavGraph(
                 }
                 composable<FastStudySessionRoute> {
                     FastStudySessionScreen(
-                        onNavigateToSummary = navController::navigateToStudySessionSummary
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSummary = navController::navigateToStudySessionSummary,
                     )
                 }
                 composable<RatedStudySessionRoute> {
                     RatedStudySessionScreen(
-                        onNavigateToSummary = navController::navigateToStudySessionSummary
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSummary = navController::navigateToStudySessionSummary,
                     )
                 }
                 composable<StudySessionSummaryRoute> {

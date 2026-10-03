@@ -9,7 +9,7 @@ sealed interface RatedSessionStateSnapshot {
     /** The session's cards are still loading. */
     data object Loading : RatedSessionStateSnapshot
 
-    /** The session's cards could not be loaded. */
+    /** The session's cards could not be loaded, or none of the routed card ids was found. */
     data object LoadFailed : RatedSessionStateSnapshot
 
     /**
@@ -57,7 +57,7 @@ sealed interface FastSessionStateSnapshot {
     /** The session's cards are still loading. */
     data object Loading : FastSessionStateSnapshot
 
-    /** The session's cards could not be loaded. */
+    /** The session's cards could not be loaded, or none of the routed card ids was found. */
     data object LoadFailed : FastSessionStateSnapshot
 
     /**
