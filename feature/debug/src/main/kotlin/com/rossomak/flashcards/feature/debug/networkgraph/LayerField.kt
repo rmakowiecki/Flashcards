@@ -139,6 +139,13 @@ private const val NODE_FULL_AT_EDGE_SHARE = 0.35f
  */
 private const val MAX_ALPHA_ROUNDS = 16
 
+/**
+ * How far over [EDGE_VISIBLE_ALPHA] an edge must be drawn at rest to count toward the mesh rules: one
+ * drawn fainter reads as missing, so a node or join held only by such edges is repaired or pruned
+ * instead. The margin covers drift stretching an edge.
+ */
+private const val VISIBLE_EDGE_MARGIN = 2f
+
 /** An alpha round that lowers no dot by more than this counts as settled. */
 private const val ALPHA_SETTLE_EPSILON = 1e-4f
 
@@ -146,6 +153,9 @@ private const val ALPHA_SETTLE_EPSILON = 1e-4f
 private const val ALPHA_RULE_TOLERANCE = 1e-4f
 
 private val ViolationColor = Color(0xFFFF1744)
+
+/** Rings the nodes of a drawn graph smaller than [MIN_GRAPH_NODES]. */
+private val SmallGraphColor = Color(0xFFFFAB00)
 private const val VIOLATION_RING_RADIUS_DP = 7f
 private const val VIOLATION_RING_STROKE_DP = 1.5f
 
@@ -308,6 +318,17 @@ internal class LayerField(
         return edgeAlphas[edge] * (1f - spec.pulseDepth.coerceIn(0f, 1f) * (1f - EDGE_PULSE_FLOOR) * trough)
     }
 
+    /**
+     * [connectivityViolations] of the graph as drawn by the last [advance]: its visible edges between
+     * visible dots.
+     */
+    internal fun drawnConnectivityViolations(): ConnectivityViolations {
+        val visible = (0 until edgeCount).map { edgeKeys[it] to edgeAlphas[it] }.filter { (key, alpha) ->
+            alpha >= EDGE_VISIBLE_ALPHA && nodeAlphas[edgeStart(key)] >= NODE_VISIBLE_ALPHA && nodeAlphas[edgeEnd(key)] >= NODE_VISIBLE_ALPHA
+        }
+        return connectivityViolations(count, LongArray(visible.size) { visible[it].first })
+    }
+
     /** Moves the layer to [timeSeconds] on a [width] × [height] surface, under the current [spec]. */
     fun advance(timeSeconds: Float, width: Float, height: Float) {
         val isFirstFrame = lastTimeSeconds.isNaN()
@@ -329,13 +350,13 @@ internal class LayerField(
         val wasMorphing = morphMesh != null
         if (spec.edgeRule != EdgeRule.FixedTriangulation) {
             morphMesh = null
-            topology = settleTopology(positionsX, positionsY, presentMask, spec)
+            topology = settleTopology(positionsX, positionsY, presentMask, presences, spec)
         } else if (morph != null) {
             topology = morphMeshFor(morph, width, height).union
         } else if (isFirstFrame || presenceChanged || filtersChanged || wasMorphing) {
             morphMesh = null
             // Triangulated over rest positions: drift stays under a cell, so the mesh never tangles.
-            topology = settleTopology(homeX, homeY, presentMask, spec)
+            topology = settleTopology(homeX, homeY, presentMask, presences, spec)
         }
         prunedNodeCount = (0 until count).count { presentMask[it] && !topology.alive[it] }
         updateFadingEdges(stepSeconds, isFirstFrame, morphing = morph != null)
@@ -614,17 +635,22 @@ internal class LayerField(
      */
     private fun morphMeshFor(morph: LayerShape.Morph, width: Float, height: Float): MorphMesh {
         morphMesh?.takeIf { it.isFor(morph, width, height, count) }?.let { return it }
-        val startMask = BooleanArray(count) { scratch(0, 0)[it] * borderFactor(it, width, height) >= PRESENT_THRESHOLD }
-        val endMask = BooleanArray(count) { scratch(0, 1)[it] * borderFactor(it, width, height) >= PRESENT_THRESHOLD }
-        val start = settleTopology(homeX, homeY, startMask, morph.from.nearestSpec)
-        val end = settleTopology(homeX, homeY, endMask, morph.to.nearestSpec)
+        val startPresences = FloatArray(count) { scratch(0, 0)[it] * borderFactor(it, width, height) }
+        val endPresences = FloatArray(count) { scratch(0, 1)[it] * borderFactor(it, width, height) }
+        val startMask = BooleanArray(count) { startPresences[it] >= PRESENT_THRESHOLD }
+        val endMask = BooleanArray(count) { endPresences[it] >= PRESENT_THRESHOLD }
+        val start = settleTopology(homeX, homeY, startMask, startPresences, morph.from.nearestSpec)
+        val end = settleTopology(homeX, homeY, endMask, endPresences, morph.to.nearestSpec)
         val comets = cometTrackFor(morph, level = 0, width = width, height = height)
         val transitMask = BooleanArray(count) { index ->
             !startMask[index] && !endMask[index] && comets.peaks[index] * borderFactor(index, width, height) >= PRESENT_THRESHOLD
         }
         val transit = if (transitMask.any { it }) {
             val everyMask = BooleanArray(count) { startMask[it] || endMask[it] || transitMask[it] }
-            TransitMesh(settleTopology(homeX, homeY, everyMask, morph.to.nearestSpec), transitMask)
+            val everyPresences = FloatArray(count) { index ->
+                max(max(startPresences[index], endPresences[index]), comets.peaks[index] * borderFactor(index, width, height))
+            }
+            TransitMesh(settleTopology(homeX, homeY, everyMask, everyPresences, morph.to.nearestSpec), transitMask)
         } else {
             null
         }
@@ -669,44 +695,23 @@ internal class LayerField(
     /**
      * The rule's filtered edges over the nodes present enough to join the mesh, then [enforceMinDegree]
      * with the rule's repair candidates. Absent nodes get no edges, so it prunes them along the way.
+     *
+     * Under [EdgeRule.FixedTriangulation], which settles once per shape rather than every frame, the
+     * mesh also keeps [enforceMinDegree]'s connectivity rules, and edges drawn too faint to see (see
+     * [VISIBLE_EDGE_MARGIN]) don't count, so the rules hold for the graph as seen.
      */
-    private fun settleTopology(xs: FloatArray, ys: FloatArray, mask: BooleanArray, filters: NetworkGraphLayerSpec): MeshTopology {
-        val presentIndices = (0 until count).filter { mask[it] }.toIntArray()
-        val presentX = FloatArray(presentIndices.size) { xs[presentIndices[it]] }
-        val presentY = FloatArray(presentIndices.size) { ys[presentIndices[it]] }
-        val baseEdges: LongArray
-        val candidateEdges: LongArray
-        if (spec.edgeRule == EdgeRule.Proximity) {
-            baseEdges = proximityEdges(presentIndices, xs, ys, reach = filters.maxEdgeFactor * cell, keepChance = filters.edgeKeepChance, seed = seed)
-            val nearest = nearestNeighbourEdgeKeys(presentIndices.size, presentX, presentY, PROXIMITY_REPAIR_NEIGHBOURS)
-            candidateEdges = LongArray(nearest.size) { edge ->
-                edgeKey(presentIndices[edgeStart(nearest[edge])], presentIndices[edgeEnd(nearest[edge])])
-            }
-        } else {
-            val triangles = Delaunay.triangulate(presentX, presentY, presentIndices.size)
-            // Back to pool indices, so each pair's keep chance stays the same whoever else is present.
-            for (corner in triangles.indices) triangles[corner] = presentIndices[triangles[corner]]
-            baseEdges = meshEdgeKeys(
-                triangles = triangles,
-                xs = xs,
-                ys = ys,
-                minAngleDegrees = filters.minAngleDegrees,
-                maxLength = filters.maxEdgeFactor * cell,
-                keepChance = filters.edgeKeepChance,
-                seed = seed,
-            )
-            candidateEdges = triangleEdgeKeys(triangles)
-        }
-        return enforceMinDegree(
+    private fun settleTopology(xs: FloatArray, ys: FloatArray, mask: BooleanArray, presence: FloatArray, filters: NetworkGraphLayerSpec): MeshTopology =
+        enforceOnVisibleEdges(
             count = count,
             xs = xs,
             ys = ys,
-            baseEdges = baseEdges,
-            candidateEdges = candidateEdges,
-            maxRepairLength = filters.repairReach * filters.maxEdgeFactor * cell,
-            strictTriangles = filters.strictTriangles,
-        )
-    }
+            edges = ruleEdges(spec.edgeRule, mask, xs, ys, filters, cell, seed),
+            presence = presence,
+            filters = filters,
+            cell = cell,
+            // A mesh rebuilt every frame can't afford the connectivity rules, nor needs edge visibility without them.
+            keepConnectivity = spec.edgeRule == EdgeRule.FixedTriangulation,
+        ) { nodes[it].depth }
 
     private fun ensureEdgeCapacity(capacity: Int) {
         if (edgeKeys.size >= capacity) return
@@ -918,8 +923,10 @@ internal class LayerField(
     private fun sizeFactor(index: Int): Float = max(NODE_SIZE_FLOOR, 1f + spec.nodeSizeVariance * (nodes[index].sizeRoll * 2f - 1f))
 
     /**
-     * Rings every node drawn visibly with fewer than two visible edges, and every node fainter than an
-     * edge it anchors as drawn this frame; there should never be either.
+     * Rings in red every node drawn visibly with fewer than two visible edges, every node fainter than an
+     * edge it anchors as drawn this frame, and every cut node of the drawn graph; in amber, every node of
+     * a drawn graph smaller than [MIN_GRAPH_NODES]. Still frames should have none; a morph may pass
+     * through some.
      */
     private fun DrawScope.drawViolations(timeSeconds: Float) {
         val stroke = Stroke(width = VIOLATION_RING_STROKE_DP * pxPerDp)
@@ -934,13 +941,15 @@ internal class LayerField(
             val underconnected = nodeAlphas[index] >= NODE_VISIBLE_ALPHA && visibleEdgeCounts[index] < 2
             val fainterThanEdge = brightestDrawn[index] > nodeAlphas[index] + ALPHA_RULE_TOLERANCE
             if (!underconnected && !fainterThanEdge) continue
-            drawCircle(
-                color = ViolationColor,
-                radius = VIOLATION_RING_RADIUS_DP * pxPerDp,
-                center = Offset(positionsX[index], positionsY[index]),
-                style = stroke,
-            )
+            drawViolationRing(index, ViolationColor, stroke)
         }
+        val connectivity = drawnConnectivityViolations()
+        connectivity.smallGraphNodes.forEach { drawViolationRing(it, SmallGraphColor, stroke) }
+        connectivity.cutNodes.forEach { drawViolationRing(it, ViolationColor, stroke) }
+    }
+
+    private fun DrawScope.drawViolationRing(index: Int, color: Color, stroke: Stroke) {
+        drawCircle(color = color, radius = VIOLATION_RING_RADIUS_DP * pxPerDp, center = Offset(positionsX[index], positionsY[index]), style = stroke)
     }
 
     /** The brush's gradient is centered on the origin, so the canvas moves to the point instead. */
@@ -1281,4 +1290,88 @@ private class DriftAxis(private val frequency: Float, private val coarsePhase: F
 /** A node's wander in its own rotated frame, as a fraction of its drift reach. */
 private class NodeDrift(private val primary: DriftAxis, private val secondary: DriftAxis) {
     fun offsetAt(clock: Float): Offset = Offset(primary.offsetAt(clock), secondary.offsetAt(clock))
+}
+
+/**
+ * The alpha the edge [key] is drawn at once fully faded in under [filters], at these positions and
+ * [presence]s: what length falloff, depth and the layer's alpha leave of it, capped by the dimmer of
+ * its two dots as that dot would fade with this edge (see [LayerField]'s updateAlphas).
+ */
+private fun restEdgeAlpha(key: Long, xs: FloatArray, ys: FloatArray, presence: FloatArray, filters: NetworkGraphLayerSpec, cell: Float, depthOf: (Int) -> Float): Float {
+    val start = edgeStart(key)
+    val end = edgeEnd(key)
+    val length = sqrt((xs[end] - xs[start]).let { it * it } + (ys[end] - ys[start]).let { it * it })
+    val lengthFactor = 1f - filters.lengthFalloff * (length / (filters.maxEdgeFactor * cell)).coerceIn(0f, 1f)
+    val startDepth = 1f - filters.depthDimming * (1f - depthOf(start))
+    val endDepth = 1f - filters.depthDimming * (1f - depthOf(end))
+    val depthFactor = min(startDepth, endDepth)
+    val edgeAlpha = filters.edgeAlpha * filters.alpha * lengthFactor * depthFactor
+    // The dimmer dot, faded as lowerDotsToTheirEdges would fade it were this its second-brightest edge.
+    val dimmerDot = min(startDepth * presence[start], endDepth * presence[end])
+    val fullAt = max(NODE_FULL_AT_EDGE_SHARE * filters.edgeAlpha * filters.alpha * dimmerDot, 2f * EDGE_VISIBLE_ALPHA)
+    val dotAlpha = max(NODE_ALPHA, filters.edgeAlpha) * filters.alpha * dimmerDot * smoothStep(EDGE_VISIBLE_ALPHA, fullAt, edgeAlpha)
+    return min(edgeAlpha, dotAlpha)
+}
+
+/** [edgeRule]'s filtered edges over the nodes in [mask] under [filters], with its repair candidates. */
+private fun ruleEdges(edgeRule: EdgeRule, mask: BooleanArray, xs: FloatArray, ys: FloatArray, filters: NetworkGraphLayerSpec, cell: Float, seed: Int): RuleEdges {
+    val presentIndices = mask.indices.filter { mask[it] }.toIntArray()
+    val presentX = FloatArray(presentIndices.size) { xs[presentIndices[it]] }
+    val presentY = FloatArray(presentIndices.size) { ys[presentIndices[it]] }
+    if (edgeRule == EdgeRule.Proximity) {
+        val nearest = nearestNeighbourEdgeKeys(presentIndices.size, presentX, presentY, PROXIMITY_REPAIR_NEIGHBOURS)
+        return RuleEdges(
+            base = proximityEdges(presentIndices, xs, ys, reach = filters.maxEdgeFactor * cell, keepChance = filters.edgeKeepChance, seed = seed),
+            candidates = LongArray(nearest.size) { edge -> edgeKey(presentIndices[edgeStart(nearest[edge])], presentIndices[edgeEnd(nearest[edge])]) },
+        )
+    }
+    val triangles = Delaunay.triangulate(presentX, presentY, presentIndices.size)
+    // Back to pool indices, so each pair's keep chance stays the same whoever else is present.
+    for (corner in triangles.indices) triangles[corner] = presentIndices[triangles[corner]]
+    val base = meshEdgeKeys(
+        triangles = triangles,
+        xs = xs,
+        ys = ys,
+        minAngleDegrees = filters.minAngleDegrees,
+        maxLength = filters.maxEdgeFactor * cell,
+        keepChance = filters.edgeKeepChance,
+        seed = seed,
+    )
+    return RuleEdges(base, candidates = triangleEdgeKeys(triangles))
+}
+
+/** An edge rule's output for [enforceMinDegree]: its filtered edges and repair candidates. */
+private class RuleEdges(val base: LongArray, val candidates: LongArray)
+
+/**
+ * [enforceMinDegree] over [edges], keeping its connectivity rules when [keepConnectivity] and then
+ * counting only edges drawn visibly at rest (see [VISIBLE_EDGE_MARGIN] and [restEdgeAlpha]).
+ */
+private fun enforceOnVisibleEdges(
+    count: Int,
+    xs: FloatArray,
+    ys: FloatArray,
+    edges: RuleEdges,
+    presence: FloatArray,
+    filters: NetworkGraphLayerSpec,
+    cell: Float,
+    keepConnectivity: Boolean,
+    depthOf: (Int) -> Float,
+): MeshTopology {
+    val visibleAlpha = EDGE_VISIBLE_ALPHA * VISIBLE_EDGE_MARGIN
+    val restAlphaOf = { key: Long -> restEdgeAlpha(key, xs, ys, presence, filters, cell, depthOf) }
+    val settle = { visible: (Long) -> Boolean ->
+        enforceMinDegree(
+            count = count,
+            xs = xs,
+            ys = ys,
+            baseEdges = edges.base.filter(visible).toLongArray(),
+            candidateEdges = edges.candidates.filter(visible).toLongArray(),
+            maxRepairLength = filters.repairReach * filters.maxEdgeFactor * cell,
+            strictTriangles = filters.strictTriangles,
+            keepConnectivity = keepConnectivity,
+        )
+    }
+    if (!keepConnectivity) return settle { true }
+    return settle { key -> restAlphaOf(key) >= visibleAlpha }
 }

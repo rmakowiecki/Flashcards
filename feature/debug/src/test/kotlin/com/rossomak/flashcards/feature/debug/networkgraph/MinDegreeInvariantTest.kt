@@ -9,8 +9,9 @@ import org.junit.Test
 
 /**
  * Sweeps real [LayerField]s over seeds, both surface shapes and every slider extreme, and checks the
- * network-graph invariants: every drawn node has at least two visible edges, and its dot is at least as
- * opaque as every edge it anchors.
+ * network-graph invariants: every drawn node has at least two visible edges, its dot is at least as
+ * opaque as every edge it anchors, and, under [EdgeRule.FixedTriangulation], the mesh and the graph as
+ * drawn have no graph smaller than [MIN_GRAPH_NODES] and none hanging together by a single node or edge.
  */
 class MinDegreeInvariantTest {
 
@@ -46,7 +47,7 @@ class MinDegreeInvariantTest {
     )
 
     @Test
-    fun `every drawn node has two visible edges and outshines them across slider extremes`() {
+    fun `every drawn node has two visible edges, outshines them and joins a solid graph across slider extremes`() {
         val baseLayers = shapes.flatMap { (shapeName, shape) ->
             EdgeRule.entries.flatMap { edgeRule ->
                 listOf(false, true).map { strictTriangles ->
@@ -90,6 +91,7 @@ class MinDegreeInvariantTest {
                     field.advance(timeSeconds, width, height)
                     val where = "$label seed=$seed ${width.toInt()}x${height.toInt()} t=$timeSeconds"
                     violations += frameViolations(where, field, layer.strictTriangles, timeSeconds)
+                    violations += connectivityViolations(where, field, layer.edgeRule)
                 }
             }
         }
@@ -165,3 +167,22 @@ private fun alphaRuleViolations(where: String, field: LayerField, timeSeconds: F
     }
     return violations
 }
+
+/**
+ * Breaks of the connectivity rules in [field]'s mesh (any cut node, or graph smaller than
+ * [MIN_GRAPH_NODES]) and the same in the graph as drawn, which only a mesh edge drawn too faint to see
+ * can break. Meshes rebuilt every frame skip the connectivity rules (see LayerField's settleTopology),
+ * so under any [edgeRule] but [EdgeRule.FixedTriangulation] there are none to break.
+ */
+private fun connectivityViolations(where: String, field: LayerField, edgeRule: EdgeRule): List<String> =
+    if (edgeRule != EdgeRule.FixedTriangulation) {
+        emptyList()
+    } else {
+        connectivityMessages("$where: mesh", connectivityViolations(field.nodeCount, field.topology.edges)) +
+            connectivityMessages("$where: drawn", field.drawnConnectivityViolations())
+    }
+
+private fun connectivityMessages(prefix: String, violations: ConnectivityViolations): List<String> = listOfNotNull(
+    "$prefix graphs too small ${violations.smallGraphNodes}".takeIf { violations.smallGraphNodes.isNotEmpty() },
+    "$prefix cut nodes ${violations.cutNodes}".takeIf { violations.cutNodes.isNotEmpty() },
+)

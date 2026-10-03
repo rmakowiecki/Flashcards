@@ -1,6 +1,8 @@
-@file:Suppress("LoopWithTooManyJumpStatements")
+@file:Suppress("LoopWithTooManyJumpStatements", "TooManyFunctions")
 
 package com.rossomak.flashcards.feature.debug.networkgraph
+
+import kotlin.math.min
 
 /**
  * Safety cap on [enforceMinDegree]'s repair rounds. Every pair can be added and removed at most once
@@ -9,6 +11,15 @@ package com.rossomak.flashcards.feature.debug.networkgraph
 internal const val MAX_ENFORCEMENT_ROUNDS = 8
 
 private const val TRIANGLE_CORNERS = 3
+
+private val EMPTY_NEIGHBOURS = IntArray(0)
+
+/**
+ * The fewest nodes a separate graph may have: a smaller one reads as a stray scrap next to the mesh.
+ * Also the fewest nodes a piece hanging from a cut node keeps when [enforceMinDegree] cuts it loose
+ * instead of pruning it.
+ */
+internal const val MIN_GRAPH_NODES = 6
 
 /**
  * The edge set a layer actually draws, after [enforceMinDegree].
@@ -38,12 +49,17 @@ internal class MeshTopology(
  * 2. every node short of two edges is repaired from [candidateEdges] no longer than
  *    [maxRepairLength], shortest first but preferring an edge that closes a triangle (with
  *    [strictTriangles], only triangle-closing repairs are allowed);
- * 3. every node still short is pruned, along with its edges.
+ * 3. every node still short is pruned, along with its edges;
+ * 4. once those settle, and with [keepConnectivity], every cut node (one whose removal splits its graph, as at either end of a
+ *    bridge) gets an edge between two of its neighbours on either side, closing a triangle across it,
+ *    or without [strictTriangles] any candidate edge across; a piece that still hangs from it is
+ *    pruned when smaller than [MIN_GRAPH_NODES] and cut loose otherwise. Every separate graph smaller
+ *    than [MIN_GRAPH_NODES] is pruned.
  *
  * Repair edges bypass the rule's keep chance and minimum-angle filters but not the length cap, so a
  * sparse area keeps its nodes connected while a far outlier disappears instead of growing a long line.
  * A pair removed during the call is never re-added, which is what makes the rounds converge. A final
- * removal-only pass guarantees the invariant even if they did not.
+ * removal-only pass guarantees the invariants even if they did not.
  */
 internal fun enforceMinDegree(
     count: Int,
@@ -53,23 +69,28 @@ internal fun enforceMinDegree(
     candidateEdges: LongArray,
     maxRepairLength: Float,
     strictTriangles: Boolean,
+    keepConnectivity: Boolean = true,
 ): MeshTopology {
     val graph = EnforcementGraph(count, xs, ys, candidateEdges, maxRepairLength)
     for (key in baseEdges) graph.addBase(key)
     var converged = false
     var rounds = 0
     while (!converged && rounds < MAX_ENFORCEMENT_ROUNDS) {
-        var changed = strictTriangles && graph.closeOrDropOpenEdges()
-        changed = graph.repairShortNodes(strictTriangles) || changed
-        changed = graph.pruneShortNodes() || changed
-        converged = !changed
+        converged = !graph.repairRound(strictTriangles, keepConnectivity)
         rounds++
     }
-    do {
-        var changed = strictTriangles && graph.dropOpenEdges()
-        changed = graph.pruneShortNodes() || changed
-    } while (changed)
+    while (graph.removalRound(strictTriangles, keepConnectivity)) Unit
     return graph.toTopology(converged)
+}
+
+/** What breaks [enforceMinDegree]'s connectivity rules in a graph: nodes of graphs under [MIN_GRAPH_NODES], and cut nodes. */
+internal class ConnectivityViolations(val smallGraphNodes: List<Int>, val cutNodes: List<Int>)
+
+/** [ConnectivityViolations] of the graph of [edges] over [count] nodes. */
+internal fun connectivityViolations(count: Int, edges: LongArray): ConnectivityViolations {
+    val graph = EnforcementGraph(count, FloatArray(count), FloatArray(count), candidateEdges = LongArray(0), maxRepairLength = 0f)
+    for (key in edges) graph.addBase(key)
+    return ConnectivityViolations(smallGraphNodes = graph.smallGraphNodes(), cutNodes = graph.cutNodes().asList())
 }
 
 /** Every unique edge of [triangles] (vertex index triples), unfiltered. Repair candidates for Delaunay rules. */
@@ -148,6 +169,24 @@ private class EnforcementGraph(
         }
     }
 
+    /** One repair round of [enforceMinDegree]; true if it changed anything. */
+    fun repairRound(strictTriangles: Boolean, keepConnectivity: Boolean): Boolean {
+        var changed = strictTriangles && closeOrDropOpenEdges()
+        changed = repairShortNodes(strictTriangles) || changed
+        changed = pruneShortNodes() || changed
+        // Connectivity only once the degrees settle: its search costs more, and repairs move cut nodes.
+        if (!changed && keepConnectivity) changed = fixCutNodes(allowAdding = true, strictTriangles = strictTriangles) || pruneSmallGraphs()
+        return changed
+    }
+
+    /** One round of [enforceMinDegree]'s removal-only terminal pass; true if it removed anything. */
+    fun removalRound(strictTriangles: Boolean, keepConnectivity: Boolean): Boolean {
+        var changed = strictTriangles && dropOpenEdges()
+        changed = pruneShortNodes() || changed
+        if (!changed && keepConnectivity) changed = fixCutNodes(allowAdding = false, strictTriangles = strictTriangles) || pruneSmallGraphs()
+        return changed
+    }
+
     fun addBase(key: Long) {
         baseKeys += key
         connect(edgeStart(key), edgeEnd(key))
@@ -196,11 +235,53 @@ private class EnforcementGraph(
         var changed = false
         for (node in 0 until count) {
             if (!alive[node] || neighbours[node].size >= 2) continue
-            alive[node] = false
-            for (other in neighbours[node].toList()) disconnect(node, other)
+            prune(node)
             changed = true
         }
         return changed
+    }
+
+    /**
+     * Fixes every cut node: joins each piece hanging from it to another piece with one new edge if
+     * [allowAdding] and one fits (see [enforceMinDegree]), else prunes the piece if it is smaller than
+     * [MIN_GRAPH_NODES] or cuts it loose from the cut node. True if anything changed.
+     */
+    fun fixCutNodes(allowAdding: Boolean, strictTriangles: Boolean): Boolean {
+        var changed = false
+        for (cut in cutNodes()) {
+            if (!alive[cut]) continue
+            val pieces = piecesAround(cut)
+            if (pieces.size < 2) continue
+            val pieceOf = IntArray(count) { -1 }
+            pieces.forEachIndexed { index, piece -> for (node in piece) pieceOf[node] = index }
+            val main = pieces.indices.maxBy { pieces[it].size }
+            for (index in pieces.indices) {
+                if (index == main) continue
+                val joined = allowAdding && (joinAcross(cut, pieces[index], pieceOf, index) || !strictTriangles && joinAnywhere(cut, pieces[index], pieceOf, index))
+                if (!joined) cutOff(cut, pieces[index])
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    /** Prunes every separate graph smaller than [MIN_GRAPH_NODES]; true if any. */
+    fun pruneSmallGraphs(): Boolean {
+        val small = smallGraphNodes()
+        for (node in small) prune(node)
+        return small.isNotEmpty()
+    }
+
+    /** Every node of a separate graph smaller than [MIN_GRAPH_NODES]. */
+    fun smallGraphNodes(): List<Int> {
+        val seen = BooleanArray(count)
+        val small = ArrayList<Int>()
+        for (start in 0 until count) {
+            if (seen[start] || !alive[start] || neighbours[start].isEmpty()) continue
+            val graph = collectFrom(start, blocked = -1, seen = seen)
+            if (graph.size < MIN_GRAPH_NODES) small += graph.asList()
+        }
+        return small
     }
 
     fun toTopology(converged: Boolean): MeshTopology {
@@ -276,6 +357,85 @@ private class EnforcementGraph(
         return false
     }
 
+    /** The edge between two of [cut]'s neighbours, one in [piece] and one outside it, that closes a triangle across [cut]; shortest first. */
+    private fun joinAcross(cut: Int, piece: IntArray, pieceOf: IntArray, pieceIndex: Int): Boolean {
+        var best: Pair<Int, Int>? = null
+        var bestDistance = Float.MAX_VALUE
+        for (near in piece) {
+            if (!isConnected(near, cut)) continue
+            for (far in candidates[near]) {
+                if (pieceOf[far] == pieceIndex || !isConnected(far, cut) || !canAdd(near, far)) continue
+                val distance = squaredDistance(near, far, xs, ys)
+                if (distance < bestDistance) {
+                    bestDistance = distance
+                    best = near to far
+                }
+                break
+            }
+        }
+        val (near, far) = best ?: return false
+        connect(near, far)
+        return true
+    }
+
+    /** The shortest candidate edge from [piece] to any node outside it other than [cut]. */
+    private fun joinAnywhere(cut: Int, piece: IntArray, pieceOf: IntArray, pieceIndex: Int): Boolean {
+        var best: Pair<Int, Int>? = null
+        var bestDistance = Float.MAX_VALUE
+        for (near in piece) {
+            val far = candidates[near].firstOrNull { it != cut && pieceOf[it] != pieceIndex && canAdd(near, it) } ?: continue
+            val distance = squaredDistance(near, far, xs, ys)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = near to far
+            }
+        }
+        val (near, far) = best ?: return false
+        connect(near, far)
+        return true
+    }
+
+    /** Prunes [piece] if it is too small to stand alone, else removes its edges to [cut]. */
+    private fun cutOff(cut: Int, piece: IntArray) {
+        if (piece.size < MIN_GRAPH_NODES) {
+            for (node in piece) prune(node)
+        } else {
+            for (node in piece) if (isConnected(node, cut)) disconnect(node, cut)
+        }
+    }
+
+    /** The groups [cut]'s graph falls into without [cut]: each holds at least one of its neighbours. */
+    private fun piecesAround(cut: Int): List<IntArray> {
+        val seen = BooleanArray(count)
+        return neighbours[cut].toList().mapNotNull { start -> if (seen[start]) null else collectFrom(start, blocked = cut, seen = seen) }
+    }
+
+    /** Every node reachable from [start] without passing [blocked], marked in [seen]. */
+    private fun collectFrom(start: Int, blocked: Int, seen: BooleanArray): IntArray {
+        val found = ArrayList<Int>()
+        val stack = ArrayDeque<Int>()
+        seen[start] = true
+        stack += start
+        while (stack.isNotEmpty()) {
+            val node = stack.removeLast()
+            found += node
+            for (other in neighbours[node]) {
+                if (other == blocked || seen[other]) continue
+                seen[other] = true
+                stack += other
+            }
+        }
+        return found.toIntArray()
+    }
+
+    /** Every cut node of the current graph; see [CutSearch]. */
+    fun cutNodes(): IntArray = CutSearch(Array(count) { if (neighbours[it].isEmpty()) EMPTY_NEIGHBOURS else neighbours[it].toIntArray() }).cutNodes()
+
+    private fun prune(node: Int) {
+        alive[node] = false
+        for (other in neighbours[node].toList()) disconnect(node, other)
+    }
+
     private fun canAdd(first: Int, second: Int): Boolean {
         if (!alive[first] || !alive[second] || isConnected(first, second)) return false
         val key = edgeKey(first, second)
@@ -306,5 +466,60 @@ private class EnforcementGraph(
             for (other in neighbours[node]) if (node < other) keys += edgeKey(node, other)
         }
         return keys.toLongArray()
+    }
+}
+
+/** Finds the cut nodes of the graph of [adjacency] by an iterative Hopcroft–Tarjan search. */
+private class CutSearch(private val adjacency: Array<IntArray>) {
+    private val count = adjacency.size
+    private val order = IntArray(count) { -1 }
+    private val low = IntArray(count)
+    private val parent = IntArray(count) { -1 }
+    private val nextNeighbour = IntArray(count)
+    private val isCut = BooleanArray(count)
+    private val stack = IntArray(count)
+    private var time = 0
+
+    fun cutNodes(): IntArray {
+        for (root in 0 until count) if (order[root] < 0 && adjacency[root].isNotEmpty()) searchFrom(root)
+        return (0 until count).filter { isCut[it] }.toIntArray()
+    }
+
+    private fun searchFrom(root: Int) {
+        var depth = 0
+        var rootChildren = 0
+        stack[0] = root
+        visit(root)
+        while (depth >= 0) {
+            val node = stack[depth]
+            if (nextNeighbour[node] == adjacency[node].size) {
+                depth--
+                finish(node, root)
+                continue
+            }
+            val other = adjacency[node][nextNeighbour[node]++]
+            if (order[other] >= 0) {
+                if (other != parent[node]) low[node] = min(low[node], order[other])
+                continue
+            }
+            if (node == root) rootChildren++
+            parent[other] = node
+            visit(other)
+            stack[++depth] = other
+        }
+        if (rootChildren > 1) isCut[root] = true
+    }
+
+    private fun visit(node: Int) {
+        order[node] = time
+        low[node] = time++
+    }
+
+    /** Hands [node]'s low point to its parent, which is a cut node if nothing under [node] reaches above it. */
+    private fun finish(node: Int, root: Int) {
+        val up = parent[node]
+        if (up < 0) return
+        low[up] = min(low[up], low[node])
+        if (up != root && low[node] >= order[up]) isCut[up] = true
     }
 }
