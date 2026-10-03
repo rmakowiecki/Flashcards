@@ -63,6 +63,14 @@ class PendingSessionProjector @Inject constructor(
         .distinctUntilChanged()
 
     /**
+     * [observePendingSessions] without the sessions that have no Flashcard Result: the server rejects
+     * those, so they never become a recorded session and are never shown as one.
+     */
+    fun observeDeliverablePendingSessions(): Flow<List<SessionResult>> = observePendingSessions()
+        .map { sessions -> sessions.filter { session -> session.cardResults.isNotEmpty() } }
+        .distinctUntilChanged()
+
+    /**
      * The Card Progress of [subcategoryId] with the Pending Sessions that touch it replayed on top.
      *
      * With no such session, this is the plain remote read, failure included. Otherwise a failed remote
@@ -131,6 +139,33 @@ class PendingSessionProjector @Inject constructor(
         Result.success(replay(baselines, pendingSessions, scoringState, xpConfig).scoringState)
     }
 
+    /**
+     * The preview `xpTotal` of each of [pendingSessions], keyed by session id, replayed in the given
+     * (oldest-first) order, so a later session's Streak and Daily Goal awards build on the earlier ones.
+     * `null` when [pendingSessions] is stale by the time the baselines are read.
+     *
+     * [pendingSessions] is a snapshot of [observeDeliverablePendingSessions], so a session the server
+     * would reject is never scored. The staleness check is the same as [projectSummaryDeltas]', compared
+     * against that same deliverable list, so a zero-card entry in the queue never makes every call look
+     * stale. The caller drops a `null` result; the queue change that made it stale re-emits.
+     *
+     * A failed scoring-state read replays from [ScoringState]'s defaults instead of failing: the values
+     * are approximate, and the server's own replace them once each session is delivered.
+     */
+    suspend fun projectSessionXpTotals(pendingSessions: List<SessionResult>): Map<String, Int>? = coroutineScope {
+        if (pendingSessions.isEmpty()) return@coroutineScope emptyMap()
+        val progressBaselines = async { readProgressBaselines(pendingSessions) }
+        val remoteScoringState = async { readRemoteScoringState() }
+        val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
+        val baselines = progressBaselines.await()
+        val scoringState = remoteScoringState.await()
+            .onFailure { exception -> logw(exception) { "Scoring state unreadable, replaying pending session XP from defaults" } }
+            .getOrNull() ?: ScoringState()
+        val xpConfig = config.await()
+        if (observeDeliverablePendingSessions().first() != pendingSessions) return@coroutineScope null
+        replay(baselines, pendingSessions, scoringState, xpConfig).xpTotalBySessionId
+    }
+
     private suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
 
     private fun signedInUid(): String? = authRepository.getCurrentUser()?.uid
@@ -153,6 +188,7 @@ class PendingSessionProjector @Inject constructor(
     ): Replay {
         val progressBySubcategory = baselineBySubcategory.mapNotNull { (subcategoryId, progress) -> progress?.let { subcategoryId to it } }.toMap().toMutableMap()
         val summaryDeltas = mutableMapOf<String, SubcategoryProgressDelta>()
+        val xpTotalBySessionId = mutableMapOf<String, Int>()
         var projectedScoringState = scoringState
 
         pendingSessions.forEach { session ->
@@ -173,10 +209,16 @@ class PendingSessionProjector @Inject constructor(
             scoring.cardProgressMerge.summaryDeltas.forEach { (subcategoryId, delta) ->
                 summaryDeltas[subcategoryId] = summaryDeltas[subcategoryId]?.plus(delta) ?: delta
             }
+            xpTotalBySessionId[session.id] = scoring.score.breakdown.xpTotal
             projectedScoringState = scoring.newScoringState
         }
 
-        return Replay(progressBySubcategory = progressBySubcategory, summaryDeltas = summaryDeltas, scoringState = projectedScoringState)
+        return Replay(
+            progressBySubcategory = progressBySubcategory,
+            summaryDeltas = summaryDeltas,
+            scoringState = projectedScoringState,
+            xpTotalBySessionId = xpTotalBySessionId,
+        )
     }
 
     /** The cached server Card Progress of every Subcategory [pendingSessions] touch, `null` where unreadable or absent. */
@@ -218,12 +260,13 @@ class PendingSessionProjector @Inject constructor(
 
     /**
      * What replaying Pending Sessions produced: the projected Card Progress of every Subcategory with a
-     * baseline document or a replayed result, the accumulated Studied/Mastered count changes, and the
-     * projected scoring state.
+     * baseline document or a replayed result, the accumulated Studied/Mastered count changes, the
+     * projected scoring state, and each replayed session's own `xpTotal`.
      */
     private data class Replay(
         val progressBySubcategory: Map<String, SubcategoryProgressDetails>,
         val summaryDeltas: Map<String, SubcategoryProgressDelta>,
         val scoringState: ScoringState,
+        val xpTotalBySessionId: Map<String, Int>,
     )
 }

@@ -270,6 +270,88 @@ class PendingSessionProjectorTest {
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
 
+    @Test
+    fun `projectSessionXpTotals of no sessions is empty without reading anything`() = runTest {
+        createProjector().projectSessionXpTotals(emptyList()) shouldBe emptyMap()
+
+        coVerify(exactly = 0) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 0) { cardProgressRemoteDataSource.getProgress(any()) }
+    }
+
+    @Test
+    fun `projectSessionXpTotals of one pending session is its scored xpTotal`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+        val projector = createProjector()
+
+        val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
+
+        // 1 new card × 10 + 1 mastered × 100 + 1 minute × 10 + 500 completion + a Streak of 1 × 20.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 640)
+        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectSessionXpTotals replays two pending sessions in order, the second reaching the Daily Goal`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID).copy(dailyGoalMinutes = 2))
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID).copy(dailyGoalMinutes = 2))
+        val projector = createProjector()
+
+        val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
+
+        // Session 1: 1 new × 10 + 10 + 500 + a Streak of 1 × 20. Session 2: card-1 is no longer new, no
+        // second Streak award the same day, and the two minutes together meet the 2-minute goal: 10 + 500 + 1000.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 540, SESSION_TWO_ID to 1510)
+        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectSessionXpTotals replays from the starting state when the scoring state is unreadable`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } throws IllegalStateException("offline, not cached")
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val projector = createProjector()
+
+        projector.projectSessionXpTotals(projector.observePendingSessions().first()) shouldBe mapOf(SESSION_ONE_ID to 540)
+        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectSessionXpTotals drops a snapshot once a pending session leaves the queue during the reads`() = runTest {
+        val projector = createProjector()
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } coAnswers {
+            pendingSessionQueue.remove(SESSION_ONE_ID)
+            null
+        }
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+        val snapshot = projector.observePendingSessions().first()
+
+        projector.projectSessionXpTotals(snapshot) shouldBe null
+        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectSessionXpTotals is not stale because of a zero-card pending session left out of its argument`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START))
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID))
+        val projector = createProjector()
+        val deliverable = projector.observeDeliverablePendingSessions().first()
+
+        projector.projectSessionXpTotals(deliverable) shouldBe mapOf(SESSION_TWO_ID to 540)
+        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
     private fun queue(sessionResult: SessionResult, uid: String = USER_ID) {
         pendingSessionQueue.seed(sessionResult.toDto(uid))
     }
