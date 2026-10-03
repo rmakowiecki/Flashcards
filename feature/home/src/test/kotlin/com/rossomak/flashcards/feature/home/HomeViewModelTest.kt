@@ -4,16 +4,27 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.RecentSession
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeRecentSessionsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Hidden as RecentsHidden
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -34,6 +45,13 @@ import org.junit.Test
 private const val COMPOSE_ID = "compose"
 private const val NAVIGATION_ID = "navigation"
 private const val DENORMALIZED_CATEGORY_NAME = "Android (denormalized)"
+private const val COROUTINES_ID = "coroutines"
+private const val DELETED_ID = "deleted"
+private const val OLDER_SESSION_ID = "older-session"
+private const val NEWER_SESSION_ID = "newer-session"
+private const val NEWEST_SESSION_ID = "newest-session"
+private const val CUSTOM_PARTIAL_SESSION_ID = "custom-partial-session"
+private const val CUSTOM_EMPTY_SESSION_ID = "custom-empty-session"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -44,6 +62,7 @@ class HomeViewModelTest {
     private val flashcardRepository = FakeFlashcardRepository()
     private val userFavoritesRepository = FakeUserFavoritesRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
+    private val recentSessionsRepository = FakeRecentSessionsRepository()
 
     private val parentCategory = Category(
         id = "android",
@@ -59,9 +78,13 @@ class HomeViewModelTest {
     )
     private val resolvableSubcategories = mutableListOf<Subcategory>()
 
-    private fun createViewModel(): HomeViewModel = HomeViewModel(
-        observeFavoriteItems = ObserveFavoriteItemsUseCase(userFavoritesRepository, flashcardRepository),
+    private fun createViewModel(
+        observeFavoriteItems: ObserveFavoriteItemsUseCase = ObserveFavoriteItemsUseCase(userFavoritesRepository, flashcardRepository),
+        observeRecentSessions: ObserveRecentSessionsUseCase = ObserveRecentSessionsUseCase(recentSessionsRepository, flashcardRepository),
+    ): HomeViewModel = HomeViewModel(
+        observeFavoriteItems = observeFavoriteItems,
         observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository),
+        observeRecentSessions = observeRecentSessions,
     )
 
     private fun subcategory(id: String, categoryName: String = parentCategory.name) = Subcategory(
@@ -93,6 +116,32 @@ class HomeViewModelTest {
 
     private fun HomeFavoritesState.subcategoryIds(): Set<String> =
         shouldBeInstanceOf<Content>().items.filterIsInstance<FavoriteSubcategory>().map { it.subcategory.id }.toSet()
+
+    private fun recentSession(
+        id: String,
+        sourceType: SessionSourceType,
+        subcategoryIds: List<String>,
+        categoryId: String = parentCategory.id,
+    ) = RecentSession.Rated(
+        id = id,
+        startedAt = Instant.EPOCH,
+        durationSeconds = 300,
+        sourceType = sourceType,
+        categoryId = categoryId,
+        subcategoryIds = subcategoryIds,
+        studiedCount = 10,
+        xpTotal = 120,
+        voiceAnsweringEnabled = false,
+    )
+
+    private fun stubTaxonomyFetches(vararg subcategoryIds: String) {
+        flashcardRepository.subcategoriesByIdsToReturn = Result.success(subcategoryIds.map { subcategory(it) })
+        flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(parentCategory))
+    }
+
+    private fun HomeRecentsState.items(): List<RecentItem> = shouldBeInstanceOf<RecentsContent>().items
+
+    private fun HomeRecentsState.sessionIds(): List<String> = items().map { it.session.id }
 
     /** Every distinct Favorites state in order, so a transient state between two others shows up as its own item. */
     private fun HomeViewModel.favoritesStates(): Flow<HomeFavoritesState> = state.map { it.favorites }.distinctUntilChanged()
@@ -250,10 +299,7 @@ class HomeViewModelTest {
             error("favorites listener failed")
         }
 
-        val viewModel = HomeViewModel(
-            observeFavoriteItems = favoriteItems,
-            observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository),
-        )
+        val viewModel = createViewModel(observeFavoriteItems = favoriteItems)
         advanceUntilIdle()
 
         viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
@@ -328,4 +374,224 @@ class HomeViewModelTest {
                 expectNoEvents()
             }
         }
+
+    @Test
+    fun `recents become Hidden when the User has no sessions`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents shouldBe RecentsHidden
+    }
+
+    @Test
+    fun `recents start Loading and become Content in the repository's newest-first order`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID, NAVIGATION_ID)
+        recentSessionsRepository.setRecentSessions(
+            listOf(
+                recentSession(NEWER_SESSION_ID, SingleSubcategory, listOf(NAVIGATION_ID)),
+                recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID)),
+            )
+        )
+        val viewModel = createViewModel()
+
+        viewModel.state.map { it.recents }.distinctUntilChanged().test {
+            awaitItem() shouldBe RecentsLoading
+            advanceUntilIdle()
+
+            awaitItem().sessionIds() shouldBe listOf(NEWER_SESSION_ID, OLDER_SESSION_ID)
+        }
+    }
+
+    @Test
+    fun `a single-subcategory Recent carries its Category and its one Subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        val session = recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))
+        recentSessionsRepository.setRecentSessions(listOf(session))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.items() shouldBe listOf(RecentItem(session, parentCategory, listOf(subcategory(COMPOSE_ID))))
+    }
+
+    @Test
+    fun `a Recent whose Category does not resolve is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(
+            listOf(
+                recentSession(NEWER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID), categoryId = DELETED_ID),
+                recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID)),
+            )
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `a single-subcategory Recent whose Subcategory does not resolve is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(
+            listOf(
+                recentSession(NEWER_SESSION_ID, SingleSubcategory, listOf(DELETED_ID)),
+                recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID)),
+            )
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `a Custom Recent keeps only the Subcategories that resolve, in stored order, even when none do`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubTaxonomyFetches(COMPOSE_ID, NAVIGATION_ID)
+            recentSessionsRepository.setRecentSessions(
+                listOf(
+                    recentSession(CUSTOM_PARTIAL_SESSION_ID, Custom, listOf(NAVIGATION_ID, DELETED_ID, COMPOSE_ID)),
+                    recentSession(CUSTOM_EMPTY_SESSION_ID, Custom, listOf(DELETED_ID, COROUTINES_ID)),
+                )
+            )
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.recents.items().associate { item -> item.session.id to item.subcategories.map { it.id } } shouldBe mapOf(
+                CUSTOM_PARTIAL_SESSION_ID to listOf(NAVIGATION_ID, COMPOSE_ID),
+                CUSTOM_EMPTY_SESSION_ID to emptyList(),
+            )
+        }
+
+    @Test
+    fun `a Quick Recent is kept with no Subcategories`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, Quick, listOf(COMPOSE_ID))))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.items().single().subcategories shouldBe emptyList()
+    }
+
+    @Test
+    fun `Recents whose taxonomy fetches keep failing are dropped instead of failing the section`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.categoriesByIdsToReturn = Result.failure(IllegalStateException("categories fetch failed"))
+            recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, Quick, listOf(COMPOSE_ID))))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.recents shouldBe RecentsHidden
+        }
+
+    @Test
+    fun `a session that appears later joins the top of the Content`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        val olderSession = recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))
+        recentSessionsRepository.setRecentSessions(listOf(olderSession))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(NEWEST_SESSION_ID, Quick, listOf(COMPOSE_ID)), olderSession))
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.sessionIds() shouldBe listOf(NEWEST_SESSION_ID, OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `a session that goes leaves the others in Content`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        val olderSession = recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(NEWER_SESSION_ID, Quick, listOf(COMPOSE_ID)), olderSession))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        recentSessionsRepository.setRecentSessions(listOf(olderSession))
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `recents move from Content to Hidden when the last session goes`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubTaxonomyFetches(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        recentSessionsRepository.setRecentSessions(emptyList())
+        advanceUntilIdle()
+
+        viewModel.state.value.recents shouldBe RecentsHidden
+    }
+
+    @Test
+    fun `a parked Recents read leaves Recents Loading and does not delay the Favorites`() = runTest(mainDispatcherRule.testDispatcher) {
+        recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
+        viewModel.state.value.recents shouldBe RecentsLoading
+    }
+
+    @Test
+    fun `a parked favorites read leaves Favorites Loading and does not delay the Recents`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        stubTaxonomyFetches(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites shouldBe Loading
+        viewModel.state.value.recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `a failing Recents flow turns Loading into Hidden and leaves the Favorites alone`() = runTest(mainDispatcherRule.testDispatcher) {
+        recentSessionsRepository.recentSessionsReadFailure = IllegalStateException("recents listener failed")
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents shouldBe RecentsHidden
+        viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
+    }
+
+    @Test
+    fun `a Recents failure after the first emission leaves the Content alone`() = runTest(mainDispatcherRule.testDispatcher) {
+        val recentItem = RecentItem(recentSession(OLDER_SESSION_ID, Quick, listOf(COMPOSE_ID)), parentCategory, emptyList())
+        val recentSessions = mockk<ObserveRecentSessionsUseCase>()
+        coEvery { recentSessions() } returns flow {
+            emit(listOf(recentItem))
+            error("recents listener failed")
+        }
+
+        val viewModel = createViewModel(observeRecentSessions = recentSessions)
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.items() shouldBe listOf(recentItem)
+    }
+
+    @Test
+    fun `a failing favorites flow leaves the Recents alone`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        stubTaxonomyFetches(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites shouldBe Hidden
+        viewModel.state.value.recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+    }
 }

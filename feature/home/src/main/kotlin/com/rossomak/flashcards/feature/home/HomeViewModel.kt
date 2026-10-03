@@ -7,11 +7,14 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Hidden as RecentsHidden
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +29,7 @@ import kotlinx.coroutines.launch
 class HomeViewModel @Inject constructor(
     private val observeFavoriteItems: ObserveFavoriteItemsUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
+    private val observeRecentSessions: ObserveRecentSessionsUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeScreenState())
@@ -37,8 +41,7 @@ class HomeViewModel @Inject constructor(
     init {
         collectFavoriteItems()
         collectProgressSummary()
-        // Hardcoded Recents shown until Home reads the User's real ones.
-        _state.update { it.copy(recents = HomeRecentsState.Content(sampleRecentItems(now = Instant.now()))) }
+        collectRecentSessions()
     }
 
     /** The card body browses: it opens Category Details and starts nothing (ADR-0041). */
@@ -118,6 +121,28 @@ class HomeViewModel @Inject constructor(
                 .catch { error -> loge(error) { "Observing the progress summary failed" } }
                 .collect { summary ->
                     _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+                }
+        }
+    }
+
+    /**
+     * Runs independently of [collectFavoriteItems] and [collectProgressSummary] so neither section gates the
+     * other. Like Favorites, a failure before the first emission degrades to [RecentsHidden], and a failure
+     * after one leaves the [RecentsContent] already shown alone.
+     */
+    private fun collectRecentSessions() {
+        viewModelScope.launch {
+            observeRecentSessions()
+                .catch { error ->
+                    loge(error) { "Observing Recents failed" }
+                    _state.update { current ->
+                        if (current.recents is RecentsLoading) current.copy(recents = RecentsHidden) else current
+                    }
+                }
+                .collect { recentItems ->
+                    _state.update { current ->
+                        current.copy(recents = if (recentItems.isEmpty()) RecentsHidden else RecentsContent(recentItems))
+                    }
                 }
         }
     }
