@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="home_empty_title">Ready to start learning?</string>
+    <string name="home_empty_message">Pick a category and run your first study session — your recents and favorites will appear here.</string>
+    <string name="home_empty_start_button">Start your first session</string>
+
     <string name="favorites_section_title">Favorites</string>
 
     <plurals name="favorites_category_topics">

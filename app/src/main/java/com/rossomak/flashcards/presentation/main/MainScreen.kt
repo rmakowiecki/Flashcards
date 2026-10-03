@@ -151,6 +151,15 @@ fun MainScreen(
     val tabNavController = rememberNavController()
     val navBackStackEntry by tabNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val navigateToTab: (route: Any) -> Unit = { route ->
+        tabNavController.navigate(route) {
+            popUpTo(tabNavController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -165,15 +174,7 @@ fun MainScreen(
             MainBottomBar(
                 tabs = tabs,
                 currentDestination = currentDestination,
-                onTabSelect = { tab ->
-                    tabNavController.navigate(tab.route) {
-                        popUpTo(tabNavController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
+                onTabSelect = { tab -> navigateToTab(tab.route) },
             )
         }
     ) { innerPadding ->
@@ -202,6 +203,7 @@ fun MainScreen(
                         onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = onNavigateToPreviewQuickSession,
                         onNavigateToPreviewRecentSession = onNavigateToPreviewRecentSession,
+                        onNavigateToBrowse = { navigateToTab(StudyGraph) },
                     )
                 }
             }
