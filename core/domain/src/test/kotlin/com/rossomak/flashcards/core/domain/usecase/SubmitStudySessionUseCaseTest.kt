@@ -11,6 +11,7 @@ import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
@@ -61,10 +62,12 @@ class SubmitStudySessionUseCaseTest {
         categoryName = "Category",
         subcategoryIds = listOf(subcategoryId),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardResults,
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastSessionResult(
@@ -79,10 +82,12 @@ class SubmitStudySessionUseCaseTest {
         categoryName = "Category",
         subcategoryIds = listOf(subcategoryId),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardResults,
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        readAloudEnabled = false,
     )
 
     private fun ratedEntry(
@@ -233,6 +238,7 @@ class SubmitStudySessionUseCaseTest {
             categoryName = "Category",
             subcategoryIds = listOf("sub-1", "sub-2"),
             subcategoryNames = listOf("Subcategory 1", "Subcategory 2"),
+            sourceType = SingleSubcategory,
             cardResults = listOf(
                 ratedEntry(cardId = "card-1", subcategoryId = "sub-1", state = FlashcardStudyProgressState.Mastered),
                 ratedEntry(cardId = "card-2", subcategoryId = "sub-2", state = FlashcardStudyProgressState.Failed),
@@ -240,6 +246,7 @@ class SubmitStudySessionUseCaseTest {
             studyDate = "2026-09-08",
             dailyGoalMinutes = 20,
             studyDateUtcOffsetMinutes = 0,
+            voiceAnsweringEnabled = false,
         )
 
         val preview = createUseCase().invokeAndCapturePreview(session)

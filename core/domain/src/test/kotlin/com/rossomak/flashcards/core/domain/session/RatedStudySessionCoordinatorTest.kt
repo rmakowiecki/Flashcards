@@ -12,6 +12,9 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
@@ -83,6 +86,7 @@ class RatedStudySessionCoordinatorTest {
         voiceAnsweringEnabled = true,
         attemptsLimit = 3,
         partialRatingCardRequeueingEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private val events = mutableListOf<RatedSessionEvent>()
@@ -1084,6 +1088,41 @@ class RatedStudySessionCoordinatorTest {
         result.abandoned shouldBe true
         result.cardResults shouldBe emptyList()
         result.durationSeconds shouldBe 0
+    }
+
+    @Test
+    fun `the ended result carries the setup's source type and voice answering setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Quick))
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
+        result.sourceType shouldBe Quick
+        result.voiceAnsweringEnabled shouldBe true
+    }
+
+    @Test
+    fun `a manual session's ended result records voice answering as off`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
+        result.voiceAnsweringEnabled shouldBe false
+    }
+
+    @Test
+    fun `leaving before the cards load still records the setup's source type and voice answering setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Custom), runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
+        result.sourceType shouldBe Custom
+        result.voiceAnsweringEnabled shouldBe true
     }
 
     @Test

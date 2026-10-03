@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.levelThreshold
 import io.kotest.matchers.shouldBe
 import java.time.Instant
@@ -78,6 +79,7 @@ class XpScoringCasesTest(
             categoryName = CATEGORY_NAME,
             subcategoryIds = listOf(SUBCATEGORY_ID),
             subcategoryNames = listOf(SUBCATEGORY_NAME),
+            sourceType = SingleSubcategory,
             cardResults = cardResults.mapIndexed { index, cardResult ->
                 FlashcardResult.Rated(
                     cardId = cardId(index),
@@ -90,6 +92,7 @@ class XpScoringCasesTest(
             studyDate = STUDY_DATE,
             studyDateUtcOffsetMinutes = 0,
             dailyGoalMinutes = DAILY_GOAL_MINUTES,
+            voiceAnsweringEnabled = false,
         )
         FAST_MODE -> SessionResult.Fast(
             id = SESSION_ID,
@@ -100,6 +103,7 @@ class XpScoringCasesTest(
             categoryName = CATEGORY_NAME,
             subcategoryIds = listOf(SUBCATEGORY_ID),
             subcategoryNames = listOf(SUBCATEGORY_NAME),
+            sourceType = SingleSubcategory,
             cardResults = cardResults.mapIndexed { index, cardResult ->
                 FlashcardResult.Fast(
                     cardId = cardId(index),
@@ -110,6 +114,7 @@ class XpScoringCasesTest(
             studyDate = STUDY_DATE,
             studyDateUtcOffsetMinutes = 0,
             dailyGoalMinutes = DAILY_GOAL_MINUTES,
+            readAloudEnabled = false,
         )
         else -> error("unknown study mode \"$studyMode\"")
     }

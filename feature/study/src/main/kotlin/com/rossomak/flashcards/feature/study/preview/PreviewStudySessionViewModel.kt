@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
@@ -64,7 +65,7 @@ class PreviewStudySessionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<PreviewStudySessionRoute>().also { decodedRoute ->
-        require(decodedRoute.isQuickSession || decodedRoute.subcategoryIds.isNotEmpty()) {
+        require(decodedRoute.sourceType == Quick || decodedRoute.subcategoryIds.isNotEmpty()) {
             "A non-Quick Preview route must carry its Subcategory ids"
         }
     }
@@ -82,7 +83,7 @@ class PreviewStudySessionViewModel @Inject constructor(
         PreviewStudySessionScreenState(
             categoryName = route.categoryName,
             subcategoryNames = route.subcategoryNames,
-            isQuickSession = route.isQuickSession,
+            sourceType = route.sourceType,
             config = StudySessionConfig(
                 subcategoryIds = route.subcategoryIds,
                 tagIds = route.filterTagIds.toSet(),
@@ -160,7 +161,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                     ),
                 )
             }
-            selectCards(resampleQuickSession = route.isQuickSession)
+            selectCards(resampleQuickSession = route.sourceType == Quick)
         }
         // Warms the process-wide voice cache so the voice dialogs, here and in the session, open complete.
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
@@ -193,7 +194,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * fetch before drawing; every other retry only redoes the draw.
      */
     fun onRetry() {
-        selectCards(resampleQuickSession = route.isQuickSession && candidatePool == null)
+        selectCards(resampleQuickSession = route.sourceType == Quick && candidatePool == null)
     }
 
     /**
@@ -475,7 +476,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * through [candidatePool] — the pool the sample was drawn from.
      */
     private fun resolveSubcategories(): ResolvedSubcategories {
-        if (!route.isQuickSession) {
+        if (route.sourceType != Quick) {
             return ResolvedSubcategories(route.subcategoryIds, route.subcategoryNames)
         }
         val sampledIds = _state.value.quickSessionSampledSubcategoryIds.orEmpty()

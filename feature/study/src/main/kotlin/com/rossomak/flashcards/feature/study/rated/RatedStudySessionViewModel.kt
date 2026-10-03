@@ -127,6 +127,7 @@ class RatedStudySessionViewModel @Inject constructor(
                 voiceAnsweringEnabled = route.voiceAnsweringEnabled,
                 attemptsLimit = route.ratedAttempts,
                 partialRatingCardRequeueingEnabled = route.partialRatingCardRequeueingEnabled,
+                sourceType = route.sourceType,
             ),
         )
     }

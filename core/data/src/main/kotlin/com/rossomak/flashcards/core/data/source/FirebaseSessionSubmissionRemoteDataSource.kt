@@ -60,22 +60,27 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         }
     }
 
-    private fun SessionResult.toPayload(ownerUid: String): Map<String, Any> = mapOf(
-        FIELD_OWNER_UID to ownerUid,
-        FIELD_SESSION_ID to id,
-        FIELD_STUDY_MODE to mode.name,
-        FIELD_STARTED_AT_EPOCH_MILLIS to startedAt.toEpochMilli(),
-        FIELD_DURATION_SECONDS to durationSeconds,
-        FIELD_ABANDONED to abandoned,
-        FIELD_CATEGORY_ID to categoryId,
-        FIELD_CATEGORY_NAME to categoryName,
-        FIELD_SUBCATEGORY_IDS to subcategoryIds,
-        FIELD_SUBCATEGORY_NAMES to subcategoryNames,
-        FIELD_CARD_RESULTS to cardResults.map { entry -> entry.toPayload() },
-        FIELD_STUDY_DATE to studyDate,
-        FIELD_STUDY_DATE_UTC_OFFSET_MINUTES to studyDateUtcOffsetMinutes,
-        FIELD_DAILY_GOAL_MINUTES to dailyGoalMinutes,
-    )
+    private fun SessionResult.toPayload(ownerUid: String): Map<String, Any> = buildMap {
+        put(FIELD_OWNER_UID, ownerUid)
+        put(FIELD_SESSION_ID, id)
+        put(FIELD_STUDY_MODE, mode.name)
+        put(FIELD_STARTED_AT_EPOCH_MILLIS, startedAt.toEpochMilli())
+        put(FIELD_DURATION_SECONDS, durationSeconds)
+        put(FIELD_ABANDONED, abandoned)
+        put(FIELD_CATEGORY_ID, categoryId)
+        put(FIELD_CATEGORY_NAME, categoryName)
+        put(FIELD_SUBCATEGORY_IDS, subcategoryIds)
+        put(FIELD_SUBCATEGORY_NAMES, subcategoryNames)
+        put(FIELD_SOURCE_TYPE, sourceType.name)
+        put(FIELD_CARD_RESULTS, cardResults.map { entry -> entry.toPayload() })
+        put(FIELD_STUDY_DATE, studyDate)
+        put(FIELD_STUDY_DATE_UTC_OFFSET_MINUTES, studyDateUtcOffsetMinutes)
+        put(FIELD_DAILY_GOAL_MINUTES, dailyGoalMinutes)
+        when (this@toPayload) {
+            is SessionResult.Rated -> put(FIELD_VOICE_ANSWERING, voiceAnsweringEnabled)
+            is SessionResult.Fast -> put(FIELD_READ_ALOUD, readAloudEnabled)
+        }
+    }
 
     private fun FlashcardResult.toPayload(): Map<String, Any> = buildMap {
         put(FIELD_CARD_ID, cardId)
@@ -186,6 +191,9 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val FIELD_CATEGORY_NAME = "categoryName"
         const val FIELD_SUBCATEGORY_IDS = "subcategoryIds"
         const val FIELD_SUBCATEGORY_NAMES = "subcategoryNames"
+        const val FIELD_SOURCE_TYPE = "sourceType"
+        const val FIELD_VOICE_ANSWERING = "voiceAnswering"
+        const val FIELD_READ_ALOUD = "readAloud"
         const val FIELD_CARD_RESULTS = "cardResults"
         const val FIELD_CARD_ID = "cardId"
         const val FIELD_CARD_SUBCATEGORY_ID = "subcategoryId"

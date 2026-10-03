@@ -87,6 +87,14 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == uid;
       }
 
+      // recents/state: one document holding the User's latest sessions, keyed by sessionId, so
+      // Home's Recents cost one read instead of a query over sessions. A projection written only by
+      // `submitStudySession` (Admin SDK, bypasses these rules) inside each session's own transaction;
+      // client-read-only, same reasoning as sessions/{sessionId} above.
+      match /recents/state {
+        allow read: if request.auth != null && request.auth.uid == uid;
+      }
+
       // entitlement: intentionally no rule here -> default deny.
       // Only the Cloud Function (Admin SDK) may read/write it.
     }

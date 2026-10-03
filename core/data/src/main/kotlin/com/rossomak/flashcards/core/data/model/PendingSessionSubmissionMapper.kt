@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.data.model
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import java.time.Instant
 
@@ -20,10 +21,13 @@ object PendingSessionSubmissionMapper {
         categoryName = categoryName,
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryNames,
+        sourceType = sourceType.name,
         cardResults = cardResults.map { it.toDto() },
         studyDate = studyDate,
         dailyGoalMinutes = dailyGoalMinutes,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
+        voiceAnsweringEnabled = (this as? SessionResult.Rated)?.voiceAnsweringEnabled,
+        readAloudEnabled = (this as? SessionResult.Fast)?.readAloudEnabled,
     )
 
     /**
@@ -45,10 +49,12 @@ object PendingSessionSubmissionMapper {
             categoryName = categoryName,
             subcategoryIds = subcategoryIds,
             subcategoryNames = subcategoryNames,
+            sourceType = SessionSourceType.valueOf(sourceType),
             cardResults = cardResults.map { it.toRatedDomain() },
             studyDate = studyDate,
             dailyGoalMinutes = dailyGoalMinutes,
             studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
+            voiceAnsweringEnabled = requireNotNull(voiceAnsweringEnabled) { "Rated pending session '$id' missing voiceAnsweringEnabled" },
         )
         StudyMode.Fast -> SessionResult.Fast(
             id = id,
@@ -59,10 +65,12 @@ object PendingSessionSubmissionMapper {
             categoryName = categoryName,
             subcategoryIds = subcategoryIds,
             subcategoryNames = subcategoryNames,
+            sourceType = SessionSourceType.valueOf(sourceType),
             cardResults = cardResults.map { it.toFastDomain() },
             studyDate = studyDate,
             dailyGoalMinutes = dailyGoalMinutes,
             studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
+            readAloudEnabled = requireNotNull(readAloudEnabled) { "Fast pending session '$id' missing readAloudEnabled" },
         )
     }
 

@@ -20,6 +20,7 @@ import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import io.kotest.assertions.throwables.shouldThrow
@@ -66,6 +67,7 @@ class DefaultSessionSubmissionRepositoryTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = listOf(
             FlashcardResult.Rated(
                 cardId = "card-1",
@@ -78,6 +80,7 @@ class DefaultSessionSubmissionRepositoryTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     @Test

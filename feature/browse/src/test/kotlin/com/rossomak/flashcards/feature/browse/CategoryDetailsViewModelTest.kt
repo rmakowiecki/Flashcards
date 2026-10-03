@@ -4,6 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
@@ -505,7 +508,7 @@ class CategoryDetailsViewModelTest {
                 val destination = awaitItem() as CategoryDetailsDestination.PreviewStudySession
                 destination.subcategoryIds shouldBe subcategories.map { it.id }
                 destination.subcategoryNames shouldBe subcategories.map { it.name }
-                destination.isQuickSession shouldBe false
+                destination.sourceType shouldBe Custom
             }
         }
 
@@ -523,7 +526,7 @@ class CategoryDetailsViewModelTest {
                 val destination = awaitItem() as CategoryDetailsDestination.PreviewStudySession
                 destination.subcategoryIds shouldBe subcategories.map { it.id }
                 destination.subcategoryNames shouldBe subcategories.map { it.name }
-                destination.isQuickSession shouldBe true
+                destination.sourceType shouldBe Quick
             }
         }
 
@@ -545,7 +548,27 @@ class CategoryDetailsViewModelTest {
                 val destination = awaitItem() as CategoryDetailsDestination.PreviewStudySession
                 destination.subcategoryIds shouldBe selected.map { it.id }
                 destination.subcategoryNames shouldBe selected.map { it.name }
-                destination.isQuickSession shouldBe false
+                destination.sourceType shouldBe Custom
+            }
+        }
+
+    @Test
+    fun `the Custom CTA with exactly one selected subcategory emits a single-subcategory session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val selectedId = "sub-2"
+            val subcategories = listOf(subcategory("sub-1"), subcategory(selectedId))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSelectionModeToggle()
+            viewModel.onSubcategorySelectionChange(selectedId, true)
+
+            viewModel.events.test {
+                viewModel.onCustomSessionStart()
+
+                val destination = awaitItem() as CategoryDetailsDestination.PreviewStudySession
+                destination.subcategoryIds shouldBe listOf(selectedId)
+                destination.sourceType shouldBe SingleSubcategory
             }
         }
 

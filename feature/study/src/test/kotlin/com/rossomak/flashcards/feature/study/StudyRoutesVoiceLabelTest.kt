@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.study
 
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import io.kotest.matchers.shouldBe
 import org.junit.Test
@@ -29,6 +30,7 @@ class StudyRoutesVoiceLabelTest {
         voiceVariantIndex = voiceVariantIndex,
         categoryName = CATEGORY_NAME,
         subcategoryNames = emptyList(),
+        sourceType = Quick,
     )
 
     private fun ratedRoute(voiceCountryCode: String? = null, voiceVariantIndex: Int? = null): RatedStudySessionRoute = RatedStudySessionRoute(
@@ -41,6 +43,7 @@ class StudyRoutesVoiceLabelTest {
         voiceVariantIndex = voiceVariantIndex,
         categoryName = CATEGORY_NAME,
         subcategoryNames = emptyList(),
+        sourceType = Quick,
     )
 
     private companion object {
