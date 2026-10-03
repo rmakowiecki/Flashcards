@@ -181,21 +181,16 @@ private fun layerSeed(specSeed: Int, indexFromFront: Int): Int = specSeed + inde
 internal fun NetworkGraphLayerSpec.isSameMorphFamily(other: NetworkGraphLayerSpec): Boolean =
     density == other.density && jitter == other.jitter && edgeRule == other.edgeRule && strictTriangles == other.strictTriangles
 
-/** Every continuous field interpolated; the morph-family fields are equal on both sides already. */
+/**
+ * Every continuous field interpolated; the morph-family fields are equal on both sides already. The
+ * shapes snap half way: which nodes show comes from [LayerShape], never from these, so only a morph
+ * restarted from this spec without its origin ever sees them.
+ */
 private fun lerp(from: NetworkGraphLayerSpec, to: NetworkGraphLayerSpec, fraction: Float): NetworkGraphLayerSpec = from.copy(
-    uniformWeight = lerp(from.uniformWeight, to.uniformWeight, fraction),
-    ribbonWeight = lerp(from.ribbonWeight, to.ribbonWeight, fraction),
-    bloomWeight = lerp(from.bloomWeight, to.bloomWeight, fraction),
+    shapes = if (fraction < SNAP_FRACTION) from.shapes else to.shapes,
     fillChance = lerp(from.fillChance, to.fillChance, fraction),
     driftAmplitude = lerp(from.driftAmplitude, to.driftAmplitude, fraction),
     driftSpeed = lerp(from.driftSpeed, to.driftSpeed, fraction),
-    ribbonCenter = lerp(from.ribbonCenter, to.ribbonCenter, fraction),
-    ribbonWidth = lerp(from.ribbonWidth, to.ribbonWidth, fraction),
-    ribbonCurve = lerp(from.ribbonCurve, to.ribbonCurve, fraction),
-    ribbonTilt = lerp(from.ribbonTilt, to.ribbonTilt, fraction),
-    bloomReach = lerp(from.bloomReach, to.bloomReach, fraction),
-    bloomX = lerp(from.bloomX, to.bloomX, fraction),
-    bloomY = lerp(from.bloomY, to.bloomY, fraction),
     envelopeFloor = lerp(from.envelopeFloor, to.envelopeFloor, fraction),
     waveAmplitude = lerp(from.waveAmplitude, to.waveAmplitude, fraction),
     waveSpeed = lerp(from.waveSpeed, to.waveSpeed, fraction),
@@ -213,6 +208,8 @@ private fun lerp(from: NetworkGraphLayerSpec, to: NetworkGraphLayerSpec, fractio
     glowRadiusDp = lerp(from.glowRadiusDp, to.glowRadiusDp, fraction),
     glowStrength = lerp(from.glowStrength, to.glowStrength, fraction),
     depthDimming = lerp(from.depthDimming, to.depthDimming, fraction),
+    cometStrength = lerp(from.cometStrength, to.cometStrength, fraction),
+    cometSpark = if (fraction < SNAP_FRACTION) from.cometSpark else to.cometSpark,
     alpha = lerp(from.alpha, to.alpha, fraction),
     surfaceColor = if (fraction < SNAP_FRACTION) from.surfaceColor else to.surfaceColor,
 )
