@@ -38,16 +38,16 @@ private val sampleCoroutinesSubcategory = "coroutines" to "Coroutines"
 private val sampleGraphsSubcategory = "graphs" to "Graph traversal, shortest paths and minimum spanning trees in weighted graphs"
 private val sampleSortingSubcategory = "sorting" to "Sorting"
 
-// Declared after the samples it reads: file-level properties initialize top to bottom.
-internal val previewRecentItems: List<RecentItem> = sampleRecentItems(now = previewRecentsNow)
-
-/** Newest first, covering each source type, Study Mode, hands-free flag and display edge case, including an unread Category. */
-@Suppress("MagicNumber", "LongMethod")
-internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
+/**
+ * Newest first, covering each source type, Study Mode, hands-free flag and display edge case, including an unread Category.
+ * Declared after the samples it reads: file-level properties initialize top to bottom.
+ */
+@Suppress("MagicNumber")
+internal val previewRecentItems: List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Rated(
             id = "sample-single-voice",
-            startedAt = now.minus(4, ChronoUnit.MINUTES),
+            startedAt = previewRecentsNow.minus(4, ChronoUnit.MINUTES),
             durationSeconds = 480,
             sourceType = SingleSubcategory,
             categoryId = sampleAndroidCategory.id,
@@ -63,7 +63,7 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Fast(
             id = "sample-quick-read-aloud",
-            startedAt = now.minus(3, ChronoUnit.HOURS),
+            startedAt = previewRecentsNow.minus(3, ChronoUnit.HOURS),
             durationSeconds = 720,
             sourceType = Quick,
             categoryId = sampleAndroidCategory.id,
@@ -79,7 +79,7 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Rated(
             id = "sample-custom",
-            startedAt = now.minus(1, ChronoUnit.DAYS),
+            startedAt = previewRecentsNow.minus(1, ChronoUnit.DAYS),
             durationSeconds = 600,
             sourceType = Custom,
             categoryId = sampleAlgorithmsCategory.id,
@@ -95,7 +95,7 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Fast(
             id = "sample-xp-loss",
-            startedAt = now.minus(3, ChronoUnit.DAYS),
+            startedAt = previewRecentsNow.minus(3, ChronoUnit.DAYS),
             durationSeconds = 300,
             sourceType = SingleSubcategory,
             categoryId = sampleAlgorithmsCategory.id,
@@ -111,7 +111,7 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Rated(
             id = "sample-short",
-            startedAt = now.minus(5, ChronoUnit.DAYS),
+            startedAt = previewRecentsNow.minus(5, ChronoUnit.DAYS),
             durationSeconds = 45,
             sourceType = SingleSubcategory,
             categoryId = sampleAndroidCategory.id,
@@ -127,7 +127,7 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Fast(
             id = "sample-older",
-            startedAt = now.minus(20, ChronoUnit.DAYS),
+            startedAt = previewRecentsNow.minus(20, ChronoUnit.DAYS),
             durationSeconds = 1_500,
             sourceType = Custom,
             categoryId = sampleAndroidCategory.id,
@@ -143,7 +143,7 @@ internal fun sampleRecentItems(now: Instant): List<RecentItem> = listOf(
     RecentItem(
         session = RecentSession.Rated(
             id = "sample-last-year",
-            startedAt = now.minus(400, ChronoUnit.DAYS),
+            startedAt = previewRecentsNow.minus(400, ChronoUnit.DAYS),
             durationSeconds = 900,
             sourceType = Quick,
             categoryId = sampleAlgorithmsCategory.id,
