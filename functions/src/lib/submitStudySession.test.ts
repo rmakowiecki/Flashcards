@@ -283,7 +283,9 @@ describe("nextRecentEntries", () => {
       voiceAnswering: false,
       sourceType: "SingleSubcategory",
       categoryId: "cat-1",
+      categoryName: "Category One",
       subcategoryIds: ["sub-1"],
+      subcategoryNames: ["Subcategory One"],
       cardCount: 1,
       xpTotal: 100,
     };
@@ -670,7 +672,9 @@ describe("submitStudySession — recents/state", () => {
       voiceAnswering: true,
       sourceType: "Quick",
       categoryId: "cat-1",
+      categoryName: "Category One",
       subcategoryIds: ["sub-1", "sub-2"],
+      subcategoryNames: ["Subcategory One", "Subcategory Two"],
       cardCount: sessionDoc.data()?.cardCount,
       xpTotal: result.breakdown.xpTotal,
     });

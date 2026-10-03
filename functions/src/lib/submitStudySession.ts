@@ -207,8 +207,8 @@ export interface SubmitStudySessionResult {
 
 /**
  * One session's entry in `recents/state`, keyed there by its `sessionId`, with the same field names and
- * values as its session document. Holds only what Home needs to show and replay a Recent: no names,
- * which the client resolves itself, and no abandoned flag, settings, card ids or XP breakdown.
+ * values as its session document. Holds only what Home needs to show and replay a Recent, names
+ * included so a row never needs a taxonomy read, and no abandoned flag, settings, card ids or XP breakdown.
  * `startTimestamp` is the session document's own `Timestamp`, and `xpTotal` is signed: a session that
  * de-mastered cards can lose XP overall.
  */
@@ -219,7 +219,9 @@ export type RecentEntry = {
   [FIELD_STUDY_MODE]: StudyMode;
   [FIELD_SOURCE_TYPE]: SessionSourceType;
   [FIELD_CATEGORY_ID]: string;
+  [FIELD_CATEGORY_NAME]: string;
   [FIELD_SUBCATEGORY_IDS]: string[];
+  [FIELD_SUBCATEGORY_NAMES]: string[];
   [FIELD_CARD_COUNT]: number;
   [FIELD_XP_TOTAL]: number;
 } & SessionDelivery;
@@ -759,7 +761,9 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
       ...request.delivery,
       [FIELD_SOURCE_TYPE]: request.sourceType,
       [FIELD_CATEGORY_ID]: request.categoryId,
+      [FIELD_CATEGORY_NAME]: request.categoryName,
       [FIELD_SUBCATEGORY_IDS]: request.subcategoryIds,
+      [FIELD_SUBCATEGORY_NAMES]: request.subcategoryNames,
       [FIELD_CARD_COUNT]: request.cardResults.length,
       [FIELD_XP_TOTAL]: breakdown.xpTotal,
     };
