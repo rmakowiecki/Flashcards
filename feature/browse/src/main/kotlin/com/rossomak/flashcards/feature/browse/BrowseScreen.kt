@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -274,7 +275,7 @@ private fun BoxScope.CategoryListContent(
     when {
         isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         categories.isEmpty() -> CenteredEmptyState(
-            icon = Icons.Filled.ErrorOutline,
+            icon = Icons.Filled.CloudOff,
             title = stringResource(R.string.browse_categories_error_title),
             supportingText = stringResource(R.string.browse_categories_error_message),
             tone = FlashcardsEmptyStateTone.Error,
