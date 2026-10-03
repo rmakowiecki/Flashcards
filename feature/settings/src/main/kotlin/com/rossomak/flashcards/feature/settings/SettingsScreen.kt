@@ -50,6 +50,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.partialRatingCardRequ
 import com.rossomak.flashcards.core.ui.composables.dialogs.readAloudLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.speechRateLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.voiceAnsweringLabel
+import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -147,11 +148,13 @@ private fun SettingsContent(
             )
         },
     ) { innerPadding ->
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .flashcardsScrollFade(scrollState)
+                .verticalScroll(scrollState)
                 .padding(bottom = MaterialTheme.spacing.small),
         ) {
             FlashcardsOverlineLabel(text = stringResource(R.string.settings_study_sessions_label))

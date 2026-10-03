@@ -62,6 +62,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsDetailedListRow
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
@@ -429,7 +430,7 @@ internal fun CategoryList(
     favorites: UserFavorites,
     onCategoryClick: (String, String) -> Unit,
 ) {
-    ScrollableSectionColumn {
+    ScrollableSectionColumn(fadesEdges = true) {
         FlashcardsOverlineLabel(text = stringResource(R.string.browse_categories_label))
         FlashcardsListGroup(
             modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
@@ -527,12 +528,19 @@ private fun SubcategoryListGroup(
     }
 }
 
+/**
+ * @param fadesEdges fades the top and bottom edges while there is more to scroll, so the category
+ * list's last cut-off row never butts straight up against the bottom navigation bar. Off for the
+ * expanded search results, which take over the whole window and so never meet that bar.
+ */
 @Composable
-private fun ScrollableSectionColumn(content: @Composable () -> Unit) {
+private fun ScrollableSectionColumn(fadesEdges: Boolean = false, content: @Composable () -> Unit) {
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .then(if (fadesEdges) Modifier.flashcardsScrollFade(scrollState) else Modifier)
+            .verticalScroll(scrollState)
             .padding(bottom = MaterialTheme.spacing.xsmall),
     ) {
         content()

@@ -54,6 +54,7 @@ import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
@@ -155,7 +156,15 @@ private fun HomeContent(
     onSubcategoryPlayClick: (Subcategory) -> Unit,
     onRecentClick: (RecentItem) -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    val scrollState = rememberScrollState()
+    // Bottom edge only: the top bar scrolls with this column, so a top fade would paint a strip of
+    // background over its gradient before it has scrolled away.
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .flashcardsScrollFade(scrollState, fadeTop = false)
+            .verticalScroll(scrollState),
+    ) {
         HomeTopBar()
         UserGreetingSection(userName = "Ross")
         val favorites = state.favorites
