@@ -92,6 +92,9 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.CategoryUnavailable
+import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.MicPermissionStillDenied
+import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.SubcategoriesUnavailable
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -121,13 +124,16 @@ fun PreviewStudySessionScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val micPermissionStillDeniedText = stringResource(CoreUiR.string.common_mic_permission_still_denied_message)
+    val subcategoriesUnavailableText = stringResource(R.string.preview_session_subcategories_unavailable_message)
+    val categoryUnavailableText = stringResource(R.string.preview_session_category_unavailable_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
-        when (message) {
-            PreviewStudySessionMessage.MicPermissionStillDenied -> snackbarScope.launch {
-                snackbarHostState.showSnackbar(message = micPermissionStillDeniedText, duration = SnackbarDuration.Short)
-            }
+        val text = when (message) {
+            MicPermissionStillDenied -> micPermissionStillDeniedText
+            SubcategoriesUnavailable -> subcategoriesUnavailableText
+            CategoryUnavailable -> categoryUnavailableText
         }
+        snackbarScope.launch { snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short) }
     }
 
     PreviewStudySessionContent(

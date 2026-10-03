@@ -18,7 +18,10 @@ import kotlinx.serialization.Serializable
  * | Quick | present | The caller's candidate pool; Preview samples it and makes no fetch |
  * | Quick | empty | Preview fetches the Category's Subcategories itself, then samples them |
  * | SingleSubcategory / Custom | present | Used literally |
- * | SingleSubcategory / Custom | empty | Invalid; the Preview screen rejects it |
+ * | SingleSubcategory / Custom | empty | Nothing to study; Preview shows the unavailable message and its error state |
+ *
+ * For SingleSubcategory and Custom, Preview first checks that the ids still exist and drops any the
+ * server confirms are gone. An id it cannot check, for example offline, is kept.
  *
  * Quick ids mean "the Category's complete Subcategory list, or none". A partial list is not
  * validated and would silently give a Quick Session over only that subset.
@@ -32,6 +35,11 @@ import kotlinx.serialization.Serializable
  * nullability is load-bearing: a non-null field could not tell a deliberate
  * [FlashcardSortOrder.Default] apart from an absent choice, and the Quick Session path from Category
  * Details genuinely has no list behind it to inherit an order from (ADR-0038).
+ * @param studyMode, [voiceAnsweringEnabled] and [readAloudEnabled]: starting values for this session
+ * only, as when replaying a past session. Like [sortOrder], **null means "use my saved default"**, and
+ * a value is never saved unless the User ticks "keep as default". Flattened to primitives and enums
+ * for the same NavType reason as [difficultyMin]. A Rated replay leaves [readAloudEnabled] null, so
+ * switching it to Fast takes read-aloud from the saved default.
  */
 @Serializable
 data class PreviewStudySessionRoute(
@@ -44,6 +52,9 @@ data class PreviewStudySessionRoute(
     val difficultyMax: Int = StudySessionConfig.MAX_DIFFICULTY,
     val sortOrder: FlashcardSortOrder? = null,
     val sourceType: SessionSourceType,
+    val studyMode: StudyMode? = null,
+    val voiceAnsweringEnabled: Boolean? = null,
+    val readAloudEnabled: Boolean? = null,
 ) {
     val difficultyRange: IntRange get() = difficultyMin..difficultyMax
 }

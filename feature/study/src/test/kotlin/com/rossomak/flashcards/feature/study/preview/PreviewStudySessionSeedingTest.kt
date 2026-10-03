@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.lifecycle.SavedStateHandle
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
@@ -10,18 +11,23 @@ import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreference
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
+import com.rossomak.flashcards.core.domain.usecase.ResolveCategorySubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ResolveSubcategoryAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SelectSessionFlashcardsUseCase
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -38,13 +44,13 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * How the Preview screen decides which sort order and difficulty range a session opens with.
+ * How the Preview screen decides which sort order, difficulty range, Study Mode and delivery a
+ * session opens with: the route-versus-saved-default precedence rule from ADR-0038.
  *
- * Split out of [PreviewStudySessionViewModelTest] purely to keep that class within detekt's size
- * limit — this is the route-versus-saved-default precedence rule from ADR-0038, nothing else.
+ * Split out of [PreviewStudySessionViewModelTest] purely to keep that class a manageable size.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class PreviewStudySessionSortSeedingTest {
+class PreviewStudySessionSeedingTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -64,6 +70,13 @@ class PreviewStudySessionSortSeedingTest {
         sourceType = SingleSubcategory,
     )
 
+    /** The opposite of every [StudySessionPreferences] default, so a seeded value is visible. */
+    private val savedFastDefaults = StudySessionPreferences(
+        defaultStudyMode = StudyMode.Fast,
+        voiceAnsweringEnabled = true,
+        readAloudEnabled = true,
+    )
+
     @Before
     fun setUp() {
         mockkObject(RouteDecoder)
@@ -81,7 +94,8 @@ class PreviewStudySessionSortSeedingTest {
 
     private fun createViewModel(): PreviewStudySessionViewModel = PreviewStudySessionViewModel(
         savedStateHandle,
-        GetSubcategoriesUseCase(flashcardRepository),
+        ResolveCategorySubcategoriesUseCase(flashcardRepository),
+        ResolveSubcategoryAvailabilityUseCase(flashcardRepository),
         SelectSessionFlashcardsUseCase(
             getFlashcards = GetFlashcardsUseCase(flashcardRepository),
             filterFlashcards = FilterFlashcardsUseCase(),
@@ -142,5 +156,81 @@ class PreviewStudySessionSortSeedingTest {
         advanceUntilIdle()
 
         viewModel.state.value.config.difficultyRange shouldBe 3..7
+    }
+
+    @Test
+    fun `a route study mode wins over the saved default`() = runTest(mainDispatcherRule.testDispatcher) {
+        preferencesRepository.preferences.value = StudySessionPreferences(defaultStudyMode = StudyMode.Rated)
+        stubRoute(route.copy(studyMode = StudyMode.Fast))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.config.mode shouldBe StudyMode.Fast
+    }
+
+    @Test
+    fun `a route voice answering choice wins over the saved default`() = runTest(mainDispatcherRule.testDispatcher) {
+        preferencesRepository.preferences.value = StudySessionPreferences(voiceAnsweringEnabled = false)
+        stubRoute(route.copy(voiceAnsweringEnabled = true))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.config.voiceAnsweringEnabled shouldBe true
+    }
+
+    @Test
+    fun `a route read-aloud choice wins over the saved default`() = runTest(mainDispatcherRule.testDispatcher) {
+        preferencesRepository.preferences.value = StudySessionPreferences(readAloudEnabled = false)
+        stubRoute(route.copy(readAloudEnabled = true))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.config.readAloudEnabled shouldBe true
+    }
+
+    @Test
+    fun `null route study mode and delivery fall back to the saved defaults`() = runTest(mainDispatcherRule.testDispatcher) {
+        preferencesRepository.preferences.value = savedFastDefaults
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        with(viewModel.state.value.config) {
+            mode shouldBe StudyMode.Fast
+            voiceAnsweringEnabled shouldBe true
+            readAloudEnabled shouldBe true
+        }
+    }
+
+    @Test
+    fun `seeding from the route saves nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        preferencesRepository.preferences.value = savedFastDefaults
+        stubRoute(route.copy(studyMode = StudyMode.Rated, voiceAnsweringEnabled = false, readAloudEnabled = false))
+
+        createViewModel()
+        advanceUntilIdle()
+
+        preferencesRepository.preferences.value shouldBe savedFastDefaults
+    }
+
+    @Test
+    fun `confirming a route-seeded mode saves it only when kept as default`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(route.copy(studyMode = StudyMode.Fast))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(SessionMode(draftState = viewModel.state.value.config.mode)))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+        preferencesRepository.preferences.value.defaultStudyMode shouldBe StudyMode.Rated
+
+        viewModel.onDialogEvent(Open(SessionMode(draftState = viewModel.state.value.config.mode)))
+        viewModel.onDialogEvent(DraftChange(SessionMode(draftState = StudyMode.Fast, keepAsDefault = true)))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+        preferencesRepository.preferences.value.defaultStudyMode shouldBe StudyMode.Fast
     }
 }

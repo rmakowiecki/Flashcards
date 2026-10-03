@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.source
 
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.CategoryDto
 import com.rossomak.flashcards.core.data.model.FlashcardDto
@@ -24,14 +25,14 @@ class FlashcardRemoteDataSource @Inject constructor(
             document.toObject(CategoryDto::class.java)?.copy(id = document.id)
         }
 
-    suspend fun getSubcategoriesByCategoryId(categoryId: String): List<SubcategoryDto> = firestore.collection(COLLECTION_SUBCATEGORIES)
+    suspend fun getSubcategoriesByCategoryId(categoryId: String): List<SubcategoryDto> = getSubcategoryPageByCategoryId(categoryId).subcategories
+
+    /** [categoryId]'s Subcategories, keeping whether Firestore served them only from the cache. */
+    suspend fun getSubcategoryPageByCategoryId(categoryId: String): SubcategoryQueryPage = firestore.collection(COLLECTION_SUBCATEGORIES)
         .whereEqualTo(FIELD_CATEGORY_ID, categoryId)
         .get()
         .await()
-        .documents
-        .mapNotNull { document ->
-            document.toObject(SubcategoryDto::class.java)?.copy(id = document.id)
-        }
+        .toSubcategoryQueryPage()
 
     suspend fun getCategoriesByIds(ids: Set<String>): List<CategoryDto> {
         if (ids.isEmpty()) return emptyList()
@@ -48,20 +49,28 @@ class FlashcardRemoteDataSource @Inject constructor(
         }
     }
 
-    suspend fun getSubcategoriesByIds(ids: Set<String>): List<SubcategoryDto> {
-        if (ids.isEmpty()) return emptyList()
-        val collection = firestore.collection(COLLECTION_SUBCATEGORIES)
-        return ids.chunked(WHEREIN_BATCH_SIZE).flatMap { chunk ->
-            collection
-                .whereIn(FieldPath.documentId(), chunk)
-                .get()
-                .await()
-                .documents
-                .mapNotNull { document ->
-                    document.toObject(SubcategoryDto::class.java)?.copy(id = document.id)
-                }
-        }
+    suspend fun getSubcategoriesByIds(ids: Set<String>): List<SubcategoryDto> =
+        ids.chunked(WHEREIN_BATCH_SIZE).flatMap { batchIds -> getSubcategoryPageByIds(batchIds).subcategories }
+
+    /**
+     * One `whereIn` batch of Subcategories, keeping whether Firestore served it only from the cache.
+     * One call per batch lets a caller tell a failed batch apart from the others. [ids] holds at most
+     * [WHEREIN_BATCH_SIZE] values.
+     */
+    suspend fun getSubcategoryPageByIds(ids: List<String>): SubcategoryQueryPage {
+        require(ids.size <= WHEREIN_BATCH_SIZE) { "A whereIn batch holds at most $WHEREIN_BATCH_SIZE ids" }
+        if (ids.isEmpty()) return SubcategoryQueryPage(subcategories = emptyList(), isFromCache = false)
+        return firestore.collection(COLLECTION_SUBCATEGORIES)
+            .whereIn(FieldPath.documentId(), ids)
+            .get()
+            .await()
+            .toSubcategoryQueryPage()
     }
+
+    private fun QuerySnapshot.toSubcategoryQueryPage(): SubcategoryQueryPage = SubcategoryQueryPage(
+        subcategories = documents.mapNotNull { document -> document.toObject(SubcategoryDto::class.java)?.copy(id = document.id) },
+        isFromCache = metadata.isFromCache,
+    )
 
     /**
      * Prefix search over the whole flat `subcategories` collection, never a bulk load. Firestore

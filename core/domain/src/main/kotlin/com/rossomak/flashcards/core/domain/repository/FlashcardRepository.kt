@@ -1,8 +1,10 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability
 
 interface FlashcardRepository {
 
@@ -15,6 +17,12 @@ interface FlashcardRepository {
 
     /** Subcategories matching [ids], in no particular order. Ids with no matching document are omitted. */
     suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>>
+
+    /** Every id in [ids] mapped to whether that Subcategory still exists. Never throws: a failed read is [SubcategoryAvailability.Unknown]. */
+    suspend fun resolveSubcategoryAvailability(ids: Set<String>): Map<String, SubcategoryAvailability>
+
+    /** [categoryId]'s Subcategories, telling a deleted Category apart from one that could not be read. Never throws. */
+    suspend fun resolveCategorySubcategories(categoryId: String): CategorySubcategoriesResolution
 
     /**
      * Subcategories across every category whose name starts with [namePrefix], ordered by name

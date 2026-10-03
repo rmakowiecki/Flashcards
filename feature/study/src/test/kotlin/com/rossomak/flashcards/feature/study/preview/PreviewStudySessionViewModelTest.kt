@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AppPermission
+import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
@@ -16,6 +17,8 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability.Missing
+import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability.Unknown
 import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -24,11 +27,12 @@ import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreference
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
-import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
+import com.rossomak.flashcards.core.domain.usecase.ResolveCategorySubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ResolveSubcategoryAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
@@ -55,7 +59,6 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
 import com.rossomak.flashcards.testutil.MainDispatcherRule
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
@@ -123,6 +126,12 @@ class PreviewStudySessionViewModelTest {
         sourceType = Quick,
     )
 
+    private val threeSubcategoryRoute = singleSubcategoryRoute.copy(
+        subcategoryIds = listOf(COMPOSE_ID, COROUTINES_ID, NAVIGATION_ID),
+        subcategoryNames = listOf("Compose", "Coroutines", "Navigation"),
+        sourceType = Custom,
+    )
+
     /** What Home hands Preview: the Category id alone, no pool. */
     private val poolLessQuickSessionRoute = quickSessionRoute.copy(
         subcategoryIds = emptyList(),
@@ -164,7 +173,8 @@ class PreviewStudySessionViewModelTest {
      */
     private fun createViewModel(): PreviewStudySessionViewModel = PreviewStudySessionViewModel(
         savedStateHandle,
-        GetSubcategoriesUseCase(flashcardRepository),
+        ResolveCategorySubcategoriesUseCase(flashcardRepository),
+        ResolveSubcategoryAvailabilityUseCase(flashcardRepository),
         SelectSessionFlashcardsUseCase(
             getFlashcards = GetFlashcardsUseCase(flashcardRepository),
             filterFlashcards = FilterFlashcardsUseCase(),
@@ -1188,13 +1198,14 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
-    fun `a quick route that supplies its pool makes no pool fetch`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a quick route that supplies its pool makes no pool fetch and no subcategory check`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(quickSessionRoute)
 
         createViewModel()
         advanceUntilIdle()
 
         flashcardRepository.fetchedSubcategoryCategoryIds shouldBe emptyList()
+        flashcardRepository.resolvedAvailabilitySubcategoryIds shouldBe emptyList()
     }
 
     @Test
@@ -1281,11 +1292,156 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
-    fun `a non quick route without subcategory ids is rejected`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(poolLessQuickSessionRoute.copy(sourceType = Custom))
+    fun `a quick route whose category is gone shows the unavailable message and the load error`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+            flashcardRepository.categorySubcategoriesResolutionToReturn = CategorySubcategoriesResolution.Missing
+            val viewModel = createViewModel()
 
-        shouldThrow<IllegalArgumentException> { createViewModel() }
+            viewModel.messages.test {
+                advanceUntilIdle()
+
+                awaitItem() shouldBe PreviewStudySessionMessage.CategoryUnavailable
+            }
+            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.canStart shouldBe false
+        }
+
+    @Test
+    fun `a quick route whose pool cannot be read shows the load error without a message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+            flashcardRepository.categorySubcategoriesResolutionToReturn = CategorySubcategoriesResolution.Unknown
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        }
+
+    @Test
+    fun `a custom route whose subcategories all exist keeps its exact set`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(threeSubcategoryRoute)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        flashcardRepository.resolvedAvailabilitySubcategoryIds shouldBe listOf(threeSubcategoryRoute.subcategoryIds.toSet())
+        viewModel.state.value.config.subcategoryIds shouldBe threeSubcategoryRoute.subcategoryIds
+        viewModel.state.value.subcategoryNames shouldBe threeSubcategoryRoute.subcategoryNames
     }
+
+    @Test
+    fun `a missing subcategory is dropped with its name`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(threeSubcategoryRoute)
+        flashcardRepository.subcategoryAvailabilityToReturn = mapOf(COROUTINES_ID to Missing)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.config.subcategoryIds shouldBe listOf(COMPOSE_ID, NAVIGATION_ID)
+        viewModel.state.value.subcategoryNames shouldBe listOf("Compose", "Navigation")
+        flashcardRepository.fetchedSubcategoryIds.toSet() shouldBe setOf(COMPOSE_ID, NAVIGATION_ID)
+    }
+
+    @Test
+    fun `a subcategory that cannot be checked is kept`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(threeSubcategoryRoute)
+        flashcardRepository.subcategoryAvailabilityToReturn = mapOf(COROUTINES_ID to Unknown)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.config.subcategoryIds shouldBe threeSubcategoryRoute.subcategoryIds
+    }
+
+    @Test
+    fun `a route whose subcategories are all missing shows the unavailable message and draws nothing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(threeSubcategoryRoute)
+            flashcardRepository.subcategoryAvailabilityToReturn = threeSubcategoryRoute.subcategoryIds.associateWith { Missing }
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                advanceUntilIdle()
+
+                awaitItem() shouldBe PreviewStudySessionMessage.SubcategoriesUnavailable
+            }
+            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.canStart shouldBe false
+            flashcardRepository.fetchedSubcategoryIds shouldBe emptyList()
+        }
+
+    @Test
+    fun `a non quick route without subcategory ids shows the unavailable message`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(poolLessQuickSessionRoute.copy(sourceType = Custom))
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe PreviewStudySessionMessage.SubcategoriesUnavailable
+        }
+        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        flashcardRepository.resolvedAvailabilitySubcategoryIds shouldBe emptyList()
+    }
+
+    @Test
+    fun `retry checks the subcategories again after they were all missing`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(threeSubcategoryRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+        flashcardRepository.subcategoryAvailabilityToReturn = threeSubcategoryRoute.subcategoryIds.associateWith { Missing }
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        flashcardRepository.subcategoryAvailabilityToReturn = null
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        flashcardRepository.resolvedAvailabilitySubcategoryIds.size shouldBe 2
+        viewModel.state.value.error shouldBe null
+        viewModel.state.value.canStart shouldBe true
+        viewModel.state.value.config.subcategoryIds shouldBe threeSubcategoryRoute.subcategoryIds
+    }
+
+    @Test
+    fun `retry checks the subcategories again after none could be checked`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(threeSubcategoryRoute)
+        flashcardRepository.flashcardsToReturn = Result.failure(IllegalStateException("boom"))
+        flashcardRepository.subcategoryAvailabilityToReturn = threeSubcategoryRoute.subcategoryIds.associateWith { Unknown }
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+        flashcardRepository.subcategoryAvailabilityToReturn = mapOf(COROUTINES_ID to Missing)
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        flashcardRepository.resolvedAvailabilitySubcategoryIds.size shouldBe 2
+        viewModel.state.value.config.subcategoryIds shouldBe listOf(COMPOSE_ID, NAVIGATION_ID)
+    }
+
+    @Test
+    fun `dialog confirms after a successful check do not check the subcategories again`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(threeSubcategoryRoute)
+            flashcardRepository.subcategoryAvailabilityToReturn = mapOf(COROUTINES_ID to Missing)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.onDialogEvent(Open(SessionCardCount(draftState = viewModel.state.value.config.length)))
+            viewModel.onDialogEvent(DraftChange(SessionCardCount(draftState = 10)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            viewModel.onResetFilters()
+            advanceUntilIdle()
+
+            flashcardRepository.resolvedAvailabilitySubcategoryIds.size shouldBe 1
+            viewModel.state.value.config.subcategoryIds shouldBe listOf(COMPOSE_ID, NAVIGATION_ID)
+        }
 
     @Test
     fun `a pool fetch failure shows the load error and retry fetches the pool again`() =
@@ -1783,5 +1939,9 @@ class PreviewStudySessionViewModelTest {
 
         /** Same rationale as [CARD_DRAW_RANDOM_SEED], for the quick-session subcategory sample. */
         const val SUBCATEGORY_SAMPLE_RANDOM_SEED = 7L
+
+        const val COMPOSE_ID = "android-compose"
+        const val COROUTINES_ID = "android-coroutines"
+        const val NAVIGATION_ID = "android-navigation"
     }
 }
