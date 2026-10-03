@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.data
 
-import android.util.Log
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
@@ -8,6 +7,7 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker
 import java.util.UUID
 import javax.inject.Inject
@@ -54,13 +54,13 @@ class SessionSubmissionDrainScheduler @Inject constructor(
 ) {
 
     fun scheduleDrain() {
-        Log.d(TAG, "Scheduling drain worker (unique work=$UNIQUE_WORK_NAME, policy=KEEP, requires network)")
+        logd { "Scheduling drain worker (unique work=$UNIQUE_WORK_NAME, policy=KEEP, requires network)" }
         workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, buildDrainRequest())
     }
 
     /** Schedules a drain for a session just queued, replacing any drain already pending, and returns the new request's id to observe with [observeDrain]. */
     fun scheduleDrainForFinishedSession(): UUID {
-        Log.d(TAG, "Scheduling drain worker (unique work=$UNIQUE_WORK_NAME, policy=REPLACE, requires network)")
+        logd { "Scheduling drain worker (unique work=$UNIQUE_WORK_NAME, policy=REPLACE, requires network)" }
         val request = buildDrainRequest()
         workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
         return request.id
@@ -78,6 +78,5 @@ class SessionSubmissionDrainScheduler @Inject constructor(
 
     companion object {
         const val UNIQUE_WORK_NAME = "session_submission_drain"
-        private const val TAG = "SessionSubmissionDrainScheduler"
     }
 }

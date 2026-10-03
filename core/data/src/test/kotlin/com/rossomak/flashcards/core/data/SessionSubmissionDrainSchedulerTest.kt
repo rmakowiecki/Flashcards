@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.data
 
-import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
@@ -9,30 +8,13 @@ import com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
 import io.mockk.slot
-import io.mockk.unmockkStatic
 import io.mockk.verify
-import org.junit.After
-import org.junit.Before
 import org.junit.Test
 
 class SessionSubmissionDrainSchedulerTest {
 
     private val workManager: WorkManager = mockk()
-
-    @Before
-    fun setUp() {
-        // scheduleDrain logs via android.util.Log, unavailable outside instrumented/Robolectric
-        // tests — stub it rather than pull in either just for this.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(Log::class)
-    }
 
     private fun createScheduler(): SessionSubmissionDrainScheduler = SessionSubmissionDrainScheduler(workManager)
 
