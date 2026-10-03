@@ -716,7 +716,10 @@ internal class LayerField(
         edgeAlphas = edgeAlphas.copyOf(edgeKeys.size)
     }
 
-    /** Edges entering [topology] fade in, edges leaving it fade out; the first frame starts fully drawn. */
+    /**
+     * Edges entering [topology] fade in, edges leaving it fade out; the first frame starts fully drawn,
+     * and so does every edge of a running morph's mesh, which the morph fades itself.
+     */
     private fun updateFadingEdges(stepSeconds: Float, isFirstFrame: Boolean, morphing: Boolean) {
         for (edge in fadingEdges.values) {
             edge.present = false
@@ -727,7 +730,10 @@ internal class LayerField(
             }
         }
         for (key in topology.edges) {
-            val edge = fadingEdges.getOrPut(key) { FadingEdge(alpha = if (isFirstFrame) 1f else 0f) }
+            // Mid-morph, the morph's own switch fades each edge (see [applyMorphEdgeWeights]); a second,
+            // timed fade on top would hold back every edge the morph brings in for its first moments.
+            val edge = fadingEdges.getOrPut(key) { FadingEdge(alpha = if (isFirstFrame || morphing) 1f else 0f) }
+            if (morphing) edge.alpha = 1f
             edge.present = true
         }
         val fadeStep = stepSeconds / EDGE_FLIP_FADE_SECONDS
