@@ -16,8 +16,9 @@ private val BrandIndigo = Color(0xFF2A2E8F)
 object NetworkGraphPresets {
 
     private val ribbonFront = NetworkGraphLayerSpec(
-        envelope = EnvelopeKind.Ribbon,
-        density = 16f,
+        uniformWeight = 0f,
+        ribbonWeight = 1f,
+        density = 24f,
         jitter = 0.4f,
         driftAmplitude = 0.3f,
         ribbonCenter = 0.62f,
@@ -34,8 +35,9 @@ object NetworkGraphPresets {
 
     /** The far mesh of the two-layer references: sparser, bigger dimmer nodes, slower (parallax). */
     private val ribbonGhost = NetworkGraphLayerSpec(
-        envelope = EnvelopeKind.Ribbon,
-        density = 8f,
+        uniformWeight = 0f,
+        ribbonWeight = 1f,
+        density = 12f,
         jitter = 0.45f,
         driftAmplitude = 0.35f,
         driftSpeed = 0.5f,
@@ -61,7 +63,6 @@ object NetworkGraphPresets {
         seed = 1,
         layers = listOf(
             NetworkGraphLayerSpec(
-                envelope = EnvelopeKind.Uniform,
                 edgeRule = EdgeRule.Proximity,
                 fillChance = 0.88f,
                 jitter = 0.5f,
@@ -71,7 +72,7 @@ object NetworkGraphPresets {
                 strokeWidthDp = 1f,
                 edgeAlpha = 0.55f,
                 lengthFalloff = 0.6f,
-                pulse = true,
+                pulseDepth = 1f,
                 nodeSizeDp = 2.2f,
                 hotNodeShare = 0.2f,
                 glowStrength = 0.16f,
@@ -100,7 +101,7 @@ object NetworkGraphPresets {
         seed = 4,
         layers = listOf(
             ribbonFront.copy(
-                density = 15f,
+                density = 23f,
                 lengthFalloff = 0.8f,
                 hotNodeShare = 0.3f,
                 glowRadiusDp = 18f,
@@ -116,8 +117,9 @@ object NetworkGraphPresets {
         seed = 5,
         layers = listOf(
             NetworkGraphLayerSpec(
-                envelope = EnvelopeKind.CornerBloom,
-                density = 15f,
+                uniformWeight = 0f,
+                bloomWeight = 1f,
+                density = 23f,
                 bloomReach = 0.8f,
                 envelopeFloor = 0.02f,
                 maxEdgeFactor = 2.4f,
@@ -137,8 +139,7 @@ object NetworkGraphPresets {
         seed = 6,
         layers = listOf(
             NetworkGraphLayerSpec(
-                envelope = EnvelopeKind.Uniform,
-                density = 14f,
+                density = 21f,
                 driftAmplitude = 0.45f,
                 maxEdgeFactor = 2.2f,
                 minAngleDegrees = 14f,
@@ -174,6 +175,69 @@ object NetworkGraphPresets {
         livingDelaunay,
     )
 
+    /** The front layer every [morphFamily] variant shares its seed, density, jitter and edge rule with. */
+    private val morphBase = NetworkGraphLayerSpec(
+        density = 23f,
+        driftAmplitude = 0.35f,
+        maxEdgeFactor = 2.4f,
+        minAngleDegrees = 14f,
+        lengthFalloff = 0.5f,
+        nodeSizeVariance = 0.4f,
+    )
+
+    private val morphRibbon = morphBase.copy(
+        uniformWeight = 0f,
+        ribbonWeight = 1f,
+        ribbonCenter = 0.62f,
+        ribbonWidth = 0.42f,
+        waveAmplitude = 0.03f,
+        waveSpeed = 0.25f,
+    )
+
+    private val morphBloom = morphBase.copy(
+        uniformWeight = 0f,
+        bloomWeight = 1f,
+        bloomReach = 0.8f,
+        hotNodeShare = 0.15f,
+        glowStrength = 0.35f,
+    )
+
+    private const val MORPH_SEED = 11
+
+    private fun morphVariant(name: String, note: String, vararg layers: NetworkGraphLayerSpec) =
+        NetworkGraphSpec(name = name, note = note, seed = MORPH_SEED, layers = layers.toList())
+
+    /**
+     * One morph family: every variant shares a seed and its layers' density, jitter and edge rule, so
+     * any two morph into each other smoothly. Back layers count from the front, so a variant with a
+     * ghost layer fades it in against one without.
+     */
+    val morphFamily: List<NetworkGraphSpec> = listOf(
+        morphVariant("Uniform field", "Even mesh over the whole surface", morphBase),
+        morphVariant("Ribbon", "Band across the lower middle", morphRibbon),
+        morphVariant(
+            "Ribbon, high and narrow",
+            "The band moved up, thinned and tilted",
+            morphRibbon.copy(ribbonCenter = 0.3f, ribbonWidth = 0.22f, ribbonTilt = -12f),
+        ),
+        morphVariant("Corner bloom", "Dense at the top-end corner, hot nodes glowing", morphBloom),
+        morphVariant(
+            "Bloom, bottom-start",
+            "The bloom moved to the opposite corner and tightened",
+            morphBloom.copy(bloomX = 0f, bloomY = 1f, bloomReach = 0.6f),
+        ),
+        morphVariant("Ribbon + bloom", "Both shapes at once", morphRibbon.copy(bloomWeight = 0.9f, bloomReach = 0.5f)),
+        morphVariant(
+            "Uniform + ghost",
+            "Even mesh over a faint, sparser back layer",
+            ribbonGhost.copy(uniformWeight = 1f, ribbonWeight = 0f),
+            morphBase,
+        ),
+    )
+
+    /** The fake onboarding pager's backgrounds, one per page. */
+    val onboardingPages: List<NetworkGraphSpec> = listOf(morphFamily[0], morphFamily[2], morphFamily[3])
+
     /** What the tuning sheet inserts as a new back layer: [ribbonGhost]'s far-mesh look, over the whole surface. */
-    val defaultBackLayer = ribbonGhost.copy(envelope = EnvelopeKind.Uniform)
+    val defaultBackLayer = ribbonGhost.copy(uniformWeight = 1f, ribbonWeight = 0f)
 }

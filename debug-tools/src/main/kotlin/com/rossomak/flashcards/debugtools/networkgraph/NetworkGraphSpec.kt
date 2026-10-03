@@ -13,6 +13,12 @@ import java.util.Locale
  *
  * [layers] draw back to front, each an independent mesh with its own nodes, envelope and seed, which
  * is what gives the "sharp foreground over a faint, larger background mesh" depth of the references.
+ * Layer seeds count from the front layer, so adding a back layer leaves the front one's layout alone.
+ *
+ * Two specs morph into each other smoothly (see [morphLayers]) when they share [seed] and each
+ * layer's morph family: [NetworkGraphLayerSpec.density], [NetworkGraphLayerSpec.jitter],
+ * [NetworkGraphLayerSpec.edgeRule] and [NetworkGraphLayerSpec.strictTriangles]. Every other field
+ * morphs.
  */
 data class NetworkGraphSpec(
     val name: String,
@@ -20,9 +26,6 @@ data class NetworkGraphSpec(
     val seed: Int,
     val layers: List<NetworkGraphLayerSpec>,
 )
-
-/** Where a layer's nodes are allowed to sit. See [NetworkGraphEnvelope] for each shape's density. */
-enum class EnvelopeKind { Uniform, Ribbon, CornerBloom }
 
 /** Which pairs of nodes get an edge. */
 enum class EdgeRule {
@@ -37,9 +40,10 @@ enum class EdgeRule {
 }
 
 /**
- * One mesh layer. Geometry is in grid cells (a cell is the surface's longer side over [density]), so
- * the mesh scales with the surface; stroke, node and glow sizes are in dp, so they read the same on a
- * 64dp app bar and a full-screen hero. Fractions marked "of height"/"of width" are of the surface.
+ * One mesh layer. Geometry is in grid cells (a cell is the window's longer side over [density]), so
+ * the mesh is equally fine on every surface of a screen and never reshuffles when one resizes; stroke,
+ * node and glow sizes are in dp, so they read the same on a 64dp app bar and a full-screen hero.
+ * Fractions marked "of height"/"of width" are of the surface.
  *
  * Invariants, whatever the values:
  * - every drawn node has at least two visible edges. The edge filters below shape the mesh, then
@@ -50,10 +54,16 @@ enum class EdgeRule {
  *   what the layer drew under them.
  */
 data class NetworkGraphLayerSpec(
-    val envelope: EnvelopeKind = EnvelopeKind.Uniform,
+    /**
+     * Where nodes sit, as three shape weights from 0 to 1, combined by taking the strongest weighted
+     * shape at each point: an even field, a meandering band, and a radial bloom. See [NetworkGraphEnvelope].
+     */
+    val uniformWeight: Float = 1f,
+    val ribbonWeight: Float = 0f,
+    val bloomWeight: Float = 0f,
     val edgeRule: EdgeRule = EdgeRule.FixedTriangulation,
-    /** Grid cells along the surface's longer side; the node-count knob. */
-    val density: Float = 13f,
+    /** Grid cells along the window's longer side; the node-count knob. */
+    val density: Float = 20f,
     /** Chance a cell inside the envelope holds a node at all. */
     val fillChance: Float = 0.9f,
     /** How far a node's rest position sits from its cell's center, in cells. */
@@ -67,8 +77,13 @@ data class NetworkGraphLayerSpec(
     val ribbonWidth: Float = 0.45f,
     /** How far the ribbon's center line meanders, as a fraction of height. */
     val ribbonCurve: Float = 0.1f,
-    /** Corner bloom radius, as a fraction of the surface's longer side. */
+    /** Ribbon slope around the surface's center, in degrees; positive runs downhill toward the end side. */
+    val ribbonTilt: Float = 0f,
+    /** Bloom radius, as a fraction of the surface's longer side. */
     val bloomReach: Float = 0.8f,
+    /** Bloom center, as fractions of width and height; the default is the top-end corner. */
+    val bloomX: Float = 1f,
+    val bloomY: Float = 0f,
     /** Node density outside the envelope, so the shape has stray outliers instead of a hard border. */
     val envelopeFloor: Float = 0.03f,
     /** Travelling vertical wave applied to every rest position, as a fraction of height. 0 = static. */
@@ -88,11 +103,12 @@ data class NetworkGraphLayerSpec(
     val edgeAlpha: Float = 0.55f,
     /** How much dimmer an edge at max length is than a very short one. */
     val lengthFalloff: Float = 0.5f,
-    val pulse: Boolean = false,
+    /** How deep edges pulse: 0 = steady, 1 = down to the pulse floor. */
+    val pulseDepth: Float = 0f,
     val nodeSizeDp: Float = 2.2f,
     /** Spread of node radii around [nodeSizeDp], 0 = all equal. */
     val nodeSizeVariance: Float = 0.3f,
-    /** Share of nodes that are "hot": larger, fully opaque, and haloed. */
+    /** Share of nodes that are "hot": larger, fully opaque, and haloed. Nodes heat up and cool down gradually as it changes. */
     val hotNodeShare: Float = 0f,
     val glowRadiusDp: Float = 14f,
     val glowStrength: Float = 0.35f,
@@ -132,7 +148,9 @@ fun NetworkGraphSpec.toKotlinSource(): String {
 }
 
 private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linkedMapOf(
-    "envelope" to "EnvelopeKind.$envelope",
+    "uniformWeight" to uniformWeight.toSource(),
+    "ribbonWeight" to ribbonWeight.toSource(),
+    "bloomWeight" to bloomWeight.toSource(),
     "edgeRule" to "EdgeRule.$edgeRule",
     "density" to density.toSource(),
     "fillChance" to fillChance.toSource(),
@@ -142,7 +160,10 @@ private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linke
     "ribbonCenter" to ribbonCenter.toSource(),
     "ribbonWidth" to ribbonWidth.toSource(),
     "ribbonCurve" to ribbonCurve.toSource(),
+    "ribbonTilt" to ribbonTilt.toSource(),
     "bloomReach" to bloomReach.toSource(),
+    "bloomX" to bloomX.toSource(),
+    "bloomY" to bloomY.toSource(),
     "envelopeFloor" to envelopeFloor.toSource(),
     "waveAmplitude" to waveAmplitude.toSource(),
     "waveSpeed" to waveSpeed.toSource(),
@@ -154,7 +175,7 @@ private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linke
     "strokeWidthDp" to strokeWidthDp.toSource(),
     "edgeAlpha" to edgeAlpha.toSource(),
     "lengthFalloff" to lengthFalloff.toSource(),
-    "pulse" to pulse.toString(),
+    "pulseDepth" to pulseDepth.toSource(),
     "nodeSizeDp" to nodeSizeDp.toSource(),
     "nodeSizeVariance" to nodeSizeVariance.toSource(),
     "hotNodeShare" to hotNodeShare.toSource(),
