@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Notifications
@@ -30,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,20 +50,28 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.home.HomeDestination.CategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.QuickSessionPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewStudySession
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden as FavoritesHidden
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading as FavoritesLoading
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Hidden as RecentsHidden
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 import java.time.Instant
+import java.time.ZoneId
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -82,6 +93,12 @@ fun HomeScreen(
     onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val now by produceState(initialValue = Instant.now()) {
+        while (true) {
+            delay(1.minutes)
+            value = Instant.now()
+        }
+    }
 
     observeAsEvents(viewModel.events) { destination ->
         with(destination) {
@@ -116,40 +133,62 @@ fun HomeScreen(
     HomeContent(
         modifier = modifier,
         state = state,
+        now = now,
         onCategoryClick = viewModel::onFavoriteCategorySelect,
         onCategoryQuickSessionClick = viewModel::onFavoriteCategoryQuickSessionStart,
         onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
         onSubcategoryPlayClick = viewModel::onFavoriteSubcategorySessionStart,
+        onRecentClick = {},
     )
 }
 
+/** @param now what Recents' start times are worded against; [HomeScreen] ticks it once a minute. */
 @Composable
 private fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeScreenState,
+    now: Instant,
+    zoneId: ZoneId = ZoneId.systemDefault(),
     onCategoryClick: (Category) -> Unit,
     onCategoryQuickSessionClick: (Category) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategoryPlayClick: (Subcategory) -> Unit,
+    onRecentClick: (RecentItem) -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         HomeTopBar()
         UserGreetingSection(userName = "Ross")
-        when (val favorites = state.favorites) {
-            Loading -> Unit
-            Empty -> HomeEmptyState(modifier = Modifier.weight(1f))
-            is Content -> FavoritesCarousel(
-                items = favorites.items,
-                progressSummary = state.progressSummary,
-                isProgressResolved = state.isProgressResolved,
-                onCategoryClick = onCategoryClick,
-                onCategoryQuickSessionClick = onCategoryQuickSessionClick,
-                onSubcategoryClick = onSubcategoryClick,
-                onSubcategoryPlayClick = onSubcategoryPlayClick,
-            )
+        val favorites = state.favorites
+        val recents = state.recents
+        if (state.showsEmptyState()) {
+            HomeEmptyState(modifier = Modifier.padding(vertical = MaterialTheme.spacing.large))
+        } else {
+            if (favorites is FavoritesContent) {
+                FavoritesCarousel(
+                    items = favorites.items,
+                    progressSummary = state.progressSummary,
+                    isProgressResolved = state.isProgressResolved,
+                    onCategoryClick = onCategoryClick,
+                    onCategoryQuickSessionClick = onCategoryQuickSessionClick,
+                    onSubcategoryClick = onSubcategoryClick,
+                    onSubcategoryPlayClick = onSubcategoryPlayClick,
+                )
+            }
+            if (recents is RecentsContent) {
+                RecentSessionsSection(
+                    items = recents.items,
+                    now = now,
+                    zoneId = zoneId,
+                    onRecentClick = onRecentClick,
+                    modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal),
+                )
+            }
         }
     }
 }
+
+/** Only when both sections are Hidden, so the empty state never flashes while one is still Loading. */
+private fun HomeScreenState.showsEmptyState(): Boolean = favorites is FavoritesHidden && recents is RecentsHidden
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -352,15 +391,28 @@ private val previewSubcategory = Subcategory(
     cardCount = 30,
 )
 
+private val previewFavorites = FavoritesContent(
+    listOf(
+        FavoriteSubcategory(previewSubcategory, previewCategory, Instant.parse("2026-05-05T10:00:00Z")),
+        FavoriteCategory(previewCategory, Instant.parse("2026-05-05T10:00:00Z")),
+    ),
+)
+private val previewProgressSummary = ProgressSummary(
+    subcategories = mapOf(previewSubcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
+)
+
 @Composable
 private fun HomeContentPreviewHost(state: HomeScreenState) {
     FlashcardsTheme {
         HomeContent(
             state = state,
+            now = previewRecentsNow,
+            zoneId = previewRecentsZoneId,
             onCategoryClick = {},
             onCategoryQuickSessionClick = {},
             onSubcategoryClick = {},
             onSubcategoryPlayClick = {},
+            onRecentClick = {},
         )
     }
 }
@@ -368,30 +420,42 @@ private fun HomeContentPreviewHost(state: HomeScreenState) {
 @PreviewLightDark
 @Composable
 private fun HomeContentLoadingPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = Loading))
+    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesLoading, recents = RecentsLoading))
 }
 
 @PreviewLightDark
 @Composable
 private fun HomeContentEmptyPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = Empty))
+    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesHidden, recents = RecentsHidden))
 }
 
 @PreviewLightDark
 @Composable
-private fun HomeContentFavoritesPreview() {
-    val favoritedAt = Instant.parse("2026-05-05T10:00:00Z")
+private fun HomeContentRecentsOnlyPreview() {
+    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesHidden, recents = RecentsContent(previewRecentItems)))
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentFavoritesOnlyPreview() {
     HomeContentPreviewHost(
         state = HomeScreenState(
-            favorites = Content(
-                listOf(
-                    FavoriteSubcategory(previewSubcategory, previewCategory, favoritedAt),
-                    FavoriteCategory(previewCategory, favoritedAt),
-                ),
-            ),
-            progressSummary = ProgressSummary(
-                subcategories = mapOf(previewSubcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
-            ),
+            favorites = previewFavorites,
+            recents = RecentsHidden,
+            progressSummary = previewProgressSummary,
+            isProgressResolved = true,
+        ),
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentFavoritesAndRecentsPreview() {
+    HomeContentPreviewHost(
+        state = HomeScreenState(
+            favorites = previewFavorites,
+            recents = RecentsContent(previewRecentItems),
+            progressSummary = previewProgressSummary,
             isProgressResolved = true,
         ),
     )

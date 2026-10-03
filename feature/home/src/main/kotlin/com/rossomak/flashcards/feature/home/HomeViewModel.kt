@@ -8,9 +8,10 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,8 @@ class HomeViewModel @Inject constructor(
     init {
         collectFavoriteItems()
         collectProgressSummary()
+        // Hardcoded Recents shown until Home reads the User's real ones.
+        _state.update { it.copy(recents = HomeRecentsState.Content(sampleRecentItems(now = Instant.now()))) }
     }
 
     /** The card body browses: it opens Category Details and starts nothing (ADR-0041). */
@@ -85,7 +88,7 @@ class HomeViewModel @Inject constructor(
     /**
      * Both observed flows are live Firestore listeners that retry only a permission-denied error, so any
      * other failure is caught here instead of crashing out of [viewModelScope]. A failure before the
-     * first emission degrades to [Empty], the same rule the use case applies to a failed id fetch; a
+     * first emission degrades to [Hidden], the same rule the use case applies to a failed id fetch; a
      * failure after one leaves the [Content] already shown alone.
      */
     private fun collectFavoriteItems() {
@@ -94,12 +97,12 @@ class HomeViewModel @Inject constructor(
                 .catch { error ->
                     loge(error) { "Observing Favorites failed" }
                     _state.update { current ->
-                        if (current.favorites is Loading) current.copy(favorites = Empty) else current
+                        if (current.favorites is Loading) current.copy(favorites = Hidden) else current
                     }
                 }
                 .collect { favoriteItems ->
                     _state.update { current ->
-                        current.copy(favorites = if (favoriteItems.isEmpty()) Empty else Content(favoriteItems))
+                        current.copy(favorites = if (favoriteItems.isEmpty()) Hidden else Content(favoriteItems))
                     }
                 }
         }
