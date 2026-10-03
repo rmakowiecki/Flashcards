@@ -24,12 +24,8 @@ class FirestoreRecentsRemoteDataSource @Inject constructor(
     private fun document(uid: String) = firestore.document(DOCUMENT_PATH_TEMPLATE.format(uid))
 
     /**
-     * One listener on the single `recents/state` document. No document yet (the User has never had a
-     * session recorded) reads back as an empty [RecentsStateDto], not an error.
-     *
-     * No authenticated user completes silently instead of registering a listener, the same guard as
-     * [FirestoreUserFavoritesRemoteDataSource.observeFavorites]: the uid is captured once here, so a
-     * sign-out racing the flow's launch cannot throw out of the `callbackFlow` builder.
+     * One listener on `recents/state`; a missing document reads as an empty [RecentsStateDto]. Signed
+     * out, it completes without a listener, like [FirestoreUserFavoritesRemoteDataSource.observeFavorites].
      */
     override fun observeRecents(): Flow<RecentsStateDto> = flow {
         val uid = firebaseAuth.currentUser?.uid ?: return@flow

@@ -17,9 +17,8 @@ sealed interface FastStudySessionDestination : NavigationEvent {
     data class Summary(val route: StudySessionSummaryRoute) : FastStudySessionDestination
 
     /**
-     * The session's cards could not be loaded, so no session ever started and there is no result to
-     * summarise. Returns to Preview, which can load the cards again. A fallback for that one failure
-     * only: leaving a session at any point, even before its cards load, goes to [Summary].
+     * The cards failed to load, so no session started. Returns to Preview to load them again. Only for
+     * that failure: leaving a session, even before its cards load, goes to [Summary].
      */
     data object Back : FastStudySessionDestination
 }

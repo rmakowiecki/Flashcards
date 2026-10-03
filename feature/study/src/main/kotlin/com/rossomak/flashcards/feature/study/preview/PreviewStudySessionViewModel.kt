@@ -146,10 +146,8 @@ class PreviewStudySessionViewModel @Inject constructor(
      * session-scoped fields (subcategoryIds, tagIds, difficultyRange) are left untouched — filters
      * are exempt from defaults entirely (ADR-0030).
      *
-     * The route can override four seeded fields. Sort: arriving from a browsed list, the order the
-     * user was just looking at wins over the saved default (ADR-0038). Study Mode, voice answering
-     * and read-aloud: a replayed session starts the way it last ran. Each applies to this session
-     * only; nothing is saved unless the user ticks "keep as default".
+     * The route can override Sort (from a browsed list, ADR-0038) and a replay's Study Mode, voice
+     * answering and read-aloud, for this session only.
      */
     init {
         viewModelScope.launch {
@@ -415,8 +413,7 @@ class PreviewStudySessionViewModel @Inject constructor(
      * written to `config.subcategoryIds` below.
      *
      * @param resampleQuickSession rerolls the Quick Session's Subcategory sample first, fetching the
-     * pool if none is held yet. Subcategories that cannot be resolved put their own
-     * [PreviewLoadFailureReason] in state, with no draw attempted.
+     * pool if none is held yet. Unresolvable Subcategories put a [PreviewLoadFailureReason] in state instead.
      */
     private fun selectCards(resampleQuickSession: Boolean = false) {
         selectionJob?.cancel()
@@ -474,17 +471,12 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * Every session type but Quick hands [SelectSessionFlashcardsUseCase] the route's Subcategory
-     * list, minus those the server confirms are gone. One that cannot be checked, for example
-     * offline, is kept, so being offline never shrinks a session. The check runs for every non-Quick
-     * entry, not only a replay, since a Subcategory may have been deleted since the caller listed
-     * it, and only until it succeeds: [routeSubcategories] serves every later selection. A check
-     * that could judge no id at all, for example fully offline, does not count, so Retry checks again.
+     * Non-Quick: the route's Subcategories minus those the server confirms are gone; unchecked ones are
+     * kept, so offline never shrinks a session. The result is cached once at least one id was judged,
+     * so a fully offline check runs again on Retry.
      *
-     * Quick is the only scenario where the Subcategory *set itself* can change between resolutions,
-     * and it does so from the sample [resampleSubcategories] puts in state — only when
-     * [resampleQuickSession] asks (ADR-0040). Sampled ids are mapped back to names through
-     * [candidatePool] — the pool the sample was drawn from.
+     * Quick: the sample [resampleSubcategories] holds in state, rerolled only when [resampleQuickSession]
+     * asks (ADR-0040).
      *
      * @return null when there is nothing to draw from, with the reason already in state.
      */
@@ -512,12 +504,10 @@ class PreviewStudySessionViewModel @Inject constructor(
      * already there, which is what keeps the sample stable while the user adjusts a filter, the
      * length or the sort (ADR-0040).
      *
-     * Fetches the Category's Subcategories as the pool first when the route supplied none, and
-     * only once: a held pool is reused (ADR-0056). A Category the server confirms is gone is
-     * [CategoryUnavailable]; one that merely could not be read is [ReadFailed], and Retry fetches again.
+     * Fetches the pool once when the route supplied none (ADR-0056): a deleted Category is
+     * [CategoryUnavailable], an unreadable one [ReadFailed].
      *
-     * @return false when the pool could not be fetched, with the reason in state and the previous
-     * sample untouched.
+     * @return false when the pool could not be fetched, with the reason in state.
      */
     private suspend fun resampleSubcategories(): Boolean {
         val pool = candidatePool ?: when (val resolution = resolveCategorySubcategories(route.categoryId)) {
@@ -548,9 +538,8 @@ class PreviewStudySessionViewModel @Inject constructor(
 private data class ResolvedSubcategories(val ids: List<String>, val names: List<String>)
 
 /**
- * The route's Subcategories in route order, with their names, minus those [availability] marks
- * Missing; null when none are left. Outside [PreviewStudySessionViewModel] to keep it under detekt's
- * `TooManyFunctions` threshold.
+ * The route's Subcategories, in order, minus those [availability] marks Missing; null when none are left.
+ * Top-level to keep [PreviewStudySessionViewModel] under detekt's `TooManyFunctions`.
  */
 private fun PreviewStudySessionRoute.withoutMissingSubcategories(availability: Map<String, SubcategoryAvailability>): ResolvedSubcategories? {
     val kept = subcategoryIds.zip(subcategoryNames).filter { (id, _) -> availability[id] != SubcategoryAvailability.Missing }

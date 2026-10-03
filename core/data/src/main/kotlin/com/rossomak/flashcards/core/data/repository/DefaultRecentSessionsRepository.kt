@@ -15,15 +15,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 
 /**
- * Merges the server's `recents/state` with the signed-in User's Pending Sessions.
+ * Merges the server's `recents/state` with the signed-in User's Pending Sessions. A server entry wins
+ * over a Pending Session with the same id, and Pending Sessions with no Flashcard Results are dropped,
+ * since the server rejects them. The cap applies after sorting, so the list is as long offline as online.
  *
- * A server entry wins over the Pending Session with the same id. A Pending Session with no Flashcard
- * Results is dropped: the server rejects it, so it would show and then vanish. The merged list is
- * capped after sorting, Pending Sessions included, so it is as long offline as online; a Pending
- * Session older than every server entry is not shown, matching the server's own trim.
- *
- * When a session is delivered, its queue entry may be removed before the snapshot carrying its server
- * entry arrives, so its row can briefly disappear and come back. Accepted.
+ * On delivery, the queue entry may go before the server entry arrives, so a row can blink. Accepted.
  */
 class DefaultRecentSessionsRepository @Inject constructor(
     private val remoteDataSource: RecentsRemoteDataSource,

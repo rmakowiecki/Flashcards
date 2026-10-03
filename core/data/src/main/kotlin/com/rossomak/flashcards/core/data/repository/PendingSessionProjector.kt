@@ -140,17 +140,10 @@ class PendingSessionProjector @Inject constructor(
     }
 
     /**
-     * The preview `xpTotal` of each of [pendingSessions], keyed by session id, replayed in the given
-     * (oldest-first) order, so a later session's Streak and Daily Goal awards build on the earlier ones.
-     * `null` when [pendingSessions] is stale by the time the baselines are read.
-     *
-     * [pendingSessions] is a snapshot of [observeDeliverablePendingSessions], so a session the server
-     * would reject is never scored. The staleness check is the same as [projectSummaryDeltas]', compared
-     * against that same deliverable list, so a zero-card entry in the queue never makes every call look
-     * stale. The caller drops a `null` result; the queue change that made it stale re-emits.
-     *
-     * A failed scoring-state read replays from [ScoringState]'s defaults instead of failing: the values
-     * are approximate, and the server's own replace them once each session is delivered.
+     * The preview `xpTotal` of each of [pendingSessions] (a snapshot of [observeDeliverablePendingSessions]),
+     * keyed by session id. Replayed oldest first, so later Streak and Daily Goal awards build on earlier ones.
+     * `null` when the queue changed meanwhile; that change re-emits. An unreadable scoring state replays
+     * from [ScoringState]'s defaults: the values are approximate until the server's replace them.
      */
     suspend fun projectSessionXpTotals(pendingSessions: List<SessionResult>): Map<String, Int>? = coroutineScope {
         if (pendingSessions.isEmpty()) return@coroutineScope emptyMap()

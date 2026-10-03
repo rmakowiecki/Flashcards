@@ -265,8 +265,7 @@ class RatedStudySessionCoordinator @Inject constructor(
     // ids, in routed order.
     private suspend fun load() {
         val sessionStartData = getSessionStartData(setup.subcategoryIds)
-        // Left before the cards arrived: the session already ended on its way to the Summary, so neither
-        // running it nor reporting LoadFailed, which would send the user back to Preview instead.
+        // Left before the cards arrived: the session already ended on its way to the Summary.
         if (hasEnded) return
         val flashcards = sessionStartData.flashcardsResult.getOrElse {
             _sessionState.value = RatedSessionStateSnapshot.LoadFailed

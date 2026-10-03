@@ -19,16 +19,12 @@ private const val FETCH_RETRY_ATTEMPTS = 2
 private const val FETCH_RETRY_BASE_DELAY_MILLIS = 300L
 
 /**
- * Resolves [RecentSessionsRepository.observeRecentSessions] against the current taxonomy, keeping the
- * repository's newest-first order.
+ * Resolves [RecentSessionsRepository.observeRecentSessions] against the current taxonomy, newest first.
  *
- * Every Recent needs its Category, so a Recent whose Category no longer resolves is dropped, as is a
- * single-subcategory Recent whose Subcategory no longer resolves: the same rule Favorites applies. A
- * Custom Recent is never dropped for its Subcategories and keeps only those that resolve, possibly none.
- * A Quick Recent resolves no Subcategories, since its replay samples the Category again.
- *
- * Offline, a fetch returns only what is cached, so an uncached id simply does not resolve. A fetch that
- * still fails after its retries degrades to resolving nothing rather than failing the emission.
+ * A Recent whose Category no longer resolves is dropped, as is a single-subcategory Recent whose
+ * Subcategory no longer resolves. A Custom Recent keeps only the Subcategories that resolve, possibly
+ * none. A Quick Recent resolves none: its replay samples the Category again. A fetch that keeps failing
+ * resolves nothing instead of failing the emission.
  */
 class ObserveRecentSessionsUseCase @Inject constructor(
     private val recentSessionsRepository: RecentSessionsRepository,

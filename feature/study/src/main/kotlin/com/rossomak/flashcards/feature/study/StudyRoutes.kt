@@ -20,8 +20,7 @@ import kotlinx.serialization.Serializable
  * | SingleSubcategory / Custom | present | Used literally |
  * | SingleSubcategory / Custom | empty | Nothing to study; Preview shows the unavailable message and its error state |
  *
- * For SingleSubcategory and Custom, Preview first checks that the ids still exist and drops any the
- * server confirms are gone. An id it cannot check, for example offline, is kept.
+ * SingleSubcategory and Custom ids the server confirms are gone are dropped; unchecked ids are kept.
  *
  * Quick ids mean "the Category's complete Subcategory list, or none". A partial list is not
  * validated and would silently give a Quick Session over only that subset.
@@ -35,11 +34,8 @@ import kotlinx.serialization.Serializable
  * nullability is load-bearing: a non-null field could not tell a deliberate
  * [FlashcardSortOrder.Default] apart from an absent choice, and the Quick Session path from Category
  * Details genuinely has no list behind it to inherit an order from (ADR-0038).
- * @param studyMode, [voiceAnsweringEnabled] and [readAloudEnabled]: starting values for this session
- * only, as when replaying a past session. Like [sortOrder], **null means "use my saved default"**, and
- * a value is never saved unless the User ticks "keep as default". Flattened to primitives and enums
- * for the same NavType reason as [difficultyMin]. A Rated replay leaves [readAloudEnabled] null, so
- * switching it to Fast takes read-aloud from the saved default.
+ * @param studyMode, [voiceAnsweringEnabled] and [readAloudEnabled]: a replay's starting values, for this
+ * session only. Like [sortOrder], null means the saved default.
  */
 @Serializable
 data class PreviewStudySessionRoute(
