@@ -105,3 +105,10 @@ destination.
   `id`-derived value so it is stable across recomposition and scroll, documented as fake at its
   source in the same way `SubcategoryDetailsViewModel.onFavoriteToggle` is. Real mastery
   aggregation is separate work and does not change this decision, only the number the ring shows.
+
+## Amendments
+
+**2026-10-03 — Recents rows are an exception.** A row of Home's Recently studied list is a past Study
+Session, not a Subcategory, so it has no browse target. Opening Preview is not a session start either:
+the User still confirms there. The whole row therefore opens Preview to replay the session, and it has
+no play button. See [ADR-0057](0057-recents-state-projection.md).

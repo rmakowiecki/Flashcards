@@ -50,3 +50,14 @@ offline, as Category Details already does. A cache-first read was rejected:
 - Preview owns one more failure mode on the Quick path: the pool fetch. It reuses the existing error state and Retry.
 - Category Details is unchanged.
 - This builds on the Preview screen owning card selection ([ADR-0004](0004-preview-study-session-screen-owns-card-selection.md)) and on the single sort and selection seam ([ADR-0038](0038-one-sort-order-and-flashcard-selection-seam.md)).
+
+## Amendments
+
+**2026-10-03 — `isQuickSession` is now `sourceType`.** The route carries the session's
+`SessionSourceType` (SingleSubcategory, Quick or Custom) instead of a Quick flag, since the session
+records its entry point. Quick with no ids still means "Preview fetches the Category's Subcategories".
+The fetch now goes through `ResolveCategorySubcategoriesUseCase`, which tells a deleted Category apart
+from an unreadable one: a server-confirmed empty list shows "Category no longer available" with no
+Retry, and a failed read shows the connection error with Retry. A non-Quick route with no ids is no
+longer rejected at construction; Preview shows "Topics no longer available", which is how a Custom
+Recent whose Subcategories were all deleted replays.
