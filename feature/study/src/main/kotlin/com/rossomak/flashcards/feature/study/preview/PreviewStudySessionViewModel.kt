@@ -3,25 +3,21 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.AppPermission
-import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution.Missing
-import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution.Present
-import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution.Unknown
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
-import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
-import com.rossomak.flashcards.core.domain.usecase.ResolveCategorySubcategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.ResolveSubcategoryAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
@@ -36,9 +32,6 @@ import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.CategoryUnavailable
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.ReadFailed
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.SubcategoriesUnavailable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -58,8 +51,7 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class PreviewStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val resolveCategorySubcategories: ResolveCategorySubcategoriesUseCase,
-    private val resolveSubcategoryAvailability: ResolveSubcategoryAvailabilityUseCase,
+    private val getSubcategories: GetSubcategoriesUseCase,
     private val selectSessionFlashcards: SelectSessionFlashcardsUseCase,
     private val sampleQuickSessionSubcategories: SampleQuickSessionSubcategoriesUseCase,
     private val observeStudySessionPreferences: ObserveStudySessionPreferencesUseCase,
@@ -71,7 +63,11 @@ class PreviewStudySessionViewModel @Inject constructor(
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
 
-    private val route = savedStateHandle.decodeRoute<PreviewStudySessionRoute>()
+    private val route = savedStateHandle.decodeRoute<PreviewStudySessionRoute>().also { decodedRoute ->
+        require(decodedRoute.sourceType == Quick || decodedRoute.subcategoryIds.isNotEmpty()) {
+            "A non-Quick Preview route must carry its Subcategory ids"
+        }
+    }
 
     /**
      * The Quick Session's candidate pool (id to name), held so every re-randomise samples the same
@@ -81,12 +77,6 @@ class PreviewStudySessionViewModel @Inject constructor(
      */
     private var candidatePool: Map<String, String>? =
         route.subcategoryIds.zip(route.subcategoryNames).toMap().takeIf { it.isNotEmpty() }
-
-    /**
-     * A non-Quick session's Subcategories once [resolveSubcategories] has dropped those that no
-     * longer exist. Null until a check succeeds; every later selection reuses it. Never set for Quick.
-     */
-    private var routeSubcategories: ResolvedSubcategories? = null
 
     private val _state = MutableStateFlow(
         PreviewStudySessionScreenState(
@@ -413,12 +403,12 @@ class PreviewStudySessionViewModel @Inject constructor(
      * written to `config.subcategoryIds` below.
      *
      * @param resampleQuickSession rerolls the Quick Session's Subcategory sample first, fetching the
-     * pool if none is held yet. Unresolvable Subcategories put a [PreviewLoadFailureReason] in state instead.
+     * pool if none is held yet. A pool that cannot be fetched sets [PreviewStudySessionScreenState.isLoadFailed].
      */
     private fun selectCards(resampleQuickSession: Boolean = false) {
         selectionJob?.cancel()
         selectionJob = viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, loadFailure = null) }
+            _state.update { it.copy(isLoading = true, isLoadFailed = false) }
             val resolved = resolveSubcategories(resampleQuickSession) ?: return@launch
             _state.update { state ->
                 state.copy(
@@ -446,7 +436,7 @@ class PreviewStudySessionViewModel @Inject constructor(
                         val availableTags = if (state.isSingleSubcategory) plan.poolTags else emptyList()
                         state.copy(
                             isLoading = false,
-                            loadFailure = null,
+                            isLoadFailed = false,
                             selectedCardCount = plan.cards.size,
                             estimatedMinutes = plan.estimatedMinutes,
                             availableTags = availableTags,
@@ -465,32 +455,19 @@ class PreviewStudySessionViewModel @Inject constructor(
                     }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, loadFailure = ReadFailed) }
+                    _state.update { it.copy(isLoading = false, isLoadFailed = true) }
                 }
         }
     }
 
     /**
-     * Non-Quick: the route's Subcategories minus those the server confirms are gone; unchecked ones are
-     * kept, so offline never shrinks a session. The result is cached once at least one id was judged,
-     * so a fully offline check runs again on Retry.
+     * Non-Quick: the route's Subcategories as given. Quick: the sample [resampleSubcategories] holds in
+     * state, rerolled only when [resampleQuickSession] asks (ADR-0040).
      *
-     * Quick: the sample [resampleSubcategories] holds in state, rerolled only when [resampleQuickSession]
-     * asks (ADR-0040).
-     *
-     * @return null when there is nothing to draw from, with the reason already in state.
+     * @return null when the Quick pool could not be fetched, with the failure already in state.
      */
     private suspend fun resolveSubcategories(resampleQuickSession: Boolean): ResolvedSubcategories? {
-        if (route.sourceType != Quick) {
-            routeSubcategories?.let { checked -> return checked }
-            val availability = route.subcategoryIds.takeIf { it.isNotEmpty() }
-                ?.let { ids -> resolveSubcategoryAvailability(ids.toSet()) }
-                .orEmpty()
-            val checked = route.withoutMissingSubcategories(availability)
-            if (checked == null) _state.update { it.copy(isLoading = false, loadFailure = SubcategoriesUnavailable) }
-            if (availability.values.any { it != SubcategoryAvailability.Unknown }) routeSubcategories = checked
-            return checked
-        }
+        if (route.sourceType != Quick) return ResolvedSubcategories(route.subcategoryIds, route.subcategoryNames)
         if (resampleQuickSession && !resampleSubcategories()) return null
         val sampledIds = _state.value.quickSessionSampledSubcategoryIds.orEmpty()
         val pool = candidatePool.orEmpty()
@@ -504,24 +481,20 @@ class PreviewStudySessionViewModel @Inject constructor(
      * already there, which is what keeps the sample stable while the user adjusts a filter, the
      * length or the sort (ADR-0040).
      *
-     * Fetches the pool once when the route supplied none (ADR-0056): a deleted Category is
-     * [CategoryUnavailable], an unreadable one [ReadFailed].
+     * Fetches the pool once when the route supplied none (ADR-0056).
      *
-     * @return false when the pool could not be fetched, with the reason in state.
+     * @return false when the pool could not be fetched or came back empty, with the failure in state.
      */
     private suspend fun resampleSubcategories(): Boolean {
-        val pool = candidatePool ?: when (val resolution = resolveCategorySubcategories(route.categoryId)) {
-            is Present -> resolution.subcategories
-                .associate { subcategory -> subcategory.id to subcategory.name }
-                .also { fetchedPool -> candidatePool = fetchedPool }
-            Missing -> {
-                _state.update { it.copy(isLoading = false, loadFailure = CategoryUnavailable) }
-                return false
-            }
-            Unknown -> {
-                _state.update { it.copy(isLoading = false, loadFailure = ReadFailed) }
-                return false
-            }
+        val pool = candidatePool ?: getSubcategories(route.categoryId)
+            .onFailure { error -> loge(error) { "Failed to fetch Subcategories for the Quick Session pool" } }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?.associate { subcategory -> subcategory.id to subcategory.name }
+            ?.also { fetchedPool -> candidatePool = fetchedPool }
+        if (pool == null) {
+            _state.update { it.copy(isLoading = false, isLoadFailed = true) }
+            return false
         }
         val sampledIds = sampleQuickSessionSubcategories(
             SampleQuickSessionSubcategoriesUseCase.Params(
@@ -536,13 +509,3 @@ class PreviewStudySessionViewModel @Inject constructor(
 
 /** A resolved Subcategory selection: ids plus the names they display under, kept together. */
 private data class ResolvedSubcategories(val ids: List<String>, val names: List<String>)
-
-/**
- * The route's Subcategories, in order, minus those [availability] marks Missing; null when none are left.
- * Top-level to keep [PreviewStudySessionViewModel] under detekt's `TooManyFunctions`.
- */
-private fun PreviewStudySessionRoute.withoutMissingSubcategories(availability: Map<String, SubcategoryAvailability>): ResolvedSubcategories? {
-    val kept = subcategoryIds.zip(subcategoryNames).filter { (id, _) -> availability[id] != SubcategoryAvailability.Missing }
-    if (kept.isEmpty()) return null
-    return ResolvedSubcategories(ids = kept.map { (id, _) -> id }, names = kept.map { (_, name) -> name })
-}

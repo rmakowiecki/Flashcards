@@ -11,12 +11,11 @@ import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreference
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
-import com.rossomak.flashcards.core.domain.usecase.ResolveCategorySubcategoriesUseCase
-import com.rossomak.flashcards.core.domain.usecase.ResolveSubcategoryAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.SampleQuickSessionSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
@@ -94,8 +93,7 @@ class PreviewStudySessionSeedingTest {
 
     private fun createViewModel(): PreviewStudySessionViewModel = PreviewStudySessionViewModel(
         savedStateHandle,
-        ResolveCategorySubcategoriesUseCase(flashcardRepository),
-        ResolveSubcategoryAvailabilityUseCase(flashcardRepository),
+        GetSubcategoriesUseCase(flashcardRepository),
         SelectSessionFlashcardsUseCase(
             getFlashcards = GetFlashcardsUseCase(flashcardRepository),
             filterFlashcards = FilterFlashcardsUseCase(),

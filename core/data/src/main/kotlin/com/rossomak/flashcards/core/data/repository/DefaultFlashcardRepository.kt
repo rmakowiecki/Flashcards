@@ -4,14 +4,11 @@ import android.util.Log
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.FlashcardDto
-import com.rossomak.flashcards.core.data.model.SubcategoryDto
 import com.rossomak.flashcards.core.data.source.FlashcardReadSource
 import com.rossomak.flashcards.core.data.source.FlashcardRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.Category
-import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.Subcategory
-import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -95,46 +92,6 @@ class DefaultFlashcardRepository @Inject constructor(
             throw exception
         } catch (exception: Exception) {
             Result.failure(exception)
-        }
-    }
-
-    /**
-     * Each `whereIn` batch is judged on its own: an id absent from a server answer is Missing, one
-     * absent from a cache-only answer is Unknown, and every id of a batch whose read fails is Unknown.
-     */
-    override suspend fun resolveSubcategoryAvailability(ids: Set<String>): Map<String, SubcategoryAvailability> = withContext(Dispatchers.IO) {
-        buildMap {
-            ids.chunked(FlashcardRemoteDataSource.WHEREIN_BATCH_SIZE).forEach { batchIds -> putAll(resolveBatchAvailability(batchIds)) }
-        }
-    }
-
-    private suspend fun resolveBatchAvailability(batchIds: List<String>): Map<String, SubcategoryAvailability> {
-        val page = try {
-            remoteDataSource.getSubcategoryPageByIds(batchIds)
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: Exception) {
-            logw(exception) { "Failed to read the availability of ${batchIds.size} Subcategories" }
-            return batchIds.associateWith { SubcategoryAvailability.Unknown }
-        }
-        val foundIds = page.subcategories.mapTo(mutableSetOf(), SubcategoryDto::id)
-        val absentAvailability = if (page.isFromCache) SubcategoryAvailability.Unknown else SubcategoryAvailability.Missing
-        return batchIds.associateWith { id -> if (id in foundIds) SubcategoryAvailability.Present else absentAvailability }
-    }
-
-    override suspend fun resolveCategorySubcategories(categoryId: String): CategorySubcategoriesResolution = withContext(Dispatchers.IO) {
-        try {
-            val page = remoteDataSource.getSubcategoryPageByCategoryId(categoryId)
-            when {
-                page.subcategories.isNotEmpty() -> CategorySubcategoriesResolution.Present(page.subcategories.map { it.toDomain() })
-                page.isFromCache -> CategorySubcategoriesResolution.Unknown
-                else -> CategorySubcategoriesResolution.Missing
-            }
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: Exception) {
-            logw(exception) { "Failed to read the Subcategories of Category $categoryId" }
-            CategorySubcategoriesResolution.Unknown
         }
     }
 

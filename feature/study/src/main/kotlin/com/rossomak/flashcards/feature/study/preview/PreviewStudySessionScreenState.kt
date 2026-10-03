@@ -12,7 +12,7 @@ data class PreviewStudySessionScreenState(
     val subcategoryNames: List<String> = emptyList(),
     val sourceType: SessionSourceType = SingleSubcategory,
     val isLoading: Boolean = true,
-    val loadFailure: PreviewLoadFailureReason? = null,
+    val isLoadFailed: Boolean = false, // A read failed, most often offline; Retry can recover.
     val config: StudySessionConfig = StudySessionConfig(subcategoryIds = emptyList()),
     val selectedCardCount: Int = 0,
     val estimatedMinutes: Int = 0,
@@ -50,5 +50,5 @@ data class PreviewStudySessionScreenState(
      */
     val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
 
-    val canStart: Boolean get() = !isLoading && loadFailure == null && selectedCardCount > 0
+    val canStart: Boolean get() = !isLoading && !isLoadFailed && selectedCardCount > 0
 }

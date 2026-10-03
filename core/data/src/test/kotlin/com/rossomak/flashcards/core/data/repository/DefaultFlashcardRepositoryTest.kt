@@ -6,11 +6,6 @@ import com.rossomak.flashcards.core.data.model.FlashcardDto
 import com.rossomak.flashcards.core.data.model.SubcategoryDto
 import com.rossomak.flashcards.core.data.source.FlashcardReadSource
 import com.rossomak.flashcards.core.data.source.FlashcardRemoteDataSource
-import com.rossomak.flashcards.core.data.source.SubcategoryQueryPage
-import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution
-import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability.Missing
-import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability.Present
-import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability.Unknown
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -26,10 +21,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-
-private const val CATEGORY_ID = "cat-1"
-private const val PRESENT_ID = "sub-present"
-private const val ABSENT_ID = "sub-absent"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DefaultFlashcardRepositoryTest {
@@ -127,83 +118,6 @@ class DefaultFlashcardRepositoryTest {
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { remoteDataSource.getSubcategoriesByCategoryId(categoryId) }
     }
-
-    @Test
-    fun `resolveSubcategoryAvailability marks ids absent from a server answer as Missing`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByIds(listOf(PRESENT_ID, ABSENT_ID)) } returns
-            SubcategoryQueryPage(subcategories = listOf(subcategoryDto(PRESENT_ID)), isFromCache = false)
-
-        val availability = createRepository().resolveSubcategoryAvailability(setOf(PRESENT_ID, ABSENT_ID))
-
-        availability shouldBe mapOf(PRESENT_ID to Present, ABSENT_ID to Missing)
-    }
-
-    @Test
-    fun `resolveSubcategoryAvailability marks ids absent from a cache-only answer as Unknown`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByIds(listOf(PRESENT_ID, ABSENT_ID)) } returns
-            SubcategoryQueryPage(subcategories = listOf(subcategoryDto(PRESENT_ID)), isFromCache = true)
-
-        val availability = createRepository().resolveSubcategoryAvailability(setOf(PRESENT_ID, ABSENT_ID))
-
-        availability shouldBe mapOf(PRESENT_ID to Present, ABSENT_ID to Unknown)
-    }
-
-    @Test
-    fun `resolveSubcategoryAvailability marks only the ids of a failed batch as Unknown`() = runTest {
-        val ids = (1..FlashcardRemoteDataSource.WHEREIN_BATCH_SIZE + 1).map { index -> "sub-$index" }
-        val (firstBatch, secondBatch) = ids.chunked(FlashcardRemoteDataSource.WHEREIN_BATCH_SIZE)
-        coEvery { remoteDataSource.getSubcategoryPageByIds(firstBatch) } throws IllegalStateException("firestore down")
-        coEvery { remoteDataSource.getSubcategoryPageByIds(secondBatch) } returns
-            SubcategoryQueryPage(subcategories = emptyList(), isFromCache = false)
-
-        val availability = createRepository().resolveSubcategoryAvailability(ids.toSet())
-
-        availability shouldBe firstBatch.associateWith { Unknown } + secondBatch.associateWith { Missing }
-    }
-
-    @Test
-    fun `resolveSubcategoryAvailability rethrows cancellation instead of marking ids Unknown`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByIds(listOf(PRESENT_ID)) } throws CancellationException("cancelled")
-
-        val thrown = runCatching { createRepository().resolveSubcategoryAvailability(setOf(PRESENT_ID)) }.exceptionOrNull()
-
-        (thrown is CancellationException) shouldBe true
-    }
-
-    @Test
-    fun `resolveCategorySubcategories maps a non-empty answer to Present`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByCategoryId(CATEGORY_ID) } returns
-            SubcategoryQueryPage(subcategories = listOf(subcategoryDto(PRESENT_ID)), isFromCache = true)
-
-        val resolution = createRepository().resolveCategorySubcategories(CATEGORY_ID)
-
-        (resolution as CategorySubcategoriesResolution.Present).subcategories.map { it.id } shouldBe listOf(PRESENT_ID)
-    }
-
-    @Test
-    fun `resolveCategorySubcategories maps an empty server answer to Missing`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByCategoryId(CATEGORY_ID) } returns
-            SubcategoryQueryPage(subcategories = emptyList(), isFromCache = false)
-
-        createRepository().resolveCategorySubcategories(CATEGORY_ID) shouldBe CategorySubcategoriesResolution.Missing
-    }
-
-    @Test
-    fun `resolveCategorySubcategories maps an empty cache-only answer to Unknown`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByCategoryId(CATEGORY_ID) } returns
-            SubcategoryQueryPage(subcategories = emptyList(), isFromCache = true)
-
-        createRepository().resolveCategorySubcategories(CATEGORY_ID) shouldBe CategorySubcategoriesResolution.Unknown
-    }
-
-    @Test
-    fun `resolveCategorySubcategories maps a failed read to Unknown`() = runTest {
-        coEvery { remoteDataSource.getSubcategoryPageByCategoryId(CATEGORY_ID) } throws IllegalStateException("firestore down")
-
-        createRepository().resolveCategorySubcategories(CATEGORY_ID) shouldBe CategorySubcategoriesResolution.Unknown
-    }
-
-    private fun subcategoryDto(id: String) = SubcategoryDto(id = id, name = "Compose", categoryId = CATEGORY_ID, categoryName = "Android", order = 1, cardCount = 12)
 
     @Test
     fun `fetchFlashcards drops cards with null difficulty and forwards subcategory id`() = runTest {

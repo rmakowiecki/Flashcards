@@ -1,10 +1,8 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.Category
-import com.rossomak.flashcards.core.domain.model.CategorySubcategoriesResolution
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.Subcategory
-import com.rossomak.flashcards.core.domain.model.SubcategoryAvailability
 
 class FakeFlashcardRepository : FlashcardRepository {
     var categoriesToReturn: Result<List<Category>> = Result.success(emptyList())
@@ -33,15 +31,6 @@ class FakeFlashcardRepository : FlashcardRepository {
 
     var cacheSeedToReturn: Result<Int> = Result.success(0)
 
-    /** Availability per id for [resolveSubcategoryAvailability]; null means every requested id is Present. An id it lacks is Present too. */
-    var subcategoryAvailabilityToReturn: Map<String, SubcategoryAvailability>? = null
-
-    /** Every id set [resolveSubcategoryAvailability] was called with, in call order. */
-    val resolvedAvailabilitySubcategoryIds: MutableList<Set<String>> = mutableListOf()
-
-    /** What [resolveCategorySubcategories] returns; null derives it from [subcategoriesToReturn]. */
-    var categorySubcategoriesResolutionToReturn: CategorySubcategoriesResolution? = null
-
     override suspend fun fetchCategories(): Result<List<Category>> = categoriesToReturn
 
     override suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>> {
@@ -52,22 +41,6 @@ class FakeFlashcardRepository : FlashcardRepository {
     override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> = categoriesByIdsToReturn
 
     override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> = subcategoriesByIdsToReturn
-
-    override suspend fun resolveSubcategoryAvailability(ids: Set<String>): Map<String, SubcategoryAvailability> {
-        resolvedAvailabilitySubcategoryIds += ids
-        return ids.associateWith { id -> subcategoryAvailabilityToReturn?.get(id) ?: SubcategoryAvailability.Present }
-    }
-
-    /** Recorded in [fetchedSubcategoryCategoryIds], like [fetchSubcategories], so either read counts as the Category's fetch. */
-    override suspend fun resolveCategorySubcategories(categoryId: String): CategorySubcategoriesResolution {
-        fetchedSubcategoryCategoryIds += categoryId
-        return categorySubcategoriesResolutionToReturn ?: subcategoriesToReturn.fold(
-            onSuccess = { subcategories ->
-                if (subcategories.isEmpty()) CategorySubcategoriesResolution.Missing else CategorySubcategoriesResolution.Present(subcategories)
-            },
-            onFailure = { CategorySubcategoriesResolution.Unknown },
-        )
-    }
 
     override suspend fun searchSubcategories(namePrefix: String): Result<List<Subcategory>> {
         searchedPrefixes += namePrefix

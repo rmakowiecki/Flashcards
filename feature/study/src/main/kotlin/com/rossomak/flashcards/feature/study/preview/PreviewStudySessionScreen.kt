@@ -21,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -95,9 +94,6 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.CategoryUnavailable
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.ReadFailed
-import com.rossomak.flashcards.feature.study.preview.PreviewLoadFailureReason.SubcategoriesUnavailable
 import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.MicPermissionStillDenied
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
@@ -287,11 +283,10 @@ fun PreviewStudySessionContent(
                     CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
                 }
 
-                state.loadFailure != null -> LoadFailureContent(
+                state.isLoadFailed -> LoadFailureContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    loadFailure = state.loadFailure,
                     onRetry = onRetry,
                 )
 
@@ -322,7 +317,7 @@ fun PreviewStudySessionContent(
         // before the first load lands, so nothing here is meaningless during that window either —
         // and the sheet cannot be open yet at that point regardless, since ReadyContent's own
         // settings toggle is what's absent until the first load lands.
-        if (state.loadFailure == null) {
+        if (!state.isLoadFailed) {
             SessionSettingsSheet(
                 state = state,
                 sheetState = settingsSheetState,
@@ -333,48 +328,27 @@ fun PreviewStudySessionContent(
     }
 }
 
-/**
- * Only [ReadFailed] offers Retry: the other reasons are confirmed by the server, so retrying cannot
- * bring the content back, and the top bar's close action is the way out.
- */
 @Composable
 private fun LoadFailureContent(
     modifier: Modifier = Modifier,
-    loadFailure: PreviewLoadFailureReason,
     onRetry: () -> Unit,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        when (loadFailure) {
-            ReadFailed -> FlashcardsEmptyState(
-                icon = Icons.Default.CloudOff,
-                title = stringResource(CoreUiR.string.common_load_error_title),
-                supportingText = stringResource(CoreUiR.string.common_flashcards_load_error_message),
-                tone = FlashcardsEmptyStateTone.Error,
-                style = OnGradient,
-                button = {
-                    FlashcardsFilledButton(
-                        text = stringResource(CoreUiR.string.common_retry_button),
-                        onClick = onRetry,
-                        icon = Icons.Default.Refresh,
-                        style = OnGradient,
-                    )
-                },
-            )
-            SubcategoriesUnavailable -> FlashcardsEmptyState(
-                icon = Icons.Default.ErrorOutline,
-                title = stringResource(R.string.preview_session_subcategories_unavailable_title),
-                supportingText = stringResource(R.string.preview_session_subcategories_unavailable_message),
-                tone = FlashcardsEmptyStateTone.Error,
-                style = OnGradient,
-            )
-            CategoryUnavailable -> FlashcardsEmptyState(
-                icon = Icons.Default.ErrorOutline,
-                title = stringResource(R.string.preview_session_category_unavailable_title),
-                supportingText = stringResource(R.string.preview_session_category_unavailable_message),
-                tone = FlashcardsEmptyStateTone.Error,
-                style = OnGradient,
-            )
-        }
+        FlashcardsEmptyState(
+            icon = Icons.Default.CloudOff,
+            title = stringResource(CoreUiR.string.common_load_error_title),
+            supportingText = stringResource(CoreUiR.string.common_flashcards_load_error_message),
+            tone = FlashcardsEmptyStateTone.Error,
+            style = OnGradient,
+            button = {
+                FlashcardsFilledButton(
+                    text = stringResource(CoreUiR.string.common_retry_button),
+                    onClick = onRetry,
+                    icon = Icons.Default.Refresh,
+                    style = OnGradient,
+                )
+            },
+        )
     }
 }
 

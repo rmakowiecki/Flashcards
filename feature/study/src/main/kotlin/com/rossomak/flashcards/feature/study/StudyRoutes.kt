@@ -18,9 +18,7 @@ import kotlinx.serialization.Serializable
  * | Quick | present | The caller's candidate pool; Preview samples it and makes no fetch |
  * | Quick | empty | Preview fetches the Category's Subcategories itself, then samples them |
  * | SingleSubcategory / Custom | present | Used literally |
- * | SingleSubcategory / Custom | empty | Nothing to study; Preview shows the unavailable message and its error state |
- *
- * SingleSubcategory and Custom ids the server confirms are gone are dropped; unchecked ids are kept.
+ * | SingleSubcategory / Custom | empty | Invalid; the Preview screen rejects it |
  *
  * Quick ids mean "the Category's complete Subcategory list, or none". A partial list is not
  * validated and would silently give a Quick Session over only that subset.
