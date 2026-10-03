@@ -37,9 +37,10 @@ import java.util.Locale
  * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
  *
  * Live editor for one [NetworkGraphSpec]: a layer picker (with add-back-layer / remove), the layer's
- * two enums as segmented rows, then the curated sliders. Sliders that only apply to one envelope are
- * hidden for the others. Edits are in-memory only; "copy spec" on the screen is how they survive.
- * [showViolations] is screen-wide, not part of the spec: it rings any node breaking the two-edge rule.
+ * edge rule as a segmented row, then the curated sliders, shape weights first. Sliders for a shape
+ * whose weight is zero are hidden. Edits are in-memory only; "copy spec" on the screen is how they survive.
+ * [header] goes above everything else, inside the same scroll. [showViolations] is screen-wide,
+ * not part of the spec: it rings any node breaking the two-edge rule.
  */
 @Composable
 fun NetworkGraphTuningSheetContent(
@@ -48,6 +49,7 @@ fun NetworkGraphTuningSheetContent(
     showViolations: Boolean,
     onSpecChange: (NetworkGraphSpec) -> Unit,
     onShowViolationsChange: (Boolean) -> Unit,
+    header: @Composable () -> Unit = {},
 ) {
     var selectedLayer by remember { mutableIntStateOf(spec.layers.lastIndex) }
     val layerIndex = selectedLayer.coerceIn(0, spec.layers.lastIndex)
@@ -64,6 +66,7 @@ fun NetworkGraphTuningSheetContent(
             .padding(bottom = MaterialTheme.spacing.large),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
     ) {
+        header()
         LayerPicker(
             layerCount = spec.layers.size,
             selectedLayer = layerIndex,
@@ -78,16 +81,10 @@ fun NetworkGraphTuningSheetContent(
             },
         )
         EnumRow(
-            options = EnvelopeKind.entries,
-            selected = layer.envelope,
-            onSelect = { onLayerChange(layer.copy(envelope = it)) },
-        )
-        EnumRow(
             options = EdgeRule.entries,
             selected = layer.edgeRule,
             onSelect = { onLayerChange(layer.copy(edgeRule = it)) },
         )
-        SwitchRow(label = "Edge pulse", checked = layer.pulse, onCheckedChange = { onLayerChange(layer.copy(pulse = it)) })
         SwitchRow(
             label = "Strict triangles (no strings)",
             checked = layer.strictTriangles,
@@ -184,26 +181,27 @@ private class LayerSlider(
     val appliesTo: (NetworkGraphLayerSpec) -> Boolean = { true },
 )
 
-private val isRibbon: (NetworkGraphLayerSpec) -> Boolean = { it.envelope == EnvelopeKind.Ribbon }
-private val isShaped: (NetworkGraphLayerSpec) -> Boolean = { it.envelope != EnvelopeKind.Uniform }
+private val hasRibbon: (NetworkGraphLayerSpec) -> Boolean = { it.ribbonWeight > 0f }
+private val hasBloom: (NetworkGraphLayerSpec) -> Boolean = { it.bloomWeight > 0f }
+private val isShaped: (NetworkGraphLayerSpec) -> Boolean = { it.uniformWeight < 1f }
 
 @Suppress("MagicNumber")
 private val layerSliders = listOf(
-    LayerSlider("Density (cells on long side)", 4f..30f, { it.density }, { spec, value -> spec.copy(density = value) }),
+    LayerSlider("Uniform weight", 0f..1f, { it.uniformWeight }, { spec, value -> spec.copy(uniformWeight = value) }),
+    LayerSlider("Ribbon weight", 0f..1f, { it.ribbonWeight }, { spec, value -> spec.copy(ribbonWeight = value) }),
+    LayerSlider("Bloom weight", 0f..1f, { it.bloomWeight }, { spec, value -> spec.copy(bloomWeight = value) }),
+    LayerSlider("Density (cells on window long side)", 4f..48f, { it.density }, { spec, value -> spec.copy(density = value) }),
     LayerSlider("Fill chance", 0.3f..1f, { it.fillChance }, { spec, value -> spec.copy(fillChance = value) }),
     LayerSlider("Jitter (cells)", 0f..0.5f, { it.jitter }, { spec, value -> spec.copy(jitter = value) }),
     LayerSlider("Drift amplitude (cells)", 0f..1.2f, { it.driftAmplitude }, { spec, value -> spec.copy(driftAmplitude = value) }),
     LayerSlider("Drift speed", 0f..4f, { it.driftSpeed }, { spec, value -> spec.copy(driftSpeed = value) }),
-    LayerSlider("Ribbon center", 0f..1f, { it.ribbonCenter }, { spec, value -> spec.copy(ribbonCenter = value) }, isRibbon),
-    LayerSlider("Ribbon width", 0.05f..1f, { it.ribbonWidth }, { spec, value -> spec.copy(ribbonWidth = value) }, isRibbon),
-    LayerSlider("Ribbon meander", 0f..0.4f, { it.ribbonCurve }, { spec, value -> spec.copy(ribbonCurve = value) }, isRibbon),
-    LayerSlider(
-        "Bloom reach",
-        0.1f..1.5f,
-        { it.bloomReach },
-        { spec, value -> spec.copy(bloomReach = value) },
-        { it.envelope == EnvelopeKind.CornerBloom },
-    ),
+    LayerSlider("Ribbon center", 0f..1f, { it.ribbonCenter }, { spec, value -> spec.copy(ribbonCenter = value) }, hasRibbon),
+    LayerSlider("Ribbon width", 0.05f..1f, { it.ribbonWidth }, { spec, value -> spec.copy(ribbonWidth = value) }, hasRibbon),
+    LayerSlider("Ribbon meander", 0f..0.4f, { it.ribbonCurve }, { spec, value -> spec.copy(ribbonCurve = value) }, hasRibbon),
+    LayerSlider("Ribbon tilt (°)", -45f..45f, { it.ribbonTilt }, { spec, value -> spec.copy(ribbonTilt = value) }, hasRibbon),
+    LayerSlider("Bloom reach", 0.1f..1.5f, { it.bloomReach }, { spec, value -> spec.copy(bloomReach = value) }, hasBloom),
+    LayerSlider("Bloom center x", 0f..1f, { it.bloomX }, { spec, value -> spec.copy(bloomX = value) }, hasBloom),
+    LayerSlider("Bloom center y", 0f..1f, { it.bloomY }, { spec, value -> spec.copy(bloomY = value) }, hasBloom),
     LayerSlider("Outlier density", 0f..0.3f, { it.envelopeFloor }, { spec, value -> spec.copy(envelopeFloor = value) }, isShaped),
     LayerSlider("Wave amplitude", 0f..0.2f, { it.waveAmplitude }, { spec, value -> spec.copy(waveAmplitude = value) }),
     LayerSlider("Wave speed", 0f..2f, { it.waveSpeed }, { spec, value -> spec.copy(waveSpeed = value) }),
@@ -213,6 +211,7 @@ private val layerSliders = listOf(
     LayerSlider("Repair reach (× max edge)", 1f..3f, { it.repairReach }, { spec, value -> spec.copy(repairReach = value) }),
     LayerSlider("Stroke width (dp)", 0.3f..3f, { it.strokeWidthDp }, { spec, value -> spec.copy(strokeWidthDp = value) }),
     LayerSlider("Edge alpha", 0f..1f, { it.edgeAlpha }, { spec, value -> spec.copy(edgeAlpha = value) }),
+    LayerSlider("Edge pulse depth", 0f..1f, { it.pulseDepth }, { spec, value -> spec.copy(pulseDepth = value) }),
     LayerSlider("Length falloff", 0f..1f, { it.lengthFalloff }, { spec, value -> spec.copy(lengthFalloff = value) }),
     LayerSlider("Node size (dp)", 0f..8f, { it.nodeSizeDp }, { spec, value -> spec.copy(nodeSizeDp = value) }),
     LayerSlider("Node size variance", 0f..1f, { it.nodeSizeVariance }, { spec, value -> spec.copy(nodeSizeVariance = value) }),
