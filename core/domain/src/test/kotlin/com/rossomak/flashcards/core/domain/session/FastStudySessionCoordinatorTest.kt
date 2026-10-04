@@ -599,6 +599,27 @@ class FastStudySessionCoordinatorTest {
     }
 
     @Test
+    fun `a card load that fails after leaving reports no load failure`() = runTest {
+        flashcardRepository.flashcardsBySubcategory[SUBCATEGORY_ID] = Result.failure(IllegalStateException("offline"))
+        val coordinator = startCoordinator(runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe FastSessionStateSnapshot.Loading
+    }
+
+    @Test
+    fun `a card load that finishes after leaving does not start the session`() = runTest {
+        val coordinator = startCoordinator(runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe FastSessionStateSnapshot.Loading
+    }
+
+    @Test
     fun `leaving before the cards load seals an empty abandoned result with zero duration`() = runTest {
         val coordinator = startCoordinator(runsLoad = false)
 

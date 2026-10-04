@@ -12,8 +12,13 @@ sealed interface FastStudySessionDestination : NavigationEvent {
 
     /**
      * The session ended — the deck was exhausted, or the user confirmed "Exit session?" — carrying
-     * the sealed result on to the Session Summary. The session's only
-     * destination now; there is no longer a plain "go back" outcome.
+     * the sealed result on to the Session Summary.
      */
     data class Summary(val route: StudySessionSummaryRoute) : FastStudySessionDestination
+
+    /**
+     * The cards failed to load, so no session started. Returns to Preview to load them again. Only for
+     * that failure: leaving a session, even before its cards load, goes to [Summary].
+     */
+    data object Back : FastStudySessionDestination
 }

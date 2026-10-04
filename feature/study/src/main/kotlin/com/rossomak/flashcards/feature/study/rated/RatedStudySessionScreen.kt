@@ -60,6 +60,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionDestination.Back
+import com.rossomak.flashcards.feature.study.rated.RatedStudySessionDestination.Summary
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.PlayIgnoredDuringCall
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerCaptureUnavailable
@@ -85,13 +87,15 @@ private const val PRESENTED_CARD_INDEX = 0
 fun RatedStudySessionScreen(
     modifier: Modifier = Modifier,
     viewModel: RatedStudySessionViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit,
     onNavigateToSummary: (StudySessionSummaryRoute) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is RatedStudySessionDestination.Summary -> onNavigateToSummary(destination.route)
+            is Summary -> onNavigateToSummary(destination.route)
+            Back -> onNavigateBack()
         }
     }
 
@@ -225,7 +229,6 @@ fun RatedStudySessionContent(
         ) { innerPadding ->
             StudySessionBody(
                 isLoading = state.isLoading,
-                error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
                 currentCardIndex = PRESENTED_CARD_INDEX,
                 isAnswerRevealed = state.isAnswerRevealed,

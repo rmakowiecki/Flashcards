@@ -42,7 +42,6 @@ import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
@@ -121,6 +120,12 @@ class PreviewStudySessionViewModelTest {
         subcategoryIds = (1..8).map { index -> "android-sub-$index" },
         subcategoryNames = (1..8).map { index -> "Sub $index" },
         sourceType = Quick,
+    )
+
+    private val threeSubcategoryRoute = singleSubcategoryRoute.copy(
+        subcategoryIds = listOf(COMPOSE_ID, COROUTINES_ID, NAVIGATION_ID),
+        subcategoryNames = listOf("Compose", "Coroutines", "Navigation"),
+        sourceType = Custom,
     )
 
     /** What Home hands Preview: the Category id alone, no pool. */
@@ -265,7 +270,7 @@ class PreviewStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.isLoadFailed shouldBe true
         viewModel.state.value.canStart shouldBe false
     }
 
@@ -978,13 +983,13 @@ class PreviewStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.isLoadFailed shouldBe true
 
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
         viewModel.onRetry()
         advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe null
+        viewModel.state.value.isLoadFailed shouldBe false
         viewModel.state.value.selectedCardCount shouldBe 1
     }
 
@@ -1188,7 +1193,7 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
-    fun `a quick route that supplies its pool makes no pool fetch`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a quick route that supplies its pool makes no pool fetch and no subcategory check`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(quickSessionRoute)
 
         createViewModel()
@@ -1212,7 +1217,7 @@ class PreviewStudySessionViewModelTest {
             viewModel.state.value.subcategoryNames shouldBe
                 sampledIds.map { id -> fetchedPool.first { subcategory -> subcategory.id == id }.name }
             viewModel.state.value.isLoading shouldBe false
-            viewModel.state.value.error shouldBe null
+            viewModel.state.value.isLoadFailed shouldBe false
         }
 
     @Test
@@ -1281,6 +1286,29 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
+    fun `a quick route whose category has no subcategories shows the load error`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            seedPoolLessQuickSession()
+            flashcardRepository.subcategoriesToReturn = Result.success(emptyList())
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.isLoadFailed shouldBe true
+            viewModel.state.value.canStart shouldBe false
+        }
+
+    @Test
+    fun `a custom route keeps its exact set`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(threeSubcategoryRoute)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.config.subcategoryIds shouldBe threeSubcategoryRoute.subcategoryIds
+        viewModel.state.value.subcategoryNames shouldBe threeSubcategoryRoute.subcategoryNames
+    }
+
+    @Test
     fun `a non quick route without subcategory ids is rejected`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(poolLessQuickSessionRoute.copy(sourceType = Custom))
 
@@ -1295,7 +1323,7 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.isLoadFailed shouldBe true
             viewModel.state.value.isLoading shouldBe false
 
             flashcardRepository.subcategoriesToReturn = Result.success(fetchedPool)
@@ -1303,7 +1331,7 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId, categoryId)
-            viewModel.state.value.error shouldBe null
+            viewModel.state.value.isLoadFailed shouldBe false
             viewModel.state.value.canStart shouldBe true
             viewModel.state.value.config.subcategoryIds.isNotEmpty() shouldBe true
         }
@@ -1320,7 +1348,7 @@ class PreviewStudySessionViewModelTest {
         advanceUntilIdle()
 
         flashcardRepository.fetchedSubcategoryCategoryIds shouldBe listOf(categoryId)
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+        viewModel.state.value.isLoadFailed shouldBe true
     }
 
     @Test
@@ -1331,14 +1359,14 @@ class PreviewStudySessionViewModelTest {
 
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.state.value.error shouldBe R.string.study_session_load_error_message
+            viewModel.state.value.isLoadFailed shouldBe true
 
             flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
             viewModel.onRetry()
             advanceUntilIdle()
 
             flashcardRepository.fetchedSubcategoryCategoryIds shouldBe emptyList()
-            viewModel.state.value.error shouldBe null
+            viewModel.state.value.isLoadFailed shouldBe false
         }
 
     @Test
@@ -1783,5 +1811,9 @@ class PreviewStudySessionViewModelTest {
 
         /** Same rationale as [CARD_DRAW_RANDOM_SEED], for the quick-session subcategory sample. */
         const val SUBCATEGORY_SAMPLE_RANDOM_SEED = 7L
+
+        const val COMPOSE_ID = "android-compose"
+        const val COROUTINES_ID = "android-coroutines"
+        const val NAVIGATION_ID = "android-navigation"
     }
 }

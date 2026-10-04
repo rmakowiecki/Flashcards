@@ -105,3 +105,12 @@ Accepted transient inaccuracies, all corrected by the next successful server rea
 - **Empty Card Progress baseline.** Offline, a Subcategory never read on this device has no cached
   document, so a Pending Session's cards replay over no record: they count as new, and a Mastery
   Defense card counts as newly Mastered.
+
+## Amendments
+
+**2026-10-03 — Recents consume the projection.** `DefaultRecentSessionsRepository` merges the User's
+Pending Sessions into Home's Recents, so a session finished offline shows at once. Through
+`PendingSessionProjector` it scores each Pending Session's preview `xpTotal` oldest first with the
+cached XP configuration, so later
+Streak and Daily Goal awards build on earlier ones, and it drops Pending Sessions with no Flashcard
+Results, which the server rejects. See [ADR-0057](0057-recents-state-projection.md).

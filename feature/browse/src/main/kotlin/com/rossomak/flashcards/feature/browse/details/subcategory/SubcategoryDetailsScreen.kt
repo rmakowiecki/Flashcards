@@ -14,7 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -202,7 +202,7 @@ fun SubcategoryDetailsContent(
                 )
 
                 is Error -> FlashcardsEmptyState(
-                    icon = Icons.Filled.ErrorOutline,
+                    icon = Icons.Filled.CloudOff,
                     title = stringResource(CoreUiR.string.common_load_error_title),
                     supportingText = stringResource(content.messageRes),
                     tone = FlashcardsEmptyStateTone.Error,
