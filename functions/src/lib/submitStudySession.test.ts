@@ -5,15 +5,15 @@
 //
 // Deliberately does not go through a running Functions emulator or an `onCall` HTTP round trip:
 // `submitStudySession`/`validateSubmitStudySessionRequest` are called directly, the same seam
-// `index.ts`'s thin `onCall` wrapper delegates to. This exercises every line this ticket is
-// responsible for — the auth check `index.ts` itself performs is a single `if (!uid) throw` guard,
-// trivial enough that a direct call with/without a uid covers it without needing a live Auth
-// emulator and token round trip for zero extra coverage.
+// `index.ts`'s thin `onCall` wrapper delegates to. `handleSubmitStudySessionCall` is the wrapper's
+// whole body; its tests build the decoded-token request `onCall` would hand it and check revocation
+// against the Auth emulator, so no token minting is needed.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, afterEach, before, describe, it } from "node:test";
 import * as admin from "firebase-admin";
-import { requireOwnerMatchesCaller, submitStudySession, validateSubmitStudySessionRequest } from "./submitStudySession";
+import { callableRequestSignedInAt, nowEpochSeconds } from "./callableRequestFixtures";
+import { handleSubmitStudySessionCall, requireOwnerMatchesCaller, submitStudySession, validateSubmitStudySessionRequest } from "./submitStudySession";
 import { loadXpConfig, xpConfigDocRef } from "./xpConfig";
 import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 
@@ -206,6 +206,43 @@ describe("requireOwnerMatchesCaller", () => {
   it("rejects a session owned by another User as unauthenticated", () => {
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
     assert.throws(() => requireOwnerMatchesCaller("other-uid", request), { code: "unauthenticated" });
+  });
+});
+
+// The revoked-token guard itself is covered in authGuard.test.ts; these only pin that the callable
+// runs it before writing anything. Uses the Auth emulator `npm test` starts alongside Firestore.
+describe("handleSubmitStudySessionCall", () => {
+  it("commits the session of an active caller", async () => {
+    const uid = (await admin.auth().createUser({ uid: randomUUID() })).uid;
+    const data = rawRatedRequest({ ownerUid: uid });
+
+    await handleSubmitStudySessionCall(admin.auth(), callableRequestSignedInAt(uid, nowEpochSeconds(), data));
+
+    const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${data.sessionId}`).get();
+    assert.ok(sessionDoc.exists);
+  });
+
+  it("rejects a caller whose tokens were revoked and writes nothing", async () => {
+    const uid = (await admin.auth().createUser({ uid: randomUUID() })).uid;
+    const signedInAt = nowEpochSeconds() - 60;
+    await admin.auth().revokeRefreshTokens(uid);
+    const data = rawRatedRequest({ ownerUid: uid });
+
+    await assert.rejects(handleSubmitStudySessionCall(admin.auth(), callableRequestSignedInAt(uid, signedInAt, data)), { code: "unauthenticated" });
+
+    const userSubcollections = await admin.firestore().doc(`users/${uid}`).listCollections();
+    assert.deepEqual(userSubcollections, []);
+  });
+
+  it("rejects a caller whose user was deleted and writes nothing", async () => {
+    const uid = (await admin.auth().createUser({ uid: randomUUID() })).uid;
+    await admin.auth().deleteUser(uid);
+    const data = rawRatedRequest({ ownerUid: uid });
+
+    await assert.rejects(handleSubmitStudySessionCall(admin.auth(), callableRequestSignedInAt(uid, nowEpochSeconds(), data)), { code: "unauthenticated" });
+
+    const userSubcollections = await admin.firestore().doc(`users/${uid}`).listCollections();
+    assert.deepEqual(userSubcollections, []);
   });
 });
 
