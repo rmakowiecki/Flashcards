@@ -295,6 +295,7 @@ describe("handleSubmitStudySessionCall", () => {
 
     const userSubcollections = await admin.firestore().doc(`users/${uid}`).listCollections();
     assert.deepEqual(userSubcollections, []);
+    assert.equal((await admin.firestore().doc(`users/${uid}`).get()).exists, false);
   });
 
   it("rejects a caller whose user was deleted and writes nothing", async () => {
@@ -306,6 +307,7 @@ describe("handleSubmitStudySessionCall", () => {
 
     const userSubcollections = await admin.firestore().doc(`users/${uid}`).listCollections();
     assert.deepEqual(userSubcollections, []);
+    assert.equal((await admin.firestore().doc(`users/${uid}`).get()).exists, false);
   });
 });
 

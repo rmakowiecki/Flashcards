@@ -57,7 +57,6 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -73,7 +72,6 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.Voic
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoiceAnswerSilenceSkip
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
 import com.rossomak.flashcards.testutil.MainDispatcherRule
-import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
@@ -270,14 +268,27 @@ class RatedStudySessionViewModelTest {
     }
 
     @Test
-    fun `loadFlashcards surfaces error when any subcategory fetch fails`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failed card load returns to Preview`() = runTest(mainDispatcherRule.testDispatcher) {
         flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
-
         val viewModel = createViewModel()
-        advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
-        viewModel.state.value.isLoading shouldBe false
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe RatedStudySessionDestination.Back
+        }
+    }
+
+    @Test
+    fun `a load that finds none of the routed cards returns to Preview`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(emptyList())
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe RatedStudySessionDestination.Back
+        }
     }
 
     @Test
@@ -367,7 +378,6 @@ class RatedStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.error shouldBe null
             viewModel.state.value.isLoading shouldBe false
             viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
             viewModel.onDialogEvent(Open(ExitSession))
@@ -382,6 +392,7 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `onShowAnswer reveals the answer`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
         val viewModel = createViewModel()
         advanceUntilIdle()
 
@@ -2143,25 +2154,6 @@ class RatedStudySessionViewModelTest {
                 val destination = awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
 
                 destination.route.durationSeconds shouldBe 42
-            }
-        }
-
-    @Test
-    fun `a session whose card load fails and is then abandoned reports zero duration and empty cardResults`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            clock.instant = FIXED_INSTANT.plusSeconds(999)
-            viewModel.onDialogEvent(Open(ExitSession))
-
-            viewModel.events.test {
-                viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
-
-                destination.route.durationSeconds shouldBe 0
-                destination.route.cardIds.shouldBeEmpty()
             }
         }
 

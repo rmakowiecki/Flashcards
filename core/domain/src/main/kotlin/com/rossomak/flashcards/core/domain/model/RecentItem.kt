@@ -1,13 +1,11 @@
 package com.rossomak.flashcards.core.domain.model
 
 /**
- * A [RecentSession] with its Category and Subcategories resolved live.
+ * A [RecentSession] with its Category looked up for color and icon only; names come from the session.
  *
- * @param subcategories exactly one for SingleSubcategory; the ids that still resolve, possibly none, for
- * Custom; always empty for Quick, whose replay samples the Category again.
+ * @param category `null` when the Category could not be read, so the row shows without its styling.
  */
 data class RecentItem(
     val session: RecentSession,
-    val category: Category,
-    val subcategories: List<Subcategory>,
+    val category: Category?,
 )

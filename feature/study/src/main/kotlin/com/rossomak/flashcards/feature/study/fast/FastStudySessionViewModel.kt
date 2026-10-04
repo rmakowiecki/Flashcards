@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.FastPauseReason
-import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.LoadFailed
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.Loading
 import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.Running
@@ -23,7 +22,6 @@ import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
@@ -107,7 +105,12 @@ class FastStudySessionViewModel @Inject constructor(
     private fun observeSnapshot() {
         viewModelScope.launch {
             coordinator.sessionState.collect { snapshot ->
-                _state.update { it.fromSnapshot(snapshot) }
+                when (snapshot) {
+                    Loading -> _state.update { it.copy(isLoading = true) }
+                    // No session started: return to Preview, which can load the cards again.
+                    LoadFailed -> eventChannel.send(FastStudySessionDestination.Back)
+                    is Running -> _state.update { it.fromRunningSnapshot(snapshot) }
+                }
             }
         }
     }
@@ -125,28 +128,25 @@ class FastStudySessionViewModel @Inject constructor(
         }
     }
 
-    private fun FastStudySessionScreenState.fromSnapshot(snapshot: FastSessionStateSnapshot) = when (snapshot) {
-        Loading -> copy(isLoading = true, error = null)
-        LoadFailed -> copy(isLoading = false, error = R.string.study_session_load_error_message)
-        is Running -> copy(
-            isLoading = false,
-            error = null,
-            flashcards = snapshot.cards,
-            currentCardIndex = snapshot.currentIndex,
-            isAnswerRevealed = snapshot.isAnswerRevealed,
-            isVoiceActive = snapshot.playback.isActive,
-            isVoicePlaying = snapshot.playback.isPlaying,
-            isVoiceEngineUnavailable = snapshot.pauseReason == FastPauseReason.VoiceEngineUnavailable,
-            availableTransportCommands = snapshot.availableTransportCommands,
-        )
-    }
+    private fun FastStudySessionScreenState.fromRunningSnapshot(snapshot: Running) = copy(
+        isLoading = false,
+        flashcards = snapshot.cards,
+        currentCardIndex = snapshot.currentIndex,
+        isAnswerRevealed = snapshot.isAnswerRevealed,
+        isVoiceActive = snapshot.playback.isActive,
+        isVoicePlaying = snapshot.playback.isPlaying,
+        isVoiceEngineUnavailable = snapshot.pauseReason == FastPauseReason.VoiceEngineUnavailable,
+        availableTransportCommands = snapshot.availableTransportCommands,
+    )
 
     /**
      * A command changes the coordinator's snapshot at once; showing it here, rather than waiting for
      * the snapshot collector to run, keeps the screen in step with the tap that caused it.
      */
     private fun showSessionNow() {
-        _state.update { it.fromSnapshot(coordinator.sessionState.value) }
+        // Commands only reach a running session.
+        val snapshot = coordinator.sessionState.value as? Running ?: return
+        _state.update { it.fromRunningSnapshot(snapshot) }
     }
 
     /**

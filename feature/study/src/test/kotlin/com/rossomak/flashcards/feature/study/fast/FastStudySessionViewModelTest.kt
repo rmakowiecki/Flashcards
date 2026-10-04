@@ -38,14 +38,12 @@ import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings as VoiceSettingsDialog
 import com.rossomak.flashcards.testutil.MainDispatcherRule
-import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -207,14 +205,27 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `loadFlashcards surfaces error when any subcategory fetch fails`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failed card load returns to Preview`() = runTest(mainDispatcherRule.testDispatcher) {
         flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
-
         val viewModel = createViewModel()
-        advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
-        viewModel.state.value.isLoading shouldBe false
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionDestination.Back
+        }
+    }
+
+    @Test
+    fun `a load that finds none of the routed cards returns to Preview`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(emptyList())
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionDestination.Back
+        }
     }
 
     @Test
@@ -251,7 +262,6 @@ class FastStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.error shouldBe null
             viewModel.state.value.isLoading shouldBe false
         }
 
@@ -511,25 +521,6 @@ class FastStudySessionViewModelTest {
                 val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
                 destination.route.durationSeconds shouldBe 17
-            }
-        }
-
-    @Test
-    fun `a session whose card load fails and is then abandoned reports zero duration and empty cardResults`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            clock.instant = FIXED_INSTANT.plusSeconds(999)
-            viewModel.onDialogEvent(Open(ExitSession))
-
-            viewModel.events.test {
-                viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
-
-                destination.route.durationSeconds shouldBe 0
-                destination.route.cardIds.shouldBeEmpty()
             }
         }
 

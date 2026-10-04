@@ -226,6 +226,8 @@ class FastStudySessionCoordinator @Inject constructor(
 
     private suspend fun load() {
         val sessionStartData = getSessionStartData(setup.subcategoryIds)
+        // Left before the cards arrived: the session already ended on its way to the Summary.
+        if (hasEnded) return
         val flashcards = sessionStartData.flashcardsResult.getOrElse {
             _sessionState.value = FastSessionStateSnapshot.LoadFailed
             return
@@ -233,9 +235,13 @@ class FastStudySessionCoordinator @Inject constructor(
         priorProgressByCardId = sessionStartData.priorProgressByCardId
         val cardsById = flashcards.associateBy { it.id }
         val sessionCards = setup.cardIds.mapNotNull(cardsById::get)
+        // Preview drew these ids from the same cards moments ago, so none matching is a load failure too.
+        if (sessionCards.isEmpty()) {
+            _sessionState.value = FastSessionStateSnapshot.LoadFailed
+            return
+        }
         state = reducer.seed(sessionCards, isReadAloudSession = setup.readAloudEnabled)
         publish()
-        if (sessionCards.isEmpty()) return
         // Read-aloud off is a tap-through session and never starts text-to-speech.
         if (setup.readAloudEnabled) startVoiceStack(startIndex = 0)
         timekeeper.start()
