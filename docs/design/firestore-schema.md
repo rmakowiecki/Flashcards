@@ -94,7 +94,10 @@ users/{uid}/favorites/state                           → { categories: { "<cate
 // → SessionSubmissionRemoteDataSource). Shape follows studyMode: RATED carries the four counters and full
 // cardResults entries below; FAST has none of the RATED-only fields at all — not zeroed, genuinely absent.
 users/{uid}/sessions/{sessionId}                      → { sessionId, startTimestamp, durationSeconds,
-                                                          studyMode: "rated"|"fast", isAbandoned,
+                                                          studyMode: "Rated"|"Fast", isAbandoned,
+                                                          sourceType: "SingleSubcategory"|"Quick"|"Custom",
+                                                          voiceAnswering,  // RATED only
+                                                          readAloud,       // FAST only
                                                           categoryId, categoryName,
                                                           subcategoryIds[], subcategoryNames[],
                                                           cardCount, newCardsStudied,
@@ -114,7 +117,33 @@ users/{uid}/sessions/{sessionId}                      → { sessionId, startTime
                                                           } }  // no transcript, ever
 ```
 
-- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. Home's Recents carousel renders from one `orderBy(startTimestamp).limit(n)` query with no joins. `cardResults` is embedded rather than split into a subcollection because Firestore bills per document read — splitting saved Recents no reads while costing a write per card. The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md). The scoring fields let a retried submission answer from this document alone: `xpRates` records the per-line rates the session was scored with (absent on documents written before it was added), and the function's response derives each XP line's count from the stored counters (newly Mastered = `cardsMastered − cardsDefended`).
+- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. `cardResults` is embedded rather than split into a subcollection because no reader needs a session without its cards, so a subcollection would only add a write per card. Home does not query this collection: it reads [`recents/state`](#recents). The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md). `sourceType` is the Study Creation entry point that started the session, not its Subcategory count. Delivery is sealed the same way: `voiceAnswering` exists only on a Rated document and `readAloud` only on a Fast one. The scoring fields let a retried submission answer from this document alone: `xpRates` records the per-line rates the session was scored with (absent on documents written before it was added), and the function's response derives each XP line's count from the stored counters (newly Mastered = `cardsMastered − cardsDefended`).
+
+## Recents
+
+```
+// Written only by the submitStudySession Cloud Function, inside the session's own transaction.
+users/{uid}/recents/state                             → { entries: { "<sessionId>": {
+                                                            sessionId: string,
+                                                            startTimestamp: Timestamp,
+                                                            durationSeconds: number,
+                                                            studyMode: "Rated"|"Fast",
+                                                            voiceAnswering: boolean,  // RATED only
+                                                            readAloud: boolean,       // FAST only
+                                                            sourceType: "SingleSubcategory"|"Quick"|"Custom",
+                                                            categoryId: string,
+                                                            categoryName: string,
+                                                            subcategoryIds: string[],
+                                                            subcategoryNames: string[],  // parallel to subcategoryIds
+                                                            cardCount: number,
+                                                            xpTotal: number  // signed
+                                                          }, ... } }
+```
+
+- **One document per User holding their latest 15 sessions**, so Home's Recently studied list costs one read on attach and one per change instead of a query over `sessions`. See [ADR-0057](../adr/0057-recents-state-projection.md).
+- Each entry repeats its session document's field names and values, **names included**: names never change, so a row shows and replays without any taxonomy read. The client looks up the Category only for its color and icon, and an entry missing its names, or whose `subcategoryIds` and `subcategoryNames` differ in length, is skipped.
+- Keyed by `sessionId`, so a retried submission is idempotent: an id already present leaves the document untouched. A new entry is added, then the map is trimmed to the 15 newest by `startTimestamp`, ties evicting the lower `sessionId` first. A late-delivered old session therefore never pushes out a newer one; one older than every kept entry is not written at all.
+- **Client-read-only**: the owner may read it; only the function (Admin SDK) writes it. See `firestore.rules`.
 
 ## Per-subcategory progress detail
 

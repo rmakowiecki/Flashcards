@@ -71,6 +71,8 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionDestination.Back
+import com.rossomak.flashcards.feature.study.fast.FastStudySessionDestination.Summary
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.CurationReportFailed
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.PlayIgnoredDuringCall
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
@@ -83,13 +85,15 @@ private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 150.dp
 fun FastStudySessionScreen(
     modifier: Modifier = Modifier,
     viewModel: FastStudySessionViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit,
     onNavigateToSummary: (StudySessionSummaryRoute) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
-            is FastStudySessionDestination.Summary -> onNavigateToSummary(destination.route)
+            is Summary -> onNavigateToSummary(destination.route)
+            Back -> onNavigateBack()
         }
     }
 
@@ -232,7 +236,6 @@ fun FastStudySessionContent(
         ) { innerPadding ->
             StudySessionBody(
                 isLoading = state.isLoading,
-                error = state.error?.let { stringResource(it) },
                 flashcards = state.flashcards,
                 currentCardIndex = state.currentCardIndex,
                 isAnswerRevealed = state.isAnswerRevealed,

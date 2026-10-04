@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.RecentSession
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
@@ -86,7 +87,7 @@ internal fun RecentSessionRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
         ) {
-            RecentCategoryOverline(item = item)
+            RecentCategoryOverline(categoryName = item.session.categoryName, category = item.category)
             Text(
                 text = recentTitle(item),
                 style = MaterialTheme.typography.titleSmall,
@@ -112,22 +113,24 @@ internal fun RecentSessionRow(
     }
 }
 
+/** [category] only styles the overline; without it the name shows in the primary color with no glyph. */
 @Composable
-private fun RecentCategoryOverline(item: RecentItem) {
-    val category = item.category
-    val categoryColor = remember(category.color) { category.color.toCategoryColorOrNull() }
+private fun RecentCategoryOverline(categoryName: String, category: Category?) {
+    val categoryColor = remember(category?.color) { category?.color?.toCategoryColorOrNull() }
         ?: MaterialTheme.colorScheme.primary
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
     ) {
-        FlashcardsInlineCategoryGlyph(
-            iconSvg = category.iconSvg,
-            tint = categoryColor,
-            contentDescription = null,
-        )
+        if (category != null) {
+            FlashcardsInlineCategoryGlyph(
+                iconSvg = category.iconSvg,
+                tint = categoryColor,
+                contentDescription = null,
+            )
+        }
         Text(
-            text = category.name,
+            text = categoryName,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = categoryColor,
@@ -137,12 +140,11 @@ private fun RecentCategoryOverline(item: RecentItem) {
     }
 }
 
-/** Counts stored ids, not resolved ones: the topic count is how wide the session was. */
 @Composable
 private fun recentTitle(item: RecentItem): String {
     val topicCount = item.session.subcategoryIds.size
     return when (item.session.sourceType) {
-        SingleSubcategory -> item.subcategories.first().name
+        SingleSubcategory -> item.session.subcategoryNames.first()
         Quick -> pluralStringResource(R.plurals.recents_quick_session_topics, topicCount, topicCount)
         Custom -> pluralStringResource(R.plurals.recents_custom_session_topics, topicCount, topicCount)
     }

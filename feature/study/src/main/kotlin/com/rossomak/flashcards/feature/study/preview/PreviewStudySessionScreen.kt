@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -70,6 +71,7 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
@@ -92,6 +94,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.MicPermissionStillDenied
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -124,7 +127,7 @@ fun PreviewStudySessionScreen(
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         when (message) {
-            PreviewStudySessionMessage.MicPermissionStillDenied -> snackbarScope.launch {
+            MicPermissionStillDenied -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(message = micPermissionStillDeniedText, duration = SnackbarDuration.Short)
             }
         }
@@ -280,11 +283,10 @@ fun PreviewStudySessionContent(
                     CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
                 }
 
-                state.error != null -> ErrorContent(
+                state.isLoadFailed -> LoadFailureContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    error = stringResource(state.error),
                     onRetry = onRetry,
                 )
 
@@ -305,7 +307,7 @@ fun PreviewStudySessionContent(
                 )
             }
         }
-        // Gated to error only, deliberately NOT to state.isLoading: a settings edit re-triggers
+        // Gated to a load failure only, deliberately NOT to state.isLoading: a settings edit re-triggers
         // selectCards(), which flips isLoading true for the reselect and false again once it lands
         // (see PreviewStudySessionViewModel.selectCards's own doc) — a sheet already open at that
         // point must ride through untouched, or it unmounts and remounts on every edit, snapping
@@ -315,7 +317,7 @@ fun PreviewStudySessionContent(
         // before the first load lands, so nothing here is meaningless during that window either —
         // and the sheet cannot be open yet at that point regardless, since ReadyContent's own
         // settings toggle is what's absent until the first load lands.
-        if (state.error == null) {
+        if (!state.isLoadFailed) {
             SessionSettingsSheet(
                 state = state,
                 sheetState = settingsSheetState,
@@ -327,27 +329,25 @@ fun PreviewStudySessionContent(
 }
 
 @Composable
-private fun ErrorContent(
+private fun LoadFailureContent(
     modifier: Modifier = Modifier,
-    error: String,
     onRetry: () -> Unit,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = error,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.brandColors.onGradientContent,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
-        FlashcardsOutlinedButton(
-            text = stringResource(CoreUiR.string.common_retry_button),
-            onClick = onRetry,
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        FlashcardsEmptyState(
+            icon = Icons.Default.CloudOff,
+            title = stringResource(CoreUiR.string.common_load_error_title),
+            supportingText = stringResource(CoreUiR.string.common_flashcards_load_error_message),
+            tone = FlashcardsEmptyStateTone.Error,
             style = OnGradient,
+            button = {
+                FlashcardsFilledButton(
+                    text = stringResource(CoreUiR.string.common_retry_button),
+                    onClick = onRetry,
+                    icon = Icons.Default.Refresh,
+                    style = OnGradient,
+                )
+            },
         )
     }
 }

@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,24 +11,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -37,8 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -51,15 +43,17 @@ import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
-import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.home.HomeDestination.CategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.QuickSessionPreviewStudySession
+import com.rossomak.flashcards.feature.home.HomeDestination.RecentPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
@@ -91,6 +85,17 @@ fun HomeScreen(
         subcategoryName: String,
     ) -> Unit,
     onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
+    onNavigateToPreviewRecentSession: (
+        categoryId: String,
+        categoryName: String,
+        sourceType: SessionSourceType,
+        subcategoryIds: List<String>,
+        subcategoryNames: List<String>,
+        studyMode: StudyMode,
+        voiceAnsweringEnabled: Boolean?,
+        readAloudEnabled: Boolean?,
+    ) -> Unit,
+    onNavigateToBrowse: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val now by produceState(initialValue = Instant.now()) {
@@ -126,6 +131,17 @@ fun HomeScreen(
                     categoryId,
                     categoryName,
                 )
+
+                is RecentPreviewStudySession -> onNavigateToPreviewRecentSession(
+                    categoryId,
+                    categoryName,
+                    sourceType,
+                    subcategoryIds,
+                    subcategoryNames,
+                    studyMode,
+                    voiceAnsweringEnabled,
+                    readAloudEnabled,
+                )
             }
         }
     }
@@ -138,11 +154,13 @@ fun HomeScreen(
         onCategoryQuickSessionClick = viewModel::onFavoriteCategoryQuickSessionStart,
         onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
         onSubcategoryPlayClick = viewModel::onFavoriteSubcategorySessionStart,
-        onRecentClick = {},
+        onRecentClick = viewModel::onRecentSelect,
+        onBrowseClick = onNavigateToBrowse,
     )
 }
 
 /** @param now what Recents' start times are worded against; [HomeScreen] ticks it once a minute. */
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
 private fun HomeContent(
     modifier: Modifier = Modifier,
@@ -154,14 +172,24 @@ private fun HomeContent(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategoryPlayClick: (Subcategory) -> Unit,
     onRecentClick: (RecentItem) -> Unit,
+    onBrowseClick: () -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        HomeTopBar()
-        UserGreetingSection(userName = "Ross")
+    val scrollState = rememberScrollState()
+    // No top app bar: MainScreen leaves each tab root to pad for the status bar itself.
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .flashcardsScrollFade(scrollState)
+            .verticalScroll(scrollState),
+    ) {
         val favorites = state.favorites
         val recents = state.recents
         if (state.showsEmptyState()) {
-            HomeEmptyState(modifier = Modifier.padding(vertical = MaterialTheme.spacing.large))
+            HomeEmptyState(
+                modifier = Modifier.padding(vertical = MaterialTheme.spacing.large),
+                onStartClick = onBrowseClick,
+            )
         } else {
             if (favorites is FavoritesContent) {
                 FavoritesCarousel(
@@ -190,92 +218,8 @@ private fun HomeContent(
 /** Only when both sections are Hidden, so the empty state never flashes while one is still Loading. */
 private fun HomeScreenState.showsEmptyState(): Boolean = favorites is FavoritesHidden && recents is RecentsHidden
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeTopBar() {
-    Box(modifier = Modifier.fillMaxWidth().background(MaterialTheme.brandColors.topBarGradient)) {
-        CenterAlignedTopAppBar(
-            title = {
-                Icon(
-                    painter = painterResource(R.drawable.flashcards_white),
-                    contentDescription = "Flashcards",
-                    tint = Color.Unspecified,
-                    modifier = Modifier.height(64.dp),
-                )
-            },
-            actions = {
-                BadgedBox(
-                    badge = {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(MaterialTheme.colorScheme.tertiary, CircleShape),
-                        )
-                    },
-                ) {
-                    IconButton(onClick = {}) {
-                        Icon(
-                            imageVector = Icons.Filled.Notifications,
-                            contentDescription = "Notifications",
-                            modifier = Modifier.size(26.dp),
-                        )
-                    }
-                }
-            },
-            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                containerColor = Color.Transparent,
-                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun UserGreetingSection(userName: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                .padding(12.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = userName.first().uppercase(),
-                style = MaterialTheme.typography.titleLarge.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-        }
-        Column {
-            Text(
-                text = "Good morning,",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
-            Text(
-                text = "$userName 👋",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeEmptyState(modifier: Modifier = Modifier) {
+private fun HomeEmptyState(modifier: Modifier = Modifier, onStartClick: () -> Unit) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -288,7 +232,7 @@ private fun HomeEmptyState(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Ready to start learning?",
+            text = stringResource(R.string.home_empty_title),
             style = MaterialTheme.typography.titleLarge.copy(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
@@ -299,7 +243,7 @@ private fun HomeEmptyState(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Pick a category and run your first study session — your recents and favorites will appear here.",
+            text = stringResource(R.string.home_empty_message),
             style = MaterialTheme.typography.bodyMedium.copy(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
@@ -309,7 +253,7 @@ private fun HomeEmptyState(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = {},
+            onClick = onStartClick,
             shape = RoundedCornerShape(50.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.secondary,
@@ -327,7 +271,7 @@ private fun HomeEmptyState(modifier: Modifier = Modifier) {
                     .size(20.dp),
             )
             Text(
-                text = "Start your first session",
+                text = stringResource(R.string.home_empty_start_button),
                 style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
             )
         }
@@ -413,6 +357,7 @@ private fun HomeContentPreviewHost(state: HomeScreenState) {
             onSubcategoryClick = {},
             onSubcategoryPlayClick = {},
             onRecentClick = {},
+            onBrowseClick = {},
         )
     }
 }

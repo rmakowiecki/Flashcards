@@ -265,6 +265,8 @@ class RatedStudySessionCoordinator @Inject constructor(
     // ids, in routed order.
     private suspend fun load() {
         val sessionStartData = getSessionStartData(setup.subcategoryIds)
+        // Left before the cards arrived: the session already ended on its way to the Summary.
+        if (hasEnded) return
         val flashcards = sessionStartData.flashcardsResult.getOrElse {
             _sessionState.value = RatedSessionStateSnapshot.LoadFailed
             return
@@ -272,6 +274,11 @@ class RatedStudySessionCoordinator @Inject constructor(
         priorProgressByCardId = sessionStartData.priorProgressByCardId
         val cardsById = flashcards.associateBy { it.id }
         val sessionCards = setup.cardIds.mapNotNull(cardsById::get)
+        // Preview drew these ids from the same cards moments ago, so none matching is a load failure too.
+        if (sessionCards.isEmpty()) {
+            _sessionState.value = RatedSessionStateSnapshot.LoadFailed
+            return
+        }
         val previouslyMasteredCardIds = priorProgressByCardId
             .filterValues { it.state == FlashcardStudyProgressState.Mastered }
             .keys
@@ -280,10 +287,9 @@ class RatedStudySessionCoordinator @Inject constructor(
             attemptsLimit = setup.attemptsLimit,
             partialRatingCardRequeueingEnabled = setup.partialRatingCardRequeueingEnabled,
             previouslyMasteredCardIds = previouslyMasteredCardIds,
-            isVoiceAnsweringSession = setup.voiceAnsweringEnabled && sessionCards.isNotEmpty(),
+            isVoiceAnsweringSession = setup.voiceAnsweringEnabled,
         )
         publish()
-        if (sessionCards.isEmpty()) return
         timekeeper.start()
         if (state?.isVoiceAnsweringSession != true) return
         // Preview only starts a voice-answering session with the microphone granted; a session

@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -80,7 +80,7 @@ internal fun FavoritesStep(
                     CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
                 }
                 loadFailed -> FlashcardsEmptyState(
-                    icon = Icons.Default.ErrorOutline,
+                    icon = Icons.Default.CloudOff,
                     title = stringResource(R.string.favorites_load_error_title),
                     supportingText = stringResource(R.string.favorites_load_error_message),
                     modifier = Modifier.fillMaxSize(),

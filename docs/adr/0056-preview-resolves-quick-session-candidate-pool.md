@@ -50,3 +50,12 @@ offline, as Category Details already does. A cache-first read was rejected:
 - Preview owns one more failure mode on the Quick path: the pool fetch. It reuses the existing error state and Retry.
 - Category Details is unchanged.
 - This builds on the Preview screen owning card selection ([ADR-0004](0004-preview-study-session-screen-owns-card-selection.md)) and on the single sort and selection seam ([ADR-0038](0038-one-sort-order-and-flashcard-selection-seam.md)).
+
+## Amendments
+
+**2026-10-03 — `isQuickSession` is now `sourceType`.** The route carries the session's
+`SessionSourceType` (SingleSubcategory, Quick or Custom) instead of a Quick flag, since the session
+records its entry point. Quick with no ids still means "Preview fetches the Category's Subcategories".
+A failed or empty fetch shows the connection error with Retry. A non-Quick route must still carry its
+ids, and Preview uses them as given: Categories and Subcategories are never deleted, so Preview does not
+check that they exist. A Recent replay sends its stored Subcategories.
