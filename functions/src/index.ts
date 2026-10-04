@@ -5,6 +5,7 @@ import { isPremiumUser } from "./lib/entitlement";
 import { transcribeWithElevenLabsScribe } from "./lib/elevenlabs";
 import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
 import { RequestDeadline } from "./lib/requestDeadline";
+import { handleSubmitBugReportCall } from "./lib/submitBugReport";
 import { SubmitStudySessionResult, handleSubmitStudySessionCall } from "./lib/submitStudySession";
 
 admin.initializeApp();
@@ -161,4 +162,13 @@ export const transcribeAndGradeSpokenAnswer = onCall<
  */
 export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResult>>(RUNTIME_OPTIONS, (request) =>
   handleSubmitStudySessionCall(admin.auth(), request),
+);
+
+/**
+ * The sole writer of Bug Reports (ADR-0058): no client can read or write `bugReports` directly. The
+ * wrapper stays thin: the revoked-token guard, validation, the per-User rate limit and the write live
+ * in `lib/submitBugReport.ts`, where they are tested against the emulators. Returns nothing on success.
+ */
+export const submitBugReport = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
+  handleSubmitBugReportCall(admin.auth(), admin.firestore(), request),
 );

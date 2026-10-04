@@ -25,7 +25,7 @@ callable runtime, or the call is rejected `unauthenticated` before any code runs
 ```
 functions/
   package.json / tsconfig.json      — Node 22, TypeScript, strict
-  src/index.ts                      — the 3 exported onCall functions
+  src/index.ts                      — the 4 exported onCall functions
   src/lib/entitlement.ts            — Firestore entitlement read (isPremiumUser)
   src/lib/elevenlabs.ts             — ElevenLabs Scribe STT call
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
@@ -33,6 +33,8 @@ functions/
   src/lib/xpScoring.ts              — pure XP/level calculation, mirrored by the client's SessionXpCalculation.kt
   src/lib/authGuard.ts              — requireActiveSession: revoked/deleted-caller guard for writing callables (ADR-0057)
   src/lib/submitStudySession.ts     — validation + the session-commit transaction
+  src/lib/submitBugReport.ts        — Bug Report validation, per-User rate limit and write (ADR-0058)
+  src/lib/requestValidation.ts      — shared field checks for the callables' request validators
   src/lib/*.test.ts                 — emulator-backed tests for the above (see "Local iteration" below)
 ```
 
@@ -180,6 +182,17 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
     debug-only 🛠️ Voice Debug tab, and test in order: entitlement (no third-party cost) →
     transcribe + sanitize → a real study-session voice answer for the full streaming path.
 
+### `submitBugReport`
+
+The only writer of the top-level `bugReports` collection; security rules deny every client access
+(ADR-0058). `index.ts` only delegates to `src/lib/submitBugReport.ts`, which runs the revoked-token
+guard, validates the request, allows at most 10 reports per uid in a rolling 24 hours
+(`resource-exhausted` past that), then adds the report with the server-set `uid`, `createdAt` and
+`status: "new"`. Returns nothing on success. The rate limit's `count()` query needs the
+`bugReports` (`uid`, `createdAt`) composite index in `../firestore.indexes.json`. That file also lists the
+`subcategories` (`categoryId`, `order`) index already live in production, so it mirrors every deployed
+composite index and an indexes deploy never finds one it doesn't know.
+
 ## Local iteration
 
 - `npm run build:watch` inside `functions/` for a standing `tsc --watch`.
@@ -187,7 +200,7 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
   ADR-0029) — every test against them goes through the real deployed callables via the debug screen.
   The in-app fake/real toggles are gone — the fake now only exists as a unit-test double
   (`core/data/src/test`).
-- `submitStudySession` is the first function with a real local test suite: `npm test`
+- `submitStudySession` and `submitBugReport` have real local test suites: `npm test`
   starts the Firestore and Auth emulators (`firebase emulators:exec`, reusing `../firebase.json`)
   and runs every `src/lib/*.test.ts` file against them with Node's built-in test runner. Tests call
   the lib functions directly rather than going through a running Functions emulator or an `onCall`
