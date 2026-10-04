@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.lifecycle.SavedStateHandle
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
@@ -13,12 +14,14 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
+import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
@@ -61,11 +64,13 @@ class StudySessionSummaryViewModelTest {
     private val scoringStateRepository = FakeScoringStateRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val xpConfigRepository = FakeXpConfigRepository()
+    private val authRepository = FakeAuthRepository()
 
     private fun createViewModel(): StudySessionSummaryViewModel = StudySessionSummaryViewModel(
         savedStateHandle,
         ObserveUserPreferencesUseCase(userPreferencesRepository),
         SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, GetXpConfigUseCase(xpConfigRepository), sessionSubmissionRepository),
+        ObserveAuthUserUseCase(authRepository),
     )
 
     @Before
@@ -484,7 +489,45 @@ class StudySessionSummaryViewModelTest {
             collectJob.cancel()
         }
 
+    @Test
+    fun `the signed-in User's photo and name reach state`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = AUTH_USER
+        stubRoute(ratedRoute())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        with(viewModel.state.value) {
+            photoUrl shouldBe AUTH_USER_PHOTO_URL
+            displayName shouldBe AUTH_USER_DISPLAY_NAME
+        }
+    }
+
+    @Test
+    fun `a null auth emission clears the photo and name`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = AUTH_USER
+        stubRoute(ratedRoute())
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        authRepository.userToReturn = null
+        advanceUntilIdle()
+
+        with(viewModel.state.value) {
+            photoUrl shouldBe null
+            displayName shouldBe null
+        }
+    }
+
     private companion object {
+        const val AUTH_USER_PHOTO_URL = "https://example.com/jane.jpg"
+        const val AUTH_USER_DISPLAY_NAME = "Jane Doe"
+        val AUTH_USER = AuthUser(
+            uid = "uid-1",
+            email = "jane@example.com",
+            displayName = AUTH_USER_DISPLAY_NAME,
+            photoUrl = AUTH_USER_PHOTO_URL,
+        )
         val SERVER_SCORE = SessionScore(
             breakdown = XpBreakdown(
                 newCards = 60,
