@@ -5,6 +5,8 @@ import com.rossomak.flashcards.core.data.mapper.toDomainOrNull
 import com.rossomak.flashcards.core.data.source.RecentsRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.RecentSession
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionResult.Fast as FastSessionResult
+import com.rossomak.flashcards.core.domain.model.SessionResult.Rated as RatedSessionResult
 import com.rossomak.flashcards.core.domain.repository.RecentSessionsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -56,7 +58,7 @@ class DefaultRecentSessionsRepository @Inject constructor(
     }
 
     private fun SessionResult.toRecentSession(xpTotal: Int): RecentSession = when (this) {
-        is SessionResult.Rated -> RecentSession.Rated(
+        is RatedSessionResult -> RecentSession.Rated(
             id = id,
             startedAt = startedAt,
             durationSeconds = durationSeconds,
@@ -69,7 +71,7 @@ class DefaultRecentSessionsRepository @Inject constructor(
             xpTotal = xpTotal,
             voiceAnsweringEnabled = voiceAnsweringEnabled,
         )
-        is SessionResult.Fast -> RecentSession.Fast(
+        is FastSessionResult -> RecentSession.Fast(
             id = id,
             startedAt = startedAt,
             durationSeconds = durationSeconds,

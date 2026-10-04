@@ -190,8 +190,7 @@ class PreviewStudySessionViewModel @Inject constructor(
 
     /**
      * A Quick Session whose pool never loaded has nothing to draw from, so it re-attempts the pool
-     * fetch before drawing. Any other session whose Subcategory check has not succeeded runs it
-     * again in [selectCards]. Every other retry only redoes the draw.
+     * fetch before drawing. Every other retry only redoes the draw.
      */
     fun onRetry() {
         selectCards(resampleQuickSession = route.sourceType == Quick && candidatePool == null)
