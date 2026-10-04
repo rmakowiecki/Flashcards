@@ -27,6 +27,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.syntaxmp)
     implementation(libs.androidsvg)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     // Annotation only on the main compile classpath so components can carry
     // @ShowkaseComposable; SOURCE-retained, so no release-runtime cost. The processor and
     // browser UI stay debug-only.
