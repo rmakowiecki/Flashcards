@@ -208,7 +208,7 @@ pass — are **not** hand-maintained Python dict literals either:
   This also fixes a real bug the first implementation pass had: a plain `set()` (full replace)
   would have silently wiped a category's already-curated `color`/`iconSvg` on every re-seed once
   those fields stopped being part of the Python-derived payload.
-- Backfilling live categories (android/kotlin/python/scientific-python) is now just: add the
+- Backfilling live categories (android/kotlin/python/data-science-python/machine-learning) is now just: add the
   `.svg`/`.color` files under `scripts/seed/assets/category-icons/`, run the seed pipeline — no
   manual Firestore console editing needed. The 4 checked-in `.svg` files were mechanically
   converted 1:1 from the earlier VD-XML assets (`android:pathData` → `d`, `android:fillType` →

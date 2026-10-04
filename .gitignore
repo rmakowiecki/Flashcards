@@ -50,7 +50,7 @@ graphify-out/
 /docs/apple-platforms
 
 # Python bytecode cache
-scripts/__pycache__/
+__pycache__/
 
 # core:voice module build output
 core/voice/build/
