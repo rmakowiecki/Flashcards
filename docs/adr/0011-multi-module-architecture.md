@@ -17,6 +17,7 @@ Portfolio project designed to demonstrate enterprise-grade Android development. 
 | `:feature:study` | `PreviewStudySessionScreen`, `StudySessionScreen`, `SessionSummaryScreen` + VMs | `:core:domain`, `:core:ui` |
 | `:feature:progress` | `ProgressScreen` + VM | `:core:domain`, `:core:ui` |
 | `:feature:settings` | `SettingsScreen` + VM | `:core:domain`, `:core:ui` |
+| `:feature:account` | `AccountScreen` + VM (reached from Settings through a navigation callback wired in `:app`) | `:core:domain`, `:core:ui` |
 | `:core:domain` | models, repository interfaces, use cases — pure Kotlin, no Android deps | nothing |
 | `:core:data` | repository impls, DTOs, mappers, Firestore sources, Hilt bindings | `:core:domain` |
 | `:core:ui` | theme, colors, typography, spacing tokens, shared composables (buttons, cards, chips, etc.) | `:core:domain` |
