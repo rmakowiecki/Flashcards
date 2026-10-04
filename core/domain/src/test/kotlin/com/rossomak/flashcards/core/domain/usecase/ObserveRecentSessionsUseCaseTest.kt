@@ -12,12 +12,19 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import java.time.Instant
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 private const val CATEGORY_ID = "android"
+private const val NEWER_CATEGORY_ID = "algorithms"
 private const val SUBCATEGORY_ID = "compose"
 private const val SESSION_ID = "session"
+private const val NEWER_SESSION_ID = "newer-session"
 
 class ObserveRecentSessionsUseCaseTest {
 
@@ -75,5 +82,23 @@ class ObserveRecentSessionsUseCaseTest {
         recentItems shouldBe listOf(RecentItem(quickSession, category = null))
         coVerify(exactly = 3) { flashcardRepository.fetchCategoriesByIds(setOf(CATEGORY_ID)) }
         coVerify(exactly = 0) { flashcardRepository.fetchSubcategoriesByIds(any()) }
+    }
+
+    @Test
+    fun `a newer list cancels the Category retries of an older one`() = runTest {
+        val newerSession = quickSession.copy(id = NEWER_SESSION_ID, categoryId = NEWER_CATEGORY_ID)
+        val newerCategory = category.copy(id = NEWER_CATEGORY_ID)
+        coEvery { flashcardRepository.fetchCategoriesByIds(setOf(CATEGORY_ID)) } returns
+            Result.failure(IllegalStateException("categories fetch failed"))
+        coEvery { flashcardRepository.fetchCategoriesByIds(setOf(NEWER_CATEGORY_ID)) } returns Result.success(listOf(newerCategory))
+        recentSessionsRepository.setRecentSessions(listOf(quickSession))
+        val emissions = mutableListOf<List<RecentItem>>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { createUseCase()().toList(emissions) }
+        runCurrent()
+
+        recentSessionsRepository.setRecentSessions(listOf(newerSession))
+        advanceUntilIdle()
+
+        emissions shouldBe listOf(listOf(RecentItem(newerSession, newerCategory)))
     }
 }

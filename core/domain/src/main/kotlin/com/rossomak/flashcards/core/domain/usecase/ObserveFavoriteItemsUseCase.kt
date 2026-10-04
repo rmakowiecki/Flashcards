@@ -6,12 +6,9 @@ import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository
 import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-
-private const val FETCH_RETRY_ATTEMPTS = 2
-private const val FETCH_RETRY_BASE_DELAY_MILLIS = 300L
+import kotlinx.coroutines.flow.mapLatest
 
 /**
  * Resolves [UserFavoritesRepository.observeFavorites] ids into full [FavoriteItem]s, sorted
@@ -21,14 +18,16 @@ private const val FETCH_RETRY_BASE_DELAY_MILLIS = 300L
  * behavior, not just the raw ids [UserFavoritesRepository] hands back.
  *
  * A resolution failure for one id type (e.g. offline) degrades to an empty list for that type
- * rather than failing the whole emission.
+ * rather than failing the whole emission. A newer favorites emission cancels the resolution of an
+ * older one, so a slow retry never delays the latest list.
  */
 class ObserveFavoriteItemsUseCase @Inject constructor(
     private val userFavoritesRepository: UserFavoritesRepository,
     private val flashcardRepository: FlashcardRepository,
 ) : NoParamUseCase<Flow<List<FavoriteItem>>> {
+    @OptIn(ExperimentalCoroutinesApi::class)
     override suspend operator fun invoke(): Flow<List<FavoriteItem>> =
-        userFavoritesRepository.observeFavorites().map { favorites ->
+        userFavoritesRepository.observeFavorites().mapLatest { favorites ->
             val subcategories = retryFetch {
                 flashcardRepository.fetchSubcategoriesByIds(favorites.subcategoryIds.keys)
             }
@@ -58,14 +57,4 @@ class ObserveFavoriteItemsUseCase @Inject constructor(
 
             (favoriteCategories + favoriteSubcategories).sortedByDescending { it.favoritedAt }
         }
-
-    // Transient one-shot fetch failures (e.g. reconnect race) get a few bounded retries before
-    // degrading to empty, since unlike observeFavorites() these calls have no listener to retry them.
-    private suspend fun <T> retryFetch(block: suspend () -> Result<List<T>>): List<T> {
-        repeat(FETCH_RETRY_ATTEMPTS) { attempt ->
-            block().getOrNull()?.let { return it }
-            delay(FETCH_RETRY_BASE_DELAY_MILLIS * (attempt + 1))
-        }
-        return block().getOrDefault(emptyList())
-    }
 }
