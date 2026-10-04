@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flashcards Privacy Policy</title>
+  <style>
+    :root { --bg: #ffffff; --fg: #1c1b1f; --muted: #5f5d66; --rule: #e3e1e8; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #141218; --fg: #e6e1e5; --muted: #a8a4ad; --rule: #2e2b33; }
+    }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.8rem; margin-bottom: 4px; }
+    h2 { font-size: 1.2rem; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); }
+    .updated { color: var(--muted); margin-top: 0; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Flashcards Privacy Policy</h1>
+  <p class="updated">Last updated: October 3, 2026</p>
+
+  <p>This policy explains what data the Flashcards Android app ("the app", "we") collects, why, who processes it, and how you can delete it.</p>
+
+  <h2>Data we collect</h2>
+  <ul>
+    <li><strong>Account data.</strong> When you sign in with Google, we receive your Google account's user ID, email address, display name and profile photo URL through Firebase Authentication.</li>
+    <li><strong>Study data.</strong> Your favorites, study sessions (dates, durations, which flashcards you studied and how you rated them), per-flashcard progress, XP, level and streak.</li>
+    <li><strong>Content you create.</strong> Private flashcards you write, and problem reports you submit about flashcards.</li>
+    <li><strong>Voice answers (optional).</strong> Only if you turn on Voice answering. See below.</li>
+  </ul>
+  <p>Some settings, such as your daily goal and study preferences, are stored only on your device.</p>
+  <p>The app does not show ads, does not use analytics or advertising SDKs, and does not sell your data.</p>
+
+  <h2>Voice answering</h2>
+  <p>Voice answering is off by default. When you use it, the app records your spoken answer through the microphone and transforms the voice audio on your device before it leaves the device. The transformed audio is then sent to our server and forwarded to:</p>
+  <ul>
+    <li><strong>ElevenLabs</strong>, which transcribes the audio to text;</li>
+    <li><strong>Google Vertex AI (Gemini)</strong>, which grades the transcript against the flashcard's expected answer.</li>
+  </ul>
+  <p>We do not store your audio or transcripts. Our server discards them once your answer is graded. ElevenLabs and Google process this data under their own terms and privacy policies.</p>
+
+  <h2>How we use data</h2>
+  <ul>
+    <li>To sign you in and keep your study progress across devices.</li>
+    <li>To calculate progress, XP, levels and streaks.</li>
+    <li>To grade spoken answers when you use Voice answering.</li>
+    <li>To fix flashcards you report as having problems.</li>
+  </ul>
+
+  <h2>Where data is stored</h2>
+  <p>Account and study data is stored in Google Firebase (Authentication, Cloud Firestore and Cloud Functions), operated by Google LLC. Data is encrypted in transit.</p>
+
+  <h2>Data retention and deletion</h2>
+  <p>We keep your account and study data for as long as your account exists. You can ask us to delete your account and all associated data by following the steps on our <a href="/delete-account">account deletion page</a>. We delete it within 30 days of your request.</p>
+
+  <h2>Children</h2>
+  <p>The app is not directed at children under 13, and we do not knowingly collect their data.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy changes, we will update this page and the date above.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or deletion requests: <a href="mailto:flashcardsdev@gmail.com">flashcardsdev@gmail.com</a></p>
+</main>
+</body>
+</html>

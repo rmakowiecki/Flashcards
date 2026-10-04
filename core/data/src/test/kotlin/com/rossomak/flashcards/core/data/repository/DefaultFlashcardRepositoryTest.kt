@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.data.repository
 
-import android.util.Log
 import com.rossomak.flashcards.core.data.model.CategoryDto
 import com.rossomak.flashcards.core.data.model.FlashcardDto
 import com.rossomak.flashcards.core.data.model.SubcategoryDto
@@ -9,17 +8,12 @@ import com.rossomak.flashcards.core.data.source.FlashcardRemoteDataSource
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -29,19 +23,6 @@ class DefaultFlashcardRepositoryTest {
 
     private fun createRepository(): DefaultFlashcardRepository =
         DefaultFlashcardRepository(remoteDataSource)
-
-    @Before
-    fun setUp() {
-        // invalidateFlashcardCache() logs via android.util.Log, unavailable outside instrumented/
-        // Robolectric tests — stub it rather than pull in either just for this one call.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(Log::class)
-    }
 
     @Test
     fun `fetchCategories maps dtos to domain in order`() = runTest {

@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.core.data.source
 
 import android.content.Context
-import android.util.Log
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.data.model.PendingFlashcardResultDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
@@ -9,15 +8,11 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.junit.After
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -26,20 +21,6 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
 
     @get:Rule
     val temporaryFolder = TemporaryFolder()
-
-    @Before
-    fun setUp() {
-        // Debug logging and a corrupted queue file both go through android.util.Log, unavailable
-        // outside instrumented/Robolectric tests — stub it rather than pull in either just for this.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.e(any(), any(), any()) } returns 0
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(Log::class)
-    }
 
     private fun createDataSource(): FilePendingSessionSubmissionLocalDataSource {
         val context: Context = mockk()

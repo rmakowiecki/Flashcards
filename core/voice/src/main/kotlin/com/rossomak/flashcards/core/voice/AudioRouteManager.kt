@@ -10,9 +10,10 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.rossomak.flashcards.core.common.logi
+import com.rossomak.flashcards.core.common.logw
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -176,7 +177,7 @@ class AudioRouteManager @Inject constructor(
             releaseBluetoothLink()
             return@withLock CaptureRoute(CaptureRouteType.None)
         }
-        Log.i(TAG, "route resolved -> ${resolved.type} (device=${resolved.device?.type})")
+        logi { "route resolved -> ${resolved.type} (device=${resolved.device?.type})" }
         _route.value = resolved
         resolved
     }
@@ -221,7 +222,7 @@ class AudioRouteManager @Inject constructor(
                 if (settled == true) return true
             }
         }
-        Log.w(TAG, "communication-device handshake failed for type=${target.type}")
+        logw { "communication-device handshake failed for type=${target.type}" }
         return false
     }
 
@@ -357,14 +358,13 @@ class AudioRouteManager @Inject constructor(
             // sets) keeps the same CaptureRouteType but is still a real device change the engine
             // must rebuild its AudioRecord for.
             if (resolved.type != previous.type || resolved.device?.id != previous.device?.id) {
-                Log.i(TAG, "route changed $previous -> $resolved")
+                logi { "route changed $previous -> $resolved" }
                 _routeChanges.emit(Unit)
             }
         }
     }
 
     private companion object {
-        const val TAG = "AudioRouteManager"
         const val HANDSHAKE_TIMEOUT_MS = 3_000L
         const val HANDSHAKE_POLL_MS = 50L
         const val HANDSHAKE_RETRIES = 1

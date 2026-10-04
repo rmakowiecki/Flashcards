@@ -1,6 +1,13 @@
 reviews:
   profile: assertive
   poem: false
+  path_instructions:
+    - path: "**"
+      instructions: >-
+        The app is unreleased and has no production users. Do not ask for migrations,
+        backward compatibility, legacy fallbacks or decoding defaults for persisted or wire
+        formats (local queue files, DataStore, Firestore documents, Cloud Function payloads).
+        Breaking those formats is intended.
   auto_review:
     enabled: true
     base_branches:

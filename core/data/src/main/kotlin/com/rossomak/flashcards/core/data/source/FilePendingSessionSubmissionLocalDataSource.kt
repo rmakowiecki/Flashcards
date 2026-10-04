@@ -1,7 +1,8 @@
 package com.rossomak.flashcards.core.data.source
 
 import android.content.Context
-import android.util.Log
+import com.rossomak.flashcards.core.common.logd
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -89,7 +90,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
         mutex.withLock {
             val queued = readQueuedOrNull(pendingSessionSubmission.id)
             if (queued.orEmpty().any { it.id == pendingSessionSubmission.id }) {
-                Log.d(TAG, "Session ${pendingSessionSubmission.id} is already queued, not appending it again")
+                logd { "Session ${pendingSessionSubmission.id} is already queued, not appending it again" }
                 return@withLock Unit
             }
             // A prior append() can have died mid-write, leaving the file's last byte something other
@@ -103,7 +104,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
                 writer.write(Json.encodeToString(pendingSessionSubmission))
                 writer.newLine()
             }
-            Log.d(TAG, "Appended session ${pendingSessionSubmission.id} to queue file")
+            logd { "Appended session ${pendingSessionSubmission.id} to queue file" }
             if (entries.value != null) entries.value = (queued ?: entries.value.orEmpty()) + pendingSessionSubmission
             Unit
         }
@@ -116,7 +117,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
     private fun readQueuedOrNull(sessionId: String): List<PendingSessionSubmissionDto>? = try {
         readAll()
     } catch (exception: IOException) {
-        Log.e(TAG, "Could not read queue file to check for session $sessionId, appending it regardless", exception)
+        loge(exception) { "Could not read queue file to check for session $sessionId, appending it regardless" }
         null
     }
 
@@ -141,7 +142,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = withContext(Dispatchers.IO) {
         mutex.withLock {
             readAll().also { queued ->
-                Log.d(TAG, "Read queue file: ${queued.size} entries")
+                logd { "Read queue file: ${queued.size} entries" }
                 if (entries.value != null) entries.value = queued
             }
         }
@@ -162,7 +163,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
             val updated = readAll().filterNot { it.id == sessionId }
             writeAll(updated)
             if (entries.value != null) entries.value = updated
-            Log.d(TAG, "Removed session $sessionId from queue file, ${updated.size} entries remain")
+            logd { "Removed session $sessionId from queue file, ${updated.size} entries remain" }
             Unit
         }
     }
@@ -185,7 +186,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
     private fun readAllOrNullForObservers(): List<PendingSessionSubmissionDto>? = try {
         readAll()
     } catch (exception: IOException) {
-        Log.e(TAG, "Could not read queue file for observers, projecting no pending sessions", exception)
+        loge(exception) { "Could not read queue file for observers, projecting no pending sessions" }
         null
     }
 
@@ -206,7 +207,7 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
                 try {
                     Json.decodeFromString<PendingSessionSubmissionDto>(line)
                 } catch (exception: SerializationException) {
-                    Log.e(TAG, "Skipping one corrupted pending session submission queue line", exception)
+                    loge(exception) { "Skipping one corrupted pending session submission queue line" }
                     null
                 }
             }
@@ -226,7 +227,6 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "PendingSessionQueue"
         const val FILE_NAME = "pending_session_submissions.jsonl"
     }
 }
