@@ -33,6 +33,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
@@ -47,6 +49,13 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 /** Share of the avatar's diameter taken by the generic person icon. */
 private const val AVATAR_ICON_FRACTION = 0.6f
 
+/**
+ * Share of the avatar's diameter taken by the initials' font size. Proportional rather than per
+ * size tier, so an avatar scaled to another diameter looks the same as one built at that diameter.
+ * Wide pairs such as "WW" still sit inside the circle at this value.
+ */
+private const val AVATAR_INITIALS_FRACTION = 0.4f
+
 /** Splits a display name into words on any run of whitespace or Unicode separator (NBSP included). */
 private val AVATAR_NAME_WORD_SEPARATOR = Regex("[\\p{Z}\\s]+")
 
@@ -56,6 +65,9 @@ private const val SHOWCASE_BROKEN_PHOTO_URL = "file:///flashcards/missing-avatar
 private const val SHOWCASE_TWO_WORD_NAME = "Jane Doe"
 
 private const val SHOWCASE_ONE_WORD_NAME = "Plato"
+
+/** Initials "WW": the widest pair, to check the text fits the circle at every size. */
+private const val SHOWCASE_WIDE_INITIALS_NAME = "Walter Wallace"
 
 /**
  * Circular user avatar: the [photoUrl] loaded with Coil's default singleton loader and cropped to
@@ -142,12 +154,21 @@ private fun AvatarFallback(
             modifier = Modifier.fillMaxSize(AVATAR_ICON_FRACTION),
         )
     } else {
+        val diameter = size.diameter
         // Initials are decorative and must fit the circle: ignore the user's font scale, which at
-        // large settings would overflow the Small avatar.
+        // large settings would overflow the Small avatar. With fontScale pinned to 1, sp and dp map
+        // one-to-one, so the font size below scales linearly with the diameter.
         CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1f)) {
+            // Line height and letter spacing are reset because their fixed sp values in the base
+            // style would not scale with the diameter.
+            val initialsStyle = MaterialTheme.typography.labelLarge.copy(
+                fontSize = with(LocalDensity.current) { (diameter * AVATAR_INITIALS_FRACTION).toSp() },
+                lineHeight = TextUnit.Unspecified,
+                letterSpacing = 0.sp,
+            )
             Text(
                 text = initials,
-                style = size.initialsStyle,
+                style = initialsStyle,
                 maxLines = 1,
                 softWrap = false,
             )
@@ -178,6 +199,7 @@ private fun AvatarShowcaseMatrix(style: FlashcardsComponentStyle) {
     Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.normal)) {
         AvatarShowcaseRow(photoUrl = null, displayName = SHOWCASE_TWO_WORD_NAME, style = style)
         AvatarShowcaseRow(photoUrl = null, displayName = SHOWCASE_ONE_WORD_NAME, style = style)
+        AvatarShowcaseRow(photoUrl = null, displayName = SHOWCASE_WIDE_INITIALS_NAME, style = style)
         AvatarShowcaseRow(photoUrl = SHOWCASE_BROKEN_PHOTO_URL, displayName = SHOWCASE_TWO_WORD_NAME, style = style)
         AvatarShowcaseRow(photoUrl = null, displayName = null, style = style)
     }
