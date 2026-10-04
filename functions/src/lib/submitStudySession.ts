@@ -4,6 +4,14 @@ import * as logger from "firebase-functions/logger";
 import { CallableRequest, HttpsError } from "firebase-functions/v2/https";
 import { requireActiveSession } from "./authGuard";
 import { CardProgressUpdate, CardState, StudyMode, mergeSessionIntoCardProgress } from "./cardProgressMerge";
+import {
+  fail,
+  requireBoolean,
+  requireFiniteNumber,
+  requireFiniteNumberInRange,
+  requireNonEmptyString,
+  requireStringArray,
+} from "./requestValidation";
 import { loadXpConfig } from "./xpConfig";
 import {
   DEFAULT_SCORING_STATE,
@@ -228,15 +236,6 @@ export type RecentEntry = {
   [FIELD_XP_TOTAL]: number;
 } & SessionDelivery;
 
-function fail(message: string): never {
-  throw new HttpsError("invalid-argument", message);
-}
-
-function requireNonEmptyString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.length === 0) fail(`${field} must be a non-empty string`);
-  return value as string;
-}
-
 // Firestore's own reserved-name rule for both document ids and nested map-field-path segments:
 // a value matching `__.*__` can never be written (Firestore itself throws INVALID_ARGUMENT). Any id
 // this function later uses as a document id (`subcategoryId`) or a nested map key inside a `set`
@@ -281,36 +280,10 @@ function deriveLocalStudyDate(startedAtEpochMillis: number, utcOffsetMinutes: nu
   return `${year}-${month}-${day}`;
 }
 
-function requireFiniteNumberInRange(value: unknown, field: string, minimum: number, maximum: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
-    fail(`${field} must be a number between ${minimum} and ${maximum}`);
-  }
-  return value as number;
-}
-
 function requireFirestoreSafeId(value: unknown, field: string): string {
   const id = requireNonEmptyString(value, field);
   if (RESERVED_FIRESTORE_NAME.test(id) || id.includes("/")) fail(`${field} is not a valid Firestore id: "${id}"`);
   return id;
-}
-
-function requireStringArray(value: unknown, field: string): string[] {
-  if (!Array.isArray(value) || value.length === 0 || !value.every((v) => typeof v === "string" && v.length > 0)) {
-    fail(`${field} must be a non-empty array of non-empty strings`);
-  }
-  return value as string[];
-}
-
-function requireFiniteNumber(value: unknown, field: string, minimum = 0): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum) {
-    fail(`${field} must be a number >= ${minimum}`);
-  }
-  return value as number;
-}
-
-function requireBoolean(value: unknown, field: string): boolean {
-  if (typeof value !== "boolean") fail(`${field} must be a boolean`);
-  return value as boolean;
 }
 
 const VALID_STATES: readonly CardState[] = ["Mastered", "Partial", "Failed", "Seen"];

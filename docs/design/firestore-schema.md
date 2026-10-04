@@ -216,6 +216,21 @@ users/{uid}/curationRequests/{cardId}                       → { subcategoryId:
 
 - **`curationRequests/{cardId}` is a flat collection** keyed by globally-unique cardId. Stores structured content-fix directives raised by any user via the in-session "Report a problem" dialog, consumed by admin sync scripts — not surfaced back to users anywhere in the app. Actions are a map of `CurationAction` string → `{ flaggedAt }`. Doc is deleted when all actions are removed. See [ADR-0017](../adr/0017-curation-report-system.md).
 
+## Bug Reports
+
+```
+bugReports/{reportId}                                 → { uid, description, severity,
+                                                          appVersionName, appVersionCode,
+                                                          deviceModel, androidVersion,
+                                                          createdAt, status }
+// severity: blocker | minor | cosmetic
+// status:   new | triaged | fixed
+```
+
+- **`bugReports` is top-level**, with an auto id and the reporter's `uid` as a field, so every report can be browsed and queried in one place. `androidVersion` is the SDK int.
+- **Written only by the `submitBugReport` Cloud Function**, which validates the report, allows at most 10 per uid in a rolling 24 hours, and sets `uid`, `createdAt` (server timestamp) and `status: "new"` itself ([ADR-0058](../adr/0058-bug-reports-written-only-by-a-callable.md)). The rate limit counts on a composite index over `uid` and `createdAt`.
+- **No client access at all**: security rules deny every read and write, the reporter's own included. The developer, or an investigation agent, moves `status` to `triaged` or `fixed` with the Admin SDK.
+
 ## Offline persistence
 
 - Offline: Firestore Android SDK built-in persistence. No Room needed.

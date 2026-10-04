@@ -1,5 +1,5 @@
 // Firestore Security Rules tests, covering the server-authoritative client-read-only rules (ADR-0049),
-// the recents projection and the server-owned XP configuration.
+// the recents projection, the server-owned XP configuration and the callable-only Bug Reports.
 // Small and standalone on purpose — this is a guard against a specific class of production-only failure
 // (there is no other way to verify a rule without deploying it), not a second test framework for the
 // project. Run via `npm test` in this directory, which starts the Firestore emulator (see
@@ -31,6 +31,11 @@ const xpConfigDoc = { cardMastered: 100 };
 
 /** A minimal, syntactically valid scoring-state document — rules don't inspect its shape. */
 const scoringStateDoc = { xp: 0, level: 1, xpIntoCurrentLevel: 0, currentStreak: 0, bestStreak: 0, lastStudyDate: '', goalMetDate: '' };
+
+const BUG_REPORT_PATH = 'bugReports/report-1';
+
+/** A minimal Bug Report document — rules don't inspect its shape. */
+const bugReportDoc = { uid: OWNER_UID, description: 'The study session froze.', severity: 'minor', status: 'new' };
 
 /** A minimal recents document — rules don't inspect its shape. */
 const recentsStateDoc = { entries: {} };
@@ -281,6 +286,37 @@ describe('config/xp (server-owned XP configuration, client-read-only)', () => {
     await assertFails(setDoc(ownerRef, { ...xpConfigDoc, cardMastered: 1000 }));
     await assertFails(setDoc(otherRef, { ...xpConfigDoc, cardMastered: 1000 }));
     await assertFails(deleteDoc(ownerRef));
+    await assertFails(deleteDoc(unauthRef));
+  });
+});
+
+describe('bugReports/{reportId} (written only by submitBugReport, no client access)', () => {
+  it('the reporting user cannot create, read, update or delete their own report', async () => {
+    const ownerRef = doc(testEnv.authenticatedContext(OWNER_UID).firestore(), BUG_REPORT_PATH);
+
+    await assertFails(setDoc(ownerRef, bugReportDoc));
+
+    await seedAsAdmin(BUG_REPORT_PATH, bugReportDoc);
+    await assertFails(getDoc(ownerRef));
+    await assertFails(setDoc(ownerRef, { ...bugReportDoc, status: 'fixed' }));
+    await assertFails(deleteDoc(ownerRef));
+  });
+
+  it('a different authenticated user cannot read or write it', async () => {
+    await seedAsAdmin(BUG_REPORT_PATH, bugReportDoc);
+    const otherRef = doc(testEnv.authenticatedContext(OTHER_UID).firestore(), BUG_REPORT_PATH);
+
+    await assertFails(getDoc(otherRef));
+    await assertFails(setDoc(otherRef, bugReportDoc));
+    await assertFails(deleteDoc(otherRef));
+  });
+
+  it('an unauthenticated request cannot read or write it', async () => {
+    await seedAsAdmin(BUG_REPORT_PATH, bugReportDoc);
+    const unauthRef = doc(testEnv.unauthenticatedContext().firestore(), BUG_REPORT_PATH);
+
+    await assertFails(getDoc(unauthRef));
+    await assertFails(setDoc(unauthRef, bugReportDoc));
     await assertFails(deleteDoc(unauthRef));
   });
 });
