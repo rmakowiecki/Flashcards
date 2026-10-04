@@ -12,6 +12,8 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -53,6 +55,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = Quick,
         cardResults = listOf(
             FlashcardResult.Rated(
                 cardId = "card-1",
@@ -65,6 +68,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = -300,
+        voiceAnsweringEnabled = true,
     )
 
     private fun fastSessionResult(): SessionResult.Fast = SessionResult.Fast(
@@ -76,10 +80,12 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = Custom,
         cardResults = listOf(FlashcardResult.Fast(cardId = "card-1", subcategoryId = "sub-1", state = FlashcardStudyProgressState.Seen)),
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = -300,
+        readAloudEnabled = true,
     )
 
     @Test
@@ -102,6 +108,9 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         payload["categoryName"] shouldBe session.categoryName
         payload["subcategoryIds"] shouldBe session.subcategoryIds
         payload["subcategoryNames"] shouldBe session.subcategoryNames
+        payload["sourceType"] shouldBe session.sourceType.name
+        payload["voiceAnswering"] shouldBe session.voiceAnsweringEnabled
+        payload.containsKey("readAloud") shouldBe false
         payload["studyDate"] shouldBe session.studyDate
         payload["studyDateUtcOffsetMinutes"] shouldBe session.studyDateUtcOffsetMinutes
         payload["dailyGoalMinutes"] shouldBe session.dailyGoalMinutes
@@ -129,6 +138,20 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val payloadCardResult = (payload["cardResults"] as List<Map<String, Any>>).single()
         payloadCardResult.keys shouldBe setOf("cardId", "subcategoryId", "state")
         payloadCardResult["state"] shouldBe session.cardResults.single().state.name
+    }
+
+    @Test
+    fun `submitSession sends a Fast session's source type and read-aloud setting without voiceAnswering`() = runTest {
+        val session = fastSessionResult()
+        val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
+
+        createApi().submitSession(OWNER_UID, session)
+
+        @Suppress("UNCHECKED_CAST")
+        val payload = payloadSlot.captured as Map<String, Any>
+        payload["sourceType"] shouldBe session.sourceType.name
+        payload["readAloud"] shouldBe session.readAloudEnabled
+        payload.containsKey("voiceAnswering") shouldBe false
     }
 
     @Test

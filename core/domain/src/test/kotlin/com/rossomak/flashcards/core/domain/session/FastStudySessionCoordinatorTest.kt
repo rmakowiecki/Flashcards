@@ -7,6 +7,9 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
@@ -57,6 +60,7 @@ class FastStudySessionCoordinatorTest {
         sessionTitle = "Compose",
         voiceSettings = VoiceSettings(speechRate = SPEECH_RATE),
         readAloudEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private val events = mutableListOf<FastSessionEvent>()
@@ -605,6 +609,30 @@ class FastStudySessionCoordinatorTest {
         result.abandoned shouldBe true
         result.cardResults shouldBe emptyList()
         result.durationSeconds shouldBe 0
+    }
+
+    @Test
+    fun `the ended result carries the setup's source type and read-aloud setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Quick))
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
+        result.sourceType shouldBe Quick
+        result.readAloudEnabled shouldBe true
+    }
+
+    @Test
+    fun `leaving before the cards load still records the setup's source type and read-aloud setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Custom, readAloudEnabled = false), runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
+        result.sourceType shouldBe Custom
+        result.readAloudEnabled shouldBe false
     }
 
     @Test

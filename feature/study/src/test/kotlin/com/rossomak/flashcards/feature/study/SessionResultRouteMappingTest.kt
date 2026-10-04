@@ -3,6 +3,10 @@ package com.rossomak.flashcards.feature.study
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 import org.junit.Test
@@ -33,6 +37,7 @@ class SessionResultRouteMappingTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1", "sub-2"),
         subcategoryNames = listOf("Subcategory 1", "Subcategory 2"),
+        sourceType = Custom,
         cardResults = listOf(
             FlashcardResult.Rated(
                 cardId = "card-1",
@@ -52,6 +57,7 @@ class SessionResultRouteMappingTest {
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
+        voiceAnsweringEnabled = true,
     )
 
     private val fastResult = SessionResult.Fast(
@@ -63,6 +69,7 @@ class SessionResultRouteMappingTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1", "sub-2"),
         subcategoryNames = listOf("Subcategory 1", "Subcategory 2"),
+        sourceType = Quick,
         cardResults = listOf(
             FlashcardResult.Fast(cardId = "card-1", subcategoryId = "sub-1", state = FlashcardStudyProgressState.Seen),
             FlashcardResult.Fast(cardId = "card-2", subcategoryId = "sub-2", state = FlashcardStudyProgressState.Seen),
@@ -70,6 +77,7 @@ class SessionResultRouteMappingTest {
         studyDate = studyDate,
         studyDateUtcOffsetMinutes = studyDateUtcOffsetMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
+        readAloudEnabled = true,
     )
 
     @Test
@@ -93,5 +101,32 @@ class SessionResultRouteMappingTest {
         route.cardAttemptsUsed shouldBe null
         route.cardWasPreviouslyMastered shouldBe null
         route.toSessionResult(dailyGoalMinutes) shouldBe fastResult
+    }
+
+    @Test
+    fun `a Rated SessionResult flattens readAloudEnabled to null`() {
+        val route = ratedResult.toSummaryRoute()
+
+        route.readAloudEnabled shouldBe null
+    }
+
+    @Test
+    fun `a Fast SessionResult flattens voiceAnsweringEnabled to null`() {
+        val route = fastResult.toSummaryRoute()
+
+        route.voiceAnsweringEnabled shouldBe null
+    }
+
+    @Test
+    fun `every source type survives the round trip for both Study Modes`() {
+        SessionSourceType.entries.forEach { sourceType ->
+            val rated = ratedResult.copy(sourceType = sourceType)
+            val fast = fastResult.copy(sourceType = sourceType)
+
+            withClue(sourceType) {
+                rated.toSummaryRoute().toSessionResult(dailyGoalMinutes) shouldBe rated
+                fast.toSummaryRoute().toSessionResult(dailyGoalMinutes) shouldBe fast
+            }
+        }
     }
 }

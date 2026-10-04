@@ -108,12 +108,14 @@ class SessionSubmissionDeliveryWorkerTest {
         categoryName = "Category",
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryIds.map { "Name of $it" },
+        sourceType = "SingleSubcategory",
         cardResults = listOf(
             PendingFlashcardResultDto(cardId = "card-1", subcategoryId = SUBCATEGORY_ID, state = "Mastered", attemptsUsed = 1, wasPreviouslyMastered = false),
         ),
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     private fun functionsException(code: FirebaseFunctionsException.Code): FirebaseFunctionsException {

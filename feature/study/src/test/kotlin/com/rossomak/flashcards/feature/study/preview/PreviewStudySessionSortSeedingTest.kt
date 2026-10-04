@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.study.preview
 
 import androidx.lifecycle.SavedStateHandle
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
@@ -60,6 +61,7 @@ class PreviewStudySessionSortSeedingTest {
         categoryName = "Android",
         subcategoryIds = listOf("android-compose"),
         subcategoryNames = listOf("Compose"),
+        sourceType = SingleSubcategory,
     )
 
     @Before
