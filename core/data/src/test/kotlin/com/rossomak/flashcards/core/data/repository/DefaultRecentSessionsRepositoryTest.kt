@@ -272,7 +272,10 @@ class DefaultRecentSessionsRepositoryTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        verifyReads(projections = 1)
+        // The queue change cancels the projection, possibly before its parallel scoring read starts,
+        // so only the progress read that triggered it is certain.
+        verify(exactly = 1) { remoteDataSource.observeRecents() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
 
     @Test
