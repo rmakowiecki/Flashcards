@@ -1,18 +1,8 @@
 package com.rossomak.flashcards.feature.account
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,40 +11,42 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
+import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
+import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large
+import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
-import kotlin.math.roundToInt
-
-private val AVATAR_SIZE = 88.dp
-private const val MANAGE_LINK_TAG = "manage"
 
 /**
- * The Account screen's top bar. Built by hand because no stock M3 bar fits it: the pinned row (back
- * arrow, Sign out) is [TopAppBarDefaults.LargeAppBarCollapsedHeight] and the block below it is at
- * least [TopAppBarDefaults.LargeAppBarExpandedHeight], the same sizes as a large app bar, but the
- * block holds an avatar beside the name and email, and the "Signed in with Google" line under both,
- * which a large bar's title slot cannot carry.
+ * Collapse fraction by which the email, the Google line and Sign out's label have faded out. Past it
+ * the email and the Google line are neither placed nor announced, which also takes the Manage link
+ * out of reach once it is invisible.
+ */
+private const val DETAILS_FADE_END_FRACTION = 0.5f
+
+/**
+ * The Account screen's top bar. Built by hand because no stock M3 bar lets one avatar and one name
+ * travel from the identity block into the pinned row as it collapses; see [AccountHeaderMeasurePolicy]
+ * for the geometry. It takes the same sizes as a large app bar and is driven by the same
+ * [scrollBehavior], so list scrolling collapses it like one, and it can also be dragged directly.
  *
- * The block translates up under the pinned row as [scrollBehavior] collapses it. It grows past the
- * M3 height rather than clipping when a large font scale needs more room, and the scroll behavior's
- * limit follows the measured height.
+ * Expanded, it shows the avatar beside the name and email, and the "Signed in with Google" line
+ * under both. Collapsed, a smaller avatar and the name sit between the back arrow and Sign out,
+ * which has dropped its label, and everything else has faded away. A null name or email just leaves
+ * its line out.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,148 +58,128 @@ internal fun AccountHeaderBar(
     onSignOutClick: () -> Unit,
     onManageAccountClick: () -> Unit,
 ) {
+    val collapsedFraction = scrollBehavior.state.collapsedFraction
+    val detailsProgress = (1f - collapsedFraction / DETAILS_FADE_END_FRACTION).coerceIn(0f, 1f)
+    val hiddenSemantics = if (detailsProgress > 0f) Modifier else Modifier.clearAndSetSemantics {}
+    val nameStyle = lerp(
+        start = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+        stop = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+        fraction = collapsedFraction,
+    )
+
     Surface(
-        modifier = modifier,
+        modifier = modifier.accountHeaderDrag(scrollBehavior),
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
-        Column(modifier = Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
-            PinnedActionsRow(
-                onNavigateBack = onNavigateBack,
-                onSignOutClick = onSignOutClick,
-            )
-            CollapsingIdentityBlock(
-                state = state,
-                scrollBehavior = scrollBehavior,
-                onManageAccountClick = onManageAccountClick,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PinnedActionsRow(
-    onNavigateBack: () -> Unit,
-    onSignOutClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(TopAppBarDefaults.LargeAppBarCollapsedHeight)
-            .padding(horizontal = MaterialTheme.spacing.xxsmall),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onNavigateBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(CoreUiR.string.common_navigate_back_cd),
-            )
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        FlashcardsTextButton(
-            text = stringResource(R.string.account_sign_out_button),
-            onClick = onSignOutClick,
+        Layout(
+            modifier = Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets),
+            content = {
+                IconButton(
+                    modifier = Modifier.layoutId(AccountHeaderSlot.Back),
+                    onClick = onNavigateBack,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(CoreUiR.string.common_navigate_back_cd),
+                    )
+                }
+                AccountSignOutAction(
+                    modifier = Modifier.layoutId(AccountHeaderSlot.SignOut),
+                    labelProgress = detailsProgress,
+                    onClick = onSignOutClick,
+                )
+                // Decorative: the name beside it already says whose account this is.
+                FlashcardsAvatar(
+                    photoUrl = state.photoUrl,
+                    displayName = state.displayName,
+                    size = Large,
+                    contentDescription = null,
+                    modifier = Modifier.layoutId(AccountHeaderSlot.Avatar),
+                )
+                state.displayName?.let { displayName ->
+                    Text(
+                        text = displayName,
+                        modifier = Modifier.layoutId(AccountHeaderSlot.Name),
+                        style = nameStyle,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // Always composed, even once faded out: dropping them would change the measured block
+                // height mid-collapse and make the name and avatar jump.
+                state.email?.let { email ->
+                    Text(
+                        text = email,
+                        modifier = Modifier
+                            .layoutId(AccountHeaderSlot.Email)
+                            .alpha(detailsProgress)
+                            .then(hiddenSemantics),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                AccountSignedInWithGoogleLine(
+                    modifier = Modifier
+                        .layoutId(AccountHeaderSlot.GoogleLine)
+                        .alpha(detailsProgress)
+                        .then(hiddenSemantics),
+                    onManageAccountClick = onManageAccountClick,
+                )
+            },
+            measurePolicy = AccountHeaderMeasurePolicy(
+                appBarState = scrollBehavior.state,
+                collapsedFraction = collapsedFraction,
+                showDetails = detailsProgress > 0f,
+                avatarCollapsedScale = Small.diameter / Large.diameter,
+                nameLineHeight = MaterialTheme.typography.headlineSmall.lineHeight,
+                spacing = MaterialTheme.spacing,
+            ),
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CollapsingIdentityBlock(
+private fun AccountHeaderBarPreview(
     state: AccountScreenState,
-    scrollBehavior: TopAppBarScrollBehavior,
-    onManageAccountClick: () -> Unit,
+    initialHeightOffset: Float,
 ) {
-    val expandedHeightPx = with(LocalDensity.current) { TopAppBarDefaults.LargeAppBarExpandedHeight.roundToPx() }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(
-                    constraints.copy(minHeight = expandedHeightPx, maxHeight = Constraints.Infinity),
-                )
-                scrollBehavior.state.heightOffsetLimit = -placeable.height.toFloat()
-                val heightOffset = scrollBehavior.state.heightOffset
-                layout(placeable.width, (placeable.height + heightOffset).roundToInt()) {
-                    placeable.place(0, heightOffset.roundToInt())
-                }
-            }
-            .clipToBounds(),
-        contentAlignment = Alignment.Center,
-        propagateMinConstraints = true,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(MaterialTheme.spacing.normal),
-            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.normal),
-            ) {
-                AccountAvatar()
-                Column(modifier = Modifier.weight(1f)) {
-                    state.displayName?.let { displayName ->
-                        Text(
-                            text = displayName,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    state.email?.let { email ->
-                        Text(
-                            text = email,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            SignedInWithGoogleLine(onManageAccountClick = onManageAccountClick)
-        }
+    FlashcardsTheme {
+        AccountHeaderBar(
+            state = state,
+            scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+                rememberTopAppBarState(initialHeightOffset = initialHeightOffset),
+            ),
+            onNavigateBack = {},
+            onSignOutClick = {},
+            onManageAccountClick = {},
+        )
     }
 }
 
-/** Placeholder until the shared avatar component exists: swapping it in is a change to this function only. */
+private val PreviewState = AccountScreenState(
+    displayName = "Radek Makowiecki",
+    email = "radek@example.com",
+)
+
+@PreviewLightDark
 @Composable
-private fun AccountAvatar() {
-    Icon(
-        imageVector = Icons.Filled.AccountCircle,
-        contentDescription = null,
-        modifier = Modifier.size(AVATAR_SIZE),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun AccountHeaderBarExpandedPreview() {
+    AccountHeaderBarPreview(state = PreviewState, initialHeightOffset = 0f)
 }
 
-/** One string with a clickable span, so a screen reader announces a single line with a link in it. */
+/** The offset starts past the end of travel; the header pulls it back to exactly collapsed. */
+@PreviewLightDark
 @Composable
-private fun SignedInWithGoogleLine(onManageAccountClick: () -> Unit) {
-    val signedInLabel = stringResource(R.string.account_signed_in_with_google_label)
-    val separator = stringResource(CoreUiR.string.common_middle_dot_separator)
-    val manageLabel = stringResource(R.string.account_manage_button)
-    val manageStyle = SpanStyle(
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-    )
-    Text(
-        text = buildAnnotatedString {
-            append(signedInLabel)
-            append(separator)
-            withLink(
-                LinkAnnotation.Clickable(
-                    tag = MANAGE_LINK_TAG,
-                    styles = TextLinkStyles(style = manageStyle),
-                    linkInteractionListener = { onManageAccountClick() },
-                ),
-            ) {
-                append(manageLabel)
-            }
-        },
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun AccountHeaderBarCollapsedPreview() {
+    AccountHeaderBarPreview(state = PreviewState, initialHeightOffset = -Float.MAX_VALUE)
+}
+
+@PreviewLightDark
+@Composable
+private fun AccountHeaderBarNoNamePreview() {
+    AccountHeaderBarPreview(state = AccountScreenState(email = "radek@example.com"), initialHeightOffset = 0f)
 }
