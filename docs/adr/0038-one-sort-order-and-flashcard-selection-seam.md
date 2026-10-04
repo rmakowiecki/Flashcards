@@ -68,7 +68,9 @@ cache generation, then serves every read after that from the on-device cache —
 result falling through to the server. That fallback is only sound because of a domain invariant now
 recorded in `CONTEXT.md`: **a Subcategory always contains at least one Flashcard.** Without it, a
 cache miss and a genuinely empty Subcategory are the same value, and the repository would surface
-both as `Result.success(emptyList())`.
+both as `Result.success(emptyList())`. The reverse fallback holds too: a server read that fails, most
+often offline, is answered from the cache when the cache has cards, and the next read tries the
+server again.
 
 Firestore's disk cache outlives the process and the SDK offers no cache-if-fresh-else-server mode
 and no TTL, so freshness policy lives in app code. It is a **cache generation** the repository

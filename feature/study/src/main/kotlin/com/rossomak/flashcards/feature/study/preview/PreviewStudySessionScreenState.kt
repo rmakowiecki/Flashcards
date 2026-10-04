@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.study.preview
 
-import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
@@ -13,7 +12,7 @@ data class PreviewStudySessionScreenState(
     val subcategoryNames: List<String> = emptyList(),
     val sourceType: SessionSourceType = SingleSubcategory,
     val isLoading: Boolean = true,
-    @param:StringRes val error: Int? = null,
+    val isLoadFailed: Boolean = false, // A read failed, most often offline; Retry can recover.
     val config: StudySessionConfig = StudySessionConfig(subcategoryIds = emptyList()),
     val selectedCardCount: Int = 0,
     val estimatedMinutes: Int = 0,
@@ -51,5 +50,5 @@ data class PreviewStudySessionScreenState(
      */
     val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
 
-    val canStart: Boolean get() = !isLoading && error == null && selectedCardCount > 0
+    val canStart: Boolean get() = !isLoading && !isLoadFailed && selectedCardCount > 0
 }

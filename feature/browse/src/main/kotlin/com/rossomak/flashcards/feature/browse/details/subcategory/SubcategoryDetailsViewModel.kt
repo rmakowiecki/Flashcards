@@ -14,6 +14,7 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveSubcategoryFavoriteSta
 import com.rossomak.flashcards.core.domain.usecase.PinSubcategoryShortcutUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SetSubcategoryFavoriteUseCase
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.composables.dialogs.selectAllTags
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -21,7 +22,6 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
-import com.rossomak.flashcards.feature.browse.R
 import com.rossomak.flashcards.feature.browse.details.DetailsMessage
 import com.rossomak.flashcards.feature.browse.details.DetailsMessage.AddedToFavorites
 import com.rossomak.flashcards.feature.browse.details.DetailsMessage.RemovedFromFavorites
@@ -228,7 +228,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
                 .onFailure {
                     _state.update {
                         it.copy(
-                            content = SubcategoryDetailsContentState.Error(R.string.subcategory_details_load_error_message),
+                            content = SubcategoryDetailsContentState.Error(CoreUiR.string.common_flashcards_load_error_message),
                         )
                     }
                 }

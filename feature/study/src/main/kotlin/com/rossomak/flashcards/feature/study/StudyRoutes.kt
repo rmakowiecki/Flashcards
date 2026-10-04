@@ -32,6 +32,8 @@ import kotlinx.serialization.Serializable
  * nullability is load-bearing: a non-null field could not tell a deliberate
  * [FlashcardSortOrder.Default] apart from an absent choice, and the Quick Session path from Category
  * Details genuinely has no list behind it to inherit an order from (ADR-0038).
+ * @param studyMode, [voiceAnsweringEnabled] and [readAloudEnabled]: a replay's starting values, for this
+ * session only. Like [sortOrder], null means the saved default.
  */
 @Serializable
 data class PreviewStudySessionRoute(
@@ -44,6 +46,9 @@ data class PreviewStudySessionRoute(
     val difficultyMax: Int = StudySessionConfig.MAX_DIFFICULTY,
     val sortOrder: FlashcardSortOrder? = null,
     val sourceType: SessionSourceType,
+    val studyMode: StudyMode? = null,
+    val voiceAnsweringEnabled: Boolean? = null,
+    val readAloudEnabled: Boolean? = null,
 ) {
     val difficultyRange: IntRange get() = difficultyMin..difficultyMax
 }
