@@ -9,6 +9,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState.See
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
 import io.kotest.matchers.shouldBe
@@ -183,6 +184,7 @@ class SessionScoringTest {
         categoryName = "Category",
         subcategoryIds = listOf(SUBCATEGORY_ID),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cards.map { card ->
             FlashcardResult.Rated(
                 cardId = card.cardId,
@@ -195,6 +197,7 @@ class SessionScoringTest {
         studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = DAILY_GOAL_MINUTES,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastSession(vararg cardIds: String) = SessionResult.Fast(
@@ -206,10 +209,12 @@ class SessionScoringTest {
         categoryName = "Category",
         subcategoryIds = listOf(SUBCATEGORY_ID),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardIds.map { cardId -> FlashcardResult.Fast(cardId = cardId, subcategoryId = SUBCATEGORY_ID, state = Seen) },
         studyDate = STUDY_DATE,
         studyDateUtcOffsetMinutes = 0,
         dailyGoalMinutes = DAILY_GOAL_MINUTES,
+        readAloudEnabled = false,
     )
 
     private companion object {

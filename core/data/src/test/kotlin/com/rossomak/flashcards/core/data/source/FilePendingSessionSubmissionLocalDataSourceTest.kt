@@ -38,12 +38,14 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = "SingleSubcategory",
         cardResults = listOf(
             PendingFlashcardResultDto(cardId = "card-1", subcategoryId = "sub-1", state = "Mastered", attemptsUsed = 1, wasPreviouslyMastered = false),
         ),
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     @Test

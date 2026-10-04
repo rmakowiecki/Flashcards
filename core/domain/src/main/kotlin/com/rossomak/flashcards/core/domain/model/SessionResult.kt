@@ -58,7 +58,8 @@ sealed interface FlashcardResult {
  * has no Terminal States to produce. [mode] is deliberately not a stored field on either
  * variant — a stored `mode` alongside the sealed branch would be a second discriminant that could
  * disagree with the branch itself; it is derived from `this` instead, so there is exactly one source
- * of truth for which mode a result belongs to.
+ * of truth for which mode a result belongs to. Delivery follows the same rule: [Rated.voiceAnsweringEnabled]
+ * and [Fast.readAloudEnabled] each exist only on their own mode's variant, never as a `false` on the other.
  */
 sealed interface SessionResult {
     /** the session's identity, generated when the session starts. */
@@ -81,6 +82,9 @@ sealed interface SessionResult {
 
     /** carried alongside their ids, same reason as [categoryName] (ADR-0014). */
     val subcategoryNames: List<String>
+
+    /** how the session was created (its Study Creation entry point), set before Preview and carried unchanged. */
+    val sourceType: SessionSourceType
 
     /** one [FlashcardResult] per Studied card. */
     val cardResults: List<FlashcardResult>
@@ -122,6 +126,7 @@ sealed interface SessionResult {
     /** How many cards were Studied. Both variants report this. */
     val studiedCount: Int get() = cardResults.size
 
+    /** @param voiceAnsweringEnabled whether the session ran with Voice Answering, as chosen on Preview. */
     data class Rated(
         override val id: String,
         override val startedAt: Instant,
@@ -131,10 +136,12 @@ sealed interface SessionResult {
         override val categoryName: String,
         override val subcategoryIds: List<String>,
         override val subcategoryNames: List<String>,
+        override val sourceType: SessionSourceType,
         override val cardResults: List<FlashcardResult.Rated>,
         override val studyDate: String,
         override val studyDateUtcOffsetMinutes: Int,
         override val dailyGoalMinutes: Int,
+        val voiceAnsweringEnabled: Boolean,
     ) : SessionResult {
         /**
          * The three Terminal State counts below are *derived* from [cardResults] rather than stored
@@ -148,6 +155,7 @@ sealed interface SessionResult {
         val failedCount: Int get() = cardResults.count { it.state == FlashcardStudyProgressState.Failed }
     }
 
+    /** @param readAloudEnabled whether the session ran with read-aloud, as chosen on Preview. */
     data class Fast(
         override val id: String,
         override val startedAt: Instant,
@@ -157,9 +165,11 @@ sealed interface SessionResult {
         override val categoryName: String,
         override val subcategoryIds: List<String>,
         override val subcategoryNames: List<String>,
+        override val sourceType: SessionSourceType,
         override val cardResults: List<FlashcardResult.Fast>,
         override val studyDate: String,
         override val studyDateUtcOffsetMinutes: Int,
         override val dailyGoalMinutes: Int,
+        val readAloudEnabled: Boolean,
     ) : SessionResult
 }

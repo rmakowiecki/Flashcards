@@ -13,6 +13,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
@@ -91,6 +94,7 @@ private fun NavHostController.navigateToPreviewStudySession(
             categoryName = categoryName,
             subcategoryIds = listOf(subcategoryId),
             subcategoryNames = listOf(subcategoryName),
+            sourceType = SingleSubcategory,
         )
     )
 }
@@ -106,7 +110,7 @@ private fun NavHostController.navigateToPreviewQuickSession(categoryId: String, 
             categoryName = categoryName,
             subcategoryIds = emptyList(),
             subcategoryNames = emptyList(),
-            isQuickSession = true,
+            sourceType = Quick,
         )
     )
 }
@@ -135,6 +139,7 @@ private fun NavHostController.navigateToPreviewStudySessionWithSelection(
             difficultyMin = difficultyRange.first,
             difficultyMax = difficultyRange.last,
             sortOrder = sortOrder,
+            sourceType = SingleSubcategory,
         )
     )
 }
@@ -144,10 +149,10 @@ private fun NavHostController.navigateToPreviewStudySessionWithSelection(
  * Subcategory list as the *candidate pool*, and the Preview screen samples a bounded subset from it
  * (ADR-0040) rather than starting a session across all of them. A caller without the list can
  * leave the ids empty and let the Preview screen fetch the pool itself (ADR-0056). **Custom** hands
- * over exactly the Subcategories the user selected, and [isQuickSession] is `false`, so the Preview
- * screen honours them literally rather than sampling. Either way — unlike [navigateToPreviewStudySession] — the
- * subcategories pass through as the lists the route already models rather than wrapping a single
- * one.
+ * over exactly the Subcategories the user selected, as [sourceType] Custom (or SingleSubcategory
+ * for a one-Subcategory selection), so the Preview screen honours them literally rather than
+ * sampling. Either way — unlike [navigateToPreviewStudySession] — the subcategories pass through as
+ * the lists the route already models rather than wrapping a single one.
  *
  * It also passes no sort order: there is no browsed card list behind either entry point, so the
  * route carries null and the Preview screen falls back to the user's saved default (ADR-0038).
@@ -157,7 +162,7 @@ private fun NavHostController.navigateToPreviewStudySessionForCategory(
     categoryName: String,
     subcategoryIds: List<String>,
     subcategoryNames: List<String>,
-    isQuickSession: Boolean,
+    sourceType: SessionSourceType,
 ) {
     navigate(
         PreviewStudySessionRoute(
@@ -165,7 +170,7 @@ private fun NavHostController.navigateToPreviewStudySessionForCategory(
             categoryName = categoryName,
             subcategoryIds = subcategoryIds,
             subcategoryNames = subcategoryNames,
-            isQuickSession = isQuickSession,
+            sourceType = sourceType,
         )
     )
 }

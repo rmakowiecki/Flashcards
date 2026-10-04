@@ -9,6 +9,9 @@ import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Denied
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.Granted
 import com.rossomak.flashcards.core.domain.model.PermissionStatus.PermanentlyDenied
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
@@ -104,18 +107,20 @@ class PreviewStudySessionViewModelTest {
         categoryName = categoryName,
         subcategoryIds = listOf(subcategoryId),
         subcategoryNames = listOf(subcategoryName),
+        sourceType = SingleSubcategory,
     )
 
     private val multiSubcategoryRoute = singleSubcategoryRoute.copy(
         subcategoryIds = listOf("android-compose", "android-coroutines"),
         subcategoryNames = listOf("Compose", "Coroutines"),
+        sourceType = Custom,
     )
 
     /** More candidates than [StudySessionConfig.DEFAULT_SUBCATEGORY_COUNT_RANGE]'s maximum. */
     private val quickSessionRoute = singleSubcategoryRoute.copy(
         subcategoryIds = (1..8).map { index -> "android-sub-$index" },
         subcategoryNames = (1..8).map { index -> "Sub $index" },
-        isQuickSession = true,
+        sourceType = Quick,
     )
 
     /** What Home hands Preview: the Category id alone, no pool. */
@@ -855,6 +860,39 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
+    fun `onStartSession carries the route's source type on the Rated route`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(quickSessionRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onStartSession()
+
+        viewModel.events.test {
+            val destination = awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            destination.route.sourceType shouldBe Quick
+        }
+    }
+
+    @Test
+    fun `onStartSession carries the route's source type on the Fast route`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(multiSubcategoryRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onDialogEvent(Open(SessionMode(draftState = StudyMode.Fast)))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+        viewModel.onStartSession()
+
+        viewModel.events.test {
+            val destination = awaitItem() as PreviewStudySessionDestination.FastStudySession
+            destination.route.sourceType shouldBe Custom
+        }
+    }
+
+    @Test
     fun `onStartSession carries the confirmed voice settings and label on the route`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(singleSubcategoryRoute)
         flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
@@ -983,7 +1021,7 @@ class PreviewStudySessionViewModelTest {
 
     @Test
     fun `quick session on a single subcategory can still reshuffle subcategories`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(singleSubcategoryRoute.copy(isQuickSession = true))
+        stubRoute(singleSubcategoryRoute.copy(sourceType = Quick))
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -1130,7 +1168,7 @@ class PreviewStudySessionViewModelTest {
     @Test
     fun `a single subcategory quick session samples the same one subcategory`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            stubRoute(singleSubcategoryRoute.copy(isQuickSession = true))
+            stubRoute(singleSubcategoryRoute.copy(sourceType = Quick))
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -1244,7 +1282,7 @@ class PreviewStudySessionViewModelTest {
 
     @Test
     fun `a non quick route without subcategory ids is rejected`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(poolLessQuickSessionRoute.copy(isQuickSession = false))
+        stubRoute(poolLessQuickSessionRoute.copy(sourceType = Custom))
 
         shouldThrow<IllegalArgumentException> { createViewModel() }
     }

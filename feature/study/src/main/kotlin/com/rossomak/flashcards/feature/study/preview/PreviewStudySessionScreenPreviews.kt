@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.feature.study.R
@@ -167,7 +168,7 @@ private fun PreviewStudySessionQuickSessionPreview() {
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
             subcategoryNames = listOf("Compose", "Coroutines", "Architecture", "Testing", "Navigation"),
-            isQuickSession = true,
+            sourceType = Quick,
             isLoading = false,
             selectedCardCount = 20,
             estimatedMinutes = 13,
