@@ -11,4 +11,34 @@
 
     <string name="favorites_subcategory_progress_label">%1$d%% studied</string>
     <string name="favorites_subcategory_play_cd">Start session, %1$s</string>
+
+    <string name="recents_section_title">Recently studied</string>
+
+    <plurals name="recents_quick_session_topics">
+        <item quantity="one">Quick session · %d topic</item>
+        <item quantity="other">Quick session · %d topics</item>
+    </plurals>
+    <plurals name="recents_custom_session_topics">
+        <item quantity="one">Custom session · %d topic</item>
+        <item quantity="other">Custom session · %d topics</item>
+    </plurals>
+
+    <plurals name="recents_card_count">
+        <item quantity="one">%d card</item>
+        <item quantity="other">%d cards</item>
+    </plurals>
+    <string name="recents_duration_label">%1$d min</string>
+    <string name="recents_duration_under_minute_label">&lt;1 min</string>
+    <string name="recents_xp_label">%1$s XP</string>
+
+    <string name="recents_time_just_now_label">Just now</string>
+    <string name="recents_time_minutes_ago_label">%1$dm ago</string>
+    <string name="recents_time_hours_ago_label">%1$dh ago</string>
+    <string name="recents_time_yesterday_label">Yesterday</string>
+    <string name="recents_time_days_ago_label">%1$dd ago</string>
+
+    <string name="recents_rated_mode_cd">Rated</string>
+    <string name="recents_fast_mode_cd">Fast</string>
+    <string name="recents_voice_answering_cd">Voice answering</string>
+    <string name="recents_read_aloud_cd">Read aloud</string>
 </resources>

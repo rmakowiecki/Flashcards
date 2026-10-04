@@ -12,7 +12,7 @@ import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepositor
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
@@ -98,7 +98,7 @@ class HomeViewModelTest {
     private fun HomeViewModel.favoritesStates(): Flow<HomeFavoritesState> = state.map { it.favorites }.distinctUntilChanged()
 
     @Test
-    fun `favorites start Loading and become Content without passing through Empty`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites start Loading and become Content without passing through Hidden`() = runTest(mainDispatcherRule.testDispatcher) {
         favorite(COMPOSE_ID)
         val viewModel = createViewModel()
 
@@ -111,18 +111,18 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `favorites become Empty when the User has none`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites become Hidden when the User has none`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Empty
+        viewModel.state.value.favorites shouldBe Hidden
     }
 
     @Test
-    fun `favorites move from Empty to Content when the first Favorite is added`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites move from Hidden to Content when the first Favorite is added`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.favorites shouldBe Empty
+        viewModel.state.value.favorites shouldBe Hidden
 
         favorite(COMPOSE_ID)
         advanceUntilIdle()
@@ -164,7 +164,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `favorites move from Content to Empty when the last Favorite is removed`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites move from Content to Hidden when the last Favorite is removed`() = runTest(mainDispatcherRule.testDispatcher) {
         favorite(COMPOSE_ID)
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -172,7 +172,7 @@ class HomeViewModelTest {
         unfavorite(COMPOSE_ID)
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Empty
+        viewModel.state.value.favorites shouldBe Hidden
     }
 
     @Test
@@ -232,14 +232,14 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `a failing favorites flow turns Loading into Empty`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failing favorites flow turns Loading into Hidden`() = runTest(mainDispatcherRule.testDispatcher) {
         userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
 
         val viewModel = createViewModel()
         viewModel.state.value.favorites shouldBe Loading
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Empty
+        viewModel.state.value.favorites shouldBe Hidden
     }
 
     @Test
