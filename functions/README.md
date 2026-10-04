@@ -25,7 +25,7 @@ callable runtime, or the call is rejected `unauthenticated` before any code runs
 ```
 functions/
   package.json / tsconfig.json      — Node 22, TypeScript, strict
-  src/index.ts                      — the 4 exported onCall functions
+  src/index.ts                      — the 5 exported onCall functions
   src/lib/entitlement.ts            — Firestore entitlement read (isPremiumUser)
   src/lib/elevenlabs.ts             — ElevenLabs Scribe STT call
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
@@ -34,6 +34,7 @@ functions/
   src/lib/authGuard.ts              — requireActiveSession: revoked/deleted-caller guard for writing callables (ADR-0057)
   src/lib/submitStudySession.ts     — validation + the session-commit transaction
   src/lib/submitBugReport.ts        — Bug Report validation, per-User rate limit and write (ADR-0058)
+  src/lib/deleteAccount.ts          — Account Deletion: Bug Reports, users/{uid} and the Auth user, in a retryable order (ADR-0059)
   src/lib/requestValidation.ts      — shared field checks for the callables' request validators
   src/lib/*.test.ts                 — emulator-backed tests for the above (see "Local iteration" below)
 ```
@@ -192,6 +193,15 @@ guard, validates the request, allows at most 10 reports per uid in a rolling 24 
 `bugReports` (`uid`, `createdAt`) composite index in `../firestore.indexes.json`. That file also lists the
 `subcategories` (`categoryId`, `order`) index already live in production, so it mirrors every deployed
 composite index and an indexes deploy never finds one it doesn't know.
+
+### `deleteAccount`
+
+Account Deletion (ADR-0059). Takes no payload and returns nothing. `index.ts` only delegates to
+`src/lib/deleteAccount.ts`, which runs the revoked-token guard, then in order: deletes the caller's Bug
+Reports and recursively deletes `users/{uid}`, revokes their refresh tokens, repeats both deletes to
+sweep anything a submission that passed the guard just before revocation wrote, and deletes the Auth
+user. Every step is idempotent. Errors: `unauthenticated` from the guard, otherwise `internal`, logged
+with the uid and the failed step.
 
 ## Local iteration
 

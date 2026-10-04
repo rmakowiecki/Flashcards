@@ -4,6 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import { isPremiumUser } from "./lib/entitlement";
 import { transcribeWithElevenLabsScribe } from "./lib/elevenlabs";
 import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
+import { handleDeleteAccountCall } from "./lib/deleteAccount";
 import { RequestDeadline } from "./lib/requestDeadline";
 import { handleSubmitBugReportCall } from "./lib/submitBugReport";
 import { SubmitStudySessionResult, handleSubmitStudySessionCall } from "./lib/submitStudySession";
@@ -171,4 +172,14 @@ export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResu
  */
 export const submitBugReport = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
   handleSubmitBugReportCall(admin.auth(), admin.firestore(), request),
+);
+
+/**
+ * Account Deletion (ADR-0059): erases the caller's Bug Reports, everything under `users/{uid}` and
+ * their Auth user. Takes no payload and returns nothing. The wrapper stays thin: the revoked-token
+ * guard and the ordered, retryable deletion steps live in `lib/deleteAccount.ts`, where they are tested
+ * against the emulators.
+ */
+export const deleteAccount = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
+  handleDeleteAccountCall(admin.auth(), admin.firestore(), request),
 );
