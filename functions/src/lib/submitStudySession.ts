@@ -1,5 +1,5 @@
-import * as admin from "firebase-admin";
 import { Auth } from "firebase-admin/auth";
+import { FieldValue, Firestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { CallableRequest, HttpsError } from "firebase-functions/v2/https";
 import { requireActiveSession } from "./authGuard";
@@ -432,7 +432,7 @@ function recentsStateDocRef(db: FirebaseFirestore.Firestore, uid: string): Fireb
 // An entry whose startTimestamp is missing or malformed sorts as the oldest, so it is evicted first.
 function startMillisOf(entry: RecentEntry | undefined): number {
   const startTimestamp = entry?.[FIELD_START_TIMESTAMP];
-  return startTimestamp instanceof admin.firestore.Timestamp ? startTimestamp.toMillis() : Number.NEGATIVE_INFINITY;
+  return startTimestamp instanceof Timestamp ? startTimestamp.toMillis() : Number.NEGATIVE_INFINITY;
 }
 
 /**
@@ -580,8 +580,7 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  *    a retry uses. `recents/state` is read in this same transaction, so overwriting it whole loses no
  *    concurrent update.
  */
-export async function submitStudySession(uid: string, request: ValidatedSubmitStudySessionRequest): Promise<SubmitStudySessionResult> {
-  const db = admin.firestore();
+export async function submitStudySession(db: Firestore, uid: string, request: ValidatedSubmitStudySessionRequest): Promise<SubmitStudySessionResult> {
   const sessionRef = sessionDocRef(db, uid, request.sessionId);
 
   // A plain read outside the transaction: the configuration is admin-edited, not part of this
@@ -654,7 +653,7 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
     );
     const xpForNextLevel = levelThreshold(config, newScoringState.level);
 
-    const startTimestamp = admin.firestore.Timestamp.fromMillis(request.startedAtEpochMillis);
+    const startTimestamp = Timestamp.fromMillis(request.startedAtEpochMillis);
     const sessionFields: Record<string, unknown> = {
       [FIELD_SESSION_ID]: request.sessionId,
       [FIELD_START_TIMESTAMP]: startTimestamp,
@@ -704,8 +703,8 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
         [FIELD_CARDS]: Object.fromEntries(
           [...cardUpdates].map(([cardId, update]) => {
             const entryFields: Record<string, unknown> = { [FIELD_STATE]: update.state };
-            if (update.stampFirstStudied) entryFields[FIELD_FIRST_STUDIED_AT] = admin.firestore.FieldValue.serverTimestamp();
-            if (update.stampMastered) entryFields[FIELD_MASTERED_AT] = admin.firestore.FieldValue.serverTimestamp();
+            if (update.stampFirstStudied) entryFields[FIELD_FIRST_STUDIED_AT] = FieldValue.serverTimestamp();
+            if (update.stampMastered) entryFields[FIELD_MASTERED_AT] = FieldValue.serverTimestamp();
             return [cardId, entryFields];
           }),
         ),
@@ -718,8 +717,8 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
         [...summaryDeltas].map(([subcategoryId, delta]) => [
           subcategoryId,
           {
-            [FIELD_MASTERED_COUNT]: admin.firestore.FieldValue.increment(delta.masteredDelta),
-            [FIELD_STUDIED_COUNT]: admin.firestore.FieldValue.increment(delta.studiedDelta),
+            [FIELD_MASTERED_COUNT]: FieldValue.increment(delta.masteredDelta),
+            [FIELD_STUDIED_COUNT]: FieldValue.increment(delta.studiedDelta),
           },
         ]),
       );
@@ -756,9 +755,9 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
  * commits it. Lives here rather than in `index.ts` so the guard's place in front of every write is
  * tested, not just assumed.
  */
-export async function handleSubmitStudySessionCall(auth: Auth, request: Pick<CallableRequest<unknown>, "auth" | "data">): Promise<SubmitStudySessionResult> {
+export async function handleSubmitStudySessionCall(auth: Auth, db: Firestore, request: Pick<CallableRequest<unknown>, "auth" | "data">): Promise<SubmitStudySessionResult> {
   const uid = await requireActiveSession(auth, request);
   const validated = validateSubmitStudySessionRequest(request.data);
   requireOwnerMatchesCaller(uid, validated);
-  return submitStudySession(uid, validated);
+  return submitStudySession(db, uid, validated);
 }

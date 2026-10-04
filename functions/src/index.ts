@@ -161,7 +161,7 @@ export const transcribeAndGradeSpokenAnswer = onCall<
  * directly without going through this `onCall` wrapper.
  */
 export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResult>>(RUNTIME_OPTIONS, (request) =>
-  handleSubmitStudySessionCall(admin.auth(), request),
+  handleSubmitStudySessionCall(admin.auth(), admin.firestore(), request),
 );
 
 /**
