@@ -109,6 +109,7 @@ dependencies {
     implementation(project(":feature:browse"))
     implementation(project(":feature:study"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:account"))
     debugImplementation(project(":feature:debug"))
     "profilingImplementation"(project(":feature:debug"))
     implementation(libs.androidx.core.ktx)
