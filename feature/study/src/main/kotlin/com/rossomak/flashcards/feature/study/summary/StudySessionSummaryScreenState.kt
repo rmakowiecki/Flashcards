@@ -17,6 +17,9 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
  * list with the animated pour, against content this makes real for the first time.
  *
  * [levelsCrossed] is carried for a Level-up celebration and not rendered yet.
+ *
+ * [photoUrl]/[displayName] are the signed-in User's avatar source for the Level card. Both are null
+ * until the auth user arrives, and again whenever there is no signed-in User.
  */
 data class StudySessionSummaryScreenState(
     val mode: StudyMode = StudyMode.Rated,
@@ -33,4 +36,6 @@ data class StudySessionSummaryScreenState(
     val xpIntoCurrentLevel: Long = 0,
     val xpForNextLevel: Long = 0,
     val levelsCrossed: List<Int> = emptyList(),
+    val photoUrl: String? = null,
+    val displayName: String? = null,
 )
