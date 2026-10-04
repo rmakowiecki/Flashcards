@@ -46,6 +46,14 @@ service cloud.firestore {
       allow read: if true;
     }
 
+    // bugReports/{reportId}: Bug Reports, top-level with the reporter's uid as a field. Written only by
+    // the `submitBugReport` Cloud Function (Admin SDK, bypasses these rules), which validates and
+    // rate-limits them (ADR-0058). Every client read and write is denied, the reporter's own included;
+    // the explicit `if false` documents that intent (a match body cannot be empty).
+    match /bugReports/{reportId} {
+      allow read, write: if false;
+    }
+
     match /users/{uid} {
       match /curationRequests/{requestId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
