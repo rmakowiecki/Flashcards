@@ -148,10 +148,14 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
    npx firebase-tools functions:artifacts:setpolicy
    ```
 
-8. **Firestore rules.** `firestore.rules` at the repo root is deployed via:
+8. **Firestore rules and indexes.** `firestore.rules` and `firestore.indexes.json` at the repo root
+   are deployed via:
    ```
-   npx firebase-tools deploy --only firestore:rules
+   npx firebase-tools deploy --only firestore:rules,firestore:indexes
    ```
+   Index builds are asynchronous: wait until every index shows `Enabled` in the Firebase console
+   (Firestore → Indexes) before sending traffic to `submitBugReport`, whose rate-limit `count()`
+   query fails with `FAILED_PRECONDITION` until its composite index is ready.
    **Read `docs/adr/0024`'s Consequences section before touching this file.** Any new collection
    needs its own explicit `match` block or it default-denies. Confirm real Firestore paths by
    grepping `core/data/.../source/*.kt` for `.collection(...)` before writing a rule.
