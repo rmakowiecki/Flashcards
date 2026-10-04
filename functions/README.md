@@ -31,6 +31,7 @@ functions/
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
   src/lib/httpError.ts              — HttpError(statusCode, message) thrown by elevenlabs/grading libs
   src/lib/xpScoring.ts              — pure XP/level calculation, mirrored by the client's SessionXpCalculation.kt
+  src/lib/authGuard.ts              — requireActiveSession: revoked/deleted-caller guard for writing callables (ADR-0057)
   src/lib/submitStudySession.ts     — validation + the session-commit transaction
   src/lib/*.test.ts                 — emulator-backed tests for the above (see "Local iteration" below)
 ```
@@ -80,14 +81,18 @@ Server-authoritative session commit. Replaces the client-side write path
 the client submits what happened during a session, and this function alone computes and writes its
 XP, level and progress. Named "submit", not "report" — this codebase's curation feature already owns
 "report" for a flagged-content signal, so a finished session is submitted, never reported. `index.ts`
-only checks auth and delegates; the real logic lives in `src/lib/submitStudySession.ts` (the
-transaction) and `src/lib/xpScoring.ts` (the pure XP/level calculation, mirrored by the
+only delegates; the real logic lives in `src/lib/submitStudySession.ts` (the revoked-token guard
+from `src/lib/authGuard.ts`, then validation and the transaction) and `src/lib/xpScoring.ts` (the pure XP/level calculation, mirrored by the
 client's `calculateSessionXp` in `SessionXpCalculation.kt`).
 
 Everything happens in one Firestore transaction, keyed for idempotency on the client-generated
 `sessionId`: if `sessions/{sessionId}` already exists, the call is a no-op that returns the same
 result again — safe for the client's own at-least-once retry queue to call
 freely. See `submitStudySession`'s own doc comment in that file for the full read/write shape.
+
+Before anything else it rejects, with `unauthenticated`, a caller whose tokens were revoked or whose
+Auth user was deleted or disabled (ADR-0057). The client's delivery worker treats that code as
+transient and keeps the session queued.
 
 ## One-time setup (from a clean checkout)
 
@@ -183,14 +188,14 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
   The in-app fake/real toggles are gone — the fake now only exists as a unit-test double
   (`core/data/src/test`).
 - `submitStudySession` is the first function with a real local test suite: `npm test`
-  starts a Firestore emulator (`firebase emulators:exec`, reusing `../firebase.json`) and runs every
-  `src/lib/*.test.ts` file against it with Node's built-in test runner. It calls
-  `submitStudySession`/`validateSubmitStudySessionRequest` directly rather than going through a
-  running Functions emulator or an `onCall` HTTP round trip — no Auth emulator or token minting
-  needed, since the `onCall` wrapper's own auth check is a single trivial guard in `index.ts`.
-  `npm run test:unit` runs the same suite against whatever Firestore emulator is already listening
-  on port 8080 (handy for repeated runs while iterating, instead of paying emulator startup cost
-  every time).
+  starts the Firestore and Auth emulators (`firebase emulators:exec`, reusing `../firebase.json`)
+  and runs every `src/lib/*.test.ts` file against them with Node's built-in test runner. Tests call
+  the lib functions directly rather than going through a running Functions emulator or an `onCall`
+  HTTP round trip. The revoked-token guard reads real user records from the Auth emulator, but the
+  tests build the decoded-token request `onCall` would pass, so no token minting is needed.
+  `npm run test:unit` runs the same suite against whatever emulators are already listening on ports
+  8080 (Firestore) and 9099 (Auth), handy for repeated runs while iterating, instead of paying
+  emulator startup cost every time.
 
 ## Redeploying after a code change
 

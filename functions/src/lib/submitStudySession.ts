@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
+import { Auth } from "firebase-admin/auth";
 import * as logger from "firebase-functions/logger";
-import { HttpsError } from "firebase-functions/v2/https";
+import { CallableRequest, HttpsError } from "firebase-functions/v2/https";
+import { requireActiveSession } from "./authGuard";
 import { CardProgressUpdate, CardState, StudyMode, mergeSessionIntoCardProgress } from "./cardProgressMerge";
 import { loadXpConfig } from "./xpConfig";
 import {
@@ -773,4 +775,17 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
 
     return resultFromSessionDocument(sessionFields);
   });
+}
+
+/**
+ * The whole `submitStudySession` callable, minus the `onCall` wrapper: rejects an inactive caller
+ * ([requireActiveSession]) before anything else, then validates the payload, checks its owner and
+ * commits it. Lives here rather than in `index.ts` so the guard's place in front of every write is
+ * tested, not just assumed.
+ */
+export async function handleSubmitStudySessionCall(auth: Auth, request: Pick<CallableRequest<unknown>, "auth" | "data">): Promise<SubmitStudySessionResult> {
+  const uid = await requireActiveSession(auth, request);
+  const validated = validateSubmitStudySessionRequest(request.data);
+  requireOwnerMatchesCaller(uid, validated);
+  return submitStudySession(uid, validated);
 }

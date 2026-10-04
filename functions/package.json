@@ -11,8 +11,8 @@
     "build:watch": "tsc --watch",
     "deploy": "npm run build && firebase deploy --only functions",
     "pretest": "npm run build",
-    "test:unit": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node --test $(find lib -name '*.test.js')",
-    "test": "firebase emulators:exec --project flashcards-functions-test --only firestore --config ../firebase.json \"npm run test:unit\""
+    "test:unit": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node --test $(find lib -name '*.test.js')",
+    "test": "firebase emulators:exec --project flashcards-functions-test --only firestore,auth --config ../firebase.json \"npm run test:unit\""
   },
   "dependencies": {
     "@google-cloud/vertexai": "^1.9.0",
