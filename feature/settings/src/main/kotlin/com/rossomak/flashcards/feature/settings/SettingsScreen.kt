@@ -3,7 +3,6 @@ package com.rossomak.flashcards.feature.settings
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,7 +16,6 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +47,6 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
-import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.dialogs.partialRatingCardRequeueingLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.readAloudLabel
@@ -62,7 +59,6 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.settings.SettingsDialog.DailyStudyGoal
 import com.rossomak.flashcards.feature.settings.SettingsDialog.FastSessionReadAloud
@@ -74,7 +70,6 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 import com.rossomak.flashcards.feature.settings.SettingsMessage.SaveFailed
 import kotlinx.coroutines.launch
 
@@ -83,15 +78,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     onNavigateToAccount: () -> Unit,
-    onNavigateToLogin: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-
-    observeAsEvents(viewModel.events) { destination ->
-        when (destination) {
-            SettingsDestination.Login -> onNavigateToLogin()
-        }
-    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -117,9 +105,8 @@ fun SettingsScreen(
 
 /**
  * Every row is the same shape — a committed value, a chevron, and a dialog that edits it — so the
- * screen is two [FlashcardsListGroup]s of [FlashcardsListGroupItem.Row]s and nothing else. Sign out
- * is the one action, and it lives in the app bar rather than as a row at the bottom of a list of
- * preferences, where it would read as one more setting.
+ * screen is two [FlashcardsListGroup]s of [FlashcardsListGroupItem.Row]s and nothing else. The app
+ * bar carries the one action, the avatar that opens the Account screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,10 +131,6 @@ private fun SettingsContent(
             MediumFlexibleTopAppBar(
                 title = { Text(text = stringResource(R.string.settings_title)) },
                 actions = {
-                    SignOutAction(
-                        isSigningOut = state.isSigningOut,
-                        onClick = { onDialogEvent(Open(SignOut)) },
-                    )
                     AccountAction(
                         photoUrl = state.avatarPhotoUrl,
                         displayName = state.avatarDisplayName,
@@ -204,30 +187,6 @@ private fun AccountAction(photoUrl: String?, displayName: String?, onClick: () -
             displayName = displayName,
             size = FlashcardsAvatarSize.Small,
             contentDescription = null,
-        )
-    }
-}
-
-/**
- * Swaps the label for a spinner while sign-out is in flight rather than only disabling it: the
- * request can outlive a slow network round-trip, and a greyed-out label does not say why.
- */
-@Composable
-private fun SignOutAction(isSigningOut: Boolean, onClick: () -> Unit) {
-    if (isSigningOut) {
-        val description = stringResource(R.string.settings_signing_out_cd)
-        CircularProgressIndicator(
-            modifier = Modifier
-                .padding(end = MaterialTheme.spacing.normal)
-                .size(MaterialTheme.sizes.inlineProgress)
-                .semantics { contentDescription = description },
-            strokeWidth = MaterialTheme.sizes.inlineProgressStroke,
-        )
-    } else {
-        FlashcardsTextButton(
-            text = stringResource(R.string.settings_sign_out_button),
-            onClick = onClick,
-            contentColor = MaterialTheme.colorScheme.error,
         )
     }
 }

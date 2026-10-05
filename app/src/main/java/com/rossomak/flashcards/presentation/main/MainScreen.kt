@@ -147,7 +147,6 @@ fun MainScreen(
         readAloudEnabled: Boolean?,
     ) -> Unit,
     onNavigateToAccount: () -> Unit,
-    onNavigateToLogin: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
 ) {
     val tabs = mainTabs()
@@ -223,7 +222,6 @@ fun MainScreen(
                 composable<SettingsRoot> {
                     SettingsScreen(
                         onNavigateToAccount = onNavigateToAccount,
-                        onNavigateToLogin = onNavigateToLogin,
                     )
                 }
             }

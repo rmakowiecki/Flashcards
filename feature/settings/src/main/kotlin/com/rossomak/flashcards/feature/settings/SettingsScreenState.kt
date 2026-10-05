@@ -35,7 +35,6 @@ data class SettingsScreenState(
     val voiceId: String? = null,
     /** Null when no voice is saved or its label is still being resolved. */
     val voiceLabel: VoiceLabel? = null,
-    val isSigningOut: Boolean = false,
     val avatarPhotoUrl: String? = null,
     val avatarDisplayName: String? = null,
     val activeDialog: SettingsDialog? = null,

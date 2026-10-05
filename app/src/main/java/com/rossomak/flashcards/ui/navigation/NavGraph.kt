@@ -345,11 +345,6 @@ fun FlashcardsNavGraph(
                         onNavigateToAccount = {
                             navController.navigate(AccountRoute) { launchSingleTop = true }
                         },
-                        onNavigateToLogin = {
-                            navController.navigate(AuthRoute) {
-                                popUpTo(Main) { inclusive = true }
-                            }
-                        },
                         onNavigateToOnboarding = {
                             navController.navigate(OnboardingRoute) {
                                 popUpTo(Main) { inclusive = true }

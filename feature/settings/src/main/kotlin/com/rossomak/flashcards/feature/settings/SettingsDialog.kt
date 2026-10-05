@@ -36,6 +36,4 @@ sealed interface SettingsDialog {
      * voice cache plus this session's current settings, neither of which the row has, so the ViewModel always replaces what it is handed here.
      */
     data class SessionVoiceSettings(val draftState: VoiceSettingsDraftState = VoiceSettingsDraftState()) : SettingsDialog
-
-    data object SignOut : SettingsDialog
 }
