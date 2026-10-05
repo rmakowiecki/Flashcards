@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="account_sign_out_button">Sign out</string>
+    <string name="account_sign_out_dialog_title">Sign out?</string>
+    <string name="account_sign_out_dialog_message">Your progress is saved to your account. Sign in again to pick up where you left off.</string>
     <string name="account_signed_in_with_google_label">Signed in with Google</string>
     <string name="account_manage_button">Manage</string>
     <string name="account_manage_failed_message">Couldn\'t open the link</string>

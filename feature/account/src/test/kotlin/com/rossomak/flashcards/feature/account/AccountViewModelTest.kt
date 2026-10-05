@@ -4,10 +4,18 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
+import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -21,9 +29,11 @@ class AccountViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val authRepository = FakeAuthRepository()
+    private val signOutUseCase: SignOutUseCase = mockk()
 
-    private fun createViewModel(): AccountViewModel = AccountViewModel(
+    private fun createViewModel(signOutUseCaseOverride: SignOutUseCase = signOutUseCase): AccountViewModel = AccountViewModel(
         observeAuthUser = ObserveAuthUserUseCase(authRepository),
+        signOutUseCase = signOutUseCaseOverride,
     )
 
     private fun authUser(
@@ -95,6 +105,92 @@ class AccountViewModelTest {
             viewModel.onManageAccountFailed()
 
             awaitItem() shouldBe ManageAccountFailed
+        }
+    }
+
+    @Test
+    fun `opening the sign out dialog shows it`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(SignOut))
+
+        viewModel.state.value.activeDialog shouldBe SignOut
+    }
+
+    @Test
+    fun `dismissing the sign out dialog does not sign out`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Dismiss)
+        advanceUntilIdle()
+
+        viewModel.state.value.activeDialog shouldBe null
+        coVerify(exactly = 0) { signOutUseCase() }
+    }
+
+    @Test
+    fun `confirming sign out signs out and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { signOutUseCase() } returns Unit
+
+        val viewModel = createViewModel()
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.events.test {
+            awaitItem() shouldBe AccountDestination.Login
+        }
+        viewModel.state.value.activeDialog shouldBe null
+        coVerify(exactly = 1) { signOutUseCase() }
+    }
+
+    @Test
+    fun `confirming sign out emits Login even when sign-out fails`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { signOutUseCase() } throws RuntimeException("remote sign-out failed")
+
+        val viewModel = createViewModel()
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.events.test {
+            awaitItem() shouldBe AccountDestination.Login
+        }
+        coVerify(exactly = 1) { signOutUseCase() }
+    }
+
+    @Test
+    fun `confirming sign out twice emits only one navigation event`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { signOutUseCase() } returns Unit
+
+        val viewModel = createViewModel()
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            awaitItem() shouldBe AccountDestination.Login
+            expectNoEvents()
+        }
+        coVerify(exactly = 1) { signOutUseCase() }
+    }
+
+    @Test
+    fun `signing out keeps the last user in the state`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel(signOutUseCaseOverride = SignOutUseCase(authRepository))
+        authRepository.userToReturn = authUser()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+
+        authRepository.userToReturn shouldBe null
+        viewModel.state.assertValue {
+            displayName shouldBe USER_NAME
+            email shouldBe USER_EMAIL
+            photoUrl shouldBe USER_PHOTO_URL
         }
     }
 

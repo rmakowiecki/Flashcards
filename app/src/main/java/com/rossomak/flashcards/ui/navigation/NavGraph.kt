@@ -311,6 +311,11 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
     composable<AccountRoute> {
         AccountScreen(
             onNavigateBack = { navController.popBackStack() },
+            onNavigateToLogin = {
+                navController.navigate(AuthRoute) {
+                    popUpTo(Main) { inclusive = true }
+                }
+            },
         )
     }
 }
