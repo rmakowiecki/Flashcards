@@ -16,6 +16,9 @@ import com.rossomak.flashcards.core.domain.model.VoiceLabel
  * the real value in memory by the time this screen is reached (`SplashViewModel` reads the same
  * store on every cold start).
  *
+ * [avatarPhotoUrl] and [avatarDisplayName] are the signed-in User's profile, for the app bar avatar. They
+ * stay null until the first emission and keep the last User once signed out.
+ *
  * [speechRate], [voiceId] and [voiceLabel] mirror `StudySessionPreferences.voiceSettings`.
  */
 data class SettingsScreenState(
@@ -33,5 +36,7 @@ data class SettingsScreenState(
     /** Null when no voice is saved or its label is still being resolved. */
     val voiceLabel: VoiceLabel? = null,
     val isSigningOut: Boolean = false,
+    val avatarPhotoUrl: String? = null,
+    val avatarDisplayName: String? = null,
     val activeDialog: SettingsDialog? = null,
 )
