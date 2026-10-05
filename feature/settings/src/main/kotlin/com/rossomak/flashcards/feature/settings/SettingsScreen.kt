@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Layers
@@ -19,6 +20,8 @@ import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
@@ -39,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -73,10 +77,13 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 import com.rossomak.flashcards.feature.settings.SettingsMessage.SaveFailed
 import kotlinx.coroutines.launch
 
+private val ACCOUNT_ICON_SIZE = 32.dp
+
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
+    onNavigateToAccount: () -> Unit,
     onNavigateToLogin: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -105,6 +112,7 @@ fun SettingsScreen(
         state = state,
         snackbarHostState = snackbarHostState,
         onDialogEvent = viewModel::onDialogEvent,
+        onAccountClick = onNavigateToAccount,
     )
 }
 
@@ -121,6 +129,7 @@ private fun SettingsContent(
     state: SettingsScreenState,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onDialogEvent: (SettingsDialogEvent) -> Unit,
+    onAccountClick: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
@@ -140,6 +149,7 @@ private fun SettingsContent(
                         isSigningOut = state.isSigningOut,
                         onClick = { onDialogEvent(Open(SignOut)) },
                     )
+                    AccountAction(onClick = onAccountClick)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -169,6 +179,18 @@ private fun SettingsContent(
                 items = voiceRows(state, onDialogEvent),
             )
         }
+    }
+}
+
+/** Placeholder until the shared avatar component exists: swapping it in is a change to this function only. */
+@Composable
+private fun AccountAction(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = Icons.Filled.AccountCircle,
+            contentDescription = stringResource(R.string.settings_account_cd),
+            modifier = Modifier.size(ACCOUNT_ICON_SIZE),
+        )
     }
 }
 
@@ -318,6 +340,7 @@ private fun SettingsContentPreview() {
         SettingsContent(
             state = SettingsScreenState(),
             onDialogEvent = {},
+            onAccountClick = {},
         )
     }
 }

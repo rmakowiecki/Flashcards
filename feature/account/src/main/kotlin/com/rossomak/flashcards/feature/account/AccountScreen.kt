@@ -1,0 +1,277 @@
+package com.rossomak.flashcards.feature.account
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
+import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
+import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
+import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsRowTrailingValue
+import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.spacing
+
+@Composable
+fun AccountScreen(
+    modifier: Modifier = Modifier,
+    viewModel: AccountViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // An empty sealed interface cannot be matched exhaustively, so each variant added to
+    // AccountDestination turns this body into a `when (destination)`.
+    observeAsEvents(viewModel.events) { _ -> }
+
+    // Each variant added to AccountMessage turns this body into a `when (message)` mapping it to a
+    // string and showing it with `snackbarHostState.showSnackbar(...)` in a coroutine launched on
+    // `rememberCoroutineScope()`.
+    observeAsEvents(viewModel.messages) { _ -> }
+
+    AccountContent(
+        modifier = modifier,
+        state = state,
+        snackbarHostState = snackbarHostState,
+        onNavigateBack = onNavigateBack,
+        onDialogEvent = viewModel::onDialogEvent,
+        onSignOutClick = {},
+        onManageAccountClick = {},
+        onContactSupportClick = {},
+        onReportBugClick = {},
+        onPrivacyPolicyClick = {},
+        onOpenSourceLicensesClick = {},
+        onAppVersionClick = {},
+        onDeleteAccountClick = {},
+    )
+}
+
+@Suppress("LongParameterList")
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountContent(
+    modifier: Modifier = Modifier,
+    state: AccountScreenState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onNavigateBack: () -> Unit,
+    onDialogEvent: (AccountDialogEvent) -> Unit,
+    onSignOutClick: () -> Unit,
+    onManageAccountClick: () -> Unit,
+    onContactSupportClick: () -> Unit,
+    onReportBugClick: () -> Unit,
+    onPrivacyPolicyClick: () -> Unit,
+    onOpenSourceLicensesClick: () -> Unit,
+    onAppVersionClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit,
+) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+
+    AccountDialogHost(
+        activeDialog = state.activeDialog,
+        onDialogEvent = onDialogEvent,
+    )
+
+    Scaffold(
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            AccountHeaderBar(
+                state = state,
+                scrollBehavior = scrollBehavior,
+                onNavigateBack = onNavigateBack,
+                onSignOutClick = onSignOutClick,
+                onManageAccountClick = onManageAccountClick,
+            )
+        },
+    ) { innerPadding ->
+        val scrollState = rememberScrollState()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .flashcardsScrollFade(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = MaterialTheme.spacing.small),
+        ) {
+            FlashcardsOverlineLabel(text = stringResource(R.string.account_support_label))
+            FlashcardsListGroup(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+                items = supportRows(
+                    onContactSupportClick = onContactSupportClick,
+                    onReportBugClick = onReportBugClick,
+                ),
+            )
+
+            FlashcardsOverlineLabel(text = stringResource(R.string.account_about_label))
+            FlashcardsListGroup(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+                items = aboutRows(
+                    state = state,
+                    onPrivacyPolicyClick = onPrivacyPolicyClick,
+                    onOpenSourceLicensesClick = onOpenSourceLicensesClick,
+                    onAppVersionClick = onAppVersionClick,
+                ),
+            )
+
+            FlashcardsOverlineLabel(text = stringResource(R.string.account_danger_zone_label))
+            FlashcardsListGroup(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
+                items = dangerZoneRows(onDeleteAccountClick = onDeleteAccountClick),
+            )
+        }
+    }
+}
+
+@Composable
+private fun supportRows(
+    onContactSupportClick: () -> Unit,
+    onReportBugClick: () -> Unit,
+): List<FlashcardsListGroupItem> = listOf(
+    FlashcardsListGroupItem.Row(
+        title = stringResource(R.string.account_contact_support_label),
+        onClick = onContactSupportClick,
+        leading = { FlashcardsIconTile(icon = Icons.Default.Email, contentDescription = null) },
+        trailing = { FlashcardsChevron() },
+    ),
+    FlashcardsListGroupItem.Row(
+        title = stringResource(R.string.account_report_bug_label),
+        onClick = onReportBugClick,
+        leading = { FlashcardsIconTile(icon = Icons.Default.BugReport, contentDescription = null) },
+        trailing = { FlashcardsChevron() },
+    ),
+)
+
+@Composable
+private fun aboutRows(
+    state: AccountScreenState,
+    onPrivacyPolicyClick: () -> Unit,
+    onOpenSourceLicensesClick: () -> Unit,
+    onAppVersionClick: () -> Unit,
+): List<FlashcardsListGroupItem> = listOf(
+    FlashcardsListGroupItem.Row(
+        title = stringResource(R.string.account_privacy_policy_label),
+        onClick = onPrivacyPolicyClick,
+        leading = { FlashcardsIconTile(icon = Icons.Default.PrivacyTip, contentDescription = null) },
+        trailing = { ExternalLinkIcon() },
+    ),
+    FlashcardsListGroupItem.Row(
+        title = stringResource(R.string.account_open_source_licenses_label),
+        onClick = onOpenSourceLicensesClick,
+        leading = { FlashcardsIconTile(icon = Icons.Default.Code, contentDescription = null) },
+        trailing = { FlashcardsChevron() },
+    ),
+    FlashcardsListGroupItem.Row(
+        title = stringResource(R.string.account_app_version_label),
+        onClick = onAppVersionClick,
+        leading = { FlashcardsIconTile(icon = Icons.Default.Info, contentDescription = null) },
+        trailing = state.appVersionLabel?.let { versionLabel -> { FlashcardsRowTrailingValue(text = versionLabel) } },
+    ),
+)
+
+@Composable
+private fun dangerZoneRows(onDeleteAccountClick: () -> Unit): List<FlashcardsListGroupItem> = listOf(
+    FlashcardsListGroupItem.Custom(
+        onClick = onDeleteAccountClick,
+        content = {
+            FlashcardsIconTile(
+                icon = Icons.Default.DeleteForever,
+                contentDescription = null,
+                contentColor = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                text = stringResource(R.string.account_delete_account_button),
+                modifier = Modifier.padding(start = MaterialTheme.spacing.xxsmall),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+    ),
+)
+
+/** Decorative: the row is the labeled, clickable node, and the system browser opens from it. */
+@Composable
+private fun ExternalLinkIcon() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun AccountContentPreview() {
+    FlashcardsTheme {
+        AccountContent(
+            state = AccountScreenState(
+                displayName = "Ross Smith",
+                email = "ross.smith@example.com",
+                appVersionLabel = "1.4.0 (142)",
+            ),
+            onNavigateBack = {},
+            onDialogEvent = {},
+            onSignOutClick = {},
+            onManageAccountClick = {},
+            onContactSupportClick = {},
+            onReportBugClick = {},
+            onPrivacyPolicyClick = {},
+            onOpenSourceLicensesClick = {},
+            onAppVersionClick = {},
+            onDeleteAccountClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AccountContentEmptyPreview() {
+    FlashcardsTheme {
+        AccountContent(
+            state = AccountScreenState(),
+            onNavigateBack = {},
+            onDialogEvent = {},
+            onSignOutClick = {},
+            onManageAccountClick = {},
+            onContactSupportClick = {},
+            onReportBugClick = {},
+            onPrivacyPolicyClick = {},
+            onOpenSourceLicensesClick = {},
+            onAppVersionClick = {},
+            onDeleteAccountClick = {},
+        )
+    }
+}

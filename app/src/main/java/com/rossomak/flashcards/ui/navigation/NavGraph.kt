@@ -21,6 +21,8 @@ import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
+import com.rossomak.flashcards.feature.account.AccountRoute
+import com.rossomak.flashcards.feature.account.AccountScreen
 import com.rossomak.flashcards.feature.auth.AuthRoute
 import com.rossomak.flashcards.feature.auth.LoginScreen
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
@@ -305,6 +307,14 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
     }
 }
 
+private fun NavGraphBuilder.accountDestination(navController: NavHostController) {
+    composable<AccountRoute> {
+        AccountScreen(
+            onNavigateBack = { navController.popBackStack() },
+        )
+    }
+}
+
 @Composable
 fun FlashcardsNavGraph(
     navController: NavHostController,
@@ -327,6 +337,9 @@ fun FlashcardsNavGraph(
                 // opaquely — see the comment on Splash.
                 composable<Main>(enterTransition = { EnterTransition.None }) {
                     MainScreen(
+                        onNavigateToAccount = {
+                            navController.navigate(AccountRoute) { launchSingleTop = true }
+                        },
                         onNavigateToLogin = {
                             navController.navigate(AuthRoute) {
                                 popUpTo(Main) { inclusive = true }
@@ -346,6 +359,7 @@ fun FlashcardsNavGraph(
                         onNavigateToPreviewRecentSession = navController::navigateToPreviewRecentSession,
                     )
                 }
+                accountDestination(navController)
                 composable<CategoryDetailsRoute> {
                     CategoryDetailsScreen(
                         onNavigateBack = { navController.popBackStack() },
