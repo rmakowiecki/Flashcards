@@ -1,6 +1,8 @@
 package com.rossomak.flashcards.feature.account
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -16,9 +18,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 @HiltViewModel
-class AccountViewModel @Inject constructor() : ViewModel() {
+class AccountViewModel @Inject constructor(
+    private val getAppVersion: GetAppVersionUseCase,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(AccountScreenState())
     val state: StateFlow<AccountScreenState> = _state.asStateFlow()
@@ -28,6 +33,13 @@ class AccountViewModel @Inject constructor() : ViewModel() {
 
     private val _messages = MutableSharedFlow<AccountMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<AccountMessage> = _messages.asSharedFlow()
+
+    init {
+        viewModelScope.launch {
+            val appVersion = getAppVersion()
+            _state.update { it.copy(appVersion = appVersion) }
+        }
+    }
 
     /** Single entry point for every dialog on this screen. */
     fun onDialogEvent(event: AccountDialogEvent) {
