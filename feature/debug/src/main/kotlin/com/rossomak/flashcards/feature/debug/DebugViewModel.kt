@@ -4,20 +4,36 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenOnboarding
+import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class DebugViewModel @Inject constructor(
+    private val getAppVersion: GetAppVersionUseCase,
     private val saveUserPreference: SaveUserPreferenceUseCase,
 ) : ViewModel() {
 
+    private val _state = MutableStateFlow(DebugScreenState())
+    val state: StateFlow<DebugScreenState> = _state.asStateFlow()
+
     private val eventChannel = Channel<DebugDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
+
+    init {
+        viewModelScope.launch {
+            val appVersion = getAppVersion()
+            _state.update { it.copy(appVersion = appVersion) }
+        }
+    }
 
     /**
      * Clears the completion flag before navigating, so the flow behaves exactly as it does for a
