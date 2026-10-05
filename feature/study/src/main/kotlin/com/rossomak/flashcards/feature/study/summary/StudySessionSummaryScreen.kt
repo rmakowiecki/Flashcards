@@ -334,6 +334,8 @@ fun StudySessionSummaryContent(
                         xpIntoCurrentLevel = state.xpIntoCurrentLevel,
                         xpForNextLevel = state.xpForNextLevel,
                         progress = if (levelBarFilled) targetProgress else 0f,
+                        photoUrl = state.photoUrl,
+                        displayName = state.displayName,
                         modifier = Modifier.fillMaxWidth(),
                         style = FlashcardsComponentStyle.OnGradient,
                     )
