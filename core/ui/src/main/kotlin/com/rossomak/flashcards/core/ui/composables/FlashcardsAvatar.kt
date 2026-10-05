@@ -59,16 +59,6 @@ private const val AVATAR_INITIALS_FRACTION = 0.4f
 /** Splits a display name into words on any run of whitespace or Unicode separator (NBSP included). */
 private val AVATAR_NAME_WORD_SEPARATOR = Regex("[\\p{Z}\\s]+")
 
-/** A URL no loader can resolve offline, to showcase the failed-load fallback. */
-private const val SHOWCASE_BROKEN_PHOTO_URL = "file:///flashcards/missing-avatar.jpg"
-
-private const val SHOWCASE_TWO_WORD_NAME = "Jane Doe"
-
-private const val SHOWCASE_ONE_WORD_NAME = "Plato"
-
-/** Initials "WW": the widest pair, to check the text fits the circle at every size. */
-private const val SHOWCASE_WIDE_INITIALS_NAME = "Walter Wallace"
-
 /**
  * Circular user avatar: the [photoUrl] loaded with Coil's default singleton loader and cropped to
  * the circle, else the initials of [displayName] (see [avatarInitials]), else a generic person icon.
@@ -197,10 +187,12 @@ private fun String.firstLetterUppercased(): String = substring(0, offsetByCodePo
 @Composable
 private fun AvatarShowcaseMatrix(style: FlashcardsComponentStyle) {
     Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.normal)) {
-        AvatarShowcaseRow(photoUrl = null, displayName = SHOWCASE_TWO_WORD_NAME, style = style)
-        AvatarShowcaseRow(photoUrl = null, displayName = SHOWCASE_ONE_WORD_NAME, style = style)
-        AvatarShowcaseRow(photoUrl = null, displayName = SHOWCASE_WIDE_INITIALS_NAME, style = style)
-        AvatarShowcaseRow(photoUrl = SHOWCASE_BROKEN_PHOTO_URL, displayName = SHOWCASE_TWO_WORD_NAME, style = style)
+        AvatarShowcaseRow(photoUrl = null, displayName = "Jane Doe", style = style)
+        AvatarShowcaseRow(photoUrl = null, displayName = "Plato", style = style)
+        // Initials "WW": the widest pair, to check the text fits the circle at every size.
+        AvatarShowcaseRow(photoUrl = null, displayName = "Walter Wallace", style = style)
+        // A URL no loader can resolve offline, to showcase the failed-load fallback.
+        AvatarShowcaseRow(photoUrl = "file:///flashcards/missing-avatar.jpg", displayName = "Jane Doe", style = style)
         AvatarShowcaseRow(photoUrl = null, displayName = null, style = style)
     }
 }

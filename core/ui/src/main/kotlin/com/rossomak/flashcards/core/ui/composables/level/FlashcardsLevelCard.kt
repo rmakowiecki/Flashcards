@@ -41,8 +41,6 @@ import com.rossomak.flashcards.core.ui.theme.spacing
  */
 private const val LEVEL_CARD_MUTED_TEXT_ALPHA = 0.7f
 
-private const val SHOWCASE_DISPLAY_NAME = "Jane Doe"
-
 /**
  * The account-wide "current level" card: the signed-in User's [FlashcardsAvatar] beside their level
  * number and XP progress. There is no rank/tier pill (BRONZE/SILVER/GOLD) at all, not even a stub —
@@ -168,7 +166,7 @@ fun FlashcardsLevelCardShowcase() {
                 xpForNextLevel = 6_000L,
                 progress = 2_300f / 6_000f,
                 photoUrl = null,
-                displayName = SHOWCASE_DISPLAY_NAME,
+                displayName = "Jane Doe",
                 modifier = Modifier.padding(MaterialTheme.spacing.normal),
             )
         }
@@ -191,7 +189,7 @@ fun FlashcardsLevelCardOnGradientShowcase() {
                 xpForNextLevel = 5_000L,
                 progress = 2_840f / 5_000f,
                 photoUrl = null,
-                displayName = SHOWCASE_DISPLAY_NAME,
+                displayName = "Jane Doe",
                 style = OnGradient,
             )
         }
@@ -236,7 +234,7 @@ private fun FlashcardsLevelCardPreview() {
                     xpForNextLevel = 6_000L,
                     progress = 2_300f / 6_000f,
                     photoUrl = null,
-                    displayName = SHOWCASE_DISPLAY_NAME,
+                    displayName = "Jane Doe",
                 )
                 Box(
                     modifier = Modifier
@@ -250,7 +248,7 @@ private fun FlashcardsLevelCardPreview() {
                             xpForNextLevel = 5_000L,
                             progress = 2_840f / 5_000f,
                             photoUrl = null,
-                            displayName = SHOWCASE_DISPLAY_NAME,
+                            displayName = "Jane Doe",
                             style = OnGradient,
                         )
                         FlashcardsLevelCard(
