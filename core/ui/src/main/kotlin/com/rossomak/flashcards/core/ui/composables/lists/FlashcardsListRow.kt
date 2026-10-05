@@ -92,7 +92,7 @@ fun FlashcardsListRow(
         }
         if (trailing != null) {
             // Unweighted and sized to its own content: every call site's trailing is a chevron,
-            // switch, stepper, icon button or short value ([FlashcardsRowTrailingValue]) — always
+            // switch, stepper or icon button — always
             // small and fixed-size, never long text (a settings row's current *value* lives in
             // secondaryText, not trailing). Giving trailing
             // a weight(1f) here — matching the title column's own weight(1f) — split the row 50/50
@@ -115,20 +115,6 @@ fun FlashcardsChevron() {
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-/**
- * A short value at the end of a [FlashcardsListRow] ("1.4.0 (142)"): muted, one line, sized to its
- * own content. For a value that must stay on the row's right edge rather than under its title.
- */
-@Composable
-fun FlashcardsRowTrailingValue(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
     )
 }
 
