@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.UserInfo
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -32,12 +33,35 @@ class FirebaseAuthRemoteDataSourceTest {
         displayName: String? = "Alex",
         photoUri: Uri? = null,
         isAnonymous: Boolean = false,
+        providerData: List<UserInfo> = emptyList(),
     ): FirebaseUser = mockk {
         every { this@mockk.uid } returns uid
         every { this@mockk.email } returns email
         every { this@mockk.displayName } returns displayName
         every { this@mockk.photoUrl } returns photoUri
         every { this@mockk.isAnonymous } returns isAnonymous
+        every { this@mockk.providerData } returns providerData
+    }
+
+    private fun uriOf(value: String?): Uri? = value?.let { text ->
+        val uri: Uri = mockk()
+        every { uri.toString() } returns text
+        uri
+    }
+
+    private fun googleProfile(
+        email: String? = null,
+        displayName: String? = null,
+        photoUrl: String? = null,
+    ): UserInfo = mockk {
+        every { providerId } returns GoogleAuthProvider.PROVIDER_ID
+        every { this@mockk.email } returns email
+        every { this@mockk.displayName } returns displayName
+        every { this@mockk.photoUrl } returns uriOf(photoUrl)
+    }
+
+    private fun otherProfile(): UserInfo = mockk {
+        every { providerId } returns "firebase"
     }
 
     @After
@@ -57,6 +81,116 @@ class FirebaseAuthRemoteDataSourceTest {
         user?.email shouldBe "user@example.com"
         user?.displayName shouldBe "Alex"
         user?.photoUrl shouldBe "http://photo"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `a photo url with a smaller size suffix is requested at the larger size`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(photoUri = uriOf("$PHOTO_BASE=s96-c"))
+
+        createDataSource().getCurrentUser()?.photoUrl shouldBe "$PHOTO_BASE=s256-c"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `a photo url with a larger size suffix is left unchanged`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(photoUri = uriOf("$PHOTO_BASE=s400-c"))
+
+        createDataSource().getCurrentUser()?.photoUrl shouldBe "$PHOTO_BASE=s400-c"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `a photo url without a size suffix is left unchanged`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(photoUri = uriOf("$PHOTO_BASE.jpg"))
+
+        createDataSource().getCurrentUser()?.photoUrl shouldBe "$PHOTO_BASE.jpg"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `a size suffix that is followed by a query is left unchanged`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(photoUri = uriOf("$PHOTO_BASE=s96-c?v=2"))
+
+        createDataSource().getCurrentUser()?.photoUrl shouldBe "$PHOTO_BASE=s96-c?v=2"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `a missing photo stays missing`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(photoUri = null)
+
+        createDataSource().getCurrentUser()?.photoUrl shouldBe null
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `null profile fields fall back to the google provider entry`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(
+            email = null,
+            displayName = null,
+            photoUri = null,
+            providerData = listOf(
+                otherProfile(),
+                googleProfile(email = GOOGLE_EMAIL, displayName = GOOGLE_NAME, photoUrl = "$PHOTO_BASE=s96-c"),
+            ),
+        )
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe GOOGLE_EMAIL
+        user?.displayName shouldBe GOOGLE_NAME
+        user?.photoUrl shouldBe "$PHOTO_BASE=s256-c"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `blank profile fields fall back to the google provider entry`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(
+            email = " ",
+            displayName = "",
+            photoUri = uriOf(""),
+            providerData = listOf(
+                googleProfile(email = GOOGLE_EMAIL, displayName = GOOGLE_NAME, photoUrl = "$PHOTO_BASE=s96-c"),
+            ),
+        )
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe GOOGLE_EMAIL
+        user?.displayName shouldBe GOOGLE_NAME
+        user?.photoUrl shouldBe "$PHOTO_BASE=s256-c"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `blank profile fields with no provider entry are missing`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(email = "", displayName = " ", photoUri = uriOf(" "))
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe null
+        user?.displayName shouldBe null
+        user?.photoUrl shouldBe null
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `profile fields on the user win over the google provider entry`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(
+            email = OWN_EMAIL,
+            displayName = OWN_NAME,
+            photoUri = uriOf("$OWN_PHOTO_BASE=s96-c"),
+            providerData = listOf(
+                googleProfile(email = GOOGLE_EMAIL, displayName = GOOGLE_NAME, photoUrl = "$PHOTO_BASE=s96-c"),
+            ),
+        )
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe OWN_EMAIL
+        user?.displayName shouldBe OWN_NAME
+        user?.photoUrl shouldBe "$OWN_PHOTO_BASE=s256-c"
         verify(exactly = 1) { firebaseAuth.currentUser }
     }
 
@@ -202,5 +336,14 @@ class FirebaseAuthRemoteDataSourceTest {
         createDataSource().signOut()
 
         verify(exactly = 1) { firebaseAuth.signOut() }
+    }
+
+    private companion object {
+        const val PHOTO_BASE = "https://host/photo"
+        const val OWN_PHOTO_BASE = "https://host/own"
+        const val GOOGLE_EMAIL = "g@example.com"
+        const val GOOGLE_NAME = "Gina"
+        const val OWN_EMAIL = "own@example.com"
+        const val OWN_NAME = "Olivia"
     }
 }

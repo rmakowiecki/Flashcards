@@ -1,13 +1,7 @@
 package com.rossomak.flashcards.core.ui.composables.lists
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -17,9 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,11 +19,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Opacity applied to the whole row when `enabled = false`, per the design's disabled rows. */
-private const val DISABLED_ALPHA = 0.6f
 
 /**
  * The generic design-system list row: an optional [leading] slot, a title with optional
@@ -59,7 +47,6 @@ private const val DISABLED_ALPHA = 0.6f
  * single-styled line — multi-color spans, a marquee, placeholder dashes while data resolves — the
  * row still reserves the same line, it just stops drawing it itself.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FlashcardsListRow(
     title: String,
@@ -74,28 +61,12 @@ fun FlashcardsListRow(
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
 ) {
-    val clickModifier = when {
-        onClick == null -> Modifier
-        onLongClick != null -> Modifier.combinedClickable(
-            enabled = enabled,
-            role = role,
-            onLongClick = onLongClick,
-            onClick = onClick,
-        )
-        else -> Modifier.clickable(enabled = enabled, role = role, onClick = onClick)
-    }
-    Row(
-        modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .heightIn(min = MaterialTheme.sizes.listRowMinHeight)
-            .then(clickModifier)
-            .padding(
-                horizontal = MaterialTheme.spacing.normal,
-                vertical = MaterialTheme.spacing.small,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+    FlashcardsListContentRow(
+        modifier = modifier,
+        onClick = onClick,
+        onLongClick = onLongClick,
+        enabled = enabled,
+        role = role,
     ) {
         if (leading != null) {
             leading()
@@ -121,8 +92,9 @@ fun FlashcardsListRow(
         }
         if (trailing != null) {
             // Unweighted and sized to its own content: every call site's trailing is a chevron,
-            // switch, stepper, or icon button — always small and fixed-size, never long text (a
-            // settings row's current *value* lives in secondaryText, not trailing). Giving trailing
+            // switch, stepper, icon button or short value ([FlashcardsRowTrailingValue]) — always
+            // small and fixed-size, never long text (a settings row's current *value* lives in
+            // secondaryText, not trailing). Giving trailing
             // a weight(1f) here — matching the title column's own weight(1f) — split the row 50/50
             // by allocation regardless of content, forcing the title into exactly half the row even
             // when short and leaving trailing stranded at that midpoint instead of flush against the
@@ -143,6 +115,20 @@ fun FlashcardsChevron() {
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * A short value at the end of a [FlashcardsListRow] ("1.4.0 (142)"): muted, one line, sized to its
+ * own content. For a value that must stay on the row's right edge rather than under its title.
+ */
+@Composable
+fun FlashcardsRowTrailingValue(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
     )
 }
 

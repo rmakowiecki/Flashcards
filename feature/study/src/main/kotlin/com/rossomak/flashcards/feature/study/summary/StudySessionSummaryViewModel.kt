@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.summary
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionResult.Rated
@@ -13,6 +14,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPr
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -46,6 +49,7 @@ class StudySessionSummaryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
     private val submitStudySession: SubmitStudySessionUseCase,
+    private val observeAuthUser: ObserveAuthUserUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<StudySessionSummaryRoute>()
@@ -90,6 +94,23 @@ class StudySessionSummaryViewModel @Inject constructor(
             )
         }
         submitSession()
+        observeAvatarSource()
+    }
+
+    /**
+     * Mirrors the signed-in User's photo and name into [state] for the Level card's avatar. Runs in
+     * its own coroutine so it neither delays nor reorders the synchronous `init` writes or the
+     * submission; a `null` emission (no signed-in User) clears both fields. A failed read just
+     * leaves the avatar on its fallback.
+     */
+    private fun observeAvatarSource() {
+        viewModelScope.launch {
+            observeAuthUser()
+                .catch { exception -> logw(exception) { "Failed to observe the auth user for the Level card avatar" } }
+                .collect { authUser ->
+                    _state.update { it.copy(photoUrl = authUser?.photoUrl, displayName = authUser?.displayName) }
+                }
+        }
     }
 
     /**

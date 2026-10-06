@@ -117,6 +117,8 @@ private fun MainBottomBar(
     }
 }
 
+// One navigation callback per destination reachable from the tabs; a holder object would only hide them.
+@Suppress("LongParameterList")
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier,
@@ -144,6 +146,7 @@ fun MainScreen(
         voiceAnsweringEnabled: Boolean?,
         readAloudEnabled: Boolean?,
     ) -> Unit,
+    onNavigateToAccount: () -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
 ) {
@@ -219,6 +222,7 @@ fun MainScreen(
             navigation<SettingsGraph>(startDestination = SettingsRoot) {
                 composable<SettingsRoot> {
                     SettingsScreen(
+                        onNavigateToAccount = onNavigateToAccount,
                         onNavigateToLogin = onNavigateToLogin,
                     )
                 }

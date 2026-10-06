@@ -119,8 +119,14 @@ object AppSizes {
     /** Glyph size inside [emptyStateIconCircle]. */
     val emptyStateIcon: Dp = 40.dp
 
-    /** Diameter of the striped placeholder avatar on [com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard]. */
-    val levelCardAvatar: Dp = 56.dp
+    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small] avatar (Settings' top app bar). */
+    val avatarSmall: Dp = 32.dp
+
+    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Medium] avatar (level card). */
+    val avatarMedium: Dp = 56.dp
+
+    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large] avatar (Account header). */
+    val avatarLarge: Dp = 88.dp
 
     /** Glyph inlined at the end of a favorited row's title text (see `FlashcardsRowTitleText`). */
     val favoriteInlineIcon: Dp = 16.dp

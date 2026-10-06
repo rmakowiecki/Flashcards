@@ -70,11 +70,37 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
         firebaseAuth.signOut()
     }
 
-    private fun FirebaseUser.toAuthUser(): AuthUser = AuthUser(
-        uid = uid,
-        email = email,
-        displayName = displayName,
-        photoUrl = photoUrl?.toString(),
-        isAnonymous = isAnonymous,
-    )
+    /**
+     * Linking a Guest to Google can leave the user's own `displayName`, `email` and `photoUrl` empty
+     * while the Google provider entry holds them, so each field falls back to that entry. A blank
+     * value counts as empty.
+     */
+    private fun FirebaseUser.toAuthUser(): AuthUser {
+        val googleProfile = providerData.firstOrNull { it.providerId == GoogleAuthProvider.PROVIDER_ID }
+        val ownPhotoUrl = photoUrl?.toString()?.takeUnless(String::isBlank)
+        val googlePhotoUrl = googleProfile?.photoUrl?.toString()?.takeUnless(String::isBlank)
+        return AuthUser(
+            uid = uid,
+            email = email?.takeUnless(String::isBlank) ?: googleProfile?.email?.takeUnless(String::isBlank),
+            displayName = displayName?.takeUnless(String::isBlank)
+                ?: googleProfile?.displayName?.takeUnless(String::isBlank),
+            photoUrl = (ownPhotoUrl ?: googlePhotoUrl)?.withSharperPhoto(),
+            isAnonymous = isAnonymous,
+        )
+    }
+
+    /**
+     * Google serves profile photos at 96 px by default, which is blurry on a larger avatar, so a
+     * smaller size suffix is raised to [PHOTO_SIZE_PX]. A larger one and a URL without the suffix are
+     * left alone.
+     */
+    private fun String.withSharperPhoto(): String = replace(PHOTO_SIZE_SUFFIX) { match ->
+        val isSmaller = match.groupValues[1].toIntOrNull()?.let { it < PHOTO_SIZE_PX } ?: false
+        if (isSmaller) "=s$PHOTO_SIZE_PX-c" else match.value
+    }
+
+    private companion object {
+        const val PHOTO_SIZE_PX = 256
+        val PHOTO_SIZE_SUFFIX = Regex("=s(\\d+)-c$")
+    }
 }

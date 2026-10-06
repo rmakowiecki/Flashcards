@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_title">Settings</string>
+    <string name="settings_account_cd">Account</string>
 
     <string name="settings_study_sessions_label">Study sessions</string>
     <string name="settings_daily_goal_label">Daily goal</string>
