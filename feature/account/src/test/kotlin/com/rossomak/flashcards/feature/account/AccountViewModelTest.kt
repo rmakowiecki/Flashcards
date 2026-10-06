@@ -10,9 +10,12 @@ import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetInstallationInfoUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import com.rossomak.flashcards.testutil.MainDispatcherRule
@@ -37,16 +40,18 @@ class AccountViewModelTest {
     private val getAppVersion: GetAppVersionUseCase = mockk {
         coEvery { this@mockk() } returns APP_VERSION
     }
+    private val signOut: SignOutUseCase = mockk()
 
     private val getInstallationInfo: GetInstallationInfoUseCase = mockk {
         coEvery { this@mockk() } returns INSTALLATION_INFO
     }
 
-    private fun createViewModel(): AccountViewModel = AccountViewModel(
+    private fun createViewModel(signOutOverride: SignOutUseCase = signOut): AccountViewModel = AccountViewModel(
         observeAuthUser = ObserveAuthUserUseCase(authRepository),
         getAppVersion = getAppVersion,
         getInstallationInfo = getInstallationInfo,
         getCurrentAuthUser = GetCurrentAuthUserUseCase(authRepository),
+        signOut = signOutOverride,
     )
 
     private fun authUser(
@@ -239,6 +244,74 @@ class AccountViewModelTest {
             viewModel.onNoEmailAppFound()
 
             awaitItem() shouldBe NoEmailApp
+        }
+    }
+
+    @Test
+    fun `opening the sign out dialog shows it`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(SignOut))
+
+        viewModel.state.value.activeDialog shouldBe SignOut
+    }
+
+    @Test
+    fun `dismissing the sign out dialog does not sign out`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Dismiss)
+        advanceUntilIdle()
+
+        viewModel.state.value.activeDialog shouldBe null
+        coVerify(exactly = 0) { signOut() }
+    }
+
+    @Test
+    fun `confirming sign out signs out and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { signOut() } returns Unit
+
+        val viewModel = createViewModel()
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.events.test {
+            awaitItem() shouldBe AccountDestination.Login
+        }
+        viewModel.state.value.activeDialog shouldBe null
+        coVerify(exactly = 1) { signOut() }
+    }
+
+    @Test
+    fun `confirming sign out emits Login even when sign-out fails`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { signOut() } throws RuntimeException("sign-out failed")
+
+        val viewModel = createViewModel()
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.events.test {
+            awaitItem() shouldBe AccountDestination.Login
+        }
+        coVerify(exactly = 1) { signOut() }
+    }
+
+    @Test
+    fun `signing out keeps the last user in the state`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel(signOutOverride = SignOutUseCase(authRepository))
+        authRepository.userToReturn = authUser()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+
+        authRepository.userToReturn shouldBe null
+        viewModel.state.assertValue {
+            displayName shouldBe USER_NAME
+            email shouldBe USER_EMAIL
+            photoUrl shouldBe USER_PHOTO_URL
         }
     }
 

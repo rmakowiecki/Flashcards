@@ -55,10 +55,13 @@ import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountDestination.Login
+import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import kotlinx.coroutines.launch
@@ -68,6 +71,7 @@ fun AccountScreen(
     modifier: Modifier = Modifier,
     viewModel: AccountViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToLogin: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -79,6 +83,7 @@ fun AccountScreen(
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
+            Login -> onNavigateToLogin()
             is ContactSupport -> {
                 val emailIntent = supportEmailIntent(context, destination.installationInfo, destination.uid)
                 if (!context.tryStartActivity(emailIntent)) viewModel.onNoEmailAppFound()
@@ -108,7 +113,6 @@ fun AccountScreen(
         snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
         onDialogEvent = viewModel::onDialogEvent,
-        onSignOutClick = {},
         onManageAccountClick = {
             val manageIntent = Intent(Intent.ACTION_VIEW, manageAccountUrl(state.email).toUri())
             if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
@@ -135,7 +139,6 @@ private fun AccountContent(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateBack: () -> Unit,
     onDialogEvent: (AccountDialogEvent) -> Unit,
-    onSignOutClick: () -> Unit,
     onManageAccountClick: () -> Unit,
     onContactSupportClick: () -> Unit,
     onReportBugClick: () -> Unit,
@@ -162,7 +165,7 @@ private fun AccountContent(
                 state = state,
                 scrollBehavior = scrollBehavior,
                 onNavigateBack = onNavigateBack,
-                onSignOutClick = onSignOutClick,
+                onSignOutClick = { onDialogEvent(Open(SignOut)) },
                 onManageAccountClick = onManageAccountClick,
             )
         },
@@ -365,7 +368,6 @@ private fun AccountContentPreview() {
             ),
             onNavigateBack = {},
             onDialogEvent = {},
-            onSignOutClick = {},
             onManageAccountClick = {},
             onContactSupportClick = {},
             onReportBugClick = {},
@@ -385,7 +387,6 @@ private fun AccountContentEmptyPreview() {
             state = AccountScreenState(),
             onNavigateBack = {},
             onDialogEvent = {},
-            onSignOutClick = {},
             onManageAccountClick = {},
             onContactSupportClick = {},
             onReportBugClick = {},

@@ -22,12 +22,6 @@ object AppSizes {
     /** 1px hairline used for card borders and dividers. */
     val hairline: Dp = 1.dp
 
-    /** An inline progress spinner sized to sit in a text button's place in an app bar. */
-    val inlineProgress: Dp = 20.dp
-
-    /** Stroke of an [inlineProgress] spinner — heavier than the M3 default at this diameter. */
-    val inlineProgressStroke: Dp = 2.dp
-
     /** Height of the checkable tag chip (M3 filter chip, one size only). */
     val tagChipHeight: Dp = 40.dp
 

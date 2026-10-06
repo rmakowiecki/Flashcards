@@ -7,15 +7,19 @@ import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetInstallationInfoUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountDestination.Login
+import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +38,7 @@ class AccountViewModel @Inject constructor(
     private val getAppVersion: GetAppVersionUseCase,
     private val getInstallationInfo: GetInstallationInfoUseCase,
     private val getCurrentAuthUser: GetCurrentAuthUserUseCase,
+    private val signOut: SignOutUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AccountScreenState())
@@ -90,9 +95,33 @@ class AccountViewModel @Inject constructor(
         when (event) {
             is Open -> _state.update { it.copy(activeDialog = event.dialog) }
             is DraftChange -> _state.update { it.copy(activeDialog = event.dialog) }
-            // No dialog commits anything yet: each variant added to AccountDialog adds its own confirm.
-            Confirm -> Unit
+            Confirm -> onDialogConfirm()
             Dismiss -> _state.update { it.copy(activeDialog = null) }
+        }
+    }
+
+    /** The only commit path: each dialog variant answers with its own action. */
+    private fun onDialogConfirm() {
+        when (_state.value.activeDialog) {
+            SignOut -> {
+                _state.update { it.copy(activeDialog = null) }
+                performSignOut()
+            }
+            null -> Unit
+        }
+    }
+
+    private fun performSignOut() {
+        viewModelScope.launch {
+            try {
+                signOut()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Navigate to Login even if sign-out throws, so the user is never stuck signed in.
+            } finally {
+                eventChannel.send(Login)
+            }
         }
     }
 }

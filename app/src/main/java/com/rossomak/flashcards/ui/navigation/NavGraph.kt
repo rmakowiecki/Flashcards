@@ -311,6 +311,13 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
     composable<AccountRoute> {
         AccountScreen(
             onNavigateBack = { navController.popBackStack() },
+            onNavigateToLogin = {
+                navController.navigate(AuthRoute) {
+                    popUpTo(Main) { inclusive = true }
+                    // A second Login event during the exit transition must not stack another AuthRoute.
+                    launchSingleTop = true
+                }
+            },
         )
     }
 }
@@ -339,11 +346,6 @@ fun FlashcardsNavGraph(
                     MainScreen(
                         onNavigateToAccount = {
                             navController.navigate(AccountRoute) { launchSingleTop = true }
-                        },
-                        onNavigateToLogin = {
-                            navController.navigate(AuthRoute) {
-                                popUpTo(Main) { inclusive = true }
-                            }
                         },
                         onNavigateToOnboarding = {
                             navController.navigate(OnboardingRoute) {

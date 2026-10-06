@@ -16,7 +16,6 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreference
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
-import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -33,12 +32,9 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -57,7 +53,6 @@ class SettingsViewModelTest {
     private val authRepository = FakeAuthRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
-    private val signOutUseCase: SignOutUseCase = mockk()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private fun createViewModel(): SettingsViewModel = SettingsViewModel(
@@ -66,7 +61,6 @@ class SettingsViewModelTest {
         observeStudySessionPreferences = ObserveStudySessionPreferencesUseCase(studySessionPreferencesRepository),
         saveUserPreference = SaveUserPreferenceUseCase(userPreferencesRepository),
         saveStudySessionPreference = SaveStudySessionPreferenceUseCase(studySessionPreferencesRepository),
-        signOutUseCase = signOutUseCase,
         voiceSettingsController = voiceSettingsController,
     )
 
@@ -482,66 +476,6 @@ class SettingsViewModelTest {
         viewModel.state.value.activeDialog shouldBe SessionVoiceSettings(
             VoiceSettingsDraftState(availableVoices = listOf(SAVED_VOICE), draftVoiceId = VOICE_ID),
         )
-    }
-
-    @Test
-    fun `confirming sign out signs out and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } returns Unit
-
-        val viewModel = createViewModel()
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Confirm)
-
-        viewModel.events.test {
-            awaitItem() shouldBe SettingsDestination.Login
-        }
-        viewModel.state.value.activeDialog shouldBe null
-        coVerify(exactly = 1) { signOutUseCase() }
-    }
-
-    @Test
-    fun `dismissing sign out does not sign out`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Dismiss)
-        advanceUntilIdle()
-
-        viewModel.state.value.activeDialog shouldBe null
-        viewModel.state.value.isSigningOut shouldBe false
-        coVerify(exactly = 0) { signOutUseCase() }
-    }
-
-    @Test
-    fun `confirming sign out emits Login even when sign-out fails`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } throws RuntimeException("remote sign-out failed")
-
-        val viewModel = createViewModel()
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Confirm)
-
-        viewModel.events.test {
-            awaitItem() shouldBe SettingsDestination.Login
-        }
-        coVerify(exactly = 1) { signOutUseCase() }
-    }
-
-    @Test
-    fun `confirming sign out twice emits only one navigation event`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } returns Unit
-
-        val viewModel = createViewModel()
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Confirm)
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Confirm)
-        advanceUntilIdle()
-
-        viewModel.events.test {
-            awaitItem() shouldBe SettingsDestination.Login
-            expectNoEvents()
-        }
-        coVerify(exactly = 1) { signOutUseCase() }
     }
 
     private companion object {
