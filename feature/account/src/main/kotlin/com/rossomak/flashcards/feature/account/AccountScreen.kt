@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.account
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -294,6 +295,17 @@ private fun ExternalLinkIcon() {
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/**
+ * Starts [intent] and reports whether an app answered it. Only a missing handler counts as a
+ * failure: any other exception is a real bug and propagates.
+ */
+private fun Context.tryStartActivity(intent: Intent): Boolean = try {
+    startActivity(intent)
+    true
+} catch (_: ActivityNotFoundException) {
+    false
 }
 
 private const val PRIVACY_POLICY_URL = "https://flashcards-8ad6d.web.app/privacy"
