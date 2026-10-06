@@ -182,6 +182,10 @@ _Avoid_: Study target, Quota
 Count of Study Sessions in which the User reached deck end (last card completed). Abandoned sessions (exited before deck end) do not count. Tracked as a lifetime aggregate stat on the Progress screen.
 _Avoid_: Sessions finished, Sessions done
 
+**Account Deletion**:
+The irreversible removal of a User and everything written for them. It runs server-side first: the `deleteAccount` Cloud Function deletes the User's Bug Reports and every document under `users/{uid}`, revokes their sessions, sweeps anything a racing submission wrote back, and deletes their Firebase Auth user ([ADR-0059](docs/adr/0059-account-deletion-runs-server-side.md)). Only then does the device reset its local state for that User and restart into Login. Signing in again afterwards, even with the same Google account, starts a fresh User with no history.
+_Avoid_: Account removal, Deactivation
+
 
 ## Relationships
 
