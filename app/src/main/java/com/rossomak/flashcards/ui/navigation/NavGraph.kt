@@ -314,6 +314,8 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
             onNavigateToLogin = {
                 navController.navigate(AuthRoute) {
                     popUpTo(Main) { inclusive = true }
+                    // A second Login event during the exit transition must not stack another AuthRoute.
+                    launchSingleTop = true
                 }
             },
         )

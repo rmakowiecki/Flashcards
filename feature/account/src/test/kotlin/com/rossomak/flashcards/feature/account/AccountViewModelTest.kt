@@ -162,7 +162,7 @@ class AccountViewModelTest {
 
     @Test
     fun `confirming sign out emits Login even when sign-out fails`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } throws RuntimeException("remote sign-out failed")
+        coEvery { signOutUseCase() } throws RuntimeException("sign-out failed")
 
         val viewModel = createViewModel()
         viewModel.onDialogEvent(Open(SignOut))
@@ -170,24 +170,6 @@ class AccountViewModelTest {
 
         viewModel.events.test {
             awaitItem() shouldBe AccountDestination.Login
-        }
-        coVerify(exactly = 1) { signOutUseCase() }
-    }
-
-    @Test
-    fun `confirming sign out twice emits only one navigation event`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } returns Unit
-
-        val viewModel = createViewModel()
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Confirm)
-        viewModel.onDialogEvent(Open(SignOut))
-        viewModel.onDialogEvent(Confirm)
-        advanceUntilIdle()
-
-        viewModel.events.test {
-            awaitItem() shouldBe AccountDestination.Login
-            expectNoEvents()
         }
         coVerify(exactly = 1) { signOutUseCase() }
     }

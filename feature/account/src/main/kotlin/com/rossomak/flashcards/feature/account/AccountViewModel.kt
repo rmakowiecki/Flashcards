@@ -43,8 +43,6 @@ class AccountViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<AccountMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<AccountMessage> = _messages.asSharedFlow()
 
-    private var isSigningOut = false
-
     init {
         viewModelScope.launch {
             val appVersion = getAppVersion()
@@ -94,16 +92,13 @@ class AccountViewModel @Inject constructor(
     }
 
     private fun signOut() {
-        if (isSigningOut) return
-        isSigningOut = true
-
         viewModelScope.launch {
             try {
                 signOutUseCase()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // Intentionally navigate to login even if remote sign-out fails.
+                // Navigate to Login even if sign-out throws, so the user is never stuck signed in.
             } finally {
                 eventChannel.send(AccountDestination.Login)
             }
