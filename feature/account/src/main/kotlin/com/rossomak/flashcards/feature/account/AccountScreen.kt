@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.account
 
+import android.content.ClipData
 import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
@@ -30,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,13 +41,13 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.AppVersion
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
-import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsRowTrailingValue
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -62,6 +66,9 @@ fun AccountScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
+    val clipLabel = stringResource(R.string.account_app_version_label)
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
@@ -98,7 +105,9 @@ fun AccountScreen(
         onReportBugClick = {},
         onPrivacyPolicyClick = {},
         onOpenSourceLicensesClick = {},
-        onAppVersionClick = {},
+        onAppVersionCopy = { versionLabel ->
+            clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(clipLabel, versionLabel))) }
+        },
         onDeleteAccountClick = {},
     )
 }
@@ -117,10 +126,13 @@ private fun AccountContent(
     onReportBugClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
     onOpenSourceLicensesClick: () -> Unit,
-    onAppVersionClick: () -> Unit,
+    onAppVersionCopy: (versionLabel: String) -> Unit,
     onDeleteAccountClick: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val appVersionLabel = state.appVersion?.let { appVersion ->
+        stringResource(R.string.account_app_version_value_label, appVersion.name, appVersion.code)
+    }
 
     AccountDialogHost(
         activeDialog = state.activeDialog,
@@ -162,10 +174,10 @@ private fun AccountContent(
             FlashcardsListGroup(
                 modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
                 items = aboutRows(
-                    state = state,
+                    appVersionLabel = appVersionLabel,
                     onPrivacyPolicyClick = onPrivacyPolicyClick,
                     onOpenSourceLicensesClick = onOpenSourceLicensesClick,
-                    onAppVersionClick = onAppVersionClick,
+                    onAppVersionCopy = onAppVersionCopy,
                 ),
             )
 
@@ -199,10 +211,10 @@ private fun supportRows(
 
 @Composable
 private fun aboutRows(
-    state: AccountScreenState,
+    appVersionLabel: String?,
     onPrivacyPolicyClick: () -> Unit,
     onOpenSourceLicensesClick: () -> Unit,
-    onAppVersionClick: () -> Unit,
+    onAppVersionCopy: (versionLabel: String) -> Unit,
 ): List<FlashcardsListGroupItem> = listOf(
     FlashcardsListGroupItem.Row(
         title = stringResource(R.string.account_privacy_policy_label),
@@ -218,9 +230,10 @@ private fun aboutRows(
     ),
     FlashcardsListGroupItem.Row(
         title = stringResource(R.string.account_app_version_label),
-        onClick = onAppVersionClick,
+        onClick = { appVersionLabel?.let(onAppVersionCopy) },
+        secondaryText = appVersionLabel,
         leading = { FlashcardsIconTile(icon = Icons.Default.Info, contentDescription = null) },
-        trailing = state.appVersionLabel?.let { versionLabel -> { FlashcardsRowTrailingValue(text = versionLabel) } },
+        trailing = appVersionLabel?.let { { CopyIcon() } },
     ),
 )
 
@@ -246,6 +259,19 @@ private fun dangerZoneRows(onDeleteAccountClick: () -> Unit): List<FlashcardsLis
     ),
 )
 
+/**
+ * Not decorative: the row is one merged node, so this description is what tells a screen reader that
+ * activating the row copies the version.
+ */
+@Composable
+private fun CopyIcon() {
+    Icon(
+        imageVector = Icons.Default.ContentCopy,
+        contentDescription = stringResource(R.string.account_copy_version_cd),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 /** Decorative: the row is the labeled, clickable node, and the system browser opens from it. */
 @Composable
 private fun ExternalLinkIcon() {
@@ -264,7 +290,7 @@ private fun AccountContentPreview() {
             state = AccountScreenState(
                 displayName = "Ross Smith",
                 email = "ross.smith@example.com",
-                appVersionLabel = "1.4.0 (142)",
+                appVersion = AppVersion(name = "1.4.0", code = 142L),
             ),
             onNavigateBack = {},
             onDialogEvent = {},
@@ -273,7 +299,7 @@ private fun AccountContentPreview() {
             onReportBugClick = {},
             onPrivacyPolicyClick = {},
             onOpenSourceLicensesClick = {},
-            onAppVersionClick = {},
+            onAppVersionCopy = {},
             onDeleteAccountClick = {},
         )
     }
@@ -292,7 +318,7 @@ private fun AccountContentEmptyPreview() {
             onReportBugClick = {},
             onPrivacyPolicyClick = {},
             onOpenSourceLicensesClick = {},
-            onAppVersionClick = {},
+            onAppVersionCopy = {},
             onDeleteAccountClick = {},
         )
     }

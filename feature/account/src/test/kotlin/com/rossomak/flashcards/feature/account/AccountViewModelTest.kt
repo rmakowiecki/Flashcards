@@ -1,8 +1,10 @@
 package com.rossomak.flashcards.feature.account
 
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AppVersion
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -29,10 +31,14 @@ class AccountViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val authRepository = FakeAuthRepository()
+    private val getAppVersion: GetAppVersionUseCase = mockk {
+        coEvery { this@mockk() } returns APP_VERSION
+    }
     private val signOutUseCase: SignOutUseCase = mockk()
 
     private fun createViewModel(signOutUseCaseOverride: SignOutUseCase = signOutUseCase): AccountViewModel = AccountViewModel(
         observeAuthUser = ObserveAuthUserUseCase(authRepository),
+        getAppVersion = getAppVersion,
         signOutUseCase = signOutUseCaseOverride,
     )
 
@@ -47,7 +53,16 @@ class AccountViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value shouldBe AccountScreenState()
+        viewModel.state.value shouldBe AccountScreenState(appVersion = APP_VERSION)
+    }
+
+    @Test
+    fun `loads the app version into state on creation`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.appVersion shouldBe APP_VERSION
+        coVerify(exactly = 1) { getAppVersion() }
     }
 
     @Test
@@ -62,6 +77,7 @@ class AccountViewModelTest {
             displayName = USER_NAME,
             email = USER_EMAIL,
             photoUrl = USER_PHOTO_URL,
+            appVersion = APP_VERSION,
         )
     }
 
@@ -200,5 +216,6 @@ class AccountViewModelTest {
         const val USER_PHOTO_URL = "https://host/photo=s256-c"
         const val OTHER_NAME = "Sam Jones"
         const val OTHER_EMAIL = "sam@example.com"
+        val APP_VERSION = AppVersion(name = "1.4.0", code = 142L)
     }
 }
