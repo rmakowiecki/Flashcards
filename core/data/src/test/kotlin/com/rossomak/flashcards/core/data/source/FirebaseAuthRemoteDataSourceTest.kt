@@ -195,6 +195,59 @@ class FirebaseAuthRemoteDataSourceTest {
     }
 
     @Test
+    fun `each profile field falls back on its own`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(
+            email = OWN_EMAIL,
+            displayName = " ",
+            photoUri = null,
+            providerData = listOf(
+                googleProfile(email = GOOGLE_EMAIL, displayName = GOOGLE_NAME, photoUrl = "$PHOTO_BASE=s96-c"),
+            ),
+        )
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe OWN_EMAIL
+        user?.displayName shouldBe GOOGLE_NAME
+        user?.photoUrl shouldBe "$PHOTO_BASE=s256-c"
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `blank fields on the google provider entry are missing`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(
+            email = null,
+            displayName = null,
+            photoUri = null,
+            providerData = listOf(otherProfile(), googleProfile(email = " ", displayName = "", photoUrl = " ")),
+        )
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe null
+        user?.displayName shouldBe null
+        user?.photoUrl shouldBe null
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
+    fun `a provider list without a google entry gives no fallback`() {
+        every { firebaseAuth.currentUser } returns firebaseUser(
+            email = null,
+            displayName = null,
+            photoUri = null,
+            providerData = listOf(otherProfile()),
+        )
+
+        val user = createDataSource().getCurrentUser()
+
+        user?.email shouldBe null
+        user?.displayName shouldBe null
+        user?.photoUrl shouldBe null
+        verify(exactly = 1) { firebaseAuth.currentUser }
+    }
+
+    @Test
     fun `getCurrentUser returns null when there is no signed in user`() {
         every { firebaseAuth.currentUser } returns null
 

@@ -3,10 +3,18 @@ package com.rossomak.flashcards.feature.account
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AppVersion
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.DeviceInfo
+import com.rossomak.flashcards.core.domain.model.InstallationInfo
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetInstallationInfoUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
-import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
+import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
+import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
@@ -30,16 +38,22 @@ class AccountViewModelTest {
         coEvery { this@mockk() } returns APP_VERSION
     }
 
+    private val getInstallationInfo: GetInstallationInfoUseCase = mockk {
+        coEvery { this@mockk() } returns INSTALLATION_INFO
+    }
+
     private fun createViewModel(): AccountViewModel = AccountViewModel(
         observeAuthUser = ObserveAuthUserUseCase(authRepository),
         getAppVersion = getAppVersion,
+        getInstallationInfo = getInstallationInfo,
+        getCurrentAuthUser = GetCurrentAuthUserUseCase(authRepository),
     )
 
     private fun authUser(
         displayName: String? = USER_NAME,
         email: String? = USER_EMAIL,
         photoUrl: String? = USER_PHOTO_URL,
-    ) = AuthUser(uid = "uid-1", email = email, displayName = displayName, photoUrl = photoUrl)
+    ) = AuthUser(uid = USER_UID, email = email, displayName = displayName, photoUrl = photoUrl)
 
     @Test
     fun `the state starts with no user data and no dialog`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -107,22 +121,138 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `a failed Manage launch emits the failure message`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a user with no profile fields clears them but keeps the app version`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        authRepository.userToReturn = authUser()
+        advanceUntilIdle()
+
+        authRepository.userToReturn = authUser(displayName = null, email = null, photoUrl = null)
+        advanceUntilIdle()
+
+        viewModel.state.value shouldBe AccountScreenState(appVersion = APP_VERSION)
+    }
+
+    @Test
+    fun `dismissing with no dialog open keeps the state unchanged`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val initialState = viewModel.state.value
+
+        viewModel.onDialogEvent(Dismiss)
+
+        viewModel.state.value shouldBe initialState
+    }
+
+    @Test
+    fun `confirming with no dialog open keeps the state unchanged`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val initialState = viewModel.state.value
+
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.state.value shouldBe initialState
+    }
+
+    @Test
+    fun `a failed link launch emits the failure message`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
         viewModel.messages.test {
-            viewModel.onManageAccountFailed()
+            viewModel.onOpenLinkFailed()
 
-            awaitItem() shouldBe ManageAccountFailed
+            awaitItem() shouldBe OpenLinkFailed
+        }
+    }
+
+    @Test
+    fun `a Contact support click emits the installation info and the account id`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = authUser()
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onContactSupportClick()
+
+            awaitItem() shouldBe ContactSupport(INSTALLATION_INFO, uid = USER_UID)
+        }
+    }
+
+    @Test
+    fun `a Contact support click with no signed in user emits a null account id`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = null
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onContactSupportClick()
+
+            awaitItem() shouldBe ContactSupport(INSTALLATION_INFO, uid = null)
+        }
+    }
+
+    @Test
+    fun `a Contact support click uses the user signed in at click time`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        authRepository.userToReturn = authUser()
+
+        viewModel.events.test {
+            viewModel.onContactSupportClick()
+
+            awaitItem() shouldBe ContactSupport(INSTALLATION_INFO, uid = USER_UID)
+        }
+    }
+
+    @Test
+    fun `a Contact support click before anyone collects is delivered once collection starts`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.userToReturn = authUser()
+            val viewModel = createViewModel()
+
+            viewModel.onContactSupportClick()
+            advanceUntilIdle()
+
+            viewModel.events.test {
+                awaitItem() shouldBe ContactSupport(INSTALLATION_INFO, uid = USER_UID)
+            }
+        }
+
+    @Test
+    fun `each Contact support click emits its own event with fresh installation info`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onContactSupportClick()
+                viewModel.onContactSupportClick()
+
+                awaitItem() shouldBe ContactSupport(INSTALLATION_INFO, uid = null)
+                awaitItem() shouldBe ContactSupport(INSTALLATION_INFO, uid = null)
+            }
+            coVerify(exactly = 2) { getInstallationInfo() }
+        }
+
+    @Test
+    fun `no email app found emits the no email app message`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onNoEmailAppFound()
+
+            awaitItem() shouldBe NoEmailApp
         }
     }
 
     private companion object {
+        const val USER_UID = "uid-1"
         const val USER_NAME = "Alex Smith"
         const val USER_EMAIL = "alex@example.com"
         const val USER_PHOTO_URL = "https://host/photo=s256-c"
         const val OTHER_NAME = "Sam Jones"
         const val OTHER_EMAIL = "sam@example.com"
         val APP_VERSION = AppVersion(name = "1.4.0", code = 142L)
+        val INSTALLATION_INFO = InstallationInfo(
+            appVersion = APP_VERSION,
+            deviceInfo = DeviceInfo(model = "Google Pixel 8", systemVersion = 35),
+        )
     }
 }
