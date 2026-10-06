@@ -1,6 +1,7 @@
 [versions]
 agp = "9.2.1"
 coreKtx = "1.19.0"
+browser = "1.10.0"
 onnxruntimeAndroid = "1.27.0"
 hiltAndroid = "2.60"
 junit = "4.13.2"
@@ -45,6 +46,7 @@ konsist = "0.17.3"
 timber = "5.0.1"
 
 [libraries]
+androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }

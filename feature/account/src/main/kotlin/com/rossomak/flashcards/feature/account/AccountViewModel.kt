@@ -4,14 +4,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetInstallationInfoUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
+import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountDestination.Login
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
-import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
+import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
+import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -31,6 +36,8 @@ import kotlinx.coroutines.launch
 class AccountViewModel @Inject constructor(
     private val observeAuthUser: ObserveAuthUserUseCase,
     private val getAppVersion: GetAppVersionUseCase,
+    private val getInstallationInfo: GetInstallationInfoUseCase,
+    private val getCurrentAuthUser: GetCurrentAuthUserUseCase,
     private val signOut: SignOutUseCase,
 ) : ViewModel() {
 
@@ -65,9 +72,22 @@ class AccountViewModel @Inject constructor(
         }
     }
 
-    /** The system found no app to open the Manage link with. */
-    fun onManageAccountFailed() {
-        _messages.tryEmit(ManageAccountFailed)
+    /** The system found no app to open a link with. */
+    fun onOpenLinkFailed() {
+        _messages.tryEmit(OpenLinkFailed)
+    }
+
+    fun onContactSupportClick() {
+        viewModelScope.launch {
+            val installationInfo = getInstallationInfo()
+            val uid = getCurrentAuthUser()?.uid
+            eventChannel.send(ContactSupport(installationInfo, uid))
+        }
+    }
+
+    /** The system found no email app to open the support draft with. */
+    fun onNoEmailAppFound() {
+        _messages.tryEmit(NoEmailApp)
     }
 
     /** Single entry point for every dialog on this screen. */
@@ -100,7 +120,7 @@ class AccountViewModel @Inject constructor(
             } catch (_: Exception) {
                 // Navigate to Login even if sign-out throws, so the user is never stuck signed in.
             } finally {
-                eventChannel.send(AccountDestination.Login)
+                eventChannel.send(Login)
             }
         }
     }
