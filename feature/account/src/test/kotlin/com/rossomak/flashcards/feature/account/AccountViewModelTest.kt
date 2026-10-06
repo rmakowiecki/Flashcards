@@ -10,6 +10,8 @@ import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetInstallationInfoUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
@@ -116,6 +118,40 @@ class AccountViewModelTest {
             email shouldBe OTHER_EMAIL
             photoUrl shouldBe null
         }
+    }
+
+    @Test
+    fun `a user with no profile fields clears them but keeps the app version`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        authRepository.userToReturn = authUser()
+        advanceUntilIdle()
+
+        authRepository.userToReturn = authUser(displayName = null, email = null, photoUrl = null)
+        advanceUntilIdle()
+
+        viewModel.state.value shouldBe AccountScreenState(appVersion = APP_VERSION)
+    }
+
+    @Test
+    fun `dismissing with no dialog open keeps the state unchanged`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val initialState = viewModel.state.value
+
+        viewModel.onDialogEvent(Dismiss)
+
+        viewModel.state.value shouldBe initialState
+    }
+
+    @Test
+    fun `confirming with no dialog open keeps the state unchanged`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val initialState = viewModel.state.value
+
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.state.value shouldBe initialState
     }
 
     @Test
