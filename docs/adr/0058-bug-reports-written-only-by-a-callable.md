@@ -38,7 +38,7 @@ The callable runs, in order, and writes nothing if any step fails:
    - `description` is trimmed, then must be 20 to 1000 characters; the trimmed text is stored;
    - `severity` is `blocker`, `minor` or `cosmetic`;
    - `appVersionName` is 1 to 50 characters, `deviceModel` 1 to 100;
-   - `appVersionCode` is an integer above 0, `androidVersion` an integer of at least 24, the app's
+   - `appVersionCode` is an integer above 0, `androidVersion` an integer of at least 26, the app's
      minimum SDK.
 
    The description limits duplicate the constants on the client's `BugReport` domain model, so the

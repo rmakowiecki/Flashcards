@@ -50,7 +50,7 @@ export const MAX_DESCRIPTION_LENGTH = 1000;
 export const MAX_APP_VERSION_NAME_LENGTH = 50;
 export const MAX_DEVICE_MODEL_LENGTH = 100;
 // The app's minSdk: no device below it can run the app that sends the report.
-export const MIN_ANDROID_VERSION = 24;
+export const MIN_ANDROID_VERSION = 26;
 
 export const MAX_REPORTS_PER_WINDOW = 10;
 export const RATE_LIMIT_WINDOW_MILLIS = 24 * 60 * 60 * 1000;
