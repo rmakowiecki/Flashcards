@@ -9,7 +9,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
-import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
+import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -61,9 +61,9 @@ class AccountViewModel @Inject constructor(
         }
     }
 
-    /** The system found no app to open the Manage link with. */
-    fun onManageAccountFailed() {
-        _messages.tryEmit(ManageAccountFailed)
+    /** The system found no app to open a link with. */
+    fun onOpenLinkFailed() {
+        _messages.tryEmit(OpenLinkFailed)
     }
 
     /** Single entry point for every dialog on this screen. */

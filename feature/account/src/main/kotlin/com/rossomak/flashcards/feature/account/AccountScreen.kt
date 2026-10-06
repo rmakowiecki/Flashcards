@@ -51,7 +51,7 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
+import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import kotlinx.coroutines.launch
 
 @Composable
@@ -70,11 +70,11 @@ fun AccountScreen(
     // AccountDestination turns this body into a `when (destination)`.
     observeAsEvents(viewModel.events) { _ -> }
 
-    val manageAccountFailedMessage = stringResource(R.string.account_manage_failed_message)
+    val openLinkFailedMessage = stringResource(R.string.account_open_link_failed_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         val text = when (message) {
-            ManageAccountFailed -> manageAccountFailedMessage
+            OpenLinkFailed -> openLinkFailedMessage
         }
         snackbarScope.launch {
             snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
@@ -91,10 +91,8 @@ fun AccountScreen(
         onDialogEvent = viewModel::onDialogEvent,
         onSignOutClick = {},
         onManageAccountClick = {
-            // No app may handle the link, which makes startActivity throw.
-            runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, manageAccountUrl(state.email).toUri()))
-            }.onFailure { viewModel.onManageAccountFailed() }
+            val manageIntent = Intent(Intent.ACTION_VIEW, manageAccountUrl(state.email).toUri())
+            if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
         },
         onContactSupportClick = {},
         onReportBugClick = {},

@@ -6,7 +6,7 @@ import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
-import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
+import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
@@ -107,13 +107,13 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `a failed Manage launch emits the failure message`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failed link launch emits the failure message`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 
         viewModel.messages.test {
-            viewModel.onManageAccountFailed()
+            viewModel.onOpenLinkFailed()
 
-            awaitItem() shouldBe ManageAccountFailed
+            awaitItem() shouldBe OpenLinkFailed
         }
     }
 
