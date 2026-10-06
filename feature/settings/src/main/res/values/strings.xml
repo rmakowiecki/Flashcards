@@ -23,9 +23,5 @@
     <string name="settings_voice_playback_label">Voice settings</string>
     <string name="settings_voice_playback_summary_label">%1$s · %2$s</string>
 
-    <string name="settings_sign_out_button">Sign out</string>
-    <string name="settings_sign_out_dialog_title">Sign out?</string>
-    <string name="settings_sign_out_dialog_message">You\'ll need to sign in again to reach your cards on this device.</string>
-    <string name="settings_signing_out_cd">Signing out</string>
     <string name="settings_save_failed_error">Failed to save setting</string>
 </resources>
