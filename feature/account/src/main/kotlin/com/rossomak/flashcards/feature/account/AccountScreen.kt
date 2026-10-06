@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.account
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -25,11 +27,14 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
@@ -42,6 +47,8 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsRowTrailingVa
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
+import kotlinx.coroutines.launch
 
 @Composable
 fun AccountScreen(
@@ -56,10 +63,18 @@ fun AccountScreen(
     // AccountDestination turns this body into a `when (destination)`.
     observeAsEvents(viewModel.events) { _ -> }
 
-    // Each variant added to AccountMessage turns this body into a `when (message)` mapping it to a
-    // string and showing it with `snackbarHostState.showSnackbar(...)` in a coroutine launched on
-    // `rememberCoroutineScope()`.
-    observeAsEvents(viewModel.messages) { _ -> }
+    val manageAccountFailedMessage = stringResource(R.string.account_manage_failed_message)
+    val snackbarScope = rememberCoroutineScope()
+    observeAsEvents(viewModel.messages) { message ->
+        val text = when (message) {
+            ManageAccountFailed -> manageAccountFailedMessage
+        }
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
+        }
+    }
+
+    val context = LocalContext.current
 
     AccountContent(
         modifier = modifier,
@@ -68,7 +83,12 @@ fun AccountScreen(
         onNavigateBack = onNavigateBack,
         onDialogEvent = viewModel::onDialogEvent,
         onSignOutClick = {},
-        onManageAccountClick = {},
+        onManageAccountClick = {
+            // No app may handle the link, which makes startActivity throw.
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, manageAccountUrl(state.email).toUri()))
+            }.onFailure { viewModel.onManageAccountFailed() }
+        },
         onContactSupportClick = {},
         onReportBugClick = {},
         onPrivacyPolicyClick = {},

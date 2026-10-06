@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.DefaultStudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.PartialRatingCardRequeueingEnabled
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.RatedAttempts
@@ -15,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.UserPreference.DailyGoalMinutes
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.model.voiceLabel
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
@@ -46,6 +48,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -54,6 +57,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    private val observeAuthUser: ObserveAuthUserUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
     private val observeStudySessionPreferences: ObserveStudySessionPreferencesUseCase,
     private val saveUserPreference: SaveUserPreferenceUseCase,
@@ -74,6 +78,11 @@ class SettingsViewModel @Inject constructor(
     private var healRequestedVoiceId: String? = null
 
     init {
+        viewModelScope.launch {
+            // A null emission only comes while the screen is on its way out (sign-out), so the last
+            // user stays rather than blanking the avatar during the exit transition.
+            observeAuthUser().filterNotNull().collect(::applyUser)
+        }
         viewModelScope.launch {
             observeUserPreferences()
                 .onEach { preferences -> _state.update { it.copy(dailyGoalMinutes = preferences.dailyGoalMinutes) } }
@@ -100,6 +109,15 @@ class SettingsViewModel @Inject constructor(
                     healVoiceLabel(preferences.voiceSettings)
                 }
                 .launchIn(this)
+        }
+    }
+
+    private fun applyUser(user: AuthUser) {
+        _state.update {
+            it.copy(
+                avatarPhotoUrl = user.photoUrl,
+                avatarDisplayName = user.displayName,
+            )
         }
     }
 

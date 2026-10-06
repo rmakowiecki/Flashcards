@@ -9,7 +9,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Layers
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumFlexibleTopAppBar
@@ -39,13 +37,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
+import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
@@ -76,8 +77,6 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSetti
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 import com.rossomak.flashcards.feature.settings.SettingsMessage.SaveFailed
 import kotlinx.coroutines.launch
-
-private val ACCOUNT_ICON_SIZE = 32.dp
 
 @Composable
 fun SettingsScreen(
@@ -149,7 +148,11 @@ private fun SettingsContent(
                         isSigningOut = state.isSigningOut,
                         onClick = { onDialogEvent(Open(SignOut)) },
                     )
-                    AccountAction(onClick = onAccountClick)
+                    AccountAction(
+                        photoUrl = state.avatarPhotoUrl,
+                        displayName = state.avatarDisplayName,
+                        onClick = onAccountClick,
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -182,14 +185,25 @@ private fun SettingsContent(
     }
 }
 
-/** Placeholder until the shared avatar component exists: swapping it in is a change to this function only. */
+/**
+ * The button carries the label, so a screen reader announces one "Account, button" rather than an
+ * image nested in a button; the avatar inside is decorative.
+ */
 @Composable
-private fun AccountAction(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = Icons.Filled.AccountCircle,
-            contentDescription = stringResource(R.string.settings_account_cd),
-            modifier = Modifier.size(ACCOUNT_ICON_SIZE),
+private fun AccountAction(photoUrl: String?, displayName: String?, onClick: () -> Unit) {
+    val description = stringResource(R.string.settings_account_cd)
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.semantics {
+            contentDescription = description
+            role = Role.Button
+        },
+    ) {
+        FlashcardsAvatar(
+            photoUrl = photoUrl,
+            displayName = displayName,
+            size = FlashcardsAvatarSize.Small,
+            contentDescription = null,
         )
     }
 }

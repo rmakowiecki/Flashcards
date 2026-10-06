@@ -1,14 +1,17 @@
 package com.rossomak.flashcards.feature.settings
 
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.model.voiceLabel
+import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
@@ -32,6 +35,7 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 import com.rossomak.flashcards.testutil.MainDispatcherRule
+import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -50,18 +54,56 @@ class SettingsViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    private val authRepository = FakeAuthRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
     private val signOutUseCase: SignOutUseCase = mockk()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private fun createViewModel(): SettingsViewModel = SettingsViewModel(
+        observeAuthUser = ObserveAuthUserUseCase(authRepository),
         observeUserPreferences = ObserveUserPreferencesUseCase(userPreferencesRepository),
         observeStudySessionPreferences = ObserveStudySessionPreferencesUseCase(studySessionPreferencesRepository),
         saveUserPreference = SaveUserPreferenceUseCase(userPreferencesRepository),
         saveStudySessionPreference = SaveStudySessionPreferenceUseCase(studySessionPreferencesRepository),
         signOutUseCase = signOutUseCase,
         voiceSettingsController = voiceSettingsController,
+    )
+
+    @Test
+    fun `the signed in user's photo and name reach the avatar fields`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        authRepository.userToReturn = authUser(displayName = USER_NAME, photoUrl = USER_PHOTO_URL)
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            avatarPhotoUrl shouldBe USER_PHOTO_URL
+            avatarDisplayName shouldBe USER_NAME
+        }
+    }
+
+    @Test
+    fun `a null user emission keeps the last avatar fields`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        authRepository.userToReturn = authUser(displayName = USER_NAME, photoUrl = USER_PHOTO_URL)
+        advanceUntilIdle()
+
+        authRepository.userToReturn = null
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            avatarPhotoUrl shouldBe USER_PHOTO_URL
+            avatarDisplayName shouldBe USER_NAME
+        }
+    }
+
+    private fun authUser(displayName: String?, photoUrl: String?) = AuthUser(
+        uid = "uid-1",
+        email = "user@example.com",
+        displayName = displayName,
+        photoUrl = photoUrl,
     )
 
     @Test
@@ -509,6 +551,8 @@ class SettingsViewModelTest {
         const val FEWER_ATTEMPTS = 1
         val DEFAULT_SUBCATEGORY_COUNT_RANGE = 3..5
         val NARROWER_SUBCATEGORY_COUNT_RANGE = 2..3
+        const val USER_NAME = "Alex Smith"
+        const val USER_PHOTO_URL = "https://host/photo=s256-c"
         const val LONGER_GOAL = DailyGoal.DEFAULT_MINUTES + DailyGoal.STEP_MINUTES
         const val FASTER_SPEECH_RATE = 1.25f
         const val VOICE_ID = "en-us-x-tpf-local"

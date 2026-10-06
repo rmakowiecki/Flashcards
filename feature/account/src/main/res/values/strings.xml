@@ -3,6 +3,7 @@
     <string name="account_sign_out_button">Sign out</string>
     <string name="account_signed_in_with_google_label">Signed in with Google</string>
     <string name="account_manage_button">Manage</string>
+    <string name="account_manage_failed_message">Couldn\'t open the link</string>
 
     <string name="account_support_label">Support</string>
     <string name="account_contact_support_label">Contact support</string>

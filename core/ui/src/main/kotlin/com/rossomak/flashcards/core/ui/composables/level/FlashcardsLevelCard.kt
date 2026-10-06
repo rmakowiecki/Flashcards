@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -41,23 +42,20 @@ import com.rossomak.flashcards.core.ui.theme.spacing
  */
 private const val LEVEL_CARD_MUTED_TEXT_ALPHA = 0.7f
 
-private const val SHOWCASE_DISPLAY_NAME = "Jane Doe"
-
 /**
  * The account-wide "current level" card: the signed-in User's [FlashcardsAvatar] beside their level
  * number and XP progress. There is no rank/tier pill (BRONZE/SILVER/GOLD) at all, not even a stub —
  * it is explicitly out of scope for now.
  *
- * Supports both [FlashcardsComponentStyle] values, following the same container/border shape as
- * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner]: [OnSurface] is a flat
- * tonal card ([com.rossomak.flashcards.core.ui.theme.BrandColors.tonalButtonContainer], no border),
- * [OnGradient] is the translucent-white-on-brand-gradient treatment
- * ([com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContainer] plus a hairline border)
- * matching [FlashcardsLinearProgressBar]'s own `OnGradient` style.
+ * Only the container differs between the two [FlashcardsComponentStyle] values; the content is always
+ * white and drawn in the `OnGradient` style, because both containers are brand gradient:
+ * - [OnSurface]: the card is on a plain surface, so it paints its own
+ *   [com.rossomak.flashcards.core.ui.theme.BrandColors.screenGradient], with no border.
+ * - [OnGradient]: the card is on that same gradient already, so it is the translucent white
+ *   [com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContainer] plus a hairline border
+ *   that gives it an edge.
  *
- * The avatar follows the card's [style] and is decorative next to the level readout. In [OnSurface]
- * its tonal container is the card's own, so the circle blends into the card and only the initials
- * or icon show.
+ * The avatar is decorative next to the level readout.
  *
  * The mock's frosted-glass `OnGradient` surface (`rgba(255,255,255,0.11)` + backdrop blur) is
  * approximated with a flat translucent container color only — `Modifier.blur` needs API 31+ and
@@ -81,19 +79,25 @@ fun FlashcardsLevelCard(
     style: FlashcardsComponentStyle = OnSurface,
 ) {
     val brandColors = MaterialTheme.brandColors
-    val onGradient = style == OnGradient
-    val containerColor = if (onGradient) brandColors.onGradientContainer else brandColors.tonalButtonContainer
-    val contentColor = if (onGradient) brandColors.onGradientContent else brandColors.onTonalButtonContainer
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.large)
+    val contentColor = brandColors.onGradientContent
     val mutedContentColor = contentColor.copy(alpha = LEVEL_CARD_MUTED_TEXT_ALPHA)
-    val border = if (onGradient) {
-        BorderStroke(width = MaterialTheme.sizes.onGradientBorder, color = brandColors.onGradientBorder)
-    } else {
-        null
+    val containerModifier = when (style) {
+        OnSurface -> Modifier.background(brandColors.screenGradient, shape)
+        OnGradient -> Modifier
+    }
+    val containerColor = when (style) {
+        OnSurface -> Color.Transparent
+        OnGradient -> brandColors.onGradientContainer
+    }
+    val border = when (style) {
+        OnSurface -> null
+        OnGradient -> BorderStroke(width = MaterialTheme.sizes.onGradientBorder, color = brandColors.onGradientBorder)
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.large),
+        modifier = modifier.fillMaxWidth().then(containerModifier),
+        shape = shape,
         color = containerColor,
         contentColor = contentColor,
         border = border,
@@ -108,7 +112,7 @@ fun FlashcardsLevelCard(
                 displayName = displayName,
                 size = FlashcardsAvatarSize.Medium,
                 contentDescription = null,
-                style = style,
+                style = OnGradient,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -134,7 +138,7 @@ fun FlashcardsLevelCard(
                         fontWeight = FontWeight.ExtraBold,
                     )
                 }
-                FlashcardsLinearProgressBar(progress = progress, style = style)
+                FlashcardsLinearProgressBar(progress = progress, style = OnGradient)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -158,6 +162,7 @@ fun FlashcardsLevelCard(
 }
 
 @ShowkaseComposable(name = "Level card", group = "Level")
+@Preview
 @Composable
 fun FlashcardsLevelCardShowcase() {
     FlashcardsTheme {
@@ -168,7 +173,7 @@ fun FlashcardsLevelCardShowcase() {
                 xpForNextLevel = 6_000L,
                 progress = 2_300f / 6_000f,
                 photoUrl = null,
-                displayName = SHOWCASE_DISPLAY_NAME,
+                displayName = "Jane Doe",
                 modifier = Modifier.padding(MaterialTheme.spacing.normal),
             )
         }
@@ -191,30 +196,7 @@ fun FlashcardsLevelCardOnGradientShowcase() {
                 xpForNextLevel = 5_000L,
                 progress = 2_840f / 5_000f,
                 photoUrl = null,
-                displayName = SHOWCASE_DISPLAY_NAME,
-                style = OnGradient,
-            )
-        }
-    }
-}
-
-@ShowkaseComposable(name = "Level card — on gradient, no name", group = "Level")
-@Preview
-@Composable
-fun FlashcardsLevelCardOnGradientIconShowcase() {
-    FlashcardsTheme {
-        Box(
-            modifier = Modifier
-                .background(MaterialTheme.brandColors.screenGradient)
-                .padding(MaterialTheme.spacing.normal),
-        ) {
-            FlashcardsLevelCard(
-                level = 12,
-                xpIntoCurrentLevel = 2_840L,
-                xpForNextLevel = 5_000L,
-                progress = 2_840f / 5_000f,
-                photoUrl = null,
-                displayName = null,
+                displayName = "Jane Doe",
                 style = OnGradient,
             )
         }
@@ -236,33 +218,22 @@ private fun FlashcardsLevelCardPreview() {
                     xpForNextLevel = 6_000L,
                     progress = 2_300f / 6_000f,
                     photoUrl = null,
-                    displayName = SHOWCASE_DISPLAY_NAME,
+                    displayName = "Jane Doe",
                 )
                 Box(
                     modifier = Modifier
                         .background(MaterialTheme.brandColors.screenGradient)
                         .padding(MaterialTheme.spacing.normal),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)) {
-                        FlashcardsLevelCard(
-                            level = 12,
-                            xpIntoCurrentLevel = 2_840L,
-                            xpForNextLevel = 5_000L,
-                            progress = 2_840f / 5_000f,
-                            photoUrl = null,
-                            displayName = SHOWCASE_DISPLAY_NAME,
-                            style = OnGradient,
-                        )
-                        FlashcardsLevelCard(
-                            level = 12,
-                            xpIntoCurrentLevel = 2_840L,
-                            xpForNextLevel = 5_000L,
-                            progress = 2_840f / 5_000f,
-                            photoUrl = null,
-                            displayName = null,
-                            style = OnGradient,
-                        )
-                    }
+                    FlashcardsLevelCard(
+                        level = 12,
+                        xpIntoCurrentLevel = 2_840L,
+                        xpForNextLevel = 5_000L,
+                        progress = 2_840f / 5_000f,
+                        photoUrl = null,
+                        displayName = "Jane Doe",
+                        style = OnGradient,
+                    )
                 }
             }
         }
