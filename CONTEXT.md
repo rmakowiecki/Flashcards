@@ -130,6 +130,10 @@ _Avoid_: Flag, Flag Action, Curation Flag
 A specific fix directive attached to a Curation Request. Values: `DifficultyTooEasy` (raise difficulty), `DifficultyTooHard` (lower difficulty), `WrongTags` (tags don't fit the card), `NeedsCodeExample` (answer needs a code block), `BacktickRedo` (inline-code formatting is wrong), `FullRedo` (factually wrong or structurally broken), `Delete` (card is duplicate or worthless). `DifficultyTooEasy` and `DifficultyTooHard` are mutually exclusive; all other actions can coexist. Every value gets a row in the Report a Problem dialog — enforced at compile-by-check time against `CurationAction.entries`, so a new action cannot be added without a row. Presented to the user as: "Raise the difficulty," "Lower the difficulty," "Wrong tags," "Needs a code example," "Formatting looks broken," "Needs a full rewrite," "Duplicate or low quality."
 _Avoid_: Flag Action, Curation Type, Curation Flag Action
 
+**Bug Report**:
+A User's free-text description of a problem with the app, a severity they pick (Blocker, Minor or Cosmetic), and automatic installation details (app version, device model, Android version). Sent through the `submitBugReport` server function and stored top-level for triage ([ADR-0058](docs/adr/0058-bug-reports-written-only-by-a-callable.md)).
+_Avoid_: Feedback, Ticket, Issue
+
 ### Activities
 
 **Study Creation**:
@@ -207,4 +211,5 @@ _Avoid_: Account removal, Deactivation
 - A **User** accumulates **XP** through study activity; XP determines **Level**
 - A **Streak** belongs to a **User** and increments once per calendar day a Study Session reaches the Session Summary screen
 - A **Daily Goal** belongs to a **User** and is compared against today's total studied minutes
+- A **Bug Report** is written by one **User**; **Account Deletion** removes the User's Bug Reports
 
