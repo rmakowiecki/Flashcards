@@ -34,12 +34,12 @@ class AccountViewModelTest {
     private val getAppVersion: GetAppVersionUseCase = mockk {
         coEvery { this@mockk() } returns APP_VERSION
     }
-    private val signOutUseCase: SignOutUseCase = mockk()
+    private val signOut: SignOutUseCase = mockk()
 
-    private fun createViewModel(signOutUseCaseOverride: SignOutUseCase = signOutUseCase): AccountViewModel = AccountViewModel(
+    private fun createViewModel(signOutOverride: SignOutUseCase = signOut): AccountViewModel = AccountViewModel(
         observeAuthUser = ObserveAuthUserUseCase(authRepository),
         getAppVersion = getAppVersion,
-        signOutUseCase = signOutUseCaseOverride,
+        signOut = signOutOverride,
     )
 
     private fun authUser(
@@ -142,12 +142,12 @@ class AccountViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.value.activeDialog shouldBe null
-        coVerify(exactly = 0) { signOutUseCase() }
+        coVerify(exactly = 0) { signOut() }
     }
 
     @Test
     fun `confirming sign out signs out and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } returns Unit
+        coEvery { signOut() } returns Unit
 
         val viewModel = createViewModel()
         viewModel.onDialogEvent(Open(SignOut))
@@ -157,12 +157,12 @@ class AccountViewModelTest {
             awaitItem() shouldBe AccountDestination.Login
         }
         viewModel.state.value.activeDialog shouldBe null
-        coVerify(exactly = 1) { signOutUseCase() }
+        coVerify(exactly = 1) { signOut() }
     }
 
     @Test
     fun `confirming sign out emits Login even when sign-out fails`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { signOutUseCase() } throws RuntimeException("sign-out failed")
+        coEvery { signOut() } throws RuntimeException("sign-out failed")
 
         val viewModel = createViewModel()
         viewModel.onDialogEvent(Open(SignOut))
@@ -171,12 +171,12 @@ class AccountViewModelTest {
         viewModel.events.test {
             awaitItem() shouldBe AccountDestination.Login
         }
-        coVerify(exactly = 1) { signOutUseCase() }
+        coVerify(exactly = 1) { signOut() }
     }
 
     @Test
     fun `signing out keeps the last user in the state`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel(signOutUseCaseOverride = SignOutUseCase(authRepository))
+        val viewModel = createViewModel(signOutOverride = SignOutUseCase(authRepository))
         authRepository.userToReturn = authUser()
         advanceUntilIdle()
 

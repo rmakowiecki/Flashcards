@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 class AccountViewModel @Inject constructor(
     private val observeAuthUser: ObserveAuthUserUseCase,
     private val getAppVersion: GetAppVersionUseCase,
-    private val signOutUseCase: SignOutUseCase,
+    private val signOut: SignOutUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AccountScreenState())
@@ -85,16 +85,16 @@ class AccountViewModel @Inject constructor(
         when (_state.value.activeDialog) {
             SignOut -> {
                 _state.update { it.copy(activeDialog = null) }
-                signOut()
+                performSignOut()
             }
             null -> Unit
         }
     }
 
-    private fun signOut() {
+    private fun performSignOut() {
         viewModelScope.launch {
             try {
-                signOutUseCase()
+                signOut()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
