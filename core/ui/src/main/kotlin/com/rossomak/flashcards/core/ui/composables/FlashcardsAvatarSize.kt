@@ -13,15 +13,9 @@ import com.rossomak.flashcards.core.ui.theme.sizes
  * person icon and the photo all scale linearly with it.
  */
 enum class FlashcardsAvatarSize {
-    /** Settings' top app bar. */
     Small,
-
-    /** The level card. */
     Medium,
-
-    /** The Account header. */
-    Large,
-    ;
+    Large;
 
     val diameter: Dp
         @Composable get() = with(MaterialTheme.sizes) {

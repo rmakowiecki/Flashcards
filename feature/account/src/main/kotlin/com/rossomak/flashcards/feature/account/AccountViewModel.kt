@@ -2,11 +2,14 @@ package com.rossomak.flashcards.feature.account
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
+import com.rossomak.flashcards.feature.account.AccountMessage.ManageAccountFailed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -16,12 +19,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class AccountViewModel @Inject constructor(
+    private val observeAuthUser: ObserveAuthUserUseCase,
     private val getAppVersion: GetAppVersionUseCase,
 ) : ViewModel() {
 
@@ -39,6 +44,26 @@ class AccountViewModel @Inject constructor(
             val appVersion = getAppVersion()
             _state.update { it.copy(appVersion = appVersion) }
         }
+        viewModelScope.launch {
+            // A null emission only comes while the screen is on its way out (sign-out), so the last
+            // user stays rather than blanking the header during the exit transition.
+            observeAuthUser().filterNotNull().collect(::applyUser)
+        }
+    }
+
+    private fun applyUser(user: AuthUser) {
+        _state.update {
+            it.copy(
+                displayName = user.displayName,
+                email = user.email,
+                photoUrl = user.photoUrl,
+            )
+        }
+    }
+
+    /** The system found no app to open the Manage link with. */
+    fun onManageAccountFailed() {
+        _messages.tryEmit(ManageAccountFailed)
     }
 
     /** Single entry point for every dialog on this screen. */
