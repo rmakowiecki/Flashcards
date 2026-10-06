@@ -47,6 +47,67 @@ workflows:
       - source_branch: "*"
         target_branch: main
 
+  backend-check:
+    summary: Cloud Functions unit tests + Firestore rules tests. Runs only when backend files change.
+    steps:
+    - git-clone@8: {}
+    - restore-cache@2:
+        inputs:
+        - key: |-
+            npm-{{ checksum "functions/package-lock.json" }}-{{ checksum "firestore-tests/package-lock.json" }}
+            npm-
+        - paths: |-
+            ~/.npm
+            ~/.cache/firebase/emulators
+    - script@1:
+        title: Install JDK 21 for Firebase emulators
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -euo pipefail
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq openjdk-21-jdk-headless
+            JAVA_21_HOME="$(ls -d /usr/lib/jvm/java-21-openjdk-* | head -n1)"
+            envman add --key JAVA_HOME --value "$JAVA_21_HOME"
+            envman add --key PATH --value "$JAVA_21_HOME/bin:$PATH"
+            "$JAVA_21_HOME/bin/java" -version
+    - script@1:
+        title: Functions tests
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -euo pipefail
+            cd functions && npm ci && npm test
+    - script@1:
+        title: Firestore rules tests
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -euo pipefail
+            cd firestore-tests && npm ci && npm test
+    - save-cache@1:
+        title: Save cache (never from PR builds)
+        run_if: ".IsCI | and (not .IsPR)"
+        inputs:
+        - key: npm-{{ checksum "functions/package-lock.json" }}-{{ checksum "firestore-tests/package-lock.json" }}
+        - paths: |-
+            ~/.npm
+            ~/.cache/firebase/emulators
+    triggers:
+      pull_request:
+      - source_branch: "*"
+        target_branch: develop
+        changed_files:
+          regex: '^(functions/|firestore-tests/|firestore\.rules$|firebase\.json$|bitrise\.yml$)'
+      - source_branch: "*"
+        target_branch: main
+        changed_files:
+          regex: '^(functions/|firestore-tests/|firestore\.rules$|firebase\.json$|bitrise\.yml$)'
+      push:
+      - branch: develop
+        changed_files:
+          regex: '^(functions/|firestore-tests/|firestore\.rules$|firebase\.json$|bitrise\.yml$)'
+
   deploy-internal:
     summary: Push to main. Builds signed debug+release APKs, distributes both to Firebase App Distribution.
     steps:
