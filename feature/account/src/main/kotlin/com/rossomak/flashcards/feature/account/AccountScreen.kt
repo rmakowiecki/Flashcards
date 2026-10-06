@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.account
 
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
@@ -46,6 +47,7 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.AppVersion
+import com.rossomak.flashcards.core.domain.model.InstallationInfo
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
@@ -55,6 +57,8 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import kotlinx.coroutines.launch
 
@@ -70,22 +74,30 @@ fun AccountScreen(
     val clipboardScope = rememberCoroutineScope()
     val clipLabel = stringResource(R.string.account_app_version_label)
 
-    // An empty sealed interface cannot be matched exhaustively, so each variant added to
-    // AccountDestination turns this body into a `when (destination)`.
-    observeAsEvents(viewModel.events) { _ -> }
+    val context = LocalContext.current
+
+    observeAsEvents(viewModel.events) { destination ->
+        when (destination) {
+            is ContactSupport -> {
+                val emailIntent = supportEmailIntent(context, destination.installationInfo, destination.uid)
+                if (!context.tryStartActivity(emailIntent)) viewModel.onNoEmailAppFound()
+            }
+        }
+    }
 
     val openLinkFailedMessage = stringResource(R.string.account_open_link_failed_message)
+    val noEmailAppMessage = stringResource(R.string.account_no_email_app_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         val text = when (message) {
             OpenLinkFailed -> openLinkFailedMessage
+            NoEmailApp -> noEmailAppMessage
         }
         snackbarScope.launch {
             snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
         }
     }
 
-    val context = LocalContext.current
     val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
     val darkTheme = isSystemInDarkTheme()
 
@@ -100,7 +112,7 @@ fun AccountScreen(
             val manageIntent = Intent(Intent.ACTION_VIEW, manageAccountUrl(state.email).toUri())
             if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
         },
-        onContactSupportClick = {},
+        onContactSupportClick = viewModel::onContactSupportClick,
         onReportBugClick = {},
         onPrivacyPolicyClick = {
             if (!context.tryStartActivity(privacyPolicyIntent(surfaceColor, darkTheme))) viewModel.onOpenLinkFailed()
@@ -300,6 +312,33 @@ private fun privacyPolicyIntent(surfaceColor: Int, darkTheme: Boolean): Intent {
         .setColorScheme(if (darkTheme) CustomTabsIntent.COLOR_SCHEME_DARK else CustomTabsIntent.COLOR_SCHEME_LIGHT)
         .build()
     return customTabsIntent.intent.apply { data = PRIVACY_POLICY_URL.toUri() }
+}
+
+private const val SUPPORT_EMAIL_ADDRESS = "flashcardsdev@gmail.com"
+
+/** An email draft to support; the address goes in an extra so the URI needs no encoding. */
+private fun supportEmailIntent(context: Context, installationInfo: InstallationInfo, uid: String?): Intent =
+    Intent(Intent.ACTION_SENDTO, "mailto:".toUri()).apply {
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_EMAIL_ADDRESS))
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.account_support_email_subject_label))
+        putExtra(Intent.EXTRA_TEXT, supportEmailBody(context, installationInfo, uid))
+    }
+
+/**
+ * The support details first, then two empty lines. Email apps put the caret at the end of the body, so
+ * the User starts typing below the details; the account line is omitted when signed out.
+ */
+internal fun supportEmailBody(context: Context, installationInfo: InstallationInfo, uid: String?): String {
+    val (appVersion, deviceInfo) = installationInfo
+    return listOfNotNull(
+        context.getString(R.string.account_support_email_details_label),
+        context.getString(R.string.account_support_email_app_version_label, appVersion.name, appVersion.code),
+        context.getString(R.string.account_support_email_device_label, deviceInfo.model),
+        context.getString(R.string.account_support_email_android_version_label, deviceInfo.systemVersion),
+        uid?.let { context.getString(R.string.account_support_email_account_id_label, it) },
+        "",
+        "",
+    ).joinToString(separator = "\n")
 }
 
 @PreviewLightDark
