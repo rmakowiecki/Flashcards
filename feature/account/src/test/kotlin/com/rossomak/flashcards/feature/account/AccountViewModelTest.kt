@@ -15,6 +15,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
+import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
@@ -167,6 +168,17 @@ class AccountViewModelTest {
             viewModel.onOpenLinkFailed()
 
             awaitItem() shouldBe OpenLinkFailed
+        }
+    }
+
+    @Test
+    fun `an Open-source licenses click emits OpenSourceLicenses`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onOpenSourceLicensesClick()
+
+            awaitItem() shouldBe OpenSourceLicenses
         }
     }
 

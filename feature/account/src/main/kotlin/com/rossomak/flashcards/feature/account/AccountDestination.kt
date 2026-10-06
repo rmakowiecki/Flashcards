@@ -6,6 +6,8 @@ import com.rossomak.flashcards.core.ui.navigation.NavigationEvent
 sealed interface AccountDestination : NavigationEvent {
     data object Login : AccountDestination
 
+    data object OpenSourceLicenses : AccountDestination
+
     /** [uid] is the signed-in user's account id, `null` when signed out. */
     data class ContactSupport(val installationInfo: InstallationInfo, val uid: String?) : AccountDestination
 }

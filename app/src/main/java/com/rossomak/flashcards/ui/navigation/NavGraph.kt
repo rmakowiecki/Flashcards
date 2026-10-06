@@ -12,6 +12,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.rossomak.flashcards.R
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
@@ -23,6 +24,8 @@ import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.feature.account.AccountRoute
 import com.rossomak.flashcards.feature.account.AccountScreen
+import com.rossomak.flashcards.feature.account.OpenSourceLicensesRoute
+import com.rossomak.flashcards.feature.account.OpenSourceLicensesScreen
 import com.rossomak.flashcards.feature.auth.AuthRoute
 import com.rossomak.flashcards.feature.auth.LoginScreen
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
@@ -311,6 +314,9 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
     composable<AccountRoute> {
         AccountScreen(
             onNavigateBack = { navController.popBackStack() },
+            onNavigateToOpenSourceLicenses = {
+                navController.navigate(OpenSourceLicensesRoute) { launchSingleTop = true }
+            },
             onNavigateToLogin = {
                 navController.navigate(AuthRoute) {
                     popUpTo(Main) { inclusive = true }
@@ -318,6 +324,15 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
                     launchSingleTop = true
                 }
             },
+        )
+    }
+}
+
+private fun NavGraphBuilder.openSourceLicensesDestination(navController: NavHostController) {
+    composable<OpenSourceLicensesRoute> {
+        OpenSourceLicensesScreen(
+            librariesResId = R.raw.aboutlibraries,
+            onNavigateBack = { navController.popBackStack() },
         )
     }
 }
@@ -362,6 +377,7 @@ fun FlashcardsNavGraph(
                     )
                 }
                 accountDestination(navController)
+                openSourceLicensesDestination(navController)
                 composable<CategoryDetailsRoute> {
                     CategoryDetailsScreen(
                         onNavigateBack = { navController.popBackStack() },
