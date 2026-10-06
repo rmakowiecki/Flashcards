@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val signInWithGoogle: SignInWithGoogleUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
 ) : ViewModel() {
 
@@ -34,7 +34,7 @@ class LoginViewModel @Inject constructor(
 
     fun onGoogleIdTokenReceived(idToken: String) {
         viewModelScope.launch {
-            signInWithGoogleUseCase(idToken)
+            signInWithGoogle(idToken)
                 .onSuccess {
                     _state.update { it.copy(isSigningIn = false, failureReason = null) }
                     // The onboarding flag is device-scoped, so a second account signing in on a
