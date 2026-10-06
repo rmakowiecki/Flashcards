@@ -47,7 +47,10 @@ that failed.
 - **There is no transaction.** Auth cannot join a Firestore transaction, and a User's documents can
   exceed a transaction's write limit. The ordering and idempotency stand in for atomicity.
 - **There is no recent-sign-in requirement.** The guard proves the session is still active, and the
-  confirmation dialog is the only gate before deletion.
+  confirmation dialog is the only gate before deletion. A gate on the token's `auth_time` would only
+  stop someone holding a stolen, unexpired ID token. That person could already read all of the User's
+  data, and `auth_time` survives a token refresh, so the gate would force a real re-login on the User
+  for little protection.
 
 ## Consequences
 
@@ -59,6 +62,12 @@ that failed.
   documents behind once the Auth user is gone, with no one able to delete them. The window is a few
   hundred milliseconds and needs a submission in flight at that moment. It is accepted: closing it
   would cost every submission an extra read of a deletion marker.
+- Security rules do not check revocation, so an ID token issued before step 4 stays valid for up to an
+  hour. A second device holding one can still write the two client-writable documents,
+  `users/{uid}/favorites/state` and `users/{uid}/curationRequests/*`, after the Auth user is deleted.
+  What survives holds no personal data, only card and Subcategory ids, under a uid that no sign-in can
+  reach again, because signing in with the same account creates a new uid. It is accepted for the same
+  reason: closing it would cost a deletion-marker read on every such write.
 - A successful deletion is not logged.
 - Each deletion costs one Auth read, the reads and deletes of every document the User has, the Bug
   Report queries, and two Auth writes.
