@@ -2,6 +2,9 @@ package com.rossomak.flashcards.feature.account
 
 import android.content.ClipData
 import android.content.Intent
+import androidx.browser.customtabs.CustomTabColorSchemeParams
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -31,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -82,6 +86,8 @@ fun AccountScreen(
     }
 
     val context = LocalContext.current
+    val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
+    val darkTheme = isSystemInDarkTheme()
 
     AccountContent(
         modifier = modifier,
@@ -96,7 +102,9 @@ fun AccountScreen(
         },
         onContactSupportClick = {},
         onReportBugClick = {},
-        onPrivacyPolicyClick = {},
+        onPrivacyPolicyClick = {
+            if (!context.tryStartActivity(privacyPolicyIntent(surfaceColor, darkTheme))) viewModel.onOpenLinkFailed()
+        },
         onOpenSourceLicensesClick = {},
         onAppVersionCopy = { versionLabel ->
             clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(clipLabel, versionLabel))) }
@@ -274,6 +282,24 @@ private fun ExternalLinkIcon() {
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+private const val PRIVACY_POLICY_URL = "https://flashcards-8ad6d.web.app/privacy"
+
+/**
+ * The launch intent for the hosted policy in a Custom Tab. The tab always follows the app's own
+ * light or dark setting, with [surfaceColor] on its toolbar and navigation bar.
+ */
+private fun privacyPolicyIntent(surfaceColor: Int, darkTheme: Boolean): Intent {
+    val colorSchemeParams = CustomTabColorSchemeParams.Builder()
+        .setToolbarColor(surfaceColor)
+        .setNavigationBarColor(surfaceColor)
+        .build()
+    val customTabsIntent = CustomTabsIntent.Builder()
+        .setDefaultColorSchemeParams(colorSchemeParams)
+        .setColorScheme(if (darkTheme) CustomTabsIntent.COLOR_SCHEME_DARK else CustomTabsIntent.COLOR_SCHEME_LIGHT)
+        .build()
+    return customTabsIntent.intent.apply { data = PRIVACY_POLICY_URL.toUri() }
 }
 
 @PreviewLightDark
