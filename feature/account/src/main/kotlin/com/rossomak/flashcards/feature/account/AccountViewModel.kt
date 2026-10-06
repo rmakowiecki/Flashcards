@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.account
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AccountViewModel @Inject constructor(
     private val observeAuthUser: ObserveAuthUserUseCase,
+    private val getAppVersion: GetAppVersionUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AccountScreenState())
@@ -38,6 +40,10 @@ class AccountViewModel @Inject constructor(
     val messages: SharedFlow<AccountMessage> = _messages.asSharedFlow()
 
     init {
+        viewModelScope.launch {
+            val appVersion = getAppVersion()
+            _state.update { it.copy(appVersion = appVersion) }
+        }
         viewModelScope.launch {
             // A null emission only comes while the screen is on its way out (sign-out), so the last
             // user stays rather than blanking the header during the exit transition.

@@ -10,7 +10,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import com.rossomak.flashcards.BuildConfig
-import com.rossomak.flashcards.feature.debug.BuildInfo
 import com.rossomak.flashcards.feature.debug.DebugGraph
 import com.rossomak.flashcards.feature.debug.DebugRoot
 import com.rossomak.flashcards.feature.debug.DebugScreen
@@ -49,11 +48,7 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
     navigation<DebugGraph>(startDestination = DebugRoot) {
         composable<DebugRoot> {
             DebugScreen(
-                buildInfo = BuildInfo(
-                    versionName = BuildConfig.VERSION_NAME,
-                    versionCode = BuildConfig.VERSION_CODE,
-                    gitShortSha = BuildConfig.GIT_SHORT_SHA,
-                ),
+                gitShortSha = BuildConfig.GIT_SHORT_SHA,
                 onNavigateToOnboarding = onNavigateToOnboarding,
                 onNavigateToVoiceDebug = { navController.navigate(DebugVoiceRoot) },
                 onNavigateToVoiceIndicatorDebug = { navController.navigate(DebugVoiceIndicatorRoot) },
