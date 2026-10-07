@@ -17,23 +17,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Blocker
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
+import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Opacity of the whole field when it is disabled, as on the option cards in the severity dialog. */
-private const val DISABLED_ALPHA = 0.6f
 
 /**
  * The form's severity field: a card showing the chosen severity, or a muted placeholder while there
@@ -41,20 +41,23 @@ private const val DISABLED_ALPHA = 0.6f
  * decoration.
  */
 @Composable
-internal fun SeverityField(
+internal fun ReportBugSeverityField(
     severity: BugReportSeverity?,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val option = severity?.option()
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.card)
+    // The card is one node for TalkBack: the field's name, then its value ("Severity, Looks wrong, button").
+    val fieldName = stringResource(R.string.report_bug_severity_label)
+    val fieldValue = stringResource(option?.title ?: R.string.report_bug_severity_hint)
 
-    FlashcardsOverlineLabel(text = stringResource(R.string.report_bug_severity_label))
+    FlashcardsOverlineLabel(text = fieldName)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = MaterialTheme.spacing.normal)
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .disabledAlpha(enabled)
             // Clipped before `clickable` so the ripple follows the rounded corners.
             .clip(shape)
             .clickable(
@@ -62,7 +65,11 @@ internal fun SeverityField(
                 onClickLabel = stringResource(R.string.report_bug_severity_hint),
                 role = Role.Button,
                 onClick = onClick,
-            ),
+            )
+            .semantics {
+                contentDescription = fieldName
+                stateDescription = fieldValue
+            },
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(width = MaterialTheme.sizes.hairline, color = MaterialTheme.colorScheme.outlineVariant),
@@ -118,30 +125,30 @@ internal fun SeverityField(
 
 @PreviewLightDark
 @Composable
-private fun SeverityFieldEmptyPreview() {
+private fun ReportBugSeverityFieldEmptyPreview() {
     FlashcardsTheme {
         Surface {
-            Column { SeverityField(severity = null, enabled = true, onClick = {}) }
+            Column { ReportBugSeverityField(severity = null, enabled = true, onClick = {}) }
         }
     }
 }
 
 @PreviewLightDark
 @Composable
-private fun SeverityFieldChosenPreview() {
+private fun ReportBugSeverityFieldChosenPreview() {
     FlashcardsTheme {
         Surface {
-            Column { SeverityField(severity = Blocker, enabled = true, onClick = {}) }
+            Column { ReportBugSeverityField(severity = Blocker, enabled = true, onClick = {}) }
         }
     }
 }
 
 @PreviewLightDark
 @Composable
-private fun SeverityFieldDisabledPreview() {
+private fun ReportBugSeverityFieldDisabledPreview() {
     FlashcardsTheme {
         Surface {
-            Column { SeverityField(severity = Blocker, enabled = false, onClick = {}) }
+            Column { ReportBugSeverityField(severity = Blocker, enabled = false, onClick = {}) }
         }
     }
 }

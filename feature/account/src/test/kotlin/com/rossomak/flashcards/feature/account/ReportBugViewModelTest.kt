@@ -23,6 +23,8 @@ import com.rossomak.flashcards.feature.account.ReportBugDialog.Severity
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportFailed
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportNoConnection
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportSent
+import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Delivered
+import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Sending
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -98,7 +100,7 @@ class ReportBugViewModelTest {
         viewModel.onDescriptionChange("another text")
         viewModel.onDialogEvent(Open(Severity(draftState = REPORT_SEVERITY)))
 
-        viewModel.state.value shouldBe filledState.copy(isSending = true)
+        viewModel.state.value shouldBe filledState.copy(submissionStatus = Sending)
     }
 
     @Test
@@ -215,7 +217,7 @@ class ReportBugViewModelTest {
         viewModel.onSendClick()
         advanceUntilIdle()
 
-        viewModel.state.value shouldBe filledState.copy(isSending = true)
+        viewModel.state.value shouldBe filledState.copy(submissionStatus = Sending)
         coVerify(exactly = 1) { submitBugReport(params) }
     }
 
@@ -243,7 +245,7 @@ class ReportBugViewModelTest {
 
             awaitItem() shouldBe ReportSent
         }
-        viewModel.state.value shouldBe filledState.copy(isSent = true)
+        viewModel.state.value shouldBe filledState.copy(submissionStatus = Delivered)
         coVerify(exactly = 1) { submitBugReport(params) }
     }
 
@@ -308,7 +310,25 @@ class ReportBugViewModelTest {
         viewModel.onSendClick()
         advanceUntilIdle()
 
-        viewModel.state.value shouldBe filledState.copy(isSent = true)
+        viewModel.state.value shouldBe filledState.copy(submissionStatus = Delivered)
+        coVerify(exactly = 2) { submitBugReport(params) }
+    }
+
+    @Test
+    fun `a failed send then a discarded close still lets the report be retried`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubSubmit(Failed(NoConnection))
+        val viewModel = createViewModel()
+        viewModel.fill()
+        viewModel.onSendClick()
+        advanceUntilIdle()
+        viewModel.onCloseClick()
+        viewModel.onDialogEvent(Dismiss)
+
+        stubSubmit(Sent)
+        viewModel.onSendClick()
+        advanceUntilIdle()
+
+        viewModel.state.value shouldBe filledState.copy(submissionStatus = Delivered)
         coVerify(exactly = 2) { submitBugReport(params) }
     }
 
@@ -337,6 +357,38 @@ class ReportBugViewModelTest {
             awaitItem() shouldBe Back
         }
         viewModel.state.value shouldBe ReportBugScreenState()
+    }
+
+    @Test
+    fun `closing a blank screen twice leaves once`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onCloseClick()
+            viewModel.onCloseClick()
+
+            awaitItem() shouldBe Back
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `closing during the confirmation leaves once, and the pending auto-close does not leave again`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubSubmit(Sent)
+        val viewModel = createViewModel()
+        viewModel.fill()
+        viewModel.onSendClick()
+        runCurrent()
+
+        viewModel.events.test {
+            viewModel.onCloseClick()
+            awaitItem() shouldBe Back
+
+            advanceTimeBy(ReportBugViewModel.SENT_CONFIRMATION_DURATION + 1.milliseconds)
+            runCurrent()
+
+            expectNoEvents()
+        }
     }
 
     @Test
@@ -403,7 +455,7 @@ class ReportBugViewModelTest {
 
             expectNoEvents()
         }
-        viewModel.state.value shouldBe filledState.copy(isSending = true)
+        viewModel.state.value shouldBe filledState.copy(submissionStatus = Sending)
         coVerify(exactly = 1) { submitBugReport(params) }
     }
 

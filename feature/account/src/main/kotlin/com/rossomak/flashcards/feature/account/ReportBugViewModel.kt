@@ -20,6 +20,9 @@ import com.rossomak.flashcards.feature.account.ReportBugDialog.Severity
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportFailed
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportNoConnection
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportSent
+import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Delivered
+import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Idle
+import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Sending
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration
@@ -50,6 +53,8 @@ class ReportBugViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<ReportBugMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<ReportBugMessage> = _messages.asSharedFlow()
 
+    private var hasLeft = false
+
     fun onDescriptionChange(text: String) {
         _state.update { if (it.isLocked) it else it.copy(draftText = text) }
     }
@@ -58,8 +63,8 @@ class ReportBugViewModel @Inject constructor(
     fun onCloseClick() {
         with(_state.value) {
             when {
-                isSending -> Unit
-                isSent || BugReport.descriptionLength(draftText) == 0 -> leave()
+                submissionStatus == Sending -> Unit
+                submissionStatus == Delivered || BugReport.descriptionLength(draftText) == 0 -> leave()
                 else -> _state.update { it.copy(activeDialog = DiscardReport) }
             }
         }
@@ -69,17 +74,17 @@ class ReportBugViewModel @Inject constructor(
         val report = _state.value
         val severity = report.severity?.takeIf { report.canSend } ?: return
         // Set before launching, so a second Send tap reads a form that is already sending.
-        _state.update { it.copy(isSending = true) }
+        _state.update { it.copy(submissionStatus = Sending) }
         viewModelScope.launch {
             when (val result = submitBugReport(SubmitBugReportUseCase.Params(report.draftText, severity))) {
                 Sent -> {
-                    _state.update { it.copy(isSending = false, isSent = true) }
+                    _state.update { it.copy(submissionStatus = Delivered) }
                     _messages.tryEmit(ReportSent)
                     delay(SENT_CONFIRMATION_DURATION)
                     leave()
                 }
                 is Failed -> {
-                    _state.update { it.copy(isSending = false) }
+                    _state.update { it.copy(submissionStatus = Idle) }
                     _messages.tryEmit(result.reason.toMessage())
                 }
             }
@@ -105,7 +110,10 @@ class ReportBugViewModel @Inject constructor(
         }
     }
 
+    /** Emits [Back] once, however many times the user closes or the auto-close fires. */
     private fun leave() {
+        if (hasLeft) return
+        hasLeft = true
         viewModelScope.launch { eventChannel.send(Back) }
     }
 

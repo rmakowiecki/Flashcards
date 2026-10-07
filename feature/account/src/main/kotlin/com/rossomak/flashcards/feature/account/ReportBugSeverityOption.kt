@@ -12,24 +12,24 @@ import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Cosmetic
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Minor
 
 /** How a severity reads: on the form's field and as a card in the severity dialog. */
-internal class SeverityOption(
+internal class ReportBugSeverityOption(
     @StringRes val title: Int,
     @StringRes val description: Int,
     val icon: ImageVector,
 )
 
-internal fun BugReportSeverity.option(): SeverityOption = when (this) {
-    Blocker -> SeverityOption(
+internal fun BugReportSeverity.option(): ReportBugSeverityOption = when (this) {
+    Blocker -> ReportBugSeverityOption(
         title = R.string.report_bug_severity_blocker_label,
         description = R.string.report_bug_severity_blocker_message,
         icon = Icons.Default.ErrorOutline,
     )
-    Minor -> SeverityOption(
+    Minor -> ReportBugSeverityOption(
         title = R.string.report_bug_severity_minor_label,
         description = R.string.report_bug_severity_minor_message,
         icon = Icons.Default.WarningAmber,
     )
-    Cosmetic -> SeverityOption(
+    Cosmetic -> ReportBugSeverityOption(
         title = R.string.report_bug_severity_cosmetic_label,
         description = R.string.report_bug_severity_cosmetic_message,
         icon = Icons.Default.Brush,

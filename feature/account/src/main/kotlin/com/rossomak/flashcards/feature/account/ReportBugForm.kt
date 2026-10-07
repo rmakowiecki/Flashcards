@@ -36,7 +36,7 @@ internal fun ColumnScope.ReportBugForm(
     onSeverityClick: () -> Unit,
     onDescriptionChange: (String) -> Unit,
 ) {
-    SeverityField(
+    ReportBugSeverityField(
         severity = state.severity,
         enabled = !state.isLocked,
         onClick = onSeverityClick,
@@ -56,13 +56,20 @@ internal fun ColumnScope.ReportBugForm(
     )
 }
 
+/** The inset every block under the severity field shares: the screen's side gutter, and a gap above. */
+@Composable
+private fun Modifier.formBlockPadding(): Modifier = padding(
+    start = MaterialTheme.spacing.normal,
+    top = MaterialTheme.spacing.normal,
+    end = MaterialTheme.spacing.normal,
+)
+
 @Composable
 private fun GuidingQuestions() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.normal)
-            .padding(top = MaterialTheme.spacing.normal),
+            .formBlockPadding(),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
     ) {
         GuidingQuestion(text = stringResource(R.string.report_bug_question_activity_message))
@@ -102,8 +109,7 @@ private fun DescriptionField(
         onValueChange = onTextChange,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.normal)
-            .padding(top = MaterialTheme.spacing.normal),
+            .formBlockPadding(),
         enabled = enabled,
         placeholder = { Text(text = stringResource(R.string.report_bug_description_hint)) },
         supportingText = { Text(text = counterText(length)) },

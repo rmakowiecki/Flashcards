@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -32,8 +33,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -41,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.BugReport
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Blocker
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Minor
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
@@ -53,6 +57,7 @@ import com.rossomak.flashcards.feature.account.ReportBugDialog.Severity
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportFailed
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportNoConnection
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportSent
+import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Sending
 import kotlinx.coroutines.launch
 
 @Composable
@@ -80,9 +85,8 @@ fun ReportBugScreen(
             ReportFailed -> reportFailedMessage
             ReportNoConnection -> reportNoConnectionMessage
         }
-        val icon = if (message == ReportSent) Icons.Default.Check else null
         snackbarScope.launch {
-            snackbarHostState.showSnackbar(ReportBugSnackbarVisuals(message = text, icon = icon))
+            snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
         }
     }
 
@@ -127,7 +131,7 @@ private fun ReportBugContent(
                 onSendClick = onSendClick,
             )
         },
-        snackbarHost = { ReportBugSnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -165,13 +169,13 @@ private fun ReportBugTopBar(
                 IconButton(onClick = onCloseClick) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(com.rossomak.flashcards.core.ui.R.string.common_close_cd),
+                        contentDescription = stringResource(CoreUiR.string.common_close_cd),
                     )
                 }
             },
             actions = {
                 SendAction(
-                    isSending = state.isSending,
+                    isSending = state.submissionStatus == Sending,
                     enabled = state.canSend,
                     onClick = onSendClick,
                 )
@@ -200,7 +204,10 @@ private fun SendAction(
             CircularProgressIndicator(
                 modifier = Modifier
                     .size(ButtonDefaults.IconSize)
-                    .semantics { contentDescription = sendingDescription },
+                    .semantics {
+                        contentDescription = sendingDescription
+                        liveRegion = LiveRegionMode.Polite
+                    },
                 strokeWidth = MaterialTheme.sizes.actionProgressStroke,
             )
         }
@@ -236,7 +243,7 @@ private fun ReportBugContentSendingPreview() {
             state = ReportBugScreenState(
                 draftText = "The timer freezes after I rotate the phone during a rated session.",
                 severity = Minor,
-                isSending = true,
+                submissionStatus = Sending,
             ),
             onCloseClick = {},
             onDescriptionChange = {},
