@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
+import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
@@ -37,9 +37,6 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 
 /** Opacity of the primary container used as the selected card's fill. */
 private const val SELECTED_TINT_ALPHA = 0.10f
-
-/** Opacity applied to the whole card when `enabled = false`. */
-private const val DISABLED_ALPHA = 0.6f
 
 /**
  * A single-select option that has to be *explained*, not just named: a leading icon tile, a title,
@@ -79,7 +76,7 @@ fun FlashcardsOptionCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .disabledAlpha(enabled)
             // Clipped before `selectable`, not by the Surface: the Surface only clips what it
             // draws, while the indication belongs to the modifier node above it and would
             // otherwise ripple as a rectangle over the card's rounded corners.
