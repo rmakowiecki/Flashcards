@@ -56,7 +56,6 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Resolved
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Unresolved
 import com.rossomak.flashcards.core.domain.model.UserFavorites
-import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
@@ -83,6 +82,7 @@ import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDe
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsDestination.SubcategoryPreviewStudySession
 import com.rossomak.flashcards.feature.browse.rememberProgressFor
+import com.rossomak.flashcards.core.ui.R as CoreUiR
 
 @Composable
 fun CategoryDetailsScreen(
@@ -289,6 +289,7 @@ private fun CategoryDetailsTopBar(
             selectedCardCount,
             selectedCardCount,
         )
+
         else -> stringResource(R.string.category_details_selection_subtitle_label)
     }
     Column {
@@ -478,7 +479,7 @@ private fun SubcategoryList(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.normal)
+            .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState)
     ) {
