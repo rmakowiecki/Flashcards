@@ -89,10 +89,9 @@ A blocked session cannot play, so nothing would ask for focus and see the call e
 therefore queues a focus request when the session opens during a call; the system grants it once the
 call lets go of focus, and every focus change makes the adapter read the mode again. Below Android 12
 (API 31) the platform has no audio-mode callback and the app does not poll: there the adapter also
-reads the mode when any app's playback starts or stops (API 26 and later), which is how the end of a
-ringtone is seen. Below API 26 a call that ends without a focus change stays unseen until the next
-signal, and the close button leaves the session. A ring that no audio mode reports (a messaging app's
-own ringtone, or a silent ring) cannot be blocked.
+reads the mode when any app's playback starts or stops, which is how the end of a ringtone is seen.
+A ring that no audio mode reports (a messaging app's own ringtone, or a silent ring) cannot be
+blocked.
 
 Signals carry no time; the coordinator stamps each with its time source when it arrives, and the
 60 s window is checked from those stamps at the end of the interruption, so it needs no timer.

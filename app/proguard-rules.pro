@@ -19,3 +19,10 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Serializable domain enums travel in nav routes and in the pending session queue file. core:domain is
+# pure Kotlin and cannot carry @Keep, so the enum classes and their constants are kept by name here:
+# navigation resolves a route's enum argument by loading the class under its serial name, so the class
+# name must survive as well as the members.
+# The MissingKeepAnnotation entries in lint-baseline.xml for these enums are covered by this rule.
+-keep enum com.rossomak.flashcards.core.domain.model.** { *; }
