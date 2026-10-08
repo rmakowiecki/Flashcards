@@ -5,7 +5,7 @@
 ## Project Overview
 - **Package Name**: `com.rossomak.flashcards`
 - **Architecture**: Clean Architecture with MVVM
-- **Minimum SDK**: 24 (Android 7.0)
+- **Minimum SDK**: 26 (Android 8.0)
 - **Target SDK**: 36
 - **Release status**: unreleased, no production users. Breaking changes to persisted or wire formats (local queue files, DataStore, Firestore documents, Cloud Function payloads) are fine: no migrations, legacy fallbacks or decoding defaults for old data. Remove this line once the app ships.
 
