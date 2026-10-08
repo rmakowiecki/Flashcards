@@ -14,6 +14,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.Login
+import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
 import com.rossomak.flashcards.feature.account.AccountDestination.ReportBug
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
@@ -88,6 +89,10 @@ class AccountViewModel @Inject constructor(
 
     fun onReportBugClick() {
         viewModelScope.launch { eventChannel.send(ReportBug) }
+    }
+
+    fun onOpenSourceLicensesClick() {
+        eventChannel.trySend(OpenSourceLicenses)
     }
 
     /** The system found no email app to open the support draft with. */

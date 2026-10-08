@@ -17,6 +17,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
@@ -162,7 +163,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result.isFailure shouldBe true
-        result.exceptionOrNull() shouldBe error
+        result.exceptionOrNull() shouldBeSameInstanceAs error
         verify(exactly = 1) { callableReference.call(any()) }
     }
 

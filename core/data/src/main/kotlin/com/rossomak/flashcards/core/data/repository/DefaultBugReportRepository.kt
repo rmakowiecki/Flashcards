@@ -11,12 +11,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * No connectivity precheck: a callable fails fast offline. A request the server writes but whose
- * answer is lost, or that outlives [BUG_REPORT_TIME_BUDGET] (cancelling does not stop the SDK call),
- * can be retried into a duplicate report. The contract has no idempotency key and the server's
- * rate limit caps it, so it is accepted.
- */
+/** A retry after a lost answer or a timeout can duplicate a report: the contract has no idempotency key. */
 class DefaultBugReportRepository @Inject constructor(
     private val bugReportRemoteDataSource: BugReportRemoteDataSource,
 ) : BugReportRepository {
@@ -25,6 +20,7 @@ class DefaultBugReportRepository @Inject constructor(
         val result = withTimeoutOrNull(BUG_REPORT_TIME_BUDGET) {
             bugReportRemoteDataSource.submitBugReport(report)
         }
+        // The data source never returns null, so null means the time budget ran out.
         if (result == null) {
             loge { "Bug report submission exceeded $BUG_REPORT_TIME_BUDGET" }
             return BugReportSubmissionResult.Failed(BugReportFailureReason.NoConnection)
@@ -39,7 +35,7 @@ class DefaultBugReportRepository @Inject constructor(
     }
 
     companion object {
-        /** A send still running then fails as [BugReportFailureReason.NoConnection]. The SDK's own default is 70 s. */
+        /** A send still running then fails as [BugReportFailureReason.NoConnection]. */
         val BUG_REPORT_TIME_BUDGET: Duration = 20.seconds
     }
 }

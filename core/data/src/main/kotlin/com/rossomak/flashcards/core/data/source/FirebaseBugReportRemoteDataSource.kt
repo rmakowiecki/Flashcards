@@ -12,16 +12,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
-/**
- * The app version name and device model are clipped to the server's limits: a rejection the User
- * cannot fix is worse than a clipped diagnostic. The version code (at least 1) and the Android
- * version (at least 24) are not checked: the code is the git commit count and `minSdk` is 24.
- */
+/** Clips the app version name and device model to the server's limits instead of failing the send. */
 class FirebaseBugReportRemoteDataSource @Inject constructor(
     private val functions: FirebaseFunctions,
 ) : BugReportRemoteDataSource {
 
-    // Broad on purpose: a callable Task can fail with more than FirebaseFunctionsException.
+    // A callable Task can fail with more than FirebaseFunctionsException.
     @Suppress("TooGenericExceptionCaught")
     override suspend fun submitBugReport(report: BugReport): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -43,7 +39,7 @@ class FirebaseBugReportRemoteDataSource @Inject constructor(
         FIELD_ANDROID_VERSION to installationInfo.deviceInfo.systemVersion,
     )
 
-    // Explicit, never `name.lowercase()`: renaming an entry must not change the contract.
+    // Explicit so renaming an entry cannot change the contract.
     private fun BugReportSeverity.toWireValue(): String = when (this) {
         Blocker -> SEVERITY_BLOCKER
         Minor -> SEVERITY_MINOR

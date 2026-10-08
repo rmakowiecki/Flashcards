@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("android-app")
+    alias(libs.plugins.aboutlibraries.android)
 }
 
 val localProperties = Properties().apply {
@@ -94,6 +95,15 @@ android {
     }
     buildFeatures {
         buildConfig = true
+    }
+}
+
+// The Open-source licenses screen lists the libraries of the variant being built. The build stays
+// offline, so license texts come from config/aboutlibraries/licenses, not the network.
+aboutLibraries {
+    offlineMode = true
+    collect {
+        configPath = layout.projectDirectory.dir("config/aboutlibraries")
     }
 }
 

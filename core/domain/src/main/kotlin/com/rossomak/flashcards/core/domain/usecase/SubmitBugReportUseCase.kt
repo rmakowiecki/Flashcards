@@ -10,7 +10,7 @@ import com.rossomak.flashcards.core.domain.repository.InstallationInfoRepository
 import com.rossomak.flashcards.core.domain.usecase.base.UseCase
 import javax.inject.Inject
 
-/** A description outside [BugReport]'s limits after trimming fails with [InvalidDescription] before anything is read or sent. */
+/** Fails with [InvalidDescription] before anything is read or sent. */
 class SubmitBugReportUseCase @Inject constructor(
     private val bugReportRepository: BugReportRepository,
     private val installationInfoRepository: InstallationInfoRepository,
@@ -22,10 +22,10 @@ class SubmitBugReportUseCase @Inject constructor(
     )
 
     override suspend fun invoke(params: Params): BugReportSubmissionResult = with(params) {
-        val trimmedDescription = description.trim()
-        if (BugReport.descriptionLength(trimmedDescription) !in BugReport.MIN_DESCRIPTION_LENGTH..BugReport.MAX_DESCRIPTION_LENGTH) {
+        if (BugReport.descriptionLength(description) !in BugReport.MIN_DESCRIPTION_LENGTH..BugReport.MAX_DESCRIPTION_LENGTH) {
             return BugReportSubmissionResult.Failed(InvalidDescription)
         }
+        val trimmedDescription = description.trim()
         val installationInfo = InstallationInfo(
             appVersion = installationInfoRepository.getAppVersion(),
             deviceInfo = installationInfoRepository.getDeviceInfo(),

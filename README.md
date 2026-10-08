@@ -7,7 +7,7 @@ An Android flashcard app with AI-assisted study session planning, spaced-repetit
 - Kotlin 2.3.0 · Jetpack Compose · Material 3
 - Hilt · Firestore (offline-first) · Coroutines + Flow
 - Retrofit + Kotlinx Serialization
-- Min SDK 24 · Target SDK 36
+- Min SDK 26 · Target SDK 36
 
 ## Building
 

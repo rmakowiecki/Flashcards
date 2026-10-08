@@ -67,8 +67,7 @@ import kotlinx.coroutines.launch
  *   lets go of focus, and that grant is what makes the monitor read the mode again.
  * - **Mode changes without a focus change** come from the mode listener (API 31+). Older releases
  *   have none, so the mode is read when a focus change arrives and when any app's playback starts
- *   or stops (API 26+), which is how the end of a ringtone reaches a session that never held focus.
- *   Below API 26 a call picked up while focus is already lost stays unseen until focus returns.
+ *   or stops, which is how the end of a ringtone reaches a session that never held focus.
  * - **A silenced microphone** (API 29+) is watched through the session's own recording. When the
  *   recording ends while silenced, the state is kept until the next recording starts or until no
  *   app records any more, because a recording that no longer exists cannot report that it is
@@ -125,7 +124,7 @@ class AudioEnvironmentMonitor @Inject constructor(
 
     // No mode callback below API 31: the ringtone player starting or stopping is the nearest event.
     private val playbackCallback: AudioManager.AudioPlaybackCallback? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             object : AudioManager.AudioPlaybackCallback() {
                 override fun onPlaybackConfigChanged(configs: List<AudioPlaybackConfiguration>) = reportLiveMode()
             }
