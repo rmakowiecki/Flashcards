@@ -1,55 +1,67 @@
 package com.rossomak.flashcards.feature.auth
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
+import com.rossomak.flashcards.core.ui.animation.SharedElementKey
+import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.sizes
+import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
 import com.rossomak.flashcards.feature.auth.LoginMessage.SignInFailed
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val LogoWidth = 200.dp
+// Private rather than a size token: Splash, Welcome and Login each draw the logo at a different
+// size, and that difference is what makes the shared-element hand-off between them visible.
+private val LogoWidth = 160.dp
+private val LogoHeight = LogoWidth * (1000f / 1800f)
+
+private const val BUTTON_REVEAL_MS = 450
 
 @Composable
 fun LoginScreen(
@@ -108,12 +120,28 @@ fun LoginScreen(
 }
 
 @Composable
-fun LoginContent(
+private fun LoginContent(
     modifier: Modifier = Modifier,
     state: LoginScreenState,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onGoogleSignInClick: () -> Unit,
 ) {
+    // The button waits for the logo the splash screen hands over to land, then fades and rises in.
+    // It stays at 1f afterwards, so signing in only changes the label and the enabled state.
+    val buttonReveal = remember { Animatable(0f) }
+    // Read once it flips, not on every frame of the reveal.
+    val hasButtonStartedRevealing by remember { derivedStateOf { buttonReveal.value > 0f } }
+    val isInspecting = LocalInspectionMode.current
+    LaunchedEffect(Unit) {
+        if (isInspecting) {
+            // A static @Preview renders the first frame only, which would hide the button.
+            buttonReveal.snapTo(1f)
+            return@LaunchedEffect
+        }
+        delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
+        buttonReveal.animateTo(1f, tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -121,53 +149,43 @@ fun LoginContent(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        Box(
+        // Offsets rather than weighted spacers, because only an offset can centre an element on a
+        // fraction of the height: the logo on one third, the button on two thirds.
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 32.dp),
-            contentAlignment = Alignment.Center
+                .padding(innerPadding),
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Image(
-                    painter = painterResource(CoreUiR.drawable.flashcards_white),
-                    contentDescription = null,
-                    modifier = Modifier.width(LogoWidth)
-                )
-
-                Spacer(modifier = Modifier.height(48.dp))
-
-                Button(
-                    onClick = onGoogleSignInClick,
-                    enabled = !state.isSigningIn,
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color(0xFF1F1F1F)
-                    ),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)
-                ) {
-                    if (state.isSigningIn) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFF1F1F1F)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = stringResource(R.string.login_signing_in_label), fontWeight = FontWeight.Medium)
-                    } else {
-                        Text(
-                            text = stringResource(R.string.login_google_signin_button),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 16.sp,
-                        )
-                    }
-                }
-            }
+            val buttonRiseDistance = MaterialTheme.spacing.medium
+            Image(
+                painter = painterResource(CoreUiR.drawable.flashcards_white),
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = maxHeight / 3 - LogoHeight / 2)
+                    .sharedElementByKey(SharedElementKey.APP_LOGO)
+                    .size(width = LogoWidth, height = LogoHeight),
+            )
+            FlashcardsFilledButton(
+                text = stringResource(
+                    if (state.isSigningIn) R.string.login_signing_in_label else R.string.login_google_signin_button,
+                ),
+                onClick = onGoogleSignInClick,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    // Normal size has the fixed height of buttonHeightNormal, which this centring relies on.
+                    .offset(y = maxHeight * 2 / 3 - MaterialTheme.sizes.buttonHeightNormal / 2)
+                    .fillMaxWidth()
+                    .padding(horizontal = MaterialTheme.spacing.large)
+                    .graphicsLayer {
+                        alpha = buttonReveal.value
+                        translationY = (1f - buttonReveal.value) * buttonRiseDistance.toPx()
+                    },
+                size = FlashcardsComponentSize.Normal,
+                // Disabled until it starts to appear, so an invisible button can't be tapped.
+                enabled = !state.isSigningIn && hasButtonStartedRevealing,
+                style = FlashcardsComponentStyle.OnGradient,
+            )
         }
     }
 }
@@ -175,11 +193,23 @@ fun LoginContent(
 @Preview(showBackground = true, widthDp = 400, heightDp = 800)
 @Composable
 private fun LoginContentPreview() {
-    LoginContent(state = LoginScreenState(), onGoogleSignInClick = {})
+    FlashcardsTheme {
+        LoginContent(state = LoginScreenState(), onGoogleSignInClick = {})
+    }
 }
 
 @Preview(showBackground = true, widthDp = 400, heightDp = 800)
 @Composable
 private fun LoginContentSigningInPreview() {
-    LoginContent(state = LoginScreenState(isSigningIn = true), onGoogleSignInClick = {})
+    FlashcardsTheme {
+        LoginContent(state = LoginScreenState(isSigningIn = true), onGoogleSignInClick = {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 400, heightDp = 800, fontScale = 1.5f)
+@Composable
+private fun LoginContentLargeFontPreview() {
+    FlashcardsTheme {
+        LoginContent(state = LoginScreenState(), onGoogleSignInClick = {})
+    }
 }

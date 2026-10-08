@@ -17,7 +17,7 @@ const val SHARED_ELEMENT_DURATION_MS: Int = 500
 
 /** Stable identities for elements that survive a navigation change instead of being redrawn. */
 object SharedElementKey {
-    /** The brand mark, handed from the splash screen to the onboarding cover. */
+    /** The brand mark, handed from the splash screen to the onboarding cover or the login screen. */
     const val APP_LOGO: String = "app-logo"
 }
 

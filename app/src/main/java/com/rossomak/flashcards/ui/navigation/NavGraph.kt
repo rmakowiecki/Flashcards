@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.ui.navigation
 
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
@@ -242,9 +243,9 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
             fadeOut(animationSpec = tween(durationMillis = 1, delayMillis = SHARED_ELEMENT_DURATION_MS))
         },
     ) {
-        // Splash and Onboarding hand the brand mark between them as a shared element, so both
+        // Splash hands the brand mark to Onboarding or Login as a shared element, so all three
         // publish their AnimatedVisibilityScope for the element to animate against.
-        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+        ProvideNavAnimatedVisibilityScope {
             SplashScreen(
                 onNavigateToMain = {
                     navController.navigate(Main) {
@@ -279,21 +280,23 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
         }
     }
     composable<AuthRoute>(enterTransition = { EnterTransition.None }) {
-        LoginScreen(
-            onNavigateToMain = {
-                navController.navigate(Main) {
-                    popUpTo(AuthRoute) { inclusive = true }
-                }
-            },
-            onNavigateToOnboarding = {
-                navController.navigate(OnboardingRoute) {
-                    popUpTo(AuthRoute) { inclusive = true }
-                }
-            },
-        )
+        ProvideNavAnimatedVisibilityScope {
+            LoginScreen(
+                onNavigateToMain = {
+                    navController.navigate(Main) {
+                        popUpTo(AuthRoute) { inclusive = true }
+                    }
+                },
+                onNavigateToOnboarding = {
+                    navController.navigate(OnboardingRoute) {
+                        popUpTo(AuthRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
     }
     composable<OnboardingRoute>(enterTransition = { EnterTransition.None }) {
-        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+        ProvideNavAnimatedVisibilityScope {
             OnboardingScreen(
                 onNavigateToMain = {
                     navController.navigate(Main) {
@@ -419,4 +422,10 @@ fun FlashcardsNavGraph(
             }
         }
     }
+}
+
+/** Publishes this destination's scope, so a shared element inside it has an end to animate against. */
+@Composable
+private fun AnimatedVisibilityScope.ProvideNavAnimatedVisibilityScope(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this, content = content)
 }
