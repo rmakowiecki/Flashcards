@@ -15,6 +15,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.Login
 import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
+import com.rossomak.flashcards.feature.account.AccountDestination.ReportBug
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
@@ -84,6 +85,10 @@ class AccountViewModel @Inject constructor(
             val uid = getCurrentAuthUser()?.uid
             eventChannel.send(ContactSupport(installationInfo, uid))
         }
+    }
+
+    fun onReportBugClick() {
+        viewModelScope.launch { eventChannel.send(ReportBug) }
     }
 
     fun onOpenSourceLicensesClick() {

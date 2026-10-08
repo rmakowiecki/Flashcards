@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.browser)
     implementation(libs.aboutlibraries.compose.core)
     implementation(libs.androidx.core.ktx)

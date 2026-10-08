@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="account_sign_out_button">Sign out</string>
     <string name="account_sign_out_dialog_title">Sign out?</string>
     <string name="account_sign_out_dialog_message">Your progress is saved to your account. Sign in again to pick up where you left off.</string>
@@ -17,6 +17,35 @@
     <string name="account_support_email_android_version_label">Android: API %1$d</string>
     <string name="account_support_email_account_id_label">Account ID: %1$s</string>
     <string name="account_no_email_app_message">No email app found</string>
+
+    <string name="report_bug_title">Report a bug</string>
+    <string name="report_bug_severity_label">Severity</string>
+    <string name="report_bug_severity_title">How bad is it?</string>
+    <string name="report_bug_severity_hint">Choose severity</string>
+    <string name="report_bug_severity_required_message">Required</string>
+    <string name="report_bug_severity_blocker_label">Something important is broken</string>
+    <string name="report_bug_severity_blocker_message">Crashes, freezes, or a feature doesn\'t work and there\'s no way around it</string>
+    <string name="report_bug_severity_minor_label">Annoying, but I can work around it</string>
+    <string name="report_bug_severity_minor_message">Something behaves wrong, but I can still do what I wanted</string>
+    <string name="report_bug_severity_cosmetic_label">Looks wrong</string>
+    <string name="report_bug_severity_cosmetic_message">Typos, layout or visual glitches</string>
+    <string name="report_bug_question_activity_message">What were you doing?</string>
+    <string name="report_bug_question_outcome_message">What happened, and what did you expect?</string>
+    <string name="report_bug_question_reproducibility_message">How reliably can you reproduce it?</string>
+    <string name="report_bug_description_hint">Describe the problem</string>
+    <string name="report_bug_counter_minimum_message" tools:ignore="PluralsCandidate">%1$d / %2$d minimum</string>
+    <string name="report_bug_counter_message">%1$d / %2$d</string>
+    <string name="report_bug_counter_over_limit_message">%1$d / %2$d, too long</string>
+    <string name="report_bug_send_button">Send</string>
+    <string name="report_bug_sending_cd">Sending</string>
+    <string name="report_bug_diagnostics_message">App version, device, Android version and your account are included automatically.</string>
+    <string name="report_bug_sent_message">Report sent</string>
+    <string name="report_bug_failed_message">Couldn\'t send report. Try again.</string>
+    <string name="report_bug_no_connection_message">No connection. Your report wasn\'t sent.</string>
+    <string name="report_bug_discard_title">Discard report?</string>
+    <string name="report_bug_discard_message">Your report hasn\'t been sent. If you discard it, everything you\'ve written will be lost.</string>
+    <string name="report_bug_discard_button">Discard</string>
+    <string name="report_bug_keep_editing_button">Keep editing</string>
 
     <string name="account_about_label">About</string>
     <string name="account_privacy_policy_label">Privacy policy</string>

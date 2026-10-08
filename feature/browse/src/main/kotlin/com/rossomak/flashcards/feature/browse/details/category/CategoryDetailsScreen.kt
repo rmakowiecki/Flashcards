@@ -289,6 +289,7 @@ private fun CategoryDetailsTopBar(
             selectedCardCount,
             selectedCardCount,
         )
+
         else -> stringResource(R.string.category_details_selection_subtitle_label)
     }
     Column {
@@ -478,7 +479,7 @@ private fun SubcategoryList(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.normal)
+            .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState)
     ) {

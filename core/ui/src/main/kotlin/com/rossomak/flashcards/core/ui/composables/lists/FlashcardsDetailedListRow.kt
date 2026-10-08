@@ -16,18 +16,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
+import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Opacity applied to the whole row when `enabled = false`, matching [FlashcardsListRow]. */
-private const val DISABLED_ALPHA = 0.6f
 
 /**
  * The generic design-system 3-line list row: an optional [leading] slot, a title, a wrapping
@@ -55,7 +52,7 @@ fun FlashcardsDetailedListRow(
 ) {
     Row(
         modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .disabledAlpha(enabled)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .heightIn(min = MaterialTheme.sizes.listRowMinHeight)
             .clickable(enabled = enabled, role = role, onClick = onClick)
