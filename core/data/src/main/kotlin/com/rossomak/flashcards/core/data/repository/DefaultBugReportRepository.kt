@@ -20,6 +20,7 @@ class DefaultBugReportRepository @Inject constructor(
         val result = withTimeoutOrNull(BUG_REPORT_TIME_BUDGET) {
             bugReportRemoteDataSource.submitBugReport(report)
         }
+        // The data source never returns null, so null means the time budget ran out.
         if (result == null) {
             loge { "Bug report submission exceeded $BUG_REPORT_TIME_BUDGET" }
             return BugReportSubmissionResult.Failed(BugReportFailureReason.NoConnection)

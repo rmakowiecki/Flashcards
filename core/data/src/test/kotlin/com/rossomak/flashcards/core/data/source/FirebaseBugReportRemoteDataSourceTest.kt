@@ -128,6 +128,7 @@ class FirebaseBugReportRemoteDataSourceTest {
     @Test
     fun `submitBugReport wraps a callable failure in a failure result`() = runTest {
         val error: FirebaseFunctionsException = mockk()
+        every { error.message } returns "callable failed"
         every { functions.getHttpsCallable(SUBMIT_BUG_REPORT_FUNCTION_NAME) } returns callableReference
         every { callableReference.call(any()) } returns Tasks.forException(error)
 

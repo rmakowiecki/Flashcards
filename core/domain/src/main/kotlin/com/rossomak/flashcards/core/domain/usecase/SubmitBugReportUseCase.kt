@@ -22,10 +22,10 @@ class SubmitBugReportUseCase @Inject constructor(
     )
 
     override suspend fun invoke(params: Params): BugReportSubmissionResult = with(params) {
-        val trimmedDescription = description.trim()
-        if (BugReport.descriptionLength(trimmedDescription) !in BugReport.MIN_DESCRIPTION_LENGTH..BugReport.MAX_DESCRIPTION_LENGTH) {
+        if (BugReport.descriptionLength(description) !in BugReport.MIN_DESCRIPTION_LENGTH..BugReport.MAX_DESCRIPTION_LENGTH) {
             return BugReportSubmissionResult.Failed(InvalidDescription)
         }
+        val trimmedDescription = description.trim()
         val installationInfo = InstallationInfo(
             appVersion = installationInfoRepository.getAppVersion(),
             deviceInfo = installationInfoRepository.getDeviceInfo(),
