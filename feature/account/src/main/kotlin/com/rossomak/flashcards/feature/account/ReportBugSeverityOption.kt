@@ -11,7 +11,6 @@ import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Blocker
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Cosmetic
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Minor
 
-/** How a severity reads: on the form's field and as a card in the severity dialog. */
 internal class ReportBugSeverityOption(
     @StringRes val title: Int,
     @StringRes val description: Int,

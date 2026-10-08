@@ -29,7 +29,6 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 
-/** The body of the Report a bug screen, in the column of its scrolling content. */
 @Composable
 internal fun ColumnScope.ReportBugForm(
     state: ReportBugScreenState,
@@ -56,7 +55,6 @@ internal fun ColumnScope.ReportBugForm(
     )
 }
 
-/** The inset every block under the severity field shares: the screen's side gutter, and a gap above. */
 @Composable
 private fun Modifier.formBlockPadding(): Modifier = padding(
     start = MaterialTheme.spacing.normal,
@@ -81,7 +79,7 @@ private fun GuidingQuestions() {
 @Composable
 private fun GuidingQuestion(text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // A drawn dot rather than a bullet character, so a screen reader does not announce "bullet".
+        // A drawn dot, so a screen reader does not announce "bullet".
         Box(
             modifier = Modifier
                 .padding(end = MaterialTheme.spacing.xsmall)

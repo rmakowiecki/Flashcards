@@ -10,12 +10,12 @@ data class ReportBugScreenState(
     val submissionStatus: ReportBugSubmissionStatus = Idle,
     val activeDialog: ReportBugDialog? = null,
 ) {
-    /** True while a send is in flight or done, so the inputs stop reacting. */
     val isLocked: Boolean
         get() = submissionStatus != Idle
 
-    /** Also the guard on the send path, so the disabled Send button is not the only barrier. */
+    /** Also guards the send path, not just the Send button. */
     val canSend: Boolean
-        get() = severity != null && !isLocked &&
+        get() = severity != null &&
+            !isLocked &&
             BugReport.descriptionLength(draftText) in BugReport.MIN_DESCRIPTION_LENGTH..BugReport.MAX_DESCRIPTION_LENGTH
 }

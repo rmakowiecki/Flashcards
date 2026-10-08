@@ -9,6 +9,6 @@ sealed interface ReportBugDialog {
 
     data object DiscardReport : ReportBugDialog
 
-    /** `draftState` is the card ticked in the dialog; `null` until the first pick when no severity was chosen yet. */
+    /** [draftState] is the ticked card, `null` until the first pick. */
     data class Severity(val draftState: BugReportSeverity?) : ReportBugDialog
 }

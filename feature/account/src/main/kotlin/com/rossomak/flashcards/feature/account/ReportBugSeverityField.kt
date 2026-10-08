@@ -35,11 +35,7 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 
-/**
- * The form's severity field: a card showing the chosen severity, or a muted placeholder while there
- * is none, that opens the severity dialog. The whole card is the tap target; the edit icon is
- * decoration.
- */
+/** The whole card is the tap target; the edit icon is decoration. */
 @Composable
 internal fun ReportBugSeverityField(
     severity: BugReportSeverity?,
@@ -48,7 +44,7 @@ internal fun ReportBugSeverityField(
 ) {
     val option = severity?.option()
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.card)
-    // The card is one node for TalkBack: the field's name, then its value ("Severity, Looks wrong, button").
+    // One TalkBack node: the field's name, then its value.
     val fieldName = stringResource(R.string.report_bug_severity_label)
     val fieldValue = stringResource(option?.title ?: R.string.report_bug_severity_hint)
 
@@ -58,7 +54,7 @@ internal fun ReportBugSeverityField(
             .fillMaxWidth()
             .padding(horizontal = MaterialTheme.spacing.normal)
             .disabledAlpha(enabled)
-            // Clipped before `clickable` so the ripple follows the rounded corners.
+            // Before `clickable`, so the ripple follows the corners.
             .clip(shape)
             .clickable(
                 enabled = enabled,

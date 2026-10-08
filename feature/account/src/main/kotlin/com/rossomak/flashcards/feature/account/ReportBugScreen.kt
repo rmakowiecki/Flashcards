@@ -90,7 +90,7 @@ fun ReportBugScreen(
         }
     }
 
-    // Back asks before discarding a written report and is ignored while sending, like the close icon.
+    // Same as the close icon.
     BackHandler(onBack = viewModel::onCloseClick)
 
     ReportBugContent(
@@ -120,7 +120,7 @@ private fun ReportBugContent(
         onDialogEvent = onDialogEvent,
     )
 
-    // imePadding sits on the Scaffold, not the body, so the snackbar rises above the keyboard too.
+    // imePadding on the Scaffold lifts the snackbar above the keyboard too.
     Scaffold(
         modifier = modifier.imePadding(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -148,7 +148,6 @@ private fun ReportBugContent(
     }
 }
 
-/** On the same white as the body, set off from it by a hairline divider instead of a tint. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReportBugTopBar(
@@ -186,7 +185,7 @@ private fun ReportBugTopBar(
     }
 }
 
-/** While [isSending] a spinner takes the button's place, at its size, so the bar does not shift. */
+/** While [isSending] a spinner replaces the label at the same size. */
 @Composable
 private fun SendAction(
     isSending: Boolean,

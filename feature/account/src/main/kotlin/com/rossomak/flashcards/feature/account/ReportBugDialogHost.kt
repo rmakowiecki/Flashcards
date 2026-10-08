@@ -20,7 +20,7 @@ internal fun ReportBugDialogHost(
 ) {
     when (activeDialog) {
         null -> Unit
-        // Back and Keep editing both return to the form, so the decision dialog's single onCancel is Dismiss.
+        // Back and Keep editing both return to the form.
         DiscardReport -> FlashcardsDecisionDialog(
             title = stringResource(R.string.report_bug_discard_title),
             supportingText = stringResource(R.string.report_bug_discard_message),
@@ -36,7 +36,7 @@ internal fun ReportBugDialogHost(
     }
 }
 
-/** Deferred commit: a card only changes the draft, and Confirm, which needs a pick, applies it. */
+/** A card changes the draft; Confirm applies it. */
 @Composable
 private fun SeverityDialog(
     dialog: Severity,

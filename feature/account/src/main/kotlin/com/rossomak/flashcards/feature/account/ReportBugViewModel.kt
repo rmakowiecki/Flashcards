@@ -59,7 +59,7 @@ class ReportBugViewModel @Inject constructor(
         _state.update { if (it.isLocked) it else it.copy(draftText = text) }
     }
 
-    /** Close icon and system back. Ignored while sending; asks first when there is text to lose. */
+    /** Ignored while sending; asks first when there is text to lose. */
     fun onCloseClick() {
         with(_state.value) {
             when {
@@ -73,7 +73,7 @@ class ReportBugViewModel @Inject constructor(
     fun onSendClick() {
         val report = _state.value
         val severity = report.severity?.takeIf { report.canSend } ?: return
-        // Set before launching, so a second Send tap reads a form that is already sending.
+        // Before launching, so a second Send tap sees the form as sending.
         _state.update { it.copy(submissionStatus = Sending) }
         viewModelScope.launch {
             when (val result = submitBugReport(SubmitBugReportUseCase.Params(report.draftText, severity))) {
@@ -91,7 +91,6 @@ class ReportBugViewModel @Inject constructor(
         }
     }
 
-    /** Single entry point for every dialog on this screen. */
     fun onDialogEvent(event: ReportBugDialogEvent) {
         when (event) {
             is Open -> _state.update { if (it.isLocked) it else it.copy(activeDialog = event.dialog) }
@@ -104,13 +103,13 @@ class ReportBugViewModel @Inject constructor(
     private fun confirmDialog() {
         when (val dialog = _state.value.activeDialog) {
             DiscardReport -> leave()
-            // A null draft never replaces a chosen severity; the dialog does not offer that Confirm.
+            // A null draft never replaces a chosen severity.
             is Severity -> _state.update { it.copy(severity = dialog.draftState ?: it.severity, activeDialog = null) }
             null -> Unit
         }
     }
 
-    /** Emits [Back] once, however many times the user closes or the auto-close fires. */
+    /** Emits [Back] once. */
     private fun leave() {
         if (hasLeft) return
         hasLeft = true
@@ -119,12 +118,11 @@ class ReportBugViewModel @Inject constructor(
 
     private fun BugReportFailureReason.toMessage(): ReportBugMessage = when (this) {
         NoConnection -> ReportNoConnection
-        // Rate limiting arrives as ServiceError and is deliberately not told apart.
         ServiceError, InvalidDescription -> ReportFailed
     }
 
     internal companion object {
-        /** How long the form stays up with its confirmation before the screen closes. */
+        /** How long the confirmation shows before the screen closes. */
         val SENT_CONFIRMATION_DURATION: Duration = 2.seconds
     }
 }
