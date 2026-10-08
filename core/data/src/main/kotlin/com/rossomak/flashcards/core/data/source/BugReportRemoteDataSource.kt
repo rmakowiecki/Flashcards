@@ -4,6 +4,5 @@ import com.rossomak.flashcards.core.domain.model.BugReport
 
 interface BugReportRemoteDataSource {
 
-    /** Sets no timeout of its own. */
     suspend fun submitBugReport(report: BugReport): Result<Unit>
 }

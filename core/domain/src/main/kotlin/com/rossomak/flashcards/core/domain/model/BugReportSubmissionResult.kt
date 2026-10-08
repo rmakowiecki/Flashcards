@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.core.domain.model
 
-/** Not a `Result<Unit>`: [BugReportFailureReason] is a plain sealed type, not a `Throwable`. */
+/** Not a `Result<Unit>`: the failure is a sealed type, not a `Throwable`. */
 sealed interface BugReportSubmissionResult {
 
     data object Sent : BugReportSubmissionResult

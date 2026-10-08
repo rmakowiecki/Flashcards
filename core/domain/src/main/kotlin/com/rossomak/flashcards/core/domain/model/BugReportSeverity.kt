@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.core.domain.model
 
-/** Worst first: UI that lists the entries keeps this order. */
+/** Worst first: UI lists the entries in this order. */
 enum class BugReportSeverity {
     Blocker,
     Minor,

@@ -10,7 +10,7 @@ import com.rossomak.flashcards.core.domain.repository.InstallationInfoRepository
 import com.rossomak.flashcards.core.domain.usecase.base.UseCase
 import javax.inject.Inject
 
-/** A description outside [BugReport]'s limits after trimming fails with [InvalidDescription] before anything is read or sent. */
+/** Fails with [InvalidDescription] before anything is read or sent. */
 class SubmitBugReportUseCase @Inject constructor(
     private val bugReportRepository: BugReportRepository,
     private val installationInfoRepository: InstallationInfoRepository,
