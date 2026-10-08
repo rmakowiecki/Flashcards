@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.account
 
-import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -61,6 +60,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.Login
+import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
@@ -71,6 +71,7 @@ fun AccountScreen(
     modifier: Modifier = Modifier,
     viewModel: AccountViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToOpenSourceLicenses: () -> Unit,
     onNavigateToLogin: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -84,6 +85,7 @@ fun AccountScreen(
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             Login -> onNavigateToLogin()
+            OpenSourceLicenses -> onNavigateToOpenSourceLicenses()
             is ContactSupport -> {
                 val emailIntent = supportEmailIntent(context, destination.installationInfo, destination.uid)
                 if (!context.tryStartActivity(emailIntent)) viewModel.onNoEmailAppFound()
@@ -122,7 +124,7 @@ fun AccountScreen(
         onPrivacyPolicyClick = {
             if (!context.tryStartActivity(privacyPolicyIntent(surfaceColor, darkTheme))) viewModel.onOpenLinkFailed()
         },
-        onOpenSourceLicensesClick = {},
+        onOpenSourceLicensesClick = viewModel::onOpenSourceLicensesClick,
         onAppVersionCopy = { versionLabel ->
             clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(clipLabel, versionLabel))) }
         },
@@ -298,17 +300,6 @@ private fun ExternalLinkIcon() {
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-}
-
-/**
- * Starts [intent] and reports whether an app answered it. Only a missing handler counts as a
- * failure: any other exception is a real bug and propagates.
- */
-private fun Context.tryStartActivity(intent: Intent): Boolean = try {
-    startActivity(intent)
-    true
-} catch (_: ActivityNotFoundException) {
-    false
 }
 
 private const val PRIVACY_POLICY_URL = "https://flashcards-8ad6d.web.app/privacy"
