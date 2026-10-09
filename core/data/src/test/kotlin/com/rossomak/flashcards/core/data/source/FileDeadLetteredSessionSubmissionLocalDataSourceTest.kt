@@ -28,10 +28,10 @@ class FileDeadLetteredSessionSubmissionLocalDataSourceTest {
 
     private fun createDataSource() = FileDeadLetteredSessionSubmissionLocalDataSource(context)
 
-    private fun deadLettered(sessionId: String): DeadLetteredSessionSubmissionDto = DeadLetteredSessionSubmissionDto(
+    private fun deadLettered(sessionId: String, uid: String = "uid-1"): DeadLetteredSessionSubmissionDto = DeadLetteredSessionSubmissionDto(
         entry = PendingSessionSubmissionDto(
             id = sessionId,
-            uid = "uid-1",
+            uid = uid,
             mode = "Rated",
             startedAtEpochMillis = 1_000L,
             durationSeconds = 60,
@@ -115,7 +115,40 @@ class FileDeadLetteredSessionSubmissionLocalDataSourceTest {
         file.isDirectory shouldBe true
     }
 
+    @Test
+    fun `removeAllForUser drops only that User's records`() = runTest {
+        val dataSource = createDataSource()
+        val deleted = deadLettered("session-1", uid = DELETED_UID)
+        val other = deadLettered("session-2", uid = OTHER_UID)
+        dataSource.append(deleted)
+        dataSource.append(other)
+
+        dataSource.removeAllForUser(DELETED_UID)
+
+        createDataSource().listAll() shouldBe listOf(other)
+    }
+
+    @Test
+    fun `removeAllForUser on a fresh store with no file yet leaves it empty`() = runTest {
+        val dataSource = createDataSource()
+
+        dataSource.removeAllForUser(DELETED_UID)
+
+        dataSource.listAll() shouldBe emptyList()
+    }
+
+    @Test
+    fun `removeAllForUser propagates an IOException instead of emptying an unreadable file`() = runTest {
+        file.mkdir()
+
+        shouldThrow<IOException> { createDataSource().removeAllForUser(DELETED_UID) }
+
+        file.isDirectory shouldBe true
+    }
+
     private companion object {
         const val FILE_NAME = "dead_lettered_session_submissions.jsonl"
+        const val DELETED_UID = "uid-deleted"
+        const val OTHER_UID = "uid-other"
     }
 }
