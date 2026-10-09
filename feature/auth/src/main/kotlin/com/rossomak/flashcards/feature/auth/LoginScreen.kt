@@ -61,7 +61,7 @@ import kotlinx.coroutines.launch
 
 // Private rather than a size token: Splash, Welcome and Login each draw the logo at a different
 // size, and that difference is what makes the shared-element hand-off between them visible.
-private val LogoWidth = 160.dp
+private val LogoWidth = 200.dp
 private val LogoHeight = LogoWidth * (1000f / 1800f)
 
 private const val BUTTON_REVEAL_MS = 450
