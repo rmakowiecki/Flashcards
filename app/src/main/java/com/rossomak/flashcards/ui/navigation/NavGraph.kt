@@ -26,6 +26,8 @@ import com.rossomak.flashcards.feature.account.AccountRoute
 import com.rossomak.flashcards.feature.account.AccountScreen
 import com.rossomak.flashcards.feature.account.OpenSourceLicensesRoute
 import com.rossomak.flashcards.feature.account.OpenSourceLicensesScreen
+import com.rossomak.flashcards.feature.account.ReportBugRoute
+import com.rossomak.flashcards.feature.account.ReportBugScreen
 import com.rossomak.flashcards.feature.auth.AuthRoute
 import com.rossomak.flashcards.feature.auth.LoginScreen
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
@@ -314,6 +316,7 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
     composable<AccountRoute> {
         AccountScreen(
             onNavigateBack = { navController.popBackStack() },
+            onNavigateToReportBug = { navController.navigate(ReportBugRoute) },
             onNavigateToOpenSourceLicenses = {
                 navController.navigate(OpenSourceLicensesRoute) { launchSingleTop = true }
             },
@@ -325,6 +328,9 @@ private fun NavGraphBuilder.accountDestination(navController: NavHostController)
                 }
             },
         )
+    }
+    composable<ReportBugRoute> {
+        ReportBugScreen(onNavigateBack = { navController.popBackStack() })
     }
 }
 

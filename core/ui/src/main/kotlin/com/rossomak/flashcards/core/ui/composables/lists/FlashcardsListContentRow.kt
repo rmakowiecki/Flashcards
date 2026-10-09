@@ -17,16 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
+import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Opacity applied to the whole row when `enabled = false`, per the design's disabled rows. */
-private const val DISABLED_ALPHA = 0.6f
 
 /**
  * The frame every list row shares, with nothing inside it: the row background, the minimum height,
@@ -64,7 +61,7 @@ fun FlashcardsListContentRow(
     }
     Row(
         modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .disabledAlpha(enabled)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .heightIn(min = MaterialTheme.sizes.listRowMinHeight)
             .then(clickModifier)

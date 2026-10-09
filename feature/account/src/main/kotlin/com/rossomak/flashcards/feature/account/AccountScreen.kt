@@ -63,6 +63,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.Login
 import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
+import com.rossomak.flashcards.feature.account.AccountDestination.ReportBug
 import com.rossomak.flashcards.feature.account.AccountDialog.DeleteAccount
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 import com.rossomak.flashcards.feature.account.AccountMessage.DeletionFailed
@@ -75,6 +76,7 @@ fun AccountScreen(
     modifier: Modifier = Modifier,
     viewModel: AccountViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToReportBug: () -> Unit,
     onNavigateToOpenSourceLicenses: () -> Unit,
     onNavigateToLogin: () -> Unit,
 ) {
@@ -89,6 +91,7 @@ fun AccountScreen(
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             Login -> onNavigateToLogin()
+            ReportBug -> onNavigateToReportBug()
             OpenSourceLicenses -> onNavigateToOpenSourceLicenses()
             is ContactSupport -> {
                 val emailIntent = supportEmailIntent(context, destination.installationInfo, destination.uid)
@@ -130,7 +133,7 @@ fun AccountScreen(
             if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
         },
         onContactSupportClick = viewModel::onContactSupportClick,
-        onReportBugClick = {},
+        onReportBugClick = viewModel::onReportBugClick,
         onPrivacyPolicyClick = {
             if (!context.tryStartActivity(privacyPolicyIntent(surfaceColor, darkTheme))) viewModel.onOpenLinkFailed()
         },

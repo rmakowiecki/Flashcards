@@ -259,6 +259,17 @@ class AccountViewModelTest {
         }
 
     @Test
+    fun `a Report a bug click emits the ReportBug destination`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onReportBugClick()
+
+            awaitItem() shouldBe AccountDestination.ReportBug
+        }
+    }
+
+    @Test
     fun `no email app found emits the no email app message`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
 

@@ -15,16 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Opacity applied to the whole row when `enabled = false`, matching the list-row family. */
-private const val DISABLED_ALPHA = 0.6f
 
 /**
  * The plainest single-select row: a leading radio and a label, no container.
@@ -51,7 +48,7 @@ fun FlashcardsRadioRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .disabledAlpha(enabled)
             .selectable(
                 selected = selected,
                 interactionSource = remember { MutableInteractionSource() },
