@@ -7,7 +7,6 @@ import com.rossomak.flashcards.core.data.mapper.toDto
 import com.rossomak.flashcards.core.data.model.DeliveredSessionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
-import com.rossomak.flashcards.core.data.network.NetworkAvailability
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.worker.SessionDeliveryReport
@@ -23,6 +22,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -50,7 +50,7 @@ class DefaultSessionSubmissionRepositoryTest {
     private fun createRepository(
         pendingLocalDataSource: PendingSessionSubmissionLocalDataSource = localDataSource,
     ): DefaultSessionSubmissionRepository =
-        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, NetworkAvailability { internetAvailable })
+        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, NetworkAvailabilityGateway { internetAvailable })
 
     @Before
     fun setUp() {
