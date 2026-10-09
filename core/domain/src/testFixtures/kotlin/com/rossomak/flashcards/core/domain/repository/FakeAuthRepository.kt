@@ -1,6 +1,10 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.SignInFailureReason.Unknown
+import com.rossomak.flashcards.core.domain.model.SignInResult
+import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
+import com.rossomak.flashcards.core.domain.model.SignInResult.SignedIn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +17,7 @@ class FakeAuthRepository : AuthRepository {
         set(value) {
             authUser.value = value
         }
-    var signInResult: Result<AuthUser> = Result.failure(UnsupportedOperationException("not configured"))
+    var signInResult: SignInResult = Failed(Unknown)
     var signInAnonymouslyResult: Result<AuthUser> = Result.failure(UnsupportedOperationException("not configured"))
     var signInAnonymouslyDelayMs: Long = 0L
     var signInAnonymouslyCallCount: Int = 0
@@ -22,8 +26,9 @@ class FakeAuthRepository : AuthRepository {
 
     override fun observeAuthUser(): Flow<AuthUser?> = authUser
 
-    override suspend fun signInWithGoogleIdToken(idToken: String): Result<AuthUser> =
-        signInResult.onSuccess { userToReturn = it }
+    override suspend fun signInWithGoogleIdToken(idToken: String): SignInResult = signInResult.also { result ->
+        if (result is SignedIn) userToReturn = result.user
+    }
 
     override suspend fun signInAnonymously(): Result<AuthUser> {
         signInAnonymouslyCallCount++
