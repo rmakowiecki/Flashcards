@@ -5,12 +5,12 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -44,7 +44,6 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
@@ -59,14 +58,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Private rather than a size token: Splash, Welcome and Login each draw the logo at a different
-// size, and that difference is what makes the shared-element hand-off between them visible.
 private val LogoWidth = 200.dp
-private val LogoHeight = LogoWidth * (1000f / 1800f)
 
 private const val BUTTON_REVEAL_MS = 450
 
-// Short enough to finish well inside the screen's own exit fade.
 private const val BUTTON_HIDE_MS = 200
 
 @Composable
@@ -114,8 +109,7 @@ fun LoginScreen(
                 val idTokenResult = try {
                     signInLauncher.launch()
                 } catch (cancellation: CancellationException) {
-                    // The Activity was recreated while the picker was open: report it, or the
-                    // surviving ViewModel stays "Signing in…" for good.
+                    // The Activity was recreated while the picker was open: report it, or the surviving ViewModel stays "Signing in…" for good.
                     viewModel.onGoogleSignInInterrupted()
                     throw cancellation
                 }
@@ -136,15 +130,12 @@ private fun LoginContent(
     // It stays at 1f while signing in, so that only changes the label and the enabled state. Once
     // signed in it fades and sinks out, so it never shows enabled again while the screen leaves.
     val buttonReveal = remember { Animatable(0f) }
-    // Read once it flips, not on every frame of the reveal.
     val hasButtonStartedRevealing by remember { derivedStateOf { buttonReveal.value > 0f } }
     val isInspecting = LocalInspectionMode.current
     val isSignedIn = state.phase == SignedIn
     LaunchedEffect(isSignedIn) {
         when {
-            // Also covers a recreated screen that is already signed in: the button starts hidden.
             isSignedIn -> buttonReveal.animateTo(0f, tween(durationMillis = BUTTON_HIDE_MS, easing = FastOutSlowInEasing))
-            // A static @Preview renders the first frame only, which would hide the button.
             isInspecting -> buttonReveal.snapTo(1f)
             else -> {
                 delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
@@ -160,22 +151,20 @@ private fun LoginContent(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        // Offsets rather than weighted spacers, because only an offset can centre an element on a
-        // fraction of the height: the logo on one third, the button on two thirds.
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
+            verticalArrangement = Arrangement.SpaceEvenly,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val buttonRiseDistance = MaterialTheme.spacing.medium
             Image(
                 painter = painterResource(CoreUiR.drawable.flashcards_white),
                 contentDescription = null,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = maxHeight / 3 - LogoHeight / 2)
                     .sharedElementByKey(SharedElementKey.APP_LOGO)
-                    .size(width = LogoWidth, height = LogoHeight),
+                    .width(LogoWidth),
             )
             FlashcardsFilledButton(
                 text = stringResource(
@@ -186,9 +175,6 @@ private fun LoginContent(
                 ),
                 onClick = onGoogleSignInClick,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    // Normal size has the fixed height of buttonHeightNormal, which this centring relies on.
-                    .offset(y = maxHeight * 2 / 3 - MaterialTheme.sizes.buttonHeightNormal / 2)
                     .fillMaxWidth()
                     .padding(horizontal = MaterialTheme.spacing.large)
                     .graphicsLayer {
@@ -204,7 +190,7 @@ private fun LoginContent(
     }
 }
 
-@Preview(showBackground = true, widthDp = 400, heightDp = 800)
+@Preview
 @Composable
 private fun LoginContentPreview() {
     FlashcardsTheme {
@@ -212,26 +198,10 @@ private fun LoginContentPreview() {
     }
 }
 
-@Preview(showBackground = true, widthDp = 400, heightDp = 800)
+@Preview
 @Composable
 private fun LoginContentSigningInPreview() {
     FlashcardsTheme {
         LoginContent(state = LoginScreenState(phase = SigningIn), onGoogleSignInClick = {})
-    }
-}
-
-@Preview(showBackground = true, widthDp = 400, heightDp = 800)
-@Composable
-private fun LoginContentSignedInPreview() {
-    FlashcardsTheme {
-        LoginContent(state = LoginScreenState(phase = SignedIn), onGoogleSignInClick = {})
-    }
-}
-
-@Preview(showBackground = true, widthDp = 400, heightDp = 800, fontScale = 1.5f)
-@Composable
-private fun LoginContentLargeFontPreview() {
-    FlashcardsTheme {
-        LoginContent(state = LoginScreenState(), onGoogleSignInClick = {})
     }
 }
