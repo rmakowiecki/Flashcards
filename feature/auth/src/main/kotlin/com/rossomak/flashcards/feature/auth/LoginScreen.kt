@@ -51,6 +51,9 @@ import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
 import com.rossomak.flashcards.feature.auth.LoginMessage.SignInFailed
+import com.rossomak.flashcards.feature.auth.LoginPhase.Idle
+import com.rossomak.flashcards.feature.auth.LoginPhase.SignedIn
+import com.rossomak.flashcards.feature.auth.LoginPhase.SigningIn
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
@@ -62,6 +65,9 @@ private val LogoWidth = 160.dp
 private val LogoHeight = LogoWidth * (1000f / 1800f)
 
 private const val BUTTON_REVEAL_MS = 450
+
+// Short enough to finish well inside the screen's own exit fade.
+private const val BUTTON_HIDE_MS = 200
 
 @Composable
 fun LoginScreen(
@@ -127,19 +133,24 @@ private fun LoginContent(
     onGoogleSignInClick: () -> Unit,
 ) {
     // The button waits for the logo the splash screen hands over to land, then fades and rises in.
-    // It stays at 1f afterwards, so signing in only changes the label and the enabled state.
+    // It stays at 1f while signing in, so that only changes the label and the enabled state. Once
+    // signed in it fades and sinks out, so it never shows enabled again while the screen leaves.
     val buttonReveal = remember { Animatable(0f) }
     // Read once it flips, not on every frame of the reveal.
     val hasButtonStartedRevealing by remember { derivedStateOf { buttonReveal.value > 0f } }
     val isInspecting = LocalInspectionMode.current
-    LaunchedEffect(Unit) {
-        if (isInspecting) {
+    val isSignedIn = state.phase == SignedIn
+    LaunchedEffect(isSignedIn) {
+        when {
+            // Also covers a recreated screen that is already signed in: the button starts hidden.
+            isSignedIn -> buttonReveal.animateTo(0f, tween(durationMillis = BUTTON_HIDE_MS, easing = FastOutSlowInEasing))
             // A static @Preview renders the first frame only, which would hide the button.
-            buttonReveal.snapTo(1f)
-            return@LaunchedEffect
+            isInspecting -> buttonReveal.snapTo(1f)
+            else -> {
+                delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
+                buttonReveal.animateTo(1f, tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
+            }
         }
-        delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
-        buttonReveal.animateTo(1f, tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
     }
 
     Scaffold(
@@ -168,7 +179,10 @@ private fun LoginContent(
             )
             FlashcardsFilledButton(
                 text = stringResource(
-                    if (state.isSigningIn) R.string.login_signing_in_label else R.string.login_google_signin_button,
+                    when (state.phase) {
+                        Idle -> R.string.login_google_signin_button
+                        SigningIn, SignedIn -> R.string.login_signing_in_label
+                    },
                 ),
                 onClick = onGoogleSignInClick,
                 modifier = Modifier
@@ -183,7 +197,7 @@ private fun LoginContent(
                     },
                 size = FlashcardsComponentSize.Normal,
                 // Disabled until it starts to appear, so an invisible button can't be tapped.
-                enabled = !state.isSigningIn && hasButtonStartedRevealing,
+                enabled = state.phase == Idle && hasButtonStartedRevealing,
                 style = FlashcardsComponentStyle.OnGradient,
             )
         }
@@ -202,7 +216,15 @@ private fun LoginContentPreview() {
 @Composable
 private fun LoginContentSigningInPreview() {
     FlashcardsTheme {
-        LoginContent(state = LoginScreenState(isSigningIn = true), onGoogleSignInClick = {})
+        LoginContent(state = LoginScreenState(phase = SigningIn), onGoogleSignInClick = {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 400, heightDp = 800)
+@Composable
+private fun LoginContentSignedInPreview() {
+    FlashcardsTheme {
+        LoginContent(state = LoginScreenState(phase = SignedIn), onGoogleSignInClick = {})
     }
 }
 
