@@ -24,12 +24,12 @@ class FileAccountDeletionMarkerLocalDataSource @Inject constructor(
         null
     }
 
-    override fun write(uid: String) {
-        try {
-            file.writeText(uid)
-        } catch (exception: IOException) {
-            loge(exception) { "Could not write the account deletion marker" }
-        }
+    override fun write(uid: String): Boolean = try {
+        file.writeText(uid)
+        true
+    } catch (exception: IOException) {
+        loge(exception) { "Could not write the account deletion marker" }
+        false
     }
 
     override fun clear() {

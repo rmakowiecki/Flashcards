@@ -13,7 +13,8 @@ interface AccountDeletionMarkerLocalDataSource {
     /** The marked uid, or null when no deletion is marked or the marker cannot be read. */
     fun read(): String?
 
-    fun write(uid: String)
+    /** Marks [uid]; false when the marker could not be saved. */
+    fun write(uid: String): Boolean
 
     fun clear()
 }

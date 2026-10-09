@@ -1,5 +1,9 @@
 package com.rossomak.flashcards.core.data.repository
 
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.google.firebase.functions.FirebaseFunctionsException.Code.DEADLINE_EXCEEDED
+import com.google.firebase.functions.FirebaseFunctionsException.Code.UNAUTHENTICATED
+import com.google.firebase.functions.FirebaseFunctionsException.Code.UNAVAILABLE
 import com.rossomak.flashcards.core.data.model.DeadLetteredSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.source.AccountDeletionMarkerLocalDataSource
@@ -37,7 +41,9 @@ class DefaultAccountRepositoryTest {
         every { getCurrentUser() } returns deletedUser
         every { signOut() } just runs
     }
-    private val accountDeletionMarkerLocalDataSource: AccountDeletionMarkerLocalDataSource = mockk(relaxUnitFun = true)
+    private val accountDeletionMarkerLocalDataSource: AccountDeletionMarkerLocalDataSource = mockk(relaxUnitFun = true) {
+        every { write(any()) } returns true
+    }
     private val pendingSessions = FakePendingSessionSubmissionLocalDataSource()
     private val deadLetters = FakeDeadLetteredSessionSubmissionLocalDataSource()
     private var isInternetAvailable = true
@@ -145,17 +151,61 @@ class DefaultAccountRepositoryTest {
     }
 
     @Test
-    fun `a connection failure fails with NoConnection and does not sign out`() = runTest {
+    fun `a connection failure fails with NoConnection, keeps the mark and does not sign out`() = runTest {
         coEvery { accountDeletionRemoteDataSource.deleteAccount() } returns Result.failure(RuntimeException("INTERNAL", IOException("connection reset")))
 
         createRepository().deleteAccount() shouldBe Failed(NoConnection)
 
-        verifyOrder {
-            accountDeletionMarkerLocalDataSource.write(DELETED_UID)
-            accountDeletionMarkerLocalDataSource.clear()
-        }
+        verify(exactly = 1) { accountDeletionMarkerLocalDataSource.write(DELETED_UID) }
+        verify(exactly = 0) { accountDeletionMarkerLocalDataSource.clear() }
         coVerify(exactly = 1) { accountDeletionRemoteDataSource.deleteAccount() }
         verify(exactly = 0) { authRemoteDataSource.signOut() }
+    }
+
+    @Test
+    fun `a server timeout fails with ServiceError and keeps the mark, since the server may have deleted the account`() = runTest {
+        coEvery { accountDeletionRemoteDataSource.deleteAccount() } returns Result.failure(functionsException(DEADLINE_EXCEEDED))
+
+        createRepository().deleteAccount() shouldBe Failed(ServiceError)
+
+        verify(exactly = 0) { accountDeletionMarkerLocalDataSource.clear() }
+        verify(exactly = 0) { authRemoteDataSource.signOut() }
+    }
+
+    @Test
+    fun `an unavailable server keeps the mark`() = runTest {
+        coEvery { accountDeletionRemoteDataSource.deleteAccount() } returns Result.failure(functionsException(UNAVAILABLE))
+
+        createRepository().deleteAccount() shouldBe Failed(ServiceError)
+
+        verify(exactly = 0) { accountDeletionMarkerLocalDataSource.clear() }
+    }
+
+    @Test
+    fun `a definite server rejection clears the mark`() = runTest {
+        coEvery { accountDeletionRemoteDataSource.deleteAccount() } returns Result.failure(functionsException(UNAUTHENTICATED))
+
+        createRepository().deleteAccount() shouldBe Failed(ServiceError)
+
+        verify(exactly = 1) { accountDeletionMarkerLocalDataSource.clear() }
+    }
+
+    @Test
+    fun `a marker that cannot be saved fails with ServiceError without calling the server`() = runTest {
+        every { accountDeletionMarkerLocalDataSource.write(DELETED_UID) } returns false
+
+        createRepository().deleteAccount() shouldBe Failed(ServiceError)
+
+        coVerify(exactly = 0) { accountDeletionRemoteDataSource.deleteAccount() }
+        verify(exactly = 0) { authRemoteDataSource.signOut() }
+    }
+
+    // A strict mock: the classifier walks `cause`, so both properties must be stubbed.
+    private fun functionsException(code: FirebaseFunctionsException.Code): FirebaseFunctionsException {
+        val exception: FirebaseFunctionsException = mockk()
+        every { exception.code } returns code
+        every { exception.cause } returns null
+        return exception
     }
 
     private fun pendingSubmission(sessionId: String, uid: String): PendingSessionSubmissionDto = PendingSessionSubmissionDto(

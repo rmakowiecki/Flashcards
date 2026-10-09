@@ -11,8 +11,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * Finishes on the device an Account Deletion that a process death interrupted, as recorded by
- * [AccountDeletionMarkerLocalDataSource]. The server keeps deleting after the device dies, so the marked
+ * Finishes on the device an Account Deletion that a process death interrupted, or whose answer was lost
+ * to a dropped connection or a timeout, as recorded by [AccountDeletionMarkerLocalDataSource]. The server keeps deleting after the device dies, so the marked
  * User is treated as deleted without asking it: if the deletion actually failed, they sign in again.
  *
  * [complete] runs once per process, from [com.rossomak.flashcards.FlashcardsApplication], before

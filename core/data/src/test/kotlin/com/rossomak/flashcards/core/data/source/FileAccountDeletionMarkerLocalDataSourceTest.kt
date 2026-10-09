@@ -25,7 +25,7 @@ class FileAccountDeletionMarkerLocalDataSourceTest {
 
     @Test
     fun `a written uid survives a new instance and is gone once cleared`() {
-        createDataSource().write(UID)
+        createDataSource().write(UID) shouldBe true
 
         createDataSource().read() shouldBe UID
 
@@ -38,6 +38,13 @@ class FileAccountDeletionMarkerLocalDataSourceTest {
         File(temporaryFolder.root, FILE_NAME).mkdir()
 
         createDataSource().read() shouldBe null
+    }
+
+    @Test
+    fun `a marker that cannot be written reports false instead of throwing`() {
+        File(temporaryFolder.root, FILE_NAME).mkdir()
+
+        createDataSource().write(UID) shouldBe false
     }
 
     private companion object {
