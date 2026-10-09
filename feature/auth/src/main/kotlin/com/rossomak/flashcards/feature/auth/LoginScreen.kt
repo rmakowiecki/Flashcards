@@ -47,6 +47,7 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoConnection
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
 import com.rossomak.flashcards.feature.auth.LoginMessage.SignInFailed
@@ -84,6 +85,7 @@ fun LoginScreen(
         }
     }
 
+    val noConnectionMessage = stringResource(R.string.login_no_connection_error)
     val noCredentialMessage = stringResource(R.string.login_no_credential_error)
     val signInFailedMessage = stringResource(R.string.login_signin_error)
     val snackbarScope = rememberCoroutineScope()
@@ -91,6 +93,7 @@ fun LoginScreen(
         when (message) {
             is SignInFailed -> {
                 val (text, duration) = when (message.reason) {
+                    NoConnection -> noConnectionMessage to SnackbarDuration.Short
                     NoCredentialAvailable -> noCredentialMessage to SnackbarDuration.Long
                     Unknown -> signInFailedMessage to SnackbarDuration.Short
                 }
