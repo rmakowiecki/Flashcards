@@ -8,4 +8,6 @@ typealias AccountDialogEvent = DialogEvent<AccountDialog>
 sealed interface AccountDialog {
 
     data object SignOut : AccountDialog
+
+    data object DeleteAccount : AccountDialog
 }

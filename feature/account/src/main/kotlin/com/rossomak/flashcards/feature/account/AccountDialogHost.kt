@@ -2,11 +2,13 @@ package com.rossomak.flashcards.feature.account
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsDecisionDialog
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
+import com.rossomak.flashcards.feature.account.AccountDialog.DeleteAccount
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
 
 @Composable
@@ -24,6 +26,15 @@ internal fun AccountDialogHost(
             onCancel = { onDialogEvent(Dismiss) },
             icon = Icons.AutoMirrored.Filled.Logout,
             supportingText = stringResource(R.string.account_sign_out_dialog_message),
+        )
+        DeleteAccount -> FlashcardsDecisionDialog(
+            title = stringResource(R.string.account_delete_account_dialog_title),
+            confirmLabel = stringResource(R.string.account_delete_button),
+            onConfirm = { onDialogEvent(Confirm) },
+            onCancel = { onDialogEvent(Dismiss) },
+            icon = Icons.Default.DeleteForever,
+            supportingText = stringResource(R.string.account_delete_account_dialog_message),
+            isDestructive = true,
         )
     }
 }

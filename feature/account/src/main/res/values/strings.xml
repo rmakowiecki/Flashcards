@@ -32,4 +32,10 @@
 
     <string name="account_danger_zone_label">Danger zone</string>
     <string name="account_delete_account_button">Delete account</string>
+    <string name="account_delete_account_dialog_title">Delete account?</string>
+    <string name="account_delete_account_dialog_message">Your progress, XP, level, streak and private flashcards will be permanently deleted. This can\'t be undone.</string>
+    <string name="account_delete_button">Delete</string>
+    <string name="account_deleting_account_message">Deleting account…</string>
+    <string name="account_delete_no_connection_message">No connection. Check your connection and try again.</string>
+    <string name="account_delete_failed_message">Couldn\'t delete your account. Try again.</string>
 </resources>
