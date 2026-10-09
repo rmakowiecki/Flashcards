@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
  * The uid is marked in [AccountDeletionMarkerLocalDataSource] while the call runs, so a process death
  * mid-deletion is finished at the next start by
  * [com.rossomak.flashcards.core.data.InterruptedAccountDeletionCompleter]. A cancelled call keeps the
- * marker, since the server may still delete the account.
+ * marker, even if the server's answer was a success: the next start finishes the deletion.
  */
 class DefaultAccountRepository @Inject constructor(
     private val accountDeletionRemoteDataSource: AccountDeletionRemoteDataSource,

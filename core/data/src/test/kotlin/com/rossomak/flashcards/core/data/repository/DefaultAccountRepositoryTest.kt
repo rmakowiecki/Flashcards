@@ -95,14 +95,16 @@ class DefaultAccountRepositoryTest {
     }
 
     @Test
-    fun `a queue that cannot be purged still signs out`() = runTest {
+    fun `a queue that cannot be purged still removes the dead letters and signs out`() = runTest {
         val unreadableQueue: PendingSessionSubmissionLocalDataSource = mockk {
             coEvery { removeAllForUser(DELETED_UID) } throws IOException("unreadable")
         }
+        deadLetters.append(deadLettered("session-3", DELETED_UID))
         coEvery { accountDeletionRemoteDataSource.deleteAccount() } returns Result.success(Unit)
 
         createRepository(pendingSessionSubmissionLocalDataSource = unreadableQueue).deleteAccount() shouldBe Deleted
 
+        deadLetters.listAll() shouldBe emptyList()
         coVerify(exactly = 1) { unreadableQueue.removeAllForUser(DELETED_UID) }
         verify(exactly = 1) { authRemoteDataSource.signOut() }
         verify(exactly = 1) { accountDeletionMarkerLocalDataSource.clear() }
@@ -148,6 +150,10 @@ class DefaultAccountRepositoryTest {
 
         createRepository().deleteAccount() shouldBe Failed(NoConnection)
 
+        verifyOrder {
+            accountDeletionMarkerLocalDataSource.write(DELETED_UID)
+            accountDeletionMarkerLocalDataSource.clear()
+        }
         coVerify(exactly = 1) { accountDeletionRemoteDataSource.deleteAccount() }
         verify(exactly = 0) { authRemoteDataSource.signOut() }
     }

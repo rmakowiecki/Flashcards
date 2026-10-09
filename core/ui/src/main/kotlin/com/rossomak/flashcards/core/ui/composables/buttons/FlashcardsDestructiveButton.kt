@@ -38,7 +38,7 @@ fun FlashcardsDestructiveButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError,
-            disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = DISABLED_GRADIENT_ALPHA),
+            disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = DISABLED_BUTTON_ALPHA),
             disabledContentColor = disabledButtonContentColorFor(OnSurface),
         ),
         contentPadding = PaddingValues(horizontal = metrics.horizontalPadding, vertical = MaterialTheme.spacing.none),

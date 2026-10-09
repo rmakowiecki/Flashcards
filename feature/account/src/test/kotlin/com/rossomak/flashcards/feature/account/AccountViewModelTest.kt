@@ -446,6 +446,7 @@ class AccountViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.value.activeDialog shouldBe null
+        coVerify(exactly = 1) { deleteAccount() }
     }
 
     private companion object {
