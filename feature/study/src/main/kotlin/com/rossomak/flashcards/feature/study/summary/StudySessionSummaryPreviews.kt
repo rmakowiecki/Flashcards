@@ -46,6 +46,7 @@ private fun SummaryPreview(state: StudySessionSummaryScreenState) {
         StudySessionSummaryContent(
             state = state,
             onNavigateBack = {},
+            onStudyAgainClick = {},
             onDialogEvent = {},
         )
     }

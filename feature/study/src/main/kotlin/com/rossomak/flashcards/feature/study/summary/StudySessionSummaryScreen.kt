@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -53,12 +54,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
@@ -69,6 +72,7 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDestination.StudyAgain
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
@@ -85,7 +89,7 @@ private const val SECONDS_PER_MINUTE = 60
 /**
  * A Rated or Fast Study Session's mandatory egress, natural end or premature exit alike. Both modes
  * end on the same screen: a headline, the session's stat pills, the XP total with its breakdown, the
- * account's Level card and a sheet with a tip and the way home. [onNavigateBack] is how the screen
+ * account's Level card and a sheet with a tip, the way home and a way to study the same thing again. [onNavigateBack] is how the screen
  * ends, from the close icon and the sheet's button alike, and system back does the same thing, since
  * `NavGraph.kt` already replaced everything between here and the tab the user started from.
  */
@@ -94,6 +98,16 @@ fun StudySessionSummaryScreen(
     modifier: Modifier = Modifier,
     viewModel: StudySessionSummaryViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToPreviewStudySession: (
+        categoryId: String,
+        categoryName: String,
+        sourceType: SessionSourceType,
+        subcategoryIds: List<String>,
+        subcategoryNames: List<String>,
+        studyMode: StudyMode,
+        voiceAnsweringEnabled: Boolean?,
+        readAloudEnabled: Boolean?,
+    ) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -107,11 +121,29 @@ fun StudySessionSummaryScreen(
         snackbarScope.launch { snackbarHostState.showSnackbar(text) }
     }
 
+    observeAsEvents(viewModel.events) { destination ->
+        when (destination) {
+            is StudyAgain -> with(destination.replay) {
+                onNavigateToPreviewStudySession(
+                    categoryId,
+                    categoryName,
+                    sourceType,
+                    subcategoryIds,
+                    subcategoryNames,
+                    studyMode,
+                    voiceAnsweringEnabled,
+                    readAloudEnabled,
+                )
+            }
+        }
+    }
+
     StudySessionSummaryContent(
         modifier = modifier,
         state = state,
         snackbarHostState = snackbarHostState,
         onNavigateBack = onNavigateBack,
+        onStudyAgainClick = viewModel::onStudyAgainClick,
         onDialogEvent = viewModel::onDialogEvent,
     )
 }
@@ -130,6 +162,7 @@ fun StudySessionSummaryContent(
     state: StudySessionSummaryScreenState,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateBack: () -> Unit,
+    onStudyAgainClick: () -> Unit,
     onDialogEvent: (StudySessionSummaryDialogEvent) -> Unit,
 ) {
     StudySessionSummaryDialogHost(
@@ -180,6 +213,7 @@ fun StudySessionSummaryContent(
             SummarySheet(
                 mode = state.mode,
                 onNavigateBack = onNavigateBack,
+                onStudyAgainClick = onStudyAgainClick,
                 modifier = Modifier.onSizeChanged { size -> sheetHeightPx = size.height },
             )
         }
@@ -325,7 +359,12 @@ private fun SummaryXpTotal(
 }
 
 @Composable
-private fun SummarySheet(mode: StudyMode, onNavigateBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun SummarySheet(
+    mode: StudyMode,
+    onNavigateBack: () -> Unit,
+    onStudyAgainClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     FlashcardsBottomSheet(
         state = rememberFlashcardsBottomSheetState(dismissible = false),
         onDismissRequest = {},
@@ -347,6 +386,14 @@ private fun SummarySheet(mode: StudyMode, onNavigateBack: () -> Unit, modifier: 
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = MaterialTheme.spacing.normal),
+        )
+        FlashcardsTonalButton(
+            text = stringResource(R.string.study_session_summary_study_again_button),
+            onClick = onStudyAgainClick,
+            icon = Icons.Filled.Replay,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = MaterialTheme.spacing.small),
         )
     }
 }

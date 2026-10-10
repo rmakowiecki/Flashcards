@@ -74,6 +74,7 @@
     <string name="study_session_summary_rated_tip_message">Your performance updates the card scores used to plan future sessions.</string>
     <string name="study_session_summary_fast_tip_message">Every card you see counts toward your topics progress.</string>
     <string name="study_session_summary_back_button">Back to Home</string>
+    <string name="study_session_summary_study_again_button">Study Again</string>
     <string name="study_session_summary_xp_unavailable_message">Couldn\'t calculate your XP right now. Your session is saved.</string>
     <string name="study_session_summary_xp_breakdown_title">XP breakdown</string>
     <string name="study_session_summary_xp_breakdown_cd">Show XP breakdown</string>
