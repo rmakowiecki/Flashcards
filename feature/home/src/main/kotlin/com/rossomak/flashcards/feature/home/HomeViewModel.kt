@@ -14,9 +14,12 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
@@ -47,6 +50,8 @@ class HomeViewModel @Inject constructor(
     private val observeFavoriteItems: ObserveFavoriteItemsUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
     private val observeRecentSessions: ObserveRecentSessionsUseCase,
+    private val observeUserPreferences: ObserveUserPreferencesUseCase,
+    private val saveUserPreference: SaveUserPreferenceUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeScreenState())
@@ -65,6 +70,7 @@ class HomeViewModel @Inject constructor(
         collectFavoriteItems()
         collectProgressSummary()
         collectRecentSessions()
+        collectFavoritesHintPreference()
     }
 
     /** The card body browses: it opens Category Details and starts nothing (ADR-0041). */
@@ -162,6 +168,18 @@ class HomeViewModel @Inject constructor(
         if (retriesRecents) collectRecentSessions()
     }
 
+    /**
+     * Hides the Favorites hint at once, then persists it fire-and-forget. A failed write only means the hint
+     * comes back on a later launch. There is no way to show it again.
+     */
+    fun onFavoritesHintHide() {
+        _state.update { it.copy(hasHiddenFavoritesHint = true) }
+        viewModelScope.launch {
+            saveUserPreference(HasHiddenFavoritesHint(true))
+                .onFailure { error -> logw(error) { "Failed to persist the hidden Favorites hint" } }
+        }
+    }
+
     /** One ceiling for both sections, so a hung read cannot hold back [HomeScreenState.body] forever. */
     private fun startRevealCeiling() {
         revealCeilingJob?.cancel()
@@ -240,6 +258,24 @@ class HomeViewModel @Inject constructor(
                         current.copy(recents = if (recentItems.isEmpty()) RecentsEmpty else RecentsContent(recentItems))
                     }
                 }
+        }
+    }
+
+    /**
+     * A read that fails or ends without a value counts as not hidden, so the body never waits on it. Hiding is
+     * one-way, so a hide already made in memory stays even if a later emission still reads `false` because its
+     * write failed.
+     */
+    private fun collectFavoritesHintPreference() {
+        viewModelScope.launch {
+            flow { emitAll(observeUserPreferences()) }
+                .catch { error -> loge(error) { "Observing the Favorites hint preference failed" } }
+                .collect { preferences ->
+                    _state.update {
+                        it.copy(hasHiddenFavoritesHint = it.hasHiddenFavoritesHint == true || preferences.hasHiddenFavoritesHint)
+                    }
+                }
+            _state.update { it.copy(hasHiddenFavoritesHint = it.hasHiddenFavoritesHint ?: false) }
         }
     }
 

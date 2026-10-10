@@ -15,21 +15,31 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeRecentSessionsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
+import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
 import com.rossomak.flashcards.feature.home.HomeBody.LoadError
 import com.rossomak.flashcards.feature.home.HomeBody.Resolving
 import com.rossomak.flashcards.feature.home.HomeBody.Sections
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Carousel
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Hint
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Omitted as FavoritesOmitted
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
@@ -76,6 +86,7 @@ class HomeViewModelTest {
     private val userFavoritesRepository = FakeUserFavoritesRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
     private val recentSessionsRepository = FakeRecentSessionsRepository()
+    private val userPreferencesRepository = FakeUserPreferencesRepository()
 
     private val parentCategory = Category(
         id = "android",
@@ -98,6 +109,8 @@ class HomeViewModelTest {
         observeFavoriteItems = observeFavoriteItems,
         observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository),
         observeRecentSessions = observeRecentSessions,
+        observeUserPreferences = ObserveUserPreferencesUseCase(userPreferencesRepository),
+        saveUserPreference = SaveUserPreferenceUseCase(userPreferencesRepository),
     )
 
     private fun subcategory(id: String, categoryName: String = parentCategory.name) = Subcategory(
@@ -178,6 +191,11 @@ class HomeViewModelTest {
 
     private fun stubCategoryFetch() {
         flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(parentCategory))
+    }
+
+    private fun givenOneRecentSession() {
+        stubCategoryFetch()
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
     }
 
     private fun HomeRecentsState.items(): List<RecentItem> = shouldBeInstanceOf<RecentsContent>().items
@@ -789,7 +807,7 @@ class HomeViewModelTest {
         advanceTimeBy(REVEAL_CEILING)
         runCurrent()
 
-        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favoriteItems.size shouldBe 1
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites.shouldBeInstanceOf<Carousel>().items.size shouldBe 1
     }
 
     @Test
@@ -801,14 +819,14 @@ class HomeViewModelTest {
         favorite(COMPOSE_ID)
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.body.shouldBeInstanceOf<Sections>().recentItems shouldBe emptyList()
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().recents shouldBe RecentsOmitted
 
         recentsGate.complete(Unit)
         advanceUntilIdle()
 
         val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
-        sections.favoriteItems.size shouldBe 1
-        sections.recentItems.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+        sections.favorites.shouldBeInstanceOf<Carousel>().items.size shouldBe 1
+        sections.recents.shouldBeInstanceOf<Rows>().items.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
     }
 
     @Test
@@ -868,8 +886,8 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
-        sections.favoriteItems shouldBe emptyList()
-        sections.recentItems.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+        sections.favorites shouldBe FavoritesOmitted
+        sections.recents.shouldBeInstanceOf<Rows>().items.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
     }
 
     @Test
@@ -881,8 +899,8 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
-        sections.favoriteItems.size shouldBe 1
-        sections.recentItems shouldBe emptyList()
+        sections.favorites.shouldBeInstanceOf<Carousel>().items.size shouldBe 1
+        sections.recents shouldBe RecentsOmitted
     }
 
     @Test
@@ -894,8 +912,8 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
-        sections.favoriteItems.size shouldBe 1
-        sections.recentItems.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+        sections.favorites.shouldBeInstanceOf<Carousel>().items.size shouldBe 1
+        sections.recents.shouldBeInstanceOf<Rows>().items.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
     }
 
     @Test
@@ -908,7 +926,7 @@ class HomeViewModelTest {
 
             viewModel.state.assertValue {
                 favorites shouldBe Empty
-                body shouldBe Sections(favoriteItems = emptyList(), recentItems = emptyList())
+                body shouldBe Sections(favorites = FavoritesOmitted, recents = RecentsOmitted)
             }
         }
 
@@ -920,7 +938,7 @@ class HomeViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.body shouldBe Sections(favoriteItems = emptyList(), recentItems = emptyList())
+        viewModel.state.value.body shouldBe Sections(favorites = FavoritesOmitted, recents = RecentsOmitted)
     }
 
     @Test
@@ -996,5 +1014,195 @@ class HomeViewModelTest {
         viewModel.onRetry()
 
         viewModel.state.value.body shouldBe FirstSession
+    }
+
+    @Test
+    fun `Empty Favorites next to Recents Content show the hint above the Recents`() = runTest(mainDispatcherRule.testDispatcher) {
+        givenOneRecentSession()
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.favorites shouldBe Hint
+        sections.recents.shouldBeInstanceOf<Rows>().items.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `a hidden hint leaves the Recents only`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.save(HasHiddenFavoritesHint(true))
+        givenOneRecentSession()
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe FavoritesOmitted
+    }
+
+    @Test
+    fun `an unresolved hint preference holds the body Resolving when the hint could show`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
+        givenOneRecentSession()
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.assertValue {
+            favorites shouldBe Empty
+            recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+            body shouldBe Resolving
+        }
+    }
+
+    @Test
+    fun `an unresolved hint preference after the ceiling omits the hint until a late not-hidden read adds it`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val preferencesGate = CompletableDeferred<Unit>()
+            userPreferencesRepository.userPreferencesReadGate = preferencesGate
+            givenOneRecentSession()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe FavoritesOmitted
+
+            preferencesGate.complete(Unit)
+            advanceUntilIdle()
+
+            viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe Hint
+        }
+
+    @Test
+    fun `an unresolved hint preference never delays Favorites Content`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites.shouldBeInstanceOf<Carousel>()
+    }
+
+    @Test
+    fun `both sections Empty give the first-session body even with an unresolved hint preference`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
+
+            val viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.state.value.body shouldBe FirstSession
+        }
+
+    @Test
+    fun `both sections Empty give the first-session body even with the hint hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.save(HasHiddenFavoritesHint(true))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body shouldBe FirstSession
+    }
+
+    @Test
+    fun `a failed hint preference read counts as not hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesReadFailure = IllegalStateException("preferences read failed")
+        givenOneRecentSession()
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe Hint
+    }
+
+    @Test
+    fun `a hint preference read that ends without a value counts as not hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesEmissionLimit = 0
+        givenOneRecentSession()
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe Hint
+    }
+
+    @Test
+    fun `an unresolved hint preference never delays Failed Favorites next to Recents Content`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+            givenOneRecentSession()
+
+            val viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe FavoritesOmitted
+        }
+
+    @Test
+    fun `an unresolved hint preference never delays the Recents placeholder`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().recents shouldBe Placeholder
+    }
+
+    @Test
+    fun `Hide removes the hint at once and persists it`() = runTest(mainDispatcherRule.testDispatcher) {
+        givenOneRecentSession()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onFavoritesHintHide()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe FavoritesOmitted
+        advanceUntilIdle()
+        userPreferencesRepository.preferences.value.hasHiddenFavoritesHint shouldBe true
+    }
+
+    @Test
+    fun `a failed Hide write keeps the hint hidden for this session`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.saveError = IllegalStateException("preferences write failed")
+        givenOneRecentSession()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onFavoritesHintHide()
+        advanceUntilIdle()
+        userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = 45)
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            hasHiddenFavoritesHint shouldBe true
+            body.shouldBeInstanceOf<Sections>().favorites shouldBe FavoritesOmitted
+        }
+    }
+
+    @Test
+    fun `a hidden hint is ignored once a Favorite exists and stays hidden after un-favoriting it`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userPreferencesRepository.save(HasHiddenFavoritesHint(true))
+            givenOneRecentSession()
+            favorite(COMPOSE_ID)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites.shouldBeInstanceOf<Carousel>()
+
+            unfavorite(COMPOSE_ID)
+            advanceUntilIdle()
+
+            viewModel.state.value.body.shouldBeInstanceOf<Sections>().favorites shouldBe FavoritesOmitted
+            userPreferencesRepository.preferences.value.hasHiddenFavoritesHint shouldBe true
+        }
+
+    @Test
+    fun `Favorites Content next to Empty Recents show the Recents placeholder`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().recents shouldBe Placeholder
     }
 }

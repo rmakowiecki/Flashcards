@@ -11,6 +11,8 @@ sealed interface UserPreference {
 
     data class HasSeenVoiceAnsweringInfo(val value: Boolean) : UserPreference
 
+    data class HasHiddenFavoritesHint(val value: Boolean) : UserPreference
+
     /** The last flashcard-cache generation seed this device saw (ADR-0039). */
     data class CacheSeed(val value: Int) : UserPreference
 }

@@ -58,6 +58,8 @@ Home empty state CTA ("Start your first session") triggers a tab switch to Study
 - Favorites and Recents each load as Loading, Empty (the User has none), Failed (could not be loaded) or Content. "Could not be loaded" is never read as "none": Favorites whose items could not all be fetched count as Failed, and so does a section whose listener ends before its first result
 - Favorites and Recents reveal together once both have resolved, with a ceiling of about two seconds so one hung read cannot leave Home blank; a section still loading after it is left out and joins in place when it arrives
 - First-session state (both sections Empty): book icon + "Start your first session" CTA → navigates to Study tab
+- Favorites hint (no Favorites, some Recents): the FAVORITES label with a small Hide button on its line, then a banner explaining that the bookmark on any Category or Topic pins it here, above Recents. Hide is permanent on the device (a local preference, never synced) and only ever applies to this hint: once any Favorite exists the carousel shows as usual, and removing every Favorite does not bring the hint back. Home waits for the preference only when the hint could show, so a hidden hint never flashes
+- Recents placeholder (some Favorites, no Recents): the carousel, then a RECENTLY STUDIED label with "Your recent sessions will appear here". A section that Failed shows neither the hint nor the placeholder
 - Error state (a section Failed and none has content): "Couldn't load Home" + Retry, which reloads only the failed sections. A section that fails next to one with content is hidden and logged, with no banner. A failure after a section has loaded keeps what is shown
 
 ## Study Screen

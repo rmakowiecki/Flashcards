@@ -47,10 +47,16 @@ import com.rossomak.flashcards.feature.home.HomeDestination.QuickSessionPreviewS
 import com.rossomak.flashcards.feature.home.HomeDestination.RecentPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewStudySession
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Carousel
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Hint
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Omitted as FavoritesOmitted
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading as FavoritesLoading
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
@@ -148,6 +154,7 @@ fun HomeScreen(
         onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
         onSubcategoryPlayClick = viewModel::onFavoriteSubcategorySessionStart,
         onRecentClick = viewModel::onRecentSelect,
+        onFavoritesHintHide = viewModel::onFavoritesHintHide,
         onBrowseClick = onNavigateToBrowse,
         onRetry = viewModel::onRetry,
     )
@@ -170,6 +177,7 @@ private fun HomeContent(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategoryPlayClick: (Subcategory) -> Unit,
     onRecentClick: (RecentItem) -> Unit,
+    onFavoritesHintHide: () -> Unit,
     onBrowseClick: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -217,6 +225,7 @@ private fun HomeContent(
                 onSubcategoryClick = onSubcategoryClick,
                 onSubcategoryPlayClick = onSubcategoryPlayClick,
                 onRecentClick = onRecentClick,
+                onFavoritesHintHide = onFavoritesHintHide,
             )
         }
     }
@@ -235,6 +244,7 @@ private fun HomeSections(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategoryPlayClick: (Subcategory) -> Unit,
     onRecentClick: (RecentItem) -> Unit,
+    onFavoritesHintHide: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     Column(
@@ -243,9 +253,9 @@ private fun HomeSections(
             .flashcardsScrollFade(scrollState)
             .verticalScroll(scrollState),
     ) {
-        if (sections.favoriteItems.isNotEmpty()) {
-            FavoritesCarousel(
-                items = sections.favoriteItems,
+        when (val favorites = sections.favorites) {
+            is Carousel -> FavoritesCarousel(
+                items = favorites.items,
                 progressSummary = progressSummary,
                 isProgressResolved = isProgressResolved,
                 onCategoryClick = onCategoryClick,
@@ -253,15 +263,23 @@ private fun HomeSections(
                 onSubcategoryClick = onSubcategoryClick,
                 onSubcategoryPlayClick = onSubcategoryPlayClick,
             )
+
+            Hint -> FavoritesHint(onHide = onFavoritesHintHide)
+
+            FavoritesOmitted -> Unit
         }
-        if (sections.recentItems.isNotEmpty()) {
-            RecentSessionsSection(
-                items = sections.recentItems,
+        when (val recents = sections.recents) {
+            is Rows -> RecentSessionsSection(
+                items = recents.items,
                 now = now,
                 zoneId = zoneId,
                 onRecentClick = onRecentClick,
                 modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal),
             )
+
+            Placeholder -> RecentsPlaceholder(modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal))
+
+            RecentsOmitted -> Unit
         }
     }
 }
@@ -306,6 +324,7 @@ private fun HomeContentPreviewHost(state: HomeScreenState) {
             onSubcategoryClick = {},
             onSubcategoryPlayClick = {},
             onRecentClick = {},
+            onFavoritesHintHide = {},
             onBrowseClick = {},
             onRetry = {},
         )
@@ -356,6 +375,35 @@ private fun HomeContentFavoritesAndRecentsPreview() {
         state = HomeScreenState(
             favorites = previewFavorites,
             recents = RecentsContent(previewRecentItems),
+            progressSummary = previewProgressSummary,
+            isProgressResolved = true,
+        ),
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentFavoritesHintPreview() {
+    HomeContentPreviewHost(
+        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), hasHiddenFavoritesHint = false),
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentFavoritesHintHiddenPreview() {
+    HomeContentPreviewHost(
+        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), hasHiddenFavoritesHint = true),
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentRecentsPlaceholderPreview() {
+    HomeContentPreviewHost(
+        state = HomeScreenState(
+            favorites = previewFavorites,
+            recents = RecentsEmpty,
             progressSummary = previewProgressSummary,
             isProgressResolved = true,
         ),

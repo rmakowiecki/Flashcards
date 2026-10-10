@@ -15,6 +15,30 @@ sealed interface HomeBody {
     /** A section failed and none has content: an error with Retry, never the first-session prompt. */
     data object LoadError : HomeBody
 
-    /** What each area renders; an empty list renders nothing for that area. */
-    data class Sections(val favoriteItems: List<FavoriteItem>, val recentItems: List<RecentItem>) : HomeBody
+    /** What each area renders, Favorites above Recents. */
+    data class Sections(val favorites: HomeFavoritesArea, val recents: HomeRecentsArea) : HomeBody
+}
+
+/** The Favorites area of [HomeBody.Sections]. */
+sealed interface HomeFavoritesArea {
+
+    data class Carousel(val items: List<FavoriteItem>) : HomeFavoritesArea
+
+    /** No Favorites next to Recents and the User has not hidden the hint: explains how to add one. */
+    data object Hint : HomeFavoritesArea
+
+    /** Nothing renders: Favorites failed, are still loading after the ceiling, or the hint is hidden. */
+    data object Omitted : HomeFavoritesArea
+}
+
+/** The Recents area of [HomeBody.Sections]. */
+sealed interface HomeRecentsArea {
+
+    data class Rows(val items: List<RecentItem>) : HomeRecentsArea
+
+    /** No Recents next to Favorites: says where sessions will appear. */
+    data object Placeholder : HomeRecentsArea
+
+    /** Nothing renders: Recents failed or are still loading after the ceiling. */
+    data object Omitted : HomeRecentsArea
 }
