@@ -106,7 +106,9 @@
     <string name="subcategory_count_range_value_label">%1$d–%2$d topics</string>
 
     <string name="level_card_avatar_cd">Your avatar</string>
-    <string name="level_card_level_label">Level</string>
+    <string name="level_card_level_label">lvl</string>
+    <string name="level_card_cd">%1$s, level %2$d, %3$,d of %4$,d XP</string>
+    <string name="level_card_without_name_cd">Level %1$d, %2$,d of %3$,d XP</string>
     <string name="level_card_xp_count_label">%1$,d / %2$,d</string>
     <string name="level_card_xp_unit_label">XP</string>
 </resources>
