@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
+import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large
@@ -31,8 +33,8 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
- * Collapse fraction by which the email, the Google line and Sign out's label have faded out. Past it
- * the email and the Google line are neither placed nor announced, which also takes the Manage link
+ * Collapse fraction by which the email, the "Signed in with …" line and Sign out's label have faded out.
+ * Past it the email and that line are neither placed nor announced, which also takes the Manage link
  * out of reach once it is invisible.
  */
 private const val DETAILS_FADE_END_FRACTION = 0.5f
@@ -43,10 +45,10 @@ private const val DETAILS_FADE_END_FRACTION = 0.5f
  * for the geometry. It takes the same sizes as a large app bar and is driven by the same
  * [scrollBehavior], so list scrolling collapses it like one, and it can also be dragged directly.
  *
- * Expanded, it shows the avatar beside the name and email, and the "Signed in with Google" line
- * under both. Collapsed, a smaller avatar and the name sit between the back arrow and Sign out,
- * which has dropped its label, and everything else has faded away. A null name or email just leaves
- * its line out.
+ * Expanded, it shows the avatar beside the name and email, and the "Signed in with …" line for the
+ * sign-in provider under both. Collapsed, a smaller avatar and the name sit between the back arrow and Sign out,
+ * which has dropped its label, and everything else has faded away. A null name, email or provider
+ * just leaves its line out.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +63,7 @@ internal fun AccountHeaderBar(
     val collapsedFraction = scrollBehavior.state.collapsedFraction
     val detailsProgress = (1f - collapsedFraction / DETAILS_FADE_END_FRACTION).coerceIn(0f, 1f)
     val hiddenSemantics = if (detailsProgress > 0f) Modifier else Modifier.clearAndSetSemantics {}
+    val fadingDetails = Modifier.alpha(detailsProgress).then(hiddenSemantics)
     val nameStyle = lerp(
         start = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
         stop = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
@@ -111,23 +114,20 @@ internal fun AccountHeaderBar(
                 state.email?.let { email ->
                     Text(
                         text = email,
-                        modifier = Modifier
-                            .layoutId(AccountHeaderSlot.Email)
-                            .alpha(detailsProgress)
-                            .then(hiddenSemantics),
+                        modifier = Modifier.layoutId(AccountHeaderSlot.Email).then(fadingDetails),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                AccountSignedInWithGoogleLine(
-                    modifier = Modifier
-                        .layoutId(AccountHeaderSlot.GoogleLine)
-                        .alpha(detailsProgress)
-                        .then(hiddenSemantics),
-                    onManageAccountClick = onManageAccountClick,
-                )
+                state.provider?.let { provider ->
+                    AccountSignedInWithLine(
+                        modifier = Modifier.layoutId(AccountHeaderSlot.SignedInWithLine).then(fadingDetails),
+                        provider = provider,
+                        onManageAccountClick = onManageAccountClick,
+                    )
+                }
             },
             measurePolicy = AccountHeaderMeasurePolicy(
                 appBarState = scrollBehavior.state,
@@ -163,6 +163,7 @@ private fun AccountHeaderBarPreview(
 private val PreviewState = AccountScreenState(
     displayName = "Radek Makowiecki",
     email = "radek@example.com",
+    provider = Google,
 )
 
 @PreviewLightDark
@@ -181,5 +182,5 @@ private fun AccountHeaderBarCollapsedPreview() {
 @PreviewLightDark
 @Composable
 private fun AccountHeaderBarNoNamePreview() {
-    AccountHeaderBarPreview(state = AccountScreenState(email = "radek@example.com"), initialHeightOffset = 0f)
+    AccountHeaderBarPreview(state = AccountScreenState(email = "radek@example.com", provider = GitHub), initialHeightOffset = 0f)
 }
