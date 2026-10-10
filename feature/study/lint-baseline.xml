@@ -45,26 +45,4 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;partial&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;study_session_summary_partial_count_label&quot;>%1$d partial&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="68"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;failed&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;study_session_summary_failed_count_label&quot;>%1$d failed&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="69"
-            column="5"/>
-    </issue>
-
 </issues>

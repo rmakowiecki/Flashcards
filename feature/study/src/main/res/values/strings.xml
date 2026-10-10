@@ -59,32 +59,25 @@
     <string name="exit_session_dialog_message">All progress for this session will be lost. This can\'t be undone.</string>
     <string name="exit_session_confirm_button">Exit</string>
 
-    <string name="study_session_summary_duration_label">Studied for %1$dm %2$ds</string>
-    <plurals name="study_session_summary_cards_studied_label">
-        <item quantity="one">%1$d card studied</item>
-        <item quantity="other">%1$d cards studied</item>
-    </plurals>
-    <string name="study_session_summary_mastered_count_label">%1$d mastered</string>
-    <string name="study_session_summary_partial_count_label">%1$d partial</string>
-    <string name="study_session_summary_failed_count_label">%1$d failed</string>
-    <string name="study_session_summary_mastered_caption_label">mastered</string>
+    <string name="study_session_summary_title_label">Session complete</string>
+    <string name="study_session_summary_close_cd">Close</string>
+    <string name="study_session_summary_headline_label">Great work!</string>
+    <string name="study_session_summary_headline_perfect_label">Perfect run! 🎉</string>
+    <string name="study_session_summary_headline_effort_label">Nice effort!</string>
     <string name="study_session_summary_duration_badge_label">%1$d min</string>
+    <string name="study_session_summary_duration_under_minute_badge_label">&lt;1 min</string>
     <plurals name="study_session_summary_cards_badge_label">
         <item quantity="one">%1$d card</item>
         <item quantity="other">%1$d cards</item>
     </plurals>
+    <string name="study_session_summary_mastered_count_label">%1$d mastered</string>
+    <string name="study_session_summary_rated_tip_message">Your performance updates the card scores used to plan future sessions.</string>
+    <string name="study_session_summary_fast_tip_message">Every card you see counts toward your topics progress.</string>
     <string name="study_session_summary_back_button">Back to Home</string>
-    <string name="study_session_summary_save_failed_message">Couldn\'t save this session</string>
-
-    <string name="study_session_summary_headline_label">Great work!</string>
-    <string name="study_session_summary_headline_abandoned_label">Sad to see you go early</string>
-    <string name="study_session_summary_meta_label">%1$s · %2$s</string>
-    <string name="study_session_summary_title_label">Session complete</string>
-    <string name="study_session_summary_skip_button">Skip</string>
-    <string name="study_session_summary_close_cd">Close</string>
-    <string name="study_session_summary_tip_message">Your performance updates the card scores used to plan future sessions.</string>
-    <string name="study_session_summary_xp_running_total_label">%1$d XP</string>
-    <string name="study_session_summary_xp_row_value">%1$d × %2$d = %3$d XP</string>
+    <string name="study_session_summary_xp_unavailable_message">Couldn\'t calculate your XP right now. Your session is saved.</string>
+    <string name="study_session_summary_xp_breakdown_title">XP breakdown</string>
+    <string name="study_session_summary_xp_breakdown_cd">Show XP breakdown</string>
+    <string name="study_session_summary_xp_breakdown_total_label">Total</string>
     <string name="study_session_summary_xp_row_new_cards_label">New Cards</string>
     <string name="study_session_summary_xp_row_mastered_label">Mastered</string>
     <string name="study_session_summary_xp_row_partial_label">Partial Credit</string>
@@ -94,7 +87,16 @@
     <string name="study_session_summary_xp_row_session_completed_label">Session Completed</string>
     <string name="study_session_summary_xp_row_daily_goal_label">Daily Goal Met</string>
     <string name="study_session_summary_xp_row_streak_label">Study Streak</string>
-    <string name="study_session_summary_xp_row_amount_label">%1$d XP</string>
+    <string name="study_session_summary_xp_row_amount_label">%1$s XP</string>
+    <string name="study_session_summary_xp_row_value_label">%1$s = %2$s XP</string>
+    <plurals name="study_session_summary_xp_formula_cards_label">
+        <item quantity="one">%1$d card × %2$s</item>
+        <item quantity="other">%1$d cards × %2$s</item>
+    </plurals>
+    <string name="study_session_summary_xp_formula_minutes_label">%1$s min × %2$s</string>
+    <string name="study_session_summary_xp_formula_streak_label">%1$d-day streak</string>
+    <string name="study_session_summary_xp_formula_session_completed_label">Session completed</string>
+    <string name="study_session_summary_xp_formula_daily_goal_label">Daily goal met</string>
 
     <string name="preview_session_quick_title">Quick session</string>
     <string name="preview_session_custom_title">Custom session</string>

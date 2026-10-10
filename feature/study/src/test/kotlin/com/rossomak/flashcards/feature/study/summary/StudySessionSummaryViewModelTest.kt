@@ -26,8 +26,18 @@ import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown as XpBreakdownDialog
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.PerfectRun
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Loading
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Scored as ScoreResolved
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Unavailable
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -85,6 +95,9 @@ class StudySessionSummaryViewModelTest {
         unmockkObject(RouteDecoder)
     }
 
+    private fun savedScore(): SessionScore? =
+        savedStateHandle.get<String>(SAVED_SCORE_KEY)?.let { json -> Json.decodeFromString<SessionScore>(json) }
+
     private fun stubRoute(route: StudySessionSummaryRoute) {
         every { RouteDecoder.decode(any<() -> StudySessionSummaryRoute>()) } returns route
     }
@@ -123,8 +136,32 @@ class StudySessionSummaryViewModelTest {
         )
     }
 
+    private fun fastRoute(durationSeconds: Int = 120): StudySessionSummaryRoute {
+        val cardIds = listOf("card-1", "card-2")
+        return StudySessionSummaryRoute(
+            sessionId = "session-2",
+            mode = StudyMode.Fast,
+            startedAtEpochSecond = 0L,
+            studyDateUtcOffsetMinutes = -300,
+            durationSeconds = durationSeconds,
+            abandoned = false,
+            categoryId = "cat-1",
+            categoryName = "Category",
+            subcategoryIds = listOf("sub-1"),
+            subcategoryNames = listOf("Subcategory"),
+            sourceType = SingleSubcategory,
+            cardIds = cardIds,
+            cardSubcategoryIds = cardIds.map { "sub-1" },
+            cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
+            cardAttemptsUsed = null,
+            cardWasPreviouslyMastered = null,
+            voiceAnsweringEnabled = null,
+            readAloudEnabled = false,
+        )
+    }
+
     @Test
-    fun `a Rated result exposes mode, duration, studied count and the three Terminal State counts`() =
+    fun `a Rated result exposes mode, duration, studied count and the Mastered count`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(ratedRoute())
 
@@ -137,8 +174,6 @@ class StudySessionSummaryViewModelTest {
                 studiedCount shouldBe 4
                 abandoned shouldBe false
                 masteredCount shouldBe 2
-                partialCount shouldBe 1
-                failedCount shouldBe 1
             }
         }
 
@@ -153,32 +188,9 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `a Fast result exposes the reduced set with zero for every Terminal State count`() =
+    fun `a Fast result exposes a zero Mastered count`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val cardIds = listOf("card-1", "card-2")
-            stubRoute(
-                StudySessionSummaryRoute(
-                    sessionId = "session-2",
-                    mode = StudyMode.Fast,
-                    startedAtEpochSecond = 0L,
-                    studyDateUtcOffsetMinutes = -300,
-                    durationSeconds = 60,
-                    abandoned = false,
-                    categoryId = "cat-1",
-                    categoryName = "Category",
-                    subcategoryIds = listOf("sub-1"),
-                    subcategoryNames = listOf("Subcategory"),
-                    sourceType = SingleSubcategory,
-                    cardIds = cardIds,
-                    cardSubcategoryIds = cardIds.map { "sub-1" },
-                    cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
-                    // Rated-only (ADR-0014): null for a Fast route, not zero-filled lists.
-                    cardAttemptsUsed = null,
-                    cardWasPreviouslyMastered = null,
-                    voiceAnsweringEnabled = null,
-                    readAloudEnabled = false,
-                ),
-            )
+            stubRoute(fastRoute(durationSeconds = 60))
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -187,20 +199,18 @@ class StudySessionSummaryViewModelTest {
                 mode shouldBe StudyMode.Fast
                 studiedCount shouldBe 2
                 masteredCount shouldBe 0
-                partialCount shouldBe 0
-                failedCount shouldBe 0
             }
         }
 
     @Test
-    fun `mode and Terminal State counts are already correct before the submission coroutine ever runs`() =
+    fun `mode and Mastered count are already correct before the submission coroutine ever runs`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            // Regression test: mode/durationSeconds/studiedCount/abandoned/the three Terminal State
-            // counts used to only get written inside submitSession()'s launched coroutine, after an
+            // Regression test: mode/durationSeconds/studiedCount/abandoned/masteredCount used to only
+            // get written inside submitSession()'s launched coroutine, after an
             // observeUserPreferences().first() suspend — leaving state.value at its
             // StudySessionSummaryScreenState default (StudyMode.Rated) until that coroutine ran. A
-            // config change or slow first composition could observe that default, e.g. latching the
-            // Ring/XpPour phase onto Rated and flashing the mastery ring on a genuine Fast session.
+            // config change or slow first composition could observe that default, e.g. showing the
+            // Rated pills on a genuine Fast session.
             // StandardTestDispatcher never runs a launched coroutine body until the dispatcher is
             // advanced, so reading state.value here — before any advanceUntilIdle() — exercises
             // exactly the window a real screen's first composition would see.
@@ -214,42 +224,18 @@ class StudySessionSummaryViewModelTest {
                 studiedCount shouldBe 4
                 abandoned shouldBe false
                 masteredCount shouldBe 2
-                partialCount shouldBe 1
-                failedCount shouldBe 1
                 // Still default: proves the assertions above were set independently of the
                 // (not-yet-run) async dailyGoalMinutes/XP path, not a byproduct of the test racing
                 // ahead of the whole coroutine.
                 xpTotal shouldBe 0
-                isLoading shouldBe true
+                scoreStatus shouldBe Loading
             }
         }
 
     @Test
     fun `a Fast route's mode never reads as the Rated default before the submission coroutine ever runs`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val cardIds = listOf("card-1", "card-2")
-            stubRoute(
-                StudySessionSummaryRoute(
-                    sessionId = "session-2",
-                    mode = StudyMode.Fast,
-                    startedAtEpochSecond = 0L,
-                    studyDateUtcOffsetMinutes = -300,
-                    durationSeconds = 60,
-                    abandoned = false,
-                    categoryId = "cat-1",
-                    categoryName = "Category",
-                    subcategoryIds = listOf("sub-1"),
-                    subcategoryNames = listOf("Subcategory"),
-                    sourceType = SingleSubcategory,
-                    cardIds = cardIds,
-                    cardSubcategoryIds = cardIds.map { "sub-1" },
-                    cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
-                    cardAttemptsUsed = null,
-                    cardWasPreviouslyMastered = null,
-                    voiceAnsweringEnabled = null,
-                    readAloudEnabled = false,
-                ),
-            )
+            stubRoute(fastRoute(durationSeconds = 60))
 
             val viewModel = createViewModel()
 
@@ -257,8 +243,6 @@ class StudySessionSummaryViewModelTest {
                 mode shouldBe StudyMode.Fast
                 studiedCount shouldBe 2
                 masteredCount shouldBe 0
-                partialCount shouldBe 0
-                failedCount shouldBe 0
             }
         }
 
@@ -272,10 +256,6 @@ class StudySessionSummaryViewModelTest {
 
         sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
         sessionSubmissionRepository.submittedSessionResults.single().id shouldBe route.sessionId
-        // Configuration change re-observes the same ViewModel instance rather than recreating it,
-        // so a second read of state must not trigger a second submission.
-        viewModel.state.value
-        sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
     }
 
     @Test
@@ -316,9 +296,9 @@ class StudySessionSummaryViewModelTest {
                 XpBreakdownLine(XpAwardSource.Mastered, count = 1, rate = 200, amount = 200),
                 XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
                 XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
-                XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
+                XpBreakdownLine(XpAwardSource.Streak, count = 8, rate = null, amount = 250),
+                XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
                 XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1000),
-                XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
             )
             xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
             level shouldBe 3
@@ -329,7 +309,7 @@ class StudySessionSummaryViewModelTest {
             xpIntoCurrentLevelBefore shouldBe 900L
             xpForNextLevelBefore shouldBe 1000L
             currentStreak shouldBe 8
-            isLoading shouldBe false
+            scoreStatus shouldBe ScoreResolved
         }
     }
 
@@ -341,7 +321,7 @@ class StudySessionSummaryViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        savedStateHandle.get<String>(SAVED_SCORE_KEY)?.let { json -> Json.decodeFromString<SessionScore>(json) } shouldBe SERVER_SCORE
+        savedScore() shouldBe SERVER_SCORE
     }
 
     @Test
@@ -351,13 +331,12 @@ class StudySessionSummaryViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        val savedScore = savedStateHandle.get<String>(SAVED_SCORE_KEY)?.let { json -> Json.decodeFromString<SessionScore>(json) }
-        savedScore?.breakdown?.xpTotal shouldBe viewModel.state.value.xpTotal
+        savedScore()?.breakdown?.xpTotal shouldBe viewModel.state.value.xpTotal
     }
 
     @Test
     fun `a failed preview is not saved, so a restore submits again`() = runTest(mainDispatcherRule.testDispatcher) {
-        scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
 
         createViewModel()
@@ -379,8 +358,8 @@ class StudySessionSummaryViewModelTest {
             level shouldBe 3
             levelBefore shouldBe 1
             currentStreak shouldBe 8
-            xpLines.size shouldBe 7
-            isLoading shouldBe false
+            xpLines.size shouldBe SERVER_LINE_COUNT
+            scoreStatus shouldBe ScoreResolved
         }
         sessionSubmissionRepository.submittedSessionResults shouldBe emptyList()
         scoringStateRepository.getScoringStateCallCount shouldBe 0
@@ -388,7 +367,7 @@ class StudySessionSummaryViewModelTest {
 
     @Test
     fun `a server score needs none of the local preview's reads`() = runTest(mainDispatcherRule.testDispatcher) {
-        scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
         var messageReceived = false
@@ -403,7 +382,7 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `isLoading stays true until the submission returns`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `the score stays Loading until the submission returns`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flow {
             emit(InFlight)
@@ -414,12 +393,12 @@ class StudySessionSummaryViewModelTest {
         val viewModel = createViewModel()
         advanceTimeBy(2.seconds)
 
-        viewModel.state.value.isLoading shouldBe true
+        viewModel.state.value.scoreStatus shouldBe Loading
         viewModel.state.value.xpLines shouldBe emptyList()
 
         advanceUntilIdle()
 
-        viewModel.state.value.isLoading shouldBe false
+        viewModel.state.value.scoreStatus shouldBe ScoreResolved
         viewModel.state.value.xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
     }
 
@@ -440,8 +419,8 @@ class StudySessionSummaryViewModelTest {
                     XpBreakdownLine(XpAwardSource.Mastered, count = 2, rate = 100, amount = 200),
                     XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
                     XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
-                    XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
-                    XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
+                    XpBreakdownLine(XpAwardSource.Streak, count = 1, rate = null, amount = 250),
+                    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
                 )
                 xpTotal shouldBe 1035
                 level shouldBe 2
@@ -451,7 +430,7 @@ class StudySessionSummaryViewModelTest {
                 xpIntoCurrentLevelBefore shouldBe 0L
                 xpForNextLevelBefore shouldBe config.levelThreshold(ScoringState.STARTING_LEVEL)
                 currentStreak shouldBe 1
-                isLoading shouldBe false
+                scoreStatus shouldBe ScoreResolved
             }
         }
 
@@ -477,8 +456,8 @@ class StudySessionSummaryViewModelTest {
                 XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
                 XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
                 XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
-                XpBreakdownLine(XpAwardSource.SessionCompleted, count = 1, rate = 500, amount = 500),
-                XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
+                XpBreakdownLine(XpAwardSource.Streak, count = 1, rate = null, amount = 250),
+                XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
             )
         }
 
@@ -496,7 +475,7 @@ class StudySessionSummaryViewModelTest {
 
     @Test
     fun `a failed scoring-state read leaves the xp fields at their defaults`() = runTest(mainDispatcherRule.testDispatcher) {
-        scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
 
         val viewModel = createViewModel()
@@ -506,13 +485,13 @@ class StudySessionSummaryViewModelTest {
             xpTotal shouldBe 0
             level shouldBe 1
             xpLines shouldBe emptyList()
-            isLoading shouldBe false
+            scoreStatus shouldBe Unavailable
         }
     }
 
     @Test
     fun `a failed scoring-state read still submits the session`() = runTest(mainDispatcherRule.testDispatcher) {
-        scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
 
         createViewModel()
@@ -524,9 +503,9 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `a failed scoring-state read surfaces a non-blocking message without clearing results`() =
+    fun `a failed scoring-state read surfaces the XP unavailable message without clearing results`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+            scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
             var receivedMessage: StudySessionSummaryMessage? = null
 
@@ -534,7 +513,7 @@ class StudySessionSummaryViewModelTest {
             val collectJob = launch { viewModel.messages.collect { message -> receivedMessage = message } }
             advanceUntilIdle()
 
-            receivedMessage shouldBe StudySessionSummaryMessage.SaveFailed
+            receivedMessage shouldBe StudySessionSummaryMessage.XpUnavailable
             viewModel.state.value.studiedCount shouldBe 4
             collectJob.cancel()
         }
@@ -569,8 +548,252 @@ class StudySessionSummaryViewModelTest {
         }
     }
 
+    @Test
+    fun `every source is listed in the dialog order, multiplied lines with count and rate`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(EVERY_SOURCE_SCORE))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.xpLines shouldBe listOf(
+            XpBreakdownLine(XpAwardSource.NewCards, count = 4, rate = 20, amount = 80),
+            XpBreakdownLine(XpAwardSource.Mastered, count = 2, rate = 200, amount = 400),
+            XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
+            XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
+            XpBreakdownLine(XpAwardSource.MasteryLost, count = 1, rate = -80, amount = -80),
+            XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
+            XpBreakdownLine(XpAwardSource.Streak, count = 8, rate = null, amount = 250),
+            XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
+            XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1000),
+        )
+    }
+
+    @Test
+    fun `a source with a zero amount is dropped from the lines`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.xpLines.map { it.source } shouldBe listOf(
+            XpAwardSource.NewCards,
+            XpAwardSource.Mastered,
+            XpAwardSource.MasteryDefended,
+            XpAwardSource.TimeStudied,
+            XpAwardSource.Streak,
+            XpAwardSource.SessionCompleted,
+            XpAwardSource.DailyGoal,
+        )
+    }
+
+    @Test
+    fun `the Streak line carries the current Streak and the completion and daily goal lines carry neither count nor rate`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(ratedRoute())
+            sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(EVERY_SOURCE_SCORE))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            val linesBySource = viewModel.state.value.xpLines.associateBy { it.source }
+            linesBySource.getValue(XpAwardSource.Streak).count shouldBe EVERY_SOURCE_SCORE.currentStreak
+            linesBySource.getValue(XpAwardSource.Streak).rate shouldBe null
+            listOf(XpAwardSource.SessionCompleted, XpAwardSource.DailyGoal).forEach { source ->
+                linesBySource.getValue(source).count shouldBe null
+                linesBySource.getValue(source).rate shouldBe null
+            }
+        }
+
+    @Test
+    fun `a Fast session never lists a Rated-only line`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(fastRoute())
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(EVERY_SOURCE_SCORE))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.xpLines.map { it.source } shouldBe listOf(
+            XpAwardSource.NewCards,
+            XpAwardSource.TimeStudied,
+            XpAwardSource.Streak,
+            XpAwardSource.SessionCompleted,
+            XpAwardSource.DailyGoal,
+        )
+    }
+
+    @Test
+    fun `a Fast session under a minute has no Time Studied line`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(fastRoute(durationSeconds = 59))
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(UNDER_A_MINUTE_SCORE))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.xpLines.map { it.source } shouldBe listOf(
+            XpAwardSource.NewCards,
+            XpAwardSource.Streak,
+            XpAwardSource.SessionCompleted,
+        )
+    }
+
+    @Test
+    fun `a session the cached state already applied is Unavailable with no numbers and the XP unavailable message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val route = ratedRoute()
+            scoringStateRepository.appliedSessionIds = setOf(route.sessionId)
+            stubRoute(route)
+            var receivedMessage: StudySessionSummaryMessage? = null
+
+            val viewModel = createViewModel()
+            val collectJob = launch { viewModel.messages.collect { message -> receivedMessage = message } }
+            advanceUntilIdle()
+
+            with(viewModel.state.value) {
+                scoreStatus shouldBe Unavailable
+                xpLines shouldBe emptyList()
+                xpTotal shouldBe 0
+            }
+            receivedMessage shouldBe StudySessionSummaryMessage.XpUnavailable
+            collectJob.cancel()
+        }
+
+    @Test
+    fun `a Rated session with every card Mastered is a perfect run`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute(cardStates = List(3) { FlashcardStudyProgressState.Mastered }))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.headline shouldBe PerfectRun
+    }
+
+    @Test
+    fun `a Rated session with a card not Mastered is great work`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.headline shouldBe GreatWork
+    }
+
+    @Test
+    fun `a finished Fast session is great work, never a perfect run`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(fastRoute())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.headline shouldBe GreatWork
+    }
+
+    @Test
+    fun `an abandoned session is nice effort even with every card Mastered`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute(abandoned = true, cardStates = List(3) { FlashcardStudyProgressState.Mastered }))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.headline shouldBe NiceEffort
+    }
+
+    @Test
+    fun `a negative total turns the headline to nice effort once the score lands`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute(cardStates = List(3) { FlashcardStudyProgressState.Mastered }))
+        sessionSubmissionRepository.deliveryStatusToReturn = flow {
+            emit(InFlight)
+            delay(3.seconds)
+            emit(Scored(LOSS_SCORE))
+        }
+
+        val viewModel = createViewModel()
+        advanceTimeBy(2.seconds)
+
+        viewModel.state.value.headline shouldBe PerfectRun
+
+        advanceUntilIdle()
+
+        viewModel.state.value.headline shouldBe NiceEffort
+        viewModel.state.value.xpTotal shouldBe LOSS_SCORE.breakdown.xpTotal
+    }
+
+    @Test
+    fun `a restored score is Scored from the first frame`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SERVER_SCORE)
+
+        val viewModel = createViewModel()
+
+        viewModel.state.value.scoreStatus shouldBe ScoreResolved
+    }
+
+    @Test
+    fun `a score that cannot be computed turns Unavailable after Loading`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+
+        val viewModel = createViewModel()
+
+        viewModel.state.value.scoreStatus shouldBe Loading
+
+        advanceUntilIdle()
+
+        viewModel.state.value.scoreStatus shouldBe Unavailable
+    }
+
+    @Test
+    fun `opening the XP breakdown shows it until Confirm closes it`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(XpBreakdownDialog))
+        viewModel.state.value.activeDialog shouldBe XpBreakdownDialog
+
+        viewModel.onDialogEvent(Confirm)
+        viewModel.state.value.activeDialog shouldBe null
+    }
+
+    @Test
+    fun `opening the XP breakdown shows it until Dismiss closes it`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(XpBreakdownDialog))
+        viewModel.onDialogEvent(Dismiss)
+
+        viewModel.state.value.activeDialog shouldBe null
+    }
+
+    @Test
+    fun `opening the XP breakdown while the score is Loading is ignored`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(XpBreakdownDialog))
+
+        viewModel.state.value.activeDialog shouldBe null
+    }
+
+    @Test
+    fun `opening the XP breakdown while the score is Unavailable is ignored`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onDialogEvent(Open(XpBreakdownDialog))
+
+        viewModel.state.value.activeDialog shouldBe null
+    }
+
     private companion object {
         const val SAVED_SCORE_KEY = "savedScore"
+        const val SERVER_LINE_COUNT = 7
+        val FIRESTORE_DOWN = IllegalStateException("firestore down")
         const val AUTH_USER_PHOTO_URL = "https://example.com/jane.jpg"
         const val AUTH_USER_DISPLAY_NAME = "Jane Doe"
         val AUTH_USER = AuthUser(
@@ -607,6 +830,28 @@ class StudySessionSummaryViewModelTest {
                 minuteStudied = 10,
                 sessionCompleted = 500,
             ),
+        )
+        val EVERY_SOURCE_SCORE = SERVER_SCORE.copy(
+            breakdown = XpBreakdown(
+                newCards = 80,
+                mastered = 400,
+                partial = 25,
+                masteryDefenseBonus = 50,
+                demastered = -80,
+                timeStudied = 20,
+                sessionCompletionBonus = 500,
+                dailyGoalBonus = 1000,
+                streakBonus = 250,
+            ),
+            counts = SessionScoreCounts(newCardsStudied = 4, newlyMastered = 2, partial = 1, defended = 1, demastered = 1),
+        )
+        val UNDER_A_MINUTE_SCORE = SERVER_SCORE.copy(
+            breakdown = XpBreakdown(newCards = 40, sessionCompletionBonus = 500, streakBonus = 250),
+            counts = SessionScoreCounts(newCardsStudied = 2, newlyMastered = null, partial = null, defended = null, demastered = null),
+        )
+        val LOSS_SCORE = SERVER_SCORE.copy(
+            breakdown = XpBreakdown(demastered = -240),
+            counts = SessionScoreCounts(newCardsStudied = 0, newlyMastered = 0, partial = 0, defended = 0, demastered = 3),
         )
     }
 }
