@@ -1,6 +1,8 @@
 package com.rossomak.flashcards.feature.study.summary
 
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -129,6 +131,67 @@ private fun StudySessionSummaryXpBreakdownDialogPreview() {
             xpLines = EveryLine,
             xpTotal = EveryLine.sumOf { it.amount },
             activeDialog = XpBreakdown,
+        ),
+    )
+}
+
+private val LevelUpState = ScoredState.copy(
+    durationSeconds = 720,
+    studiedCount = 14,
+    masteredCount = 8,
+    xpLines = EveryLine,
+    xpTotal = EveryLine.sumOf { it.amount },
+    level = 8,
+    xpIntoCurrentLevel = 1_100,
+    xpForNextLevel = 7_000,
+    levelsCrossed = listOf(8),
+    levelBefore = 7,
+    xpIntoCurrentLevelBefore = 5_200,
+    xpForNextLevelBefore = 6_000,
+)
+
+private const val MID_ITEMIZATION_LINES = 5
+private const val MID_POUR_XP = 5_700L
+
+/** A frame of the payoff held still, drawn through the same layout the live sequence uses. */
+@Composable
+private fun PayoffFramePreview(state: StudySessionSummaryScreenState, frame: SummaryFrame) {
+    val payoff = remember {
+        SummaryPayoff(state.xpLines, state.xpTotal, state.positionBefore(), state.positionAfter(), state.levelsCrossed, frame)
+    }
+    FlashcardsTheme {
+        SummaryLayout(
+            state = state,
+            payoff = payoff,
+            snackbarHostState = remember { SnackbarHostState() },
+            onNavigateBack = {},
+            onStudyAgainClick = {},
+            onDialogEvent = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun StudySessionSummaryMidItemizationPreview() {
+    val shownLines = EveryLine.take(MID_ITEMIZATION_LINES)
+    PayoffFramePreview(
+        state = LevelUpState,
+        frame = SummaryFrame.start(LevelUpState.positionBefore()).copy(
+            runningTotal = shownLines.sumOf { it.amount }.toFloat(),
+            visibleLineCount = shownLines.size,
+        ),
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun StudySessionSummaryMidPourPreview() {
+    PayoffFramePreview(
+        state = LevelUpState,
+        frame = SummaryFrame.settled(LevelUpState.xpTotal, LevelUpState.xpLines.size, LevelUpState.positionBefore()).copy(
+            pour = LevelPosition(level = LevelUpState.levelBefore, xpIntoLevel = MID_POUR_XP, xpForNextLevel = LevelUpState.xpForNextLevelBefore),
+            isSettled = false,
         ),
     )
 }

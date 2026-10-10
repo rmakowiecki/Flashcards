@@ -15,8 +15,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -66,6 +69,12 @@ private const val LEVEL_CARD_MUTED_TEXT_ALPHA = 0.7f
  * for the readout text; the caller drives the fill via [progress] so it can animate the bar
  * (0 → final) independently of when the readout text itself should update. [photoUrl] and
  * [displayName] are handed to [FlashcardsAvatar] as is.
+ *
+ * A caller that scripts the card frame by frame, such as the Session Summary's XP pour, has three
+ * hooks, all defaulted so every other caller is unchanged:
+ * - [showXpCount] hides the "x / y XP" readout, for a Level whose threshold is unknown;
+ * - [animateProgress] set to `false` draws [progress] exactly as given instead of easing towards it;
+ * - [levelScale] scales the Level number, read in the draw phase so a pulse never recomposes the card.
  */
 @Composable
 fun FlashcardsLevelCard(
@@ -77,6 +86,9 @@ fun FlashcardsLevelCard(
     displayName: String?,
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
+    showXpCount: Boolean = true,
+    animateProgress: Boolean = true,
+    levelScale: () -> Float = { 1f },
 ) {
     val brandColors = MaterialTheme.brandColors
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.large)
@@ -133,31 +145,59 @@ fun FlashcardsLevelCard(
                     )
                     Text(
                         text = level.toString(),
-                        modifier = Modifier.alignByBaseline(),
+                        modifier = Modifier
+                            .alignByBaseline()
+                            .graphicsLayer {
+                                val scale = levelScale()
+                                scaleX = scale
+                                scaleY = scale
+                            },
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.ExtraBold,
                     )
                 }
-                FlashcardsLinearProgressBar(progress = progress, style = OnGradient)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        text = stringResource(R.string.level_card_xp_count_label, xpIntoCurrentLevel, xpForNextLevel),
-                        color = mutedContentColor,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.level_card_xp_unit_label),
-                        modifier = Modifier.padding(start = MaterialTheme.spacing.xxsmall),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                FlashcardsLinearProgressBar(progress = progress, style = OnGradient, animate = animateProgress)
+                LevelCardXpCount(
+                    xpIntoCurrentLevel = xpIntoCurrentLevel,
+                    xpForNextLevel = xpForNextLevel,
+                    isVisible = showXpCount,
+                    mutedContentColor = mutedContentColor,
+                )
             }
         }
+    }
+}
+
+/**
+ * The "x / y XP" readout. Hidden, it is blanked rather than removed and kept out of accessibility, so
+ * a Level that scrolls past never changes the card's height.
+ */
+@Composable
+private fun LevelCardXpCount(
+    xpIntoCurrentLevel: Long,
+    xpForNextLevel: Long,
+    isVisible: Boolean,
+    mutedContentColor: Color,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (isVisible) 1f else 0f)
+            .then(if (isVisible) Modifier else Modifier.clearAndSetSemantics {}),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = stringResource(R.string.level_card_xp_count_label, xpIntoCurrentLevel, xpForNextLevel),
+            color = mutedContentColor,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Text(
+            text = stringResource(R.string.level_card_xp_unit_label),
+            modifier = Modifier.padding(start = MaterialTheme.spacing.xxsmall),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
