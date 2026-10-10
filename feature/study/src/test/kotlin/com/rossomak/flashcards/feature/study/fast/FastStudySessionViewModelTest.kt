@@ -346,6 +346,7 @@ class FastStudySessionViewModelTest {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
+            viewModel.onShowAnswer()
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -372,17 +373,18 @@ class FastStudySessionViewModelTest {
 
     @Test
     fun `a card skipped during its question is absent from cardResults`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createReadAloudViewModel()
         // card-1's question is skipped past without its answer ever being shown.
+        playbackGateway.emitExternal(TransportCommand.JumpTo(1))
+        advanceUntilIdle()
+        readQuestionThrough()
         viewModel.onDialogEvent(Open(ExitSession))
 
         viewModel.events.test {
             viewModel.onDialogEvent(Confirm)
             val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
-            destination.route.cardIds shouldNotContain "card-1"
+            destination.route.cardIds shouldBe listOf("card-2")
         }
     }
 
@@ -507,12 +509,28 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
+    fun `confirming the exit dialog before any answer is revealed navigates back, not to the summary`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onDialogEvent(Open(ExitSession))
+
+            viewModel.events.test {
+                viewModel.onDialogEvent(Confirm)
+
+                awaitItem() shouldBe FastStudySessionDestination.Back
+            }
+        }
+
+    @Test
     fun `duration is measured from first card shown, not from route entry`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
+            viewModel.onShowAnswer()
             clock.instant = FIXED_INSTANT.plusSeconds(17)
             viewModel.onDialogEvent(Open(ExitSession))
 
@@ -533,6 +551,7 @@ class FastStudySessionViewModelTest {
 
             // Simulates a long backgrounded gap (a phone call, switching apps) with no lifecycle
             // hook to react to it — v1 is deliberately simplistic: wall time only, no pausing.
+            viewModel.onShowAnswer()
             clock.instant = FIXED_INSTANT.plusSeconds(1_200)
             viewModel.onDialogEvent(Open(ExitSession))
 
