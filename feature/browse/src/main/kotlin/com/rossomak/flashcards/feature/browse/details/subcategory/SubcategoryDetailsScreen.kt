@@ -426,7 +426,7 @@ private fun FlashcardList(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.normal)
+            .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState),
     ) {

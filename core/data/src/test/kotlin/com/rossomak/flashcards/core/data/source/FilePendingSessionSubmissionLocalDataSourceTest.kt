@@ -28,8 +28,9 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
         return FilePendingSessionSubmissionLocalDataSource(context)
     }
 
-    private fun pendingSubmission(sessionId: String, startedAtEpochMillis: Long = 0L): PendingSessionSubmissionDto = PendingSessionSubmissionDto(
+    private fun pendingSubmission(sessionId: String, startedAtEpochMillis: Long = 0L, uid: String = ""): PendingSessionSubmissionDto = PendingSessionSubmissionDto(
         id = sessionId,
+        uid = uid,
         mode = "Rated",
         startedAtEpochMillis = startedAtEpochMillis,
         durationSeconds = 60,
@@ -272,5 +273,57 @@ class FilePendingSessionSubmissionLocalDataSourceTest {
         dataSource.observeAll().test {
             awaitItem().map { it.id } shouldBe listOf("session-1")
         }
+    }
+
+    @Test
+    fun `removeAllForUser drops only that User's entries`() = runTest {
+        val dataSource = createDataSource()
+        val other = pendingSubmission("session-2", uid = OTHER_UID)
+        dataSource.append(pendingSubmission("session-1", uid = DELETED_UID))
+        dataSource.append(other)
+        dataSource.append(pendingSubmission("session-3", uid = DELETED_UID))
+
+        dataSource.removeAllForUser(DELETED_UID)
+
+        dataSource.listAll() shouldBe listOf(other)
+        createDataSource().listAll() shouldBe listOf(other)
+    }
+
+    @Test
+    fun `removeAllForUser re-emits the remaining entries to observers`() = runTest {
+        val dataSource = createDataSource()
+        val deleted = pendingSubmission("session-1", uid = DELETED_UID)
+        val other = pendingSubmission("session-2", uid = OTHER_UID)
+        dataSource.append(deleted)
+        dataSource.append(other)
+
+        dataSource.observeAll().test {
+            awaitItem() shouldBe listOf(deleted, other)
+
+            dataSource.removeAllForUser(DELETED_UID)
+
+            awaitItem() shouldBe listOf(other)
+        }
+    }
+
+    @Test
+    fun `removeAllForUser on a fresh store with no file yet leaves it empty`() = runTest {
+        val dataSource = createDataSource()
+
+        dataSource.removeAllForUser(DELETED_UID)
+
+        dataSource.listAll() shouldBe emptyList()
+    }
+
+    @Test
+    fun `removeAllForUser propagates an unreadable queue file instead of emptying it`() = runTest {
+        File(temporaryFolder.root, "pending_session_submissions.jsonl").mkdir()
+
+        shouldThrow<IOException> { createDataSource().removeAllForUser(DELETED_UID) }
+    }
+
+    private companion object {
+        const val DELETED_UID = "uid-deleted"
+        const val OTHER_UID = "uid-other"
     }
 }

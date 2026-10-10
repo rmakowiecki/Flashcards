@@ -4,6 +4,8 @@ import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason.NoConnection
+import com.rossomak.flashcards.core.domain.model.GradingFailureReason.ServiceError
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.repository.VoiceAnswerGradingRepository
@@ -56,7 +58,7 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
         }
         if (completed == null) {
             loge { "Voice answer grading exceeded $GRADING_TIME_BUDGET" }
-            emit(VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection))
+            emit(VoiceAnswerGradingEvent.Failed(NoConnection))
         }
     }
 
@@ -91,7 +93,7 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
     }
         .catch { exception ->
             loge(exception) { "Voice answer grading failed" }
-            emit(VoiceAnswerGradingEvent.Failed(exception.toGradingFailureReason()))
+            emit(VoiceAnswerGradingEvent.Failed(exception.toFailureReason(NoConnection, ServiceError)))
         }
         .flowOn(ioDispatcher)
 
