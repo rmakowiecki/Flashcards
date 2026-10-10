@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.study.summary
 
-import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.StudyMode
 
 /**
@@ -10,13 +9,17 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
  * always zero for a Fast result — Fast never produces those outcomes — and the content chooses the
  * reduced Fast variant off [mode] rather than inferring it from the counts being zero.
  *
- * [xpLines]/[xpTotal]/[level]/[xpIntoCurrentLevel]/[xpForNextLevel]/[levelsCrossed] all stay at
- * their zero defaults until the session's submission resolves — the state is populated from the route
- * synchronously, before that I/O-dependent calculation can possibly have run. [xpLines] never
+ * [xpLines]/[xpTotal]/[levelsCrossed] all stay at their zero defaults until the session's submission
+ * resolves — the state is populated from the route synchronously, before that I/O-dependent
+ * calculation can possibly have run. [xpLines] never
  * includes a zero-[XpBreakdownLine.amount] entry; a future redesign replaces this plain
  * list with the animated pour, against content this makes real for the first time.
  *
  * [levelsCrossed] is carried for a Level-up celebration and not rendered yet.
+ *
+ * [levelCard] is the Level card's own state, read from the live Level stream and independent of the
+ * session's score and of [isLoading]: it starts as [StudySessionSummaryLevelCardState.Loading] and
+ * its value comes from the same stream as Home's card, so both screens always agree.
  *
  * [photoUrl]/[displayName] are the signed-in User's avatar source for the Level card. Both are null
  * until the auth user arrives, and again whenever there is no signed-in User.
@@ -32,10 +35,8 @@ data class StudySessionSummaryScreenState(
     val xpLines: List<XpBreakdownLine> = emptyList(),
     val isLoading: Boolean = true,
     val xpTotal: Int = 0,
-    val level: Int = ScoringState.STARTING_LEVEL,
-    val xpIntoCurrentLevel: Long = 0,
-    val xpForNextLevel: Long = 0,
     val levelsCrossed: List<Int> = emptyList(),
+    val levelCard: StudySessionSummaryLevelCardState = StudySessionSummaryLevelCardState.Loading,
     val photoUrl: String? = null,
     val displayName: String? = null,
 )

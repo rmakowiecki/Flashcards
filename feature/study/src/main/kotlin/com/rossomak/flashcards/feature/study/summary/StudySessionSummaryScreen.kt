@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.feature.study.summary
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExitTransition
@@ -8,7 +9,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +56,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -83,6 +87,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardSkeleton
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
@@ -190,6 +195,8 @@ fun StudySessionSummaryContent(
     var xpRevealedCount by rememberSaveable(replayKey) { mutableIntStateOf(0) }
     var levelBarFilled by rememberSaveable(replayKey) { mutableStateOf(false) }
 
+    val currentLevelProgress by rememberUpdatedState((state.levelCard as? StudySessionSummaryLevelCardState.Content)?.levelProgress)
+
     LaunchedEffect(phase, state.isLoading) {
         if (state.isLoading) return@LaunchedEffect
         if (phase != Phase.Ring) return@LaunchedEffect
@@ -218,8 +225,11 @@ fun StudySessionSummaryContent(
         delay(LEVEL_CARD_ENTRANCE_DELAY_MS.milliseconds)
         levelBarFilled = true
         // Nothing to fill: advance immediately instead of waiting out a fill animation that
-        // would never visibly move.
-        delay((if (state.xpIntoCurrentLevel == 0L) 0L else LEVEL_CARD_FILL_SETTLE_DELAY_MS).milliseconds)
+        // would never visibly move. Read when the delay starts, not when this effect was launched:
+        // the stream may have resolved during the entrance delay above, and an unresolved card has
+        // nothing to fill.
+        val hasXpToFill = (currentLevelProgress?.xpIntoCurrentLevel ?: 0L) != 0L
+        delay((if (hasXpToFill) LEVEL_CARD_FILL_SETTLE_DELAY_MS else 0L).milliseconds)
         phase = Phase.Panel
     }
 
@@ -242,12 +252,6 @@ fun StudySessionSummaryContent(
     LaunchedEffect(Unit) {
         headerVisibleState.targetState = true
         headerAppeared = true
-    }
-
-    val targetProgress = if (state.xpForNextLevel <= 0L) {
-        0f
-    } else {
-        (state.xpIntoCurrentLevel.toFloat() / state.xpForNextLevel.toFloat()).coerceIn(0f, 1f)
     }
 
     Box(
@@ -320,25 +324,24 @@ fun StudySessionSummaryContent(
                 // it slides down from above the screen once Ring/XpPour finish, pushing the
                 // "Great work!" section below it down rather than crossfading in its place (order
                 // deliberately flipped from the header-first layout the earlier phases use).
-                AnimatedVisibility(
-                    visible = phase == Phase.LevelCard || phase == Phase.Panel,
-                    enter = fadeIn(tween(LEVEL_CARD_ENTER_DURATION_MS)) +
-                        slideInVertically(animationSpec = tween(LEVEL_CARD_ENTER_DURATION_MS), initialOffsetY = { -it }),
-                    // See XpPourPhaseContent's exit comment: the default exit's shrinkOut() would
-                    // silently clip this card during its own enter too. Phase only moves forward,
-                    // so exit never plays.
-                    exit = ExitTransition.None,
-                ) {
-                    FlashcardsLevelCard(
-                        level = state.level,
-                        xpIntoCurrentLevel = state.xpIntoCurrentLevel,
-                        xpForNextLevel = state.xpForNextLevel,
-                        progress = if (levelBarFilled) targetProgress else 0f,
-                        photoUrl = state.photoUrl,
-                        displayName = state.displayName,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = FlashcardsComponentStyle.OnGradient,
-                    )
+                if (state.levelCard !is StudySessionSummaryLevelCardState.Unavailable) {
+                    AnimatedVisibility(
+                        visible = phase == Phase.LevelCard || phase == Phase.Panel,
+                        enter = fadeIn(tween(LEVEL_CARD_ENTER_DURATION_MS)) +
+                            slideInVertically(animationSpec = tween(LEVEL_CARD_ENTER_DURATION_MS), initialOffsetY = { -it }),
+                        // See XpPourPhaseContent's exit comment: the default exit's shrinkOut() would
+                        // silently clip this card during its own enter too. Phase only moves forward,
+                        // so exit never plays.
+                        exit = ExitTransition.None,
+                    ) {
+                        SummaryLevelCard(
+                            state = state.levelCard,
+                            levelBarFilled = levelBarFilled,
+                            photoUrl = state.photoUrl,
+                            displayName = state.displayName,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -415,6 +418,49 @@ fun StudySessionSummaryContent(
                         .padding(top = MaterialTheme.spacing.normal),
                 )
             }
+        }
+    }
+}
+
+/**
+ * The Level card slot: the on-gradient skeleton until the Level stream has emitted, then the card,
+ * with a fade between them. [StudySessionSummaryLevelCardState.Unavailable] draws nothing; the caller
+ * leaves the slot out instead. The bar stays empty until [levelBarFilled] so the fill plays with the
+ * reveal sequence, and a later emission re-targets it by itself.
+ */
+@Composable
+private fun SummaryLevelCard(
+    state: StudySessionSummaryLevelCardState,
+    levelBarFilled: Boolean,
+    photoUrl: String?,
+    displayName: String?,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedContent(
+        targetState = state,
+        modifier = modifier,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        contentKey = { it::class },
+        label = "SummaryLevelCard",
+    ) { targetState ->
+        when (targetState) {
+            StudySessionSummaryLevelCardState.Loading -> FlashcardsLevelCardSkeleton(
+                modifier = Modifier.fillMaxWidth(),
+                style = FlashcardsComponentStyle.OnGradient,
+            )
+            is StudySessionSummaryLevelCardState.Content -> with(targetState.levelProgress) {
+                FlashcardsLevelCard(
+                    level = level,
+                    xpIntoCurrentLevel = xpIntoCurrentLevel,
+                    xpForNextLevel = xpForNextLevel,
+                    progress = if (levelBarFilled) progress else 0f,
+                    photoUrl = photoUrl,
+                    displayName = displayName,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = FlashcardsComponentStyle.OnGradient,
+                )
+            }
+            StudySessionSummaryLevelCardState.Unavailable -> Unit
         }
     }
 }
