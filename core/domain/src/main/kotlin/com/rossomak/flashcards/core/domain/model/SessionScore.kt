@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.core.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * One session's XP award, line by line, and the account's Level position right before and right after
  * applying it.
@@ -19,6 +21,7 @@ package com.rossomak.flashcards.core.domain.model
  * @param counts how many cards or events each multiplied line counts.
  * @param rates the per-line rates the session was scored with.
  */
+@Serializable
 data class SessionScore(
     val breakdown: XpBreakdown,
     val level: Int,
@@ -43,6 +46,7 @@ data class SessionScore(
  * @param defended cards ending Mastered that were already Mastered, behind [XpBreakdown.masteryDefenseBonus].
  * @param demastered cards ending Failed that were Mastered before, behind [XpBreakdown.demastered].
  */
+@Serializable
 data class SessionScoreCounts(
     val newCardsStudied: Int,
     val newlyMastered: Int?,
@@ -55,6 +59,7 @@ data class SessionScoreCounts(
  * The [XpConfig] rates behind each multiplied [XpBreakdown] line, as the server scored the session.
  * The Streak and Daily Goal awards are not multiplied per item, so they have no rate here.
  */
+@Serializable
 data class SessionScoreRates(
     val newCardStudied: Int,
     val cardMastered: Int,
