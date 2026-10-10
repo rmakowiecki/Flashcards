@@ -11,6 +11,7 @@ import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.UserPreference
 import com.rossomak.flashcards.core.domain.model.UserPreference.CacheSeed
 import com.rossomak.flashcards.core.domain.model.UserPreference.DailyGoalMinutes
+import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenOnboarding
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.UserPreferences
@@ -38,6 +39,7 @@ class DataStoreUserPreferencesLocalDataSource @Inject constructor(
                 hasSeenOnboarding = prefs[HAS_SEEN_ONBOARDING_KEY] ?: DEFAULT_HAS_SEEN_ONBOARDING,
                 dailyGoalMinutes = prefs[DAILY_GOAL_MINUTES_KEY] ?: DailyGoal.DEFAULT_MINUTES,
                 hasSeenVoiceAnsweringInfo = prefs[HAS_SEEN_VOICE_ANSWERING_INFO_KEY] ?: DEFAULT_HAS_SEEN_VOICE_ANSWERING_INFO,
+                hasHiddenFavoritesHint = prefs[HAS_HIDDEN_FAVORITES_HINT_KEY] ?: DEFAULT_HAS_HIDDEN_FAVORITES_HINT,
                 localCacheSeed = prefs[CACHE_SEED_KEY],
             )
         }
@@ -48,6 +50,7 @@ class DataStoreUserPreferencesLocalDataSource @Inject constructor(
                 is DailyGoalMinutes -> prefs[DAILY_GOAL_MINUTES_KEY] = DailyGoal.coerce(preference.value)
                 is HasSeenOnboarding -> prefs[HAS_SEEN_ONBOARDING_KEY] = preference.value
                 is HasSeenVoiceAnsweringInfo -> prefs[HAS_SEEN_VOICE_ANSWERING_INFO_KEY] = preference.value
+                is HasHiddenFavoritesHint -> prefs[HAS_HIDDEN_FAVORITES_HINT_KEY] = preference.value
                 is CacheSeed -> prefs[CACHE_SEED_KEY] = preference.value
             }
         }
@@ -56,9 +59,11 @@ class DataStoreUserPreferencesLocalDataSource @Inject constructor(
     private companion object {
         val DEFAULT_HAS_SEEN_ONBOARDING = UserPreferences().hasSeenOnboarding
         val DEFAULT_HAS_SEEN_VOICE_ANSWERING_INFO = UserPreferences().hasSeenVoiceAnsweringInfo
+        val DEFAULT_HAS_HIDDEN_FAVORITES_HINT = UserPreferences().hasHiddenFavoritesHint
         val HAS_SEEN_ONBOARDING_KEY = booleanPreferencesKey("has_seen_onboarding")
         val DAILY_GOAL_MINUTES_KEY = intPreferencesKey("daily_goal_minutes")
         val HAS_SEEN_VOICE_ANSWERING_INFO_KEY = booleanPreferencesKey("has_seen_voice_answering_info")
+        val HAS_HIDDEN_FAVORITES_HINT_KEY = booleanPreferencesKey("has_hidden_favorites_hint")
         val CACHE_SEED_KEY = intPreferencesKey("cache_seed")
     }
 }

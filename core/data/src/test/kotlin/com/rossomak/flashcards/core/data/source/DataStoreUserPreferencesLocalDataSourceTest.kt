@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.UserPreference.DailyGoalMinutes
+import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenOnboarding
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.UserPreferences
@@ -89,5 +90,23 @@ class DataStoreUserPreferencesLocalDataSourceTest {
         val preferences = localDataSource.userPreferences().first()
 
         preferences.hasSeenVoiceAnsweringInfo shouldBe true
+    }
+
+    @Test
+    fun `the favorites hint is not hidden when nothing is persisted`() = runTest {
+        val preferences = createLocalDataSource().userPreferences().first()
+
+        preferences.hasHiddenFavoritesHint shouldBe false
+    }
+
+    @Test
+    fun `saving the favorites hint hidden flag persists it and leaves the other preferences untouched`() = runTest {
+        val localDataSource = createLocalDataSource()
+        localDataSource.save(DailyGoalMinutes(30))
+
+        localDataSource.save(HasHiddenFavoritesHint(true))
+        val preferences = localDataSource.userPreferences().first()
+
+        preferences shouldBe UserPreferences(dailyGoalMinutes = 30, hasHiddenFavoritesHint = true)
     }
 }
