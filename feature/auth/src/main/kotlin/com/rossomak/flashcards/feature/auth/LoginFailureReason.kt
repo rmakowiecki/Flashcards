@@ -8,6 +8,7 @@ package com.rossomak.flashcards.feature.auth
  * error to report back to the user. See [isGoogleSignInCancellation].
  */
 sealed interface LoginFailureReason {
+    data object NoConnection : LoginFailureReason
     data object NoCredentialAvailable : LoginFailureReason
     data object Unknown : LoginFailureReason
 }

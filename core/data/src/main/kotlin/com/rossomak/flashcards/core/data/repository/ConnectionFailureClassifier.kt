@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.data.repository
 
+import com.rossomak.flashcards.core.common.isConnectionFailure
 import java.io.IOException
 
 /**
@@ -11,12 +12,3 @@ import java.io.IOException
  */
 internal fun <Reason> Throwable.toFailureReason(noConnection: Reason, serviceError: Reason): Reason =
     if (isConnectionFailure()) noConnection else serviceError
-
-/** The service was never reached: an [IOException] anywhere in the cause chain. */
-internal fun Throwable.isConnectionFailure(): Boolean {
-    // Bounded, since a malformed cause chain can loop back on itself.
-    val causeChain = generateSequence(this) { throwable -> throwable.cause }.take(MAX_CAUSE_CHAIN_DEPTH)
-    return causeChain.any { throwable -> throwable is IOException }
-}
-
-private const val MAX_CAUSE_CHAIN_DEPTH = 16

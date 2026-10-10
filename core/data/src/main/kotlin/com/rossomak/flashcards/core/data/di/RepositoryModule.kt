@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.core.data.di
 
-import com.rossomak.flashcards.core.data.network.DefaultNetworkAvailability
-import com.rossomak.flashcards.core.data.network.NetworkAvailability
+import com.rossomak.flashcards.core.data.network.DefaultNetworkAvailabilityGateway
 import com.rossomak.flashcards.core.data.repository.DefaultAppShortcutsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
@@ -34,6 +33,7 @@ import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.LevelProgressRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.OnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.domain.repository.RecentSessionsRepository
 import com.rossomak.flashcards.core.domain.repository.ScoringStateRepository
@@ -100,7 +100,7 @@ abstract class RepositoryModule {
     abstract fun bindSessionSubmissionRemoteDataSource(firebaseSessionSubmissionRemoteDataSource: FirebaseSessionSubmissionRemoteDataSource): SessionSubmissionRemoteDataSource
 
     @Binds
-    abstract fun bindNetworkAvailability(defaultNetworkAvailability: DefaultNetworkAvailability): NetworkAvailability
+    abstract fun bindNetworkAvailabilityGateway(defaultNetworkAvailabilityGateway: DefaultNetworkAvailabilityGateway): NetworkAvailabilityGateway
 
     @Binds
     @Singleton
