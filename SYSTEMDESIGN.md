@@ -42,7 +42,7 @@ Accessible from both Home and Study tabs. Registered at the root NavHost level (
 
 All session entry points navigate to `PreviewStudySessionScreen`, which owns card selection from the given scope. See [ADR-0004](docs/adr/0004-preview-study-session-screen-owns-card-selection.md).
 
-- **Study Again (All)**: → `PreviewStudySessionScreen` with same params, `popUpTo<Main>()`.
+- **Study Again**: → `PreviewStudySessionScreen` as tapping the session's Recent on Home would (Quick sends the Category only, so Preview samples afresh; the past Study Mode and delivery are starting values, not saved as defaults), `popUpTo<Main>(inclusive = false)`. Home's Recent and the Summary share one replay rule (`StudySessionReplay`) and one navigation builder.
 - **Study Again (Failed)**: → `RatedStudySession` directly with `cardIds = [failedCardIds]`, `popUpTo<Main>()`. Unambiguous by construction — a failed-card replay is always Rated.
 - **Back to Home / system back from StudySessionSummary**: `popUpTo<Main>(inclusive = false)` — returns to whatever tab was active.
 
@@ -203,10 +203,11 @@ The batch contains:
 
 It is the **mandatory exit path for every session**, abandoned included, and the only place XP is computed and persisted. A freshly-finished session's result arrives as route arguments — `cardResults` flattened into parallel lists of primitives (`androidx.navigation`'s typesafe routes only derive a `NavType` for primitives, enums and lists of those, the same constraint `StudySessionRoute` already works around for its voice settings). `cardIds`/`subcategoryIds`/`states` are always present; `attemptsUsed`/`wasPreviouslyMastered` are Rated-only lists, `null` on a Fast route rather than lists of zeroes and falses. A past session instead carries only `sessionId` and is read back from `sessions/{sessionId}` — one document, `cardResults` included. Session length is capped at `StudySessionConfig.MAX_LENGTH` (50 cards), so the flattened lists stay well within the platform's navigation argument size ceiling.
 
-Both Study Modes terminate here, on the same settled screen: an app bar (close and "Session complete"), a headline ("Great work!", "Perfect run!" for a Rated session with every card Mastered, or "Nice effort!" for an abandoned session or one with a negative XP total), stat pills (duration, cards studied and, Rated only, mastered), the XP total with an info button that opens the XP breakdown dialog, the Level card, and a bottom sheet with a mode-specific tip and "Back to Home". While the score loads only a spinner shows. When no score could be computed the XP total, its info button and the Level card are left out and a snackbar says the session is saved but the XP could not be calculated. Fast differs from Rated in its pills and tip only: it has no mastered count and no Rated-only breakdown lines.
+Both Study Modes terminate here, on the same settled screen: an app bar (close and "Session complete"), a headline ("Great work!", "Perfect run!" for a Rated session with every card Mastered, or "Nice effort!" for an abandoned session or one with a negative XP total), stat pills (duration, cards studied and, Rated only, mastered), the XP total with an info button that opens the XP breakdown dialog, the Level card, and a bottom sheet with a mode-specific tip, "Back to Home" and "Study Again". While the score loads only a spinner shows. When no score could be computed the XP total, its info button and the Level card are left out and a snackbar says the session is saved but the XP could not be calculated. Fast differs from Rated in its pills and tip only: it has no mastered count and no Rated-only breakdown lines.
+
+- **Study Again** — opens the Preview Study Session Screen for the same scope, Study Mode and delivery as the session's Recent, removing the Summary from the back stack so back from Preview returns to the starting tab; card selection happens fresh on Preview. Ignores a second tap.
 
 Designed:
-- **Study Again (All)** — navigates to Preview Study Session Screen with same `categoryId` + `subcategoryIds`, clearing the session stack (`popUpTo<Main>()`); card re-selection happens fresh on the Preview Study Session Screen
 - **Study Again (Failed)** — shown only if ≥1 Flashcard reached Terminal State Failed; navigates directly to `RatedStudySession` with `cardIds = [failedCardIds]`, `popUpTo<Main>()`
 - **Back to Home** — `popUpTo<Main>(inclusive = false)`; returns to Main on whichever tab was active. System back has the same behavior.
 
