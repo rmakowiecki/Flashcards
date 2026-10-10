@@ -70,7 +70,7 @@ private fun HomeContentPreviewHost(state: HomeScreenState, levelCard: HomeLevelC
     FlashcardsTheme {
         HomeContent(
             state = state.copy(levelCard = levelCard),
-            now = previewRecentsNow,
+            now = { previewRecentsNow },
             zoneId = previewRecentsZoneId,
             onCategoryClick = {},
             onCategoryQuickSessionClick = {},
