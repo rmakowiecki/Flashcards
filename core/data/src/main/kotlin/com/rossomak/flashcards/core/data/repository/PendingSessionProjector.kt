@@ -112,19 +112,22 @@ class PendingSessionProjector @Inject constructor(
     }
 
     /**
-     * The User's scoring state with every Pending Session replayed on top.
+     * The User's scoring state with every deliverable Pending Session ([observeDeliverablePendingSessions])
+     * replayed on top. A session with no Flashcard Result is left out: the server rejects it, so it never
+     * earns XP.
      *
-     * With no Pending Session, this is the plain remote read: `null` for an account with no document
-     * yet. Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state
-     * read always fails: a guessed low starting state would show a misleading number.
+     * With no such session, this is the plain remote read: `null` for an account with no document yet.
+     * Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state read
+     * always fails: a guessed low starting state would show a misleading number.
      *
      * If the signed-in User changes while the reads are in flight, the queue and the remote documents
      * may belong to different Users, so the read fails rather than projecting one User's sessions over
-     * the other's scoring state.
+     * the other's scoring state. A queue that merely changes meanwhile is not checked: a delivery
+     * removing an older session during the read must not fail the caller.
      */
     suspend fun projectScoringState(): Result<ScoringState?> = coroutineScope {
         val uidAtStart = signedInUid()
-        val pendingSessions = pendingSessions()
+        val pendingSessions = observeDeliverablePendingSessions().first()
         val remoteScoringState = async { readRemoteScoringState() }
         if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await()
 
@@ -137,6 +140,27 @@ class PendingSessionProjector @Inject constructor(
             return@coroutineScope Result.failure(IllegalStateException("Signed-in User changed while reading the scoring state"))
         }
         Result.success(replay(baselines, pendingSessions, scoringState, xpConfig).scoringState)
+    }
+
+    /**
+     * [remoteScoringState] with [pendingSessions] (a snapshot of [observeDeliverablePendingSessions])
+     * replayed on top and scored with [config], or `null` when [pendingSessions] is stale by the time
+     * the Card Progress baselines are read. A missing remote document (`null`) replays from
+     * [ScoringState]'s defaults. With no session, this returns the remote state, or the defaults,
+     * without reading anything.
+     *
+     * The queue is read again after the baselines and compared with [pendingSessions], against the
+     * deliverable list they were taken from: a different list means the queue changed meanwhile. The
+     * same check covers a User switch, so there is no separate uid check: after sign-out the list is
+     * empty, and another User's list never equals a non-empty one, since entries are owned by uid and
+     * ids are unique. The caller drops a `null` result; the queue change that made it stale re-emits.
+     */
+    suspend fun projectScoringStateOver(remoteScoringState: ScoringState?, pendingSessions: List<SessionResult>, config: XpConfig): ScoringState? {
+        val scoringState = remoteScoringState ?: ScoringState()
+        if (pendingSessions.isEmpty()) return scoringState
+        val baselines = readProgressBaselines(pendingSessions)
+        if (observeDeliverablePendingSessions().first() != pendingSessions) return null
+        return replay(baselines, pendingSessions, scoringState, config).scoringState
     }
 
     /**
