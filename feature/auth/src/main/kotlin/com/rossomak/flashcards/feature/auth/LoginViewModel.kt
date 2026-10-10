@@ -3,6 +3,10 @@ package com.rossomak.flashcards.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.domain.model.SignInFailureReason
+import com.rossomak.flashcards.core.domain.model.SignInResult
+import com.rossomak.flashcards.core.domain.model.SignInResult.Cancelled
+import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
 import com.rossomak.flashcards.core.domain.usecase.CheckInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
@@ -50,7 +54,7 @@ class LoginViewModel @Inject constructor(
     fun onGoogleSignInResult(idTokenResult: Result<String>) {
         idTokenResult
             .onSuccess { idToken -> signInWithIdToken(idToken) }
-            .onFailure { error -> handleSignInFailure(error) }
+            .onFailure { error -> handleAccountPickerFailure(error) }
     }
 
     /**
@@ -63,8 +67,8 @@ class LoginViewModel @Inject constructor(
 
     private fun signInWithIdToken(idToken: String) {
         viewModelScope.launch {
-            signInWithGoogle(idToken)
-                .onSuccess {
+            when (val result = signInWithGoogle(idToken)) {
+                is SignInResult.SignedIn -> {
                     // Before the preferences read, so the button never comes back while the screen leaves.
                     _state.update { it.copy(phase = SignedIn) }
                     // The onboarding flag is device-scoped, so a second account signing in on a
@@ -72,12 +76,24 @@ class LoginViewModel @Inject constructor(
                     val hasSeenOnboarding = observeUserPreferences().first().hasSeenOnboarding
                     eventChannel.send(if (hasSeenOnboarding) Main else Onboarding)
                 }
-                .onFailure { error -> handleSignInFailure(error) }
+                Cancelled -> _state.update { it.copy(phase = Idle) }
+                is Failed -> handleSignInFailure(result.reason)
+            }
         }
     }
 
     /** Clears the flag first, so the button is enabled again by the time the snackbar appears. */
-    private fun handleSignInFailure(error: Throwable) {
+    private fun handleSignInFailure(reason: SignInFailureReason) {
+        _state.update { it.copy(phase = Idle) }
+        viewModelScope.launch {
+            // The data layer already logged the throwable behind this reason.
+            val isInternetAvailable = checkInternetAvailability()
+            _messages.tryEmit(SignInFailed(reason.toLoginFailureReason(isInternetAvailable)))
+        }
+    }
+
+    /** Clears the flag first, so the button is enabled again by the time the snackbar appears. */
+    private fun handleAccountPickerFailure(error: Throwable) {
         _state.update { it.copy(phase = Idle) }
         if (error.isGoogleSignInCancellation()) return
         viewModelScope.launch {

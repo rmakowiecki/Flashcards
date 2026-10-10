@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.feature.auth
 
 /**
- * Why Google sign-in failed. Non-string per the domain/UI string split (AGENTS.md, "String
+ * Why a sign-in failed. Non-string per the domain/UI string split (AGENTS.md, "String
  * Resources") — resolved to a string resource only at the presentation boundary that surfaces it.
  *
  * Cancellation (the user dismissing the account picker) is not a variant here — it is not an

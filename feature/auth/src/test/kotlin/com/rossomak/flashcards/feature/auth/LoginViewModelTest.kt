@@ -4,6 +4,10 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.SignInFailureReason
+import com.rossomak.flashcards.core.domain.model.SignInResult
+import com.rossomak.flashcards.core.domain.model.SignInResult.Cancelled
+import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
@@ -58,7 +62,7 @@ class LoginViewModelTest {
     @Test
     fun `a token result with successful sign-in emits Main when onboarding was already seen`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            authRepository.signInResult = Result.success(testUser)
+            authRepository.signInResult = SignInResult.SignedIn(testUser)
             val viewModel = createViewModel()
 
             viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
@@ -71,7 +75,7 @@ class LoginViewModelTest {
     @Test
     fun `a token result with successful sign-in emits Onboarding when onboarding was never seen`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            authRepository.signInResult = Result.success(testUser)
+            authRepository.signInResult = SignInResult.SignedIn(testUser)
             val viewModel = createViewModel(hasSeenOnboarding = false)
 
             viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
@@ -84,7 +88,7 @@ class LoginViewModelTest {
     @Test
     fun `a token result with successful sign-in ends signed in rather than idle`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            authRepository.signInResult = Result.success(testUser)
+            authRepository.signInResult = SignInResult.SignedIn(testUser)
             val viewModel = createViewModel()
             viewModel.onGoogleSignInStarted()
 
@@ -99,7 +103,7 @@ class LoginViewModelTest {
     @Test
     fun `a token result with failed sign-in emits an Unknown failure message and stops signing in`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            authRepository.signInResult = Result.failure(IllegalStateException(NETWORK_DOWN_MESSAGE))
+            authRepository.signInResult = Failed(SignInFailureReason.Unknown)
             val viewModel = createViewModel()
             viewModel.onGoogleSignInStarted()
 
@@ -259,8 +263,8 @@ class LoginViewModelTest {
         }
 
     @Test
-    fun `a token exchange failure caused by an IOException emits NoConnection`() = runTest(mainDispatcherRule.testDispatcher) {
-        authRepository.signInResult = Result.failure(IllegalStateException(IOException(NETWORK_DOWN_MESSAGE)))
+    fun `a token exchange that failed for no connection emits NoConnection`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.signInResult = Failed(SignInFailureReason.NoConnection)
         val viewModel = createViewModel()
 
         viewModel.messages.test {
@@ -305,6 +309,61 @@ class LoginViewModelTest {
         phaseAtCheck shouldBe Idle
         verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
     }
+
+    @Test
+    fun `an offline token exchange that failed for an unknown reason emits NoConnection`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { networkAvailabilityGateway.isInternetAvailable() } returns false
+            authRepository.signInResult = Failed(SignInFailureReason.Unknown)
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
+
+                awaitItem() shouldBe SignInFailed(NoConnection)
+            }
+
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+        }
+
+    @Test
+    fun `a cancelled token exchange emits nothing and stops signing in`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.signInResult = Cancelled
+        val viewModel = createViewModel()
+        viewModel.onGoogleSignInStarted()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+        viewModel.state.value.phase shouldBe Idle
+        viewModel.events.test { expectNoEvents() }
+
+        verify(exactly = 0) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `a token exchange failure stops signing in before connectivity is checked`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.signInResult = Failed(SignInFailureReason.Unknown)
+            val viewModel = createViewModel()
+            var phaseAtCheck: LoginPhase? = null
+            every { networkAvailabilityGateway.isInternetAvailable() } answers {
+                phaseAtCheck = viewModel.state.value.phase
+                true
+            }
+            viewModel.onGoogleSignInStarted()
+
+            viewModel.messages.test {
+                viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
+
+                awaitItem() shouldBe SignInFailed(Unknown)
+            }
+            phaseAtCheck shouldBe Idle
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+        }
 
     private companion object {
         const val ID_TOKEN = "token"
