@@ -6,6 +6,9 @@ package com.rossomak.flashcards.core.domain.model
  * from the client's own [com.rossomak.flashcards.core.domain.scoring.scoreSession] for the Session
  * Summary's fallback preview; both use the same rules, so the Summary renders either the same way.
  *
+ * The Level position ([level], [xpIntoCurrentLevel], [xpForNextLevel]) is not what the Summary's Level
+ * card draws: that card reads the live [LevelProgress] stream, so it always agrees with Home.
+ *
  * @param breakdown every award line, [XpBreakdown.dailyGoalBonus] and [XpBreakdown.streakBonus] included.
  * @param level the account's Level after this session.
  * @param xpIntoCurrentLevel points into [level] after this session.
