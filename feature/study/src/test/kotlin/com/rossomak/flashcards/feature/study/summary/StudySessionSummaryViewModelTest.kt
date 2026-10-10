@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionScore
@@ -302,7 +303,7 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
-    fun `a server score renders the server's lines, counts and Level data`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a server score renders the server's lines, counts, Level data before and after and Streak`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
 
@@ -324,6 +325,10 @@ class StudySessionSummaryViewModelTest {
             xpIntoCurrentLevel shouldBe 80L
             xpForNextLevel shouldBe 16000L
             levelsCrossed shouldBe listOf(2, 3)
+            levelBefore shouldBe 1
+            xpIntoCurrentLevelBefore shouldBe 900L
+            xpForNextLevelBefore shouldBe 1000L
+            currentStreak shouldBe 8
             isLoading shouldBe false
         }
     }
@@ -342,28 +347,6 @@ class StudySessionSummaryViewModelTest {
         messageReceived shouldBe false
         viewModel.state.value.xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
         collectJob.cancel()
-    }
-
-    @Test
-    fun `a server score without rates renders every line's amount only`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE.copy(rates = null)))
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.state.value.xpLines shouldBe SERVER_SCORE_AMOUNT_ONLY_LINES
-    }
-
-    @Test
-    fun `a server score without counts renders every line's amount only`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE.copy(counts = null)))
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.state.value.xpLines shouldBe SERVER_SCORE_AMOUNT_ONLY_LINES
     }
 
     @Test
@@ -388,7 +371,7 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `with no server score the summary computes and exposes the local preview's breakdown, total, level and progress`() =
+    fun `with no server score the summary computes and exposes the local preview's breakdown, total, Level before and after and Streak`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(ratedRoute())
 
@@ -411,6 +394,10 @@ class StudySessionSummaryViewModelTest {
                 level shouldBe 2
                 xpIntoCurrentLevel shouldBe 35L
                 xpForNextLevel shouldBe config.levelThreshold(2)
+                levelBefore shouldBe ScoringState.STARTING_LEVEL
+                xpIntoCurrentLevelBefore shouldBe 0L
+                xpForNextLevelBefore shouldBe config.levelThreshold(ScoringState.STARTING_LEVEL)
+                currentStreak shouldBe 1
                 isLoading shouldBe false
             }
         }
@@ -552,6 +539,10 @@ class StudySessionSummaryViewModelTest {
             xpIntoCurrentLevel = 80,
             xpForNextLevel = 16000,
             levelsCrossed = listOf(2, 3),
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 900,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 8,
             counts = SessionScoreCounts(newCardsStudied = 3, newlyMastered = 1, partial = 0, defended = 1, demastered = 0),
             rates = SessionScoreRates(
                 newCardStudied = 20,
@@ -562,15 +553,6 @@ class StudySessionSummaryViewModelTest {
                 minuteStudied = 10,
                 sessionCompleted = 500,
             ),
-        )
-        val SERVER_SCORE_AMOUNT_ONLY_LINES = listOf(
-            XpBreakdownLine(XpAwardSource.NewCards, count = null, rate = null, amount = 60),
-            XpBreakdownLine(XpAwardSource.Mastered, count = null, rate = null, amount = 200),
-            XpBreakdownLine(XpAwardSource.MasteryDefended, count = null, rate = null, amount = 50),
-            XpBreakdownLine(XpAwardSource.TimeStudied, count = null, rate = null, amount = 20),
-            XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
-            XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1000),
-            XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = 250),
         )
     }
 }

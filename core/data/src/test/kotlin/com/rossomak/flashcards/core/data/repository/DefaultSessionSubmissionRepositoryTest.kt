@@ -19,6 +19,8 @@ import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
@@ -188,8 +190,20 @@ class DefaultSessionSubmissionRepositoryTest {
             xpIntoCurrentLevel = 360,
             xpForNextLevel = 1000,
             levelsCrossed = emptyList(),
-            counts = null,
-            rates = null,
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 0,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 1,
+            counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
+            rates = SessionScoreRates(
+                newCardStudied = 10,
+                cardMastered = 100,
+                cardPartial = 25,
+                masteryDefended = 50,
+                cardDemastered = -80,
+                minuteStudied = 10,
+                sessionCompleted = 500,
+            ),
         )
 
         fun workInfo(

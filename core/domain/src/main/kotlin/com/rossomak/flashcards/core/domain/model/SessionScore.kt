@@ -1,7 +1,8 @@
 package com.rossomak.flashcards.core.domain.model
 
 /**
- * One session's XP award, line by line, and the account's Level position right after applying it.
+ * One session's XP award, line by line, and the account's Level position right before and right after
+ * applying it.
  * Comes from the server-authoritative `submitStudySession` Cloud Function for a delivered session, or
  * from the client's own [com.rossomak.flashcards.core.domain.scoring.scoreSession] for the Session
  * Summary's fallback preview; both use the same rules, so the Summary renders either the same way.
@@ -11,10 +12,12 @@ package com.rossomak.flashcards.core.domain.model
  * @param xpIntoCurrentLevel points into [level] after this session.
  * @param xpForNextLevel points [level] needs in total before the next Level.
  * @param levelsCrossed every Level reached by this session, ascending; empty when none was.
- * @param counts how many cards or events each multiplied line counts; `null` only when the function
- * answered without them. Always present on a client score.
- * @param rates the per-line rates the session was scored with; `null` when the function answered from
- * a session recorded before it stored them. Always present on a client score.
+ * @param levelBefore the account's Level right before this session.
+ * @param xpIntoCurrentLevelBefore points into [levelBefore] right before this session.
+ * @param xpForNextLevelBefore points [levelBefore] needs in total before the next Level.
+ * @param currentStreak the account's Streak right after this session.
+ * @param counts how many cards or events each multiplied line counts.
+ * @param rates the per-line rates the session was scored with.
  */
 data class SessionScore(
     val breakdown: XpBreakdown,
@@ -22,8 +25,12 @@ data class SessionScore(
     val xpIntoCurrentLevel: Long,
     val xpForNextLevel: Long,
     val levelsCrossed: List<Int>,
-    val counts: SessionScoreCounts?,
-    val rates: SessionScoreRates?,
+    val levelBefore: Int,
+    val xpIntoCurrentLevelBefore: Long,
+    val xpForNextLevelBefore: Long,
+    val currentStreak: Int,
+    val counts: SessionScoreCounts,
+    val rates: SessionScoreRates,
 )
 
 /**

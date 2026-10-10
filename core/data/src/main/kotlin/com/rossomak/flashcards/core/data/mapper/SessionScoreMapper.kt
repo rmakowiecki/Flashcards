@@ -22,26 +22,26 @@ fun SessionScore.toDto(): SessionScoreDto = SessionScoreDto(
     xpIntoCurrentLevel = xpIntoCurrentLevel,
     xpForNextLevel = xpForNextLevel,
     levelsCrossed = levelsCrossed,
-    counts = counts?.let { sessionCounts ->
-        SessionScoreCountsDto(
-            newCardsStudied = sessionCounts.newCardsStudied,
-            newlyMastered = sessionCounts.newlyMastered,
-            partial = sessionCounts.partial,
-            defended = sessionCounts.defended,
-            demastered = sessionCounts.demastered,
-        )
-    },
-    rates = rates?.let { sessionRates ->
-        SessionScoreRatesDto(
-            newCardStudied = sessionRates.newCardStudied,
-            cardMastered = sessionRates.cardMastered,
-            cardPartial = sessionRates.cardPartial,
-            masteryDefended = sessionRates.masteryDefended,
-            cardDemastered = sessionRates.cardDemastered,
-            minuteStudied = sessionRates.minuteStudied,
-            sessionCompleted = sessionRates.sessionCompleted,
-        )
-    },
+    levelBefore = levelBefore,
+    xpIntoCurrentLevelBefore = xpIntoCurrentLevelBefore,
+    xpForNextLevelBefore = xpForNextLevelBefore,
+    currentStreak = currentStreak,
+    counts = SessionScoreCountsDto(
+        newCardsStudied = counts.newCardsStudied,
+        newlyMastered = counts.newlyMastered,
+        partial = counts.partial,
+        defended = counts.defended,
+        demastered = counts.demastered,
+    ),
+    rates = SessionScoreRatesDto(
+        newCardStudied = rates.newCardStudied,
+        cardMastered = rates.cardMastered,
+        cardPartial = rates.cardPartial,
+        masteryDefended = rates.masteryDefended,
+        cardDemastered = rates.cardDemastered,
+        minuteStudied = rates.minuteStudied,
+        sessionCompleted = rates.sessionCompleted,
+    ),
 )
 
 fun SessionScoreDto.toDomain(): SessionScore = SessionScore(
@@ -60,24 +60,24 @@ fun SessionScoreDto.toDomain(): SessionScore = SessionScore(
     xpIntoCurrentLevel = xpIntoCurrentLevel,
     xpForNextLevel = xpForNextLevel,
     levelsCrossed = levelsCrossed,
-    counts = counts?.let { countsDto ->
-        SessionScoreCounts(
-            newCardsStudied = countsDto.newCardsStudied,
-            newlyMastered = countsDto.newlyMastered,
-            partial = countsDto.partial,
-            defended = countsDto.defended,
-            demastered = countsDto.demastered,
-        )
-    },
-    rates = rates?.let { ratesDto ->
-        SessionScoreRates(
-            newCardStudied = ratesDto.newCardStudied,
-            cardMastered = ratesDto.cardMastered,
-            cardPartial = ratesDto.cardPartial,
-            masteryDefended = ratesDto.masteryDefended,
-            cardDemastered = ratesDto.cardDemastered,
-            minuteStudied = ratesDto.minuteStudied,
-            sessionCompleted = ratesDto.sessionCompleted,
-        )
-    },
+    levelBefore = levelBefore,
+    xpIntoCurrentLevelBefore = xpIntoCurrentLevelBefore,
+    xpForNextLevelBefore = xpForNextLevelBefore,
+    currentStreak = currentStreak,
+    counts = SessionScoreCounts(
+        newCardsStudied = counts.newCardsStudied,
+        newlyMastered = counts.newlyMastered,
+        partial = counts.partial,
+        defended = counts.defended,
+        demastered = counts.demastered,
+    ),
+    rates = SessionScoreRates(
+        newCardStudied = rates.newCardStudied,
+        cardMastered = rates.cardMastered,
+        cardPartial = rates.cardPartial,
+        masteryDefended = rates.masteryDefended,
+        cardDemastered = rates.cardDemastered,
+        minuteStudied = rates.minuteStudied,
+        sessionCompleted = rates.sessionCompleted,
+    ),
 )

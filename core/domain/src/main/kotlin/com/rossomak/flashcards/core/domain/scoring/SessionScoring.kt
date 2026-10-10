@@ -68,6 +68,10 @@ fun scoreSession(
         xpIntoCurrentLevel = newScoringState.xpIntoCurrentLevel,
         xpForNextLevel = config.levelThreshold(newScoringState.level),
         levelsCrossed = sessionXp.levelsCrossed,
+        levelBefore = scoringState.level,
+        xpIntoCurrentLevelBefore = scoringState.xpIntoCurrentLevel,
+        xpForNextLevelBefore = config.levelThreshold(scoringState.level),
+        currentStreak = newScoringState.currentStreak,
         counts = authoritativeSession.scoreCounts(cardProgressMerge.newCardsStudied),
         rates = config.toScoreRates(),
     )

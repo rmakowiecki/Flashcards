@@ -37,8 +37,12 @@ data class SessionScoreDto(
     val xpIntoCurrentLevel: Long,
     val xpForNextLevel: Long,
     val levelsCrossed: List<Int>,
-    val counts: SessionScoreCountsDto? = null,
-    val rates: SessionScoreRatesDto? = null,
+    val levelBefore: Int,
+    val xpIntoCurrentLevelBefore: Long,
+    val xpForNextLevelBefore: Long,
+    val currentStreak: Int,
+    val counts: SessionScoreCountsDto,
+    val rates: SessionScoreRatesDto,
 )
 
 @Serializable
