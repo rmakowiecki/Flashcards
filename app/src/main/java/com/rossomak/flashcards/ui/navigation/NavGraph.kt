@@ -125,11 +125,15 @@ private fun NavHostController.navigateToPreviewQuickSession(categoryId: String, 
 }
 
 /**
- * A Recent replays its past Study Mode and delivery as Preview's starting values. It carries no filters or
- * sort: there is no browsed list behind a Recent, so Preview uses the saved defaults (ADR-0038).
+ * Studying a finished session's thing again, from its Recent on Home or from its Session Summary: Preview
+ * opens with the past Study Mode and delivery as starting values. It carries no filters or sort, so Preview
+ * uses the saved defaults (ADR-0038).
+ *
+ * `popUpTo(Main)` is a no-op from Home, where [Main] is already on top, and from the Summary it removes the
+ * Summary, so back from Preview returns to the tab the user started from.
  */
 @Suppress("LongParameterList") // one primitive per route field: feature modules never build each other's routes.
-private fun NavHostController.navigateToPreviewRecentSession(
+private fun NavHostController.navigateToPreviewReplay(
     categoryId: String,
     categoryName: String,
     sourceType: SessionSourceType,
@@ -150,7 +154,9 @@ private fun NavHostController.navigateToPreviewRecentSession(
             voiceAnsweringEnabled = voiceAnsweringEnabled,
             readAloudEnabled = readAloudEnabled,
         )
-    )
+    ) {
+        popUpTo(Main) { inclusive = false }
+    }
 }
 
 /**
@@ -382,7 +388,7 @@ fun FlashcardsNavGraph(
                         onNavigateToSubcategoryDetails = navController::navigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = navController::navigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = navController::navigateToPreviewQuickSession,
-                        onNavigateToPreviewRecentSession = navController::navigateToPreviewRecentSession,
+                        onNavigateToPreviewRecentSession = navController::navigateToPreviewReplay,
                     )
                 }
                 accountDestination(navController)
@@ -422,7 +428,8 @@ fun FlashcardsNavGraph(
                 }
                 composable<StudySessionSummaryRoute> {
                     StudySessionSummaryScreen(
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPreviewStudySession = navController::navigateToPreviewReplay,
                     )
                 }
             }

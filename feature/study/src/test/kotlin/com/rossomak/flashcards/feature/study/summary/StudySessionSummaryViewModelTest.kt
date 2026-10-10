@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.lifecycle.SavedStateHandle
+import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
@@ -10,8 +11,12 @@ import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.StudySessionReplay
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.model.XpConfig
@@ -31,6 +36,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDestination.StudyAgain
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown as XpBreakdownDialog
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
@@ -40,6 +46,7 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreSta
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Unavailable
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
@@ -106,6 +113,10 @@ class StudySessionSummaryViewModelTest {
         sessionId: String = "session-1",
         abandoned: Boolean = false,
         studyDateUtcOffsetMinutes: Int = -300,
+        sourceType: SessionSourceType = SingleSubcategory,
+        subcategoryIds: List<String> = listOf("sub-1"),
+        subcategoryNames: List<String> = listOf("Subcategory"),
+        voiceAnsweringEnabled: Boolean = false,
         cardStates: List<FlashcardStudyProgressState> = listOf(
             FlashcardStudyProgressState.Mastered,
             FlashcardStudyProgressState.Mastered,
@@ -123,20 +134,24 @@ class StudySessionSummaryViewModelTest {
             abandoned = abandoned,
             categoryId = "cat-1",
             categoryName = "Category",
-            subcategoryIds = listOf("sub-1"),
-            subcategoryNames = listOf("Subcategory"),
-            sourceType = SingleSubcategory,
+            subcategoryIds = subcategoryIds,
+            subcategoryNames = subcategoryNames,
+            sourceType = sourceType,
             cardIds = cardIds,
             cardSubcategoryIds = cardIds.map { "sub-1" },
             cardStates = cardStates,
             cardAttemptsUsed = cardStates.map { 1 },
             cardWasPreviouslyMastered = cardStates.map { false },
-            voiceAnsweringEnabled = false,
+            voiceAnsweringEnabled = voiceAnsweringEnabled,
             readAloudEnabled = null,
         )
     }
 
-    private fun fastRoute(durationSeconds: Int = 120): StudySessionSummaryRoute {
+    private fun fastRoute(
+        durationSeconds: Int = 120,
+        sourceType: SessionSourceType = SingleSubcategory,
+        readAloudEnabled: Boolean = false,
+    ): StudySessionSummaryRoute {
         val cardIds = listOf("card-1", "card-2")
         return StudySessionSummaryRoute(
             sessionId = "session-2",
@@ -149,14 +164,14 @@ class StudySessionSummaryViewModelTest {
             categoryName = "Category",
             subcategoryIds = listOf("sub-1"),
             subcategoryNames = listOf("Subcategory"),
-            sourceType = SingleSubcategory,
+            sourceType = sourceType,
             cardIds = cardIds,
             cardSubcategoryIds = cardIds.map { "sub-1" },
             cardStates = cardIds.map { FlashcardStudyProgressState.Seen },
             cardAttemptsUsed = null,
             cardWasPreviouslyMastered = null,
             voiceAnsweringEnabled = null,
-            readAloudEnabled = false,
+            readAloudEnabled = readAloudEnabled,
         )
     }
 
@@ -789,6 +804,107 @@ class StudySessionSummaryViewModelTest {
 
         viewModel.state.value.activeDialog shouldBe null
     }
+
+    @Test
+    fun `Study Again on a single-subcategory Rated session replays its Subcategory with voice answering`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val route = ratedRoute(voiceAnsweringEnabled = true)
+            stubRoute(route)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.events.test {
+                viewModel.onStudyAgainClick()
+
+                awaitItem() shouldBe StudyAgain(
+                    StudySessionReplay(
+                        categoryId = route.categoryId,
+                        categoryName = route.categoryName,
+                        sourceType = SingleSubcategory,
+                        subcategoryIds = route.subcategoryIds,
+                        subcategoryNames = route.subcategoryNames,
+                        studyMode = StudyMode.Rated,
+                        voiceAnsweringEnabled = true,
+                        readAloudEnabled = null,
+                    )
+                )
+            }
+        }
+
+    @Test
+    fun `Study Again on a Quick Fast session replays the Category alone with read-aloud`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val route = fastRoute(sourceType = Quick, readAloudEnabled = true)
+            stubRoute(route)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.events.test {
+                viewModel.onStudyAgainClick()
+
+                awaitItem() shouldBe StudyAgain(
+                    StudySessionReplay(
+                        categoryId = route.categoryId,
+                        categoryName = route.categoryName,
+                        sourceType = Quick,
+                        subcategoryIds = emptyList(),
+                        subcategoryNames = emptyList(),
+                        studyMode = StudyMode.Fast,
+                        voiceAnsweringEnabled = null,
+                        readAloudEnabled = true,
+                    )
+                )
+            }
+        }
+
+    @Test
+    fun `Study Again on a Custom session replays every stored Subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
+        val storedIds = listOf("sub-2", "sub-1")
+        val storedNames = listOf("Second", "First")
+        stubRoute(ratedRoute(sourceType = Custom, subcategoryIds = storedIds, subcategoryNames = storedNames))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onStudyAgainClick()
+
+            val replay = awaitItem().shouldBeInstanceOf<StudyAgain>().replay
+            replay.sourceType shouldBe Custom
+            replay.subcategoryIds shouldBe storedIds
+            replay.subcategoryNames shouldBe storedNames
+        }
+    }
+
+    @Test
+    fun `a second Study Again click emits nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onStudyAgainClick()
+            viewModel.onStudyAgainClick()
+
+            awaitItem().shouldBeInstanceOf<StudyAgain>()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `Study Again still works when the score is unavailable`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(ratedRoute())
+            scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.scoreStatus shouldBe Unavailable
+
+            viewModel.events.test {
+                viewModel.onStudyAgainClick()
+
+                awaitItem().shouldBeInstanceOf<StudyAgain>()
+            }
+        }
 
     private companion object {
         const val SAVED_SCORE_KEY = "savedScore"

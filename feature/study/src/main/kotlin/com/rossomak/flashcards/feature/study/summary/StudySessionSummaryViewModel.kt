@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.StudyMode
+import com.rossomak.flashcards.core.domain.model.StudySessionReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
@@ -28,6 +29,7 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreSta
 import com.rossomak.flashcards.feature.study.toSessionResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -71,6 +74,11 @@ class StudySessionSummaryViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<StudySessionSummaryMessage>(extraBufferCapacity = 1)
 
     val messages: SharedFlow<StudySessionSummaryMessage> = _messages.asSharedFlow()
+
+    private val eventChannel = Channel<StudySessionSummaryDestination>(Channel.BUFFERED)
+    val events = eventChannel.receiveAsFlow()
+
+    private var studyAgainSent = false
 
     init {
         // Written directly in init, not inside submitSession()'s coroutine: this must land before
@@ -179,6 +187,26 @@ class StudySessionSummaryViewModel @Inject constructor(
     private fun onPreviewFailed() {
         _state.update { it.copy(scoreStatus = Unavailable) }
         _messages.tryEmit(StudySessionSummaryMessage.XpUnavailable)
+    }
+
+    /**
+     * Opens Preview for this session's scope, Study Mode and delivery, exactly as its Recent would. Only
+     * the first click navigates: the channel is buffered, so a double tap would otherwise send twice.
+     */
+    fun onStudyAgainClick() {
+        if (studyAgainSent) return
+        studyAgainSent = true
+        val replay = StudySessionReplay.of(
+            categoryId = route.categoryId,
+            categoryName = route.categoryName,
+            sourceType = route.sourceType,
+            subcategoryIds = route.subcategoryIds,
+            subcategoryNames = route.subcategoryNames,
+            studyMode = route.mode,
+            voiceAnsweringEnabled = route.voiceAnsweringEnabled,
+            readAloudEnabled = route.readAloudEnabled,
+        )
+        viewModelScope.launch { eventChannel.send(StudySessionSummaryDestination.StudyAgain(replay)) }
     }
 
     /** Single entry point for every dialog on this screen. */
