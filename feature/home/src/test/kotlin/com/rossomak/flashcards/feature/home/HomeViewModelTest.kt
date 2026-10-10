@@ -1,10 +1,12 @@
 package com.rossomak.flashcards.feature.home
 
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult
 import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Resolved
+import com.rossomak.flashcards.core.domain.model.LevelProgress
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.RecentSession
@@ -16,12 +18,16 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
+import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeLevelProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeRecentSessionsRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
@@ -37,6 +43,9 @@ import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeLevelCardState.Content as LevelCardContent
+import com.rossomak.flashcards.feature.home.HomeLevelCardState.Loading as LevelCardLoading
+import com.rossomak.flashcards.feature.home.HomeLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
@@ -55,6 +64,7 @@ import io.mockk.mockk
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
@@ -75,6 +85,9 @@ private const val NEWER_SESSION_ID = "newer-session"
 private const val NEWEST_SESSION_ID = "newest-session"
 private const val CUSTOM_SESSION_ID = "custom-session"
 private const val UNREAD_CATEGORY_ID = "unread-category"
+private const val AVATAR_URL = "https://example.com/jane.png"
+private const val DISPLAY_NAME = "Jane Doe"
+private const val RENAMED_DISPLAY_NAME = "Jane Smith"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -87,6 +100,8 @@ class HomeViewModelTest {
     private val cardProgressRepository = FakeCardProgressRepository()
     private val recentSessionsRepository = FakeRecentSessionsRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
+    private val levelProgressRepository = FakeLevelProgressRepository()
+    private val authRepository = FakeAuthRepository()
 
     private val parentCategory = Category(
         id = "android",
@@ -103,10 +118,14 @@ class HomeViewModelTest {
     private val resolvableSubcategories = mutableListOf<Subcategory>()
 
     private fun createViewModel(
+        observeAuthUser: ObserveAuthUserUseCase = ObserveAuthUserUseCase(authRepository),
+        observeLevelProgress: ObserveLevelProgressUseCase = ObserveLevelProgressUseCase(levelProgressRepository),
         observeFavoriteItems: ObserveFavoriteItemsUseCase = ObserveFavoriteItemsUseCase(userFavoritesRepository, flashcardRepository),
         observeRecentSessions: ObserveRecentSessionsUseCase = ObserveRecentSessionsUseCase(recentSessionsRepository, flashcardRepository),
     ): HomeViewModel = HomeViewModel(
+        observeAuthUser = observeAuthUser,
         observeFavoriteItems = observeFavoriteItems,
+        observeLevelProgress = observeLevelProgress,
         observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository),
         observeRecentSessions = observeRecentSessions,
         observeUserPreferences = ObserveUserPreferencesUseCase(userPreferencesRepository),
@@ -143,6 +162,10 @@ class HomeViewModelTest {
     private fun composeFavorite() = FavoriteSubcategory(subcategory(COMPOSE_ID), parentCategory, favoritedAt = Instant.EPOCH)
 
     private fun recentItem() = RecentItem(recentSession(OLDER_SESSION_ID, Quick, listOf(COMPOSE_ID)), parentCategory)
+
+    private fun levelProgressReturning(levelProgress: Flow<LevelProgress>): ObserveLevelProgressUseCase = mockk {
+        coEvery { this@mockk() } returns levelProgress
+    }
 
     private fun favoriteItemsReturning(results: Flow<FavoriteItemsResult>): ObserveFavoriteItemsUseCase = mockk {
         coEvery { this@mockk() } returns results
@@ -1205,4 +1228,267 @@ class HomeViewModelTest {
 
         viewModel.state.value.body.shouldBeInstanceOf<Sections>().recents shouldBe Placeholder
     }
+
+    private val startingLevelProgress = LevelProgress(level = 1, xpIntoCurrentLevel = 0, xpForNextLevel = 1_000)
+    private val levelThreeProgress = LevelProgress(level = 3, xpIntoCurrentLevel = 250, xpForNextLevel = 1_000)
+    private val janeDoe = AuthUser(uid = "uid", email = null, displayName = DISPLAY_NAME, photoUrl = AVATAR_URL)
+
+    @Test
+    fun `the Level card is Loading until the Level stream emits`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = janeDoe
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.levelCard shouldBe LevelCardLoading
+
+        levelProgressRepository.emit(levelThreeProgress)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
+    }
+
+    @Test
+    fun `a new account shows its real starting Level, not Loading`() = runTest(mainDispatcherRule.testDispatcher) {
+        levelProgressRepository.emit(startingLevelProgress)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>().levelProgress shouldBe startingLevelProgress
+    }
+
+    @Test
+    fun `a null auth user still gives Content, without a name or photo`() = runTest(mainDispatcherRule.testDispatcher) {
+        levelProgressRepository.emit(levelThreeProgress)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+    }
+
+    @Test
+    fun `an auth update changes the Level card in place`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = janeDoe
+        levelProgressRepository.emit(levelThreeProgress)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        authRepository.userToReturn = janeDoe.copy(displayName = RENAMED_DISPLAY_NAME, photoUrl = null)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = RENAMED_DISPLAY_NAME)
+    }
+
+    @Test
+    fun `a new Level emission updates the Level card in place`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.userToReturn = janeDoe
+        levelProgressRepository.emit(startingLevelProgress)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        levelProgressRepository.emit(levelThreeProgress)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
+    }
+
+    @Test
+    fun `a Level stream that fails before its first emission makes the card Unavailable`() = runTest(mainDispatcherRule.testDispatcher) {
+        levelProgressRepository.levelProgressReadFailure = IllegalStateException("level listener failed")
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+    }
+
+    @Test
+    fun `a Level stream that completes before its first emission makes the card Unavailable`() = runTest(mainDispatcherRule.testDispatcher) {
+        levelProgressRepository.completesWithoutEmitting = true
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+    }
+
+    @Test
+    fun `a Level use case that fails to build its flow makes the card Unavailable`() = runTest(mainDispatcherRule.testDispatcher) {
+        val levelProgress = mockk<ObserveLevelProgressUseCase>()
+        coEvery { levelProgress() } throws IllegalStateException("level use case failed")
+
+        val viewModel = createViewModel(observeLevelProgress = levelProgress)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+        coVerify(exactly = 1) { levelProgress() }
+    }
+
+    @Test
+    fun `a Level stream failure after the first emission keeps the last card`() = runTest(mainDispatcherRule.testDispatcher) {
+        val levelProgress = levelProgressReturning(
+            flow {
+                emit(levelThreeProgress)
+                error("level listener failed")
+            },
+        )
+
+        val viewModel = createViewModel(observeLevelProgress = levelProgress)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+        coVerify(exactly = 1) { levelProgress() }
+    }
+
+    @Test
+    fun `a Level stream completion after the first emission keeps the last card`() = runTest(mainDispatcherRule.testDispatcher) {
+        val levelProgress = levelProgressReturning(flow { emit(levelThreeProgress) })
+
+        val viewModel = createViewModel(observeLevelProgress = levelProgress)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+        coVerify(exactly = 1) { levelProgress() }
+    }
+
+    @Test
+    fun `the Level card stays Loading until the auth user emits, even after the Level stream ended`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val authUserGate = CompletableDeferred<AuthUser?>()
+            val authUser = mockk<ObserveAuthUserUseCase>()
+            coEvery { authUser() } returns flow { emit(authUserGate.await()) }
+            val levelProgress = levelProgressReturning(flow { emit(levelThreeProgress) })
+
+            val viewModel = createViewModel(observeLevelProgress = levelProgress, observeAuthUser = authUser)
+            advanceUntilIdle()
+            viewModel.state.value.levelCard shouldBe LevelCardLoading
+
+            authUserGate.complete(janeDoe)
+            advanceUntilIdle()
+
+            viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
+            coVerify(exactly = 1) { levelProgress() }
+            coVerify(exactly = 1) { authUser() }
+        }
+
+    @Test
+    fun `a Level stream that ends after its first emission but before the auth user does not make the card Unavailable`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val authUserGate = CompletableDeferred<AuthUser?>()
+            val authUser = mockk<ObserveAuthUserUseCase>()
+            coEvery { authUser() } returns flow { emit(authUserGate.await()) }
+            val levelProgress = levelProgressReturning(
+                flow {
+                    emit(levelThreeProgress)
+                    error("level listener failed")
+                },
+            )
+
+            val viewModel = createViewModel(observeLevelProgress = levelProgress, observeAuthUser = authUser)
+            advanceUntilIdle()
+
+            viewModel.state.value.levelCard shouldBe LevelCardLoading
+            coVerify(exactly = 1) { authUser() }
+        }
+
+    @Test
+    fun `the Level card never holds the sections back`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            levelCard shouldBe LevelCardLoading
+            body.shouldBeInstanceOf<Sections>().favorites.shouldBeInstanceOf<Carousel>()
+        }
+    }
+
+    @Test
+    fun `the sections never hold the Level card back`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        levelProgressRepository.emit(levelThreeProgress)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        advanceTimeBy(REVEAL_CEILING)
+
+        viewModel.state.assertValue {
+            levelCard.shouldBeInstanceOf<LevelCardContent>()
+            favorites shouldBe Loading
+        }
+    }
+
+    @Test
+    fun `the body is Resolving while the Level card is already Content`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        levelProgressRepository.emit(levelThreeProgress)
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.assertValue {
+            levelCard.shouldBeInstanceOf<LevelCardContent>()
+            body shouldBe Resolving
+        }
+    }
+
+    @Test
+    fun `Retry relaunches the Level collector when the card is Unavailable`() = runTest(mainDispatcherRule.testDispatcher) {
+        levelProgressRepository.levelProgressReadFailure = IllegalStateException("level listener failed")
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+
+        levelProgressRepository.levelProgressReadFailure = null
+        levelProgressRepository.emit(levelThreeProgress)
+        viewModel.onRetry()
+        viewModel.state.value.levelCard shouldBe LevelCardLoading
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>().levelProgress shouldBe levelThreeProgress
+    }
+
+    @Test
+    fun `Retry relaunches the Level collector while the card is still Loading`() = runTest(mainDispatcherRule.testDispatcher) {
+        val levelProgress = levelProgressReturning(flow { awaitCancellation() })
+        val viewModel = createViewModel(observeLevelProgress = levelProgress)
+        advanceUntilIdle()
+
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { levelProgress() }
+        viewModel.state.value.levelCard shouldBe LevelCardLoading
+    }
+
+    @Test
+    fun `Retry leaves a Level card with content alone`() = runTest(mainDispatcherRule.testDispatcher) {
+        val levelProgress = levelProgressReturning(flow { emit(levelThreeProgress) })
+        val viewModel = createViewModel(observeLevelProgress = levelProgress)
+        advanceUntilIdle()
+
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { levelProgress() }
+        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>()
+    }
+
+    @Test
+    fun `Retry on a failed section leaves the Level card with content alone and keeps the ceiling rules`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+            levelProgressRepository.emit(levelThreeProgress)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.onRetry()
+
+            viewModel.state.assertValue {
+                levelCard.shouldBeInstanceOf<LevelCardContent>()
+                favorites shouldBe Loading
+            }
+        }
 }
