@@ -25,7 +25,7 @@ internal enum class AccountHeaderSlot {
     Avatar,
     Name,
     Email,
-    GoogleLine,
+    SignedInWithLine,
 }
 
 /**
@@ -39,10 +39,10 @@ internal enum class AccountHeaderSlot {
  * to [appBarState] as the travel limit, so a list scrolling underneath moves this header with the
  * same state.
  *
- * Expanded, the avatar sits at full size beside the name and email, with the Google line under
+ * Expanded, the avatar sits at full size beside the name and email, with the "Signed in with …" line under
  * both. Collapsed, the avatar has shrunk by [avatarCollapsedScale] and sits between the back arrow and
  * the name, which has moved to the pinned row and is narrowed to stop before Sign out. The email and
- * the Google line never travel: the email trails the name and the Google line scrolls up with the
+ * that line never travel: the email trails the name and that line scrolls up with the
  * block, and both are faded out by then. They stay measured even when [showDetails] is false and
  * they are left unplaced, so the block's height, and with it every position, stays the same.
  *
@@ -89,10 +89,10 @@ internal class AccountHeaderMeasurePolicy(
         )
         val nameWidth = Constraints(maxWidth = (nameRightEdge - nameX).roundToInt().coerceAtLeast(0))
         val emailWidth = Constraints(maxWidth = (width - expandedNameX - padding).coerceAtLeast(0))
-        val googleWidth = Constraints(maxWidth = (width - 2 * padding).coerceAtLeast(0))
+        val signedInWithWidth = Constraints(maxWidth = (width - 2 * padding).coerceAtLeast(0))
         val name = slots[AccountHeaderSlot.Name]?.measure(nameWidth)
         val email = slots[AccountHeaderSlot.Email]?.measure(emailWidth)
-        val google = slots[AccountHeaderSlot.GoogleLine]?.measure(googleWidth)
+        val signedInWith = slots[AccountHeaderSlot.SignedInWithLine]?.measure(signedInWithWidth)
 
         val expandedNameHeight = if (name != null && nameLineHeight.isSpecified) {
             nameLineHeight.toPx().roundToInt()
@@ -100,7 +100,7 @@ internal class AccountHeaderMeasurePolicy(
             0
         }
         val identityRowHeight = max(avatar.height, expandedNameHeight + (email?.height ?: 0))
-        val contentHeight = padding + identityRowHeight + gap + (google?.height ?: 0) + padding
+        val contentHeight = padding + identityRowHeight + gap + (signedInWith?.height ?: 0) + padding
         val expandedHeight = max(contentHeight, TopAppBarDefaults.LargeAppBarExpandedHeight.roundToPx())
         updateTravelLimit(expandedHeight)
 
@@ -109,7 +109,7 @@ internal class AccountHeaderMeasurePolicy(
         return layout(width, pinnedHeight + expandedHeight - collapsedOffset) {
             back.place(edge, (pinnedHeight - back.height) / 2)
             signOut.place(width - edge - signOut.width, (pinnedHeight - signOut.height) / 2)
-            if (showDetails) google?.place(padding, identityTop + identityRowHeight + gap - collapsedOffset)
+            if (showDetails) signedInWith?.place(padding, identityTop + identityRowHeight + gap - collapsedOffset)
 
             val nameHeight = name?.height ?: 0
             val expandedNameY = identityTop + (identityRowHeight - nameHeight - (email?.height ?: 0)) / 2

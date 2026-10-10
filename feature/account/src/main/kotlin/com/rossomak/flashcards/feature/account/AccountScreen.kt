@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.NoConnection
 import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.ServiceError
 import com.rossomak.flashcards.core.domain.model.AppVersion
+import com.rossomak.flashcards.core.domain.model.AuthProvider
 import com.rossomak.flashcards.core.domain.model.InstallationInfo
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
@@ -129,8 +130,11 @@ fun AccountScreen(
         onNavigateBack = onNavigateBack,
         onDialogEvent = viewModel::onDialogEvent,
         onManageAccountClick = {
-            val manageIntent = Intent(Intent.ACTION_VIEW, manageAccountUrl(state.email).toUri())
-            if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
+            // The Manage link only shows for a known provider.
+            state.provider?.let { provider ->
+                val manageIntent = Intent(Intent.ACTION_VIEW, manageAccountUrl(provider, state.email).toUri())
+                if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
+            }
         },
         onContactSupportClick = viewModel::onContactSupportClick,
         onReportBugClick = viewModel::onReportBugClick,
@@ -369,6 +373,7 @@ private fun AccountContentPreview() {
             state = AccountScreenState(
                 displayName = "Ross Smith",
                 email = "ross.smith@example.com",
+                provider = AuthProvider.Google,
                 appVersion = AppVersion(name = "1.4.0", code = 142L),
             ),
             onNavigateBack = {},

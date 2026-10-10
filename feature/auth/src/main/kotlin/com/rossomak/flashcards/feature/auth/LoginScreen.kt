@@ -26,19 +26,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.AuthProvider
+import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
+import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
@@ -47,6 +53,7 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.AccountExistsWithDifferentProvider
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoConnection
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
@@ -88,6 +95,8 @@ fun LoginScreen(
     val noConnectionMessage = stringResource(R.string.login_no_connection_error)
     val noCredentialMessage = stringResource(R.string.login_no_credential_error)
     val signInFailedMessage = stringResource(R.string.login_signin_error)
+    val accountExistsWithGoogleMessage = stringResource(R.string.login_account_exists_google_error)
+    val accountExistsWithGitHubMessage = stringResource(R.string.login_account_exists_github_error)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         when (message) {
@@ -96,6 +105,10 @@ fun LoginScreen(
                     NoConnection -> noConnectionMessage to SnackbarDuration.Short
                     NoCredentialAvailable -> noCredentialMessage to SnackbarDuration.Long
                     Unknown -> signInFailedMessage to SnackbarDuration.Short
+                    is AccountExistsWithDifferentProvider -> when (message.reason.existingProvider) {
+                        Google -> accountExistsWithGoogleMessage
+                        GitHub -> accountExistsWithGitHubMessage
+                    } to SnackbarDuration.Long
                 }
                 snackbarScope.launch { snackbarHostState.showSnackbar(message = text, duration = duration) }
             }
@@ -119,6 +132,7 @@ fun LoginScreen(
                 viewModel.onGoogleSignInResult(idTokenResult)
             }
         },
+        onGitHubSignInClick = viewModel::onGitHubSignInClick,
     )
 }
 
@@ -128,14 +142,15 @@ private fun LoginContent(
     state: LoginScreenState,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onGoogleSignInClick: () -> Unit,
+    onGitHubSignInClick: () -> Unit,
 ) {
-    // The button waits for the logo the splash screen hands over to land, then fades and rises in.
-    // It stays at 1f while signing in, so that only changes the label and the enabled state. Once
-    // signed in it fades and sinks out, so it never shows enabled again while the screen leaves.
+    // The buttons wait for the logo the splash screen hands over to land, then fade and rise in.
+    // They stay at 1f while signing in, so that only changes the labels and the enabled state. Once
+    // signed in they fade and sink out, so they never show enabled again while the screen leaves.
     val buttonReveal = remember { Animatable(0f) }
     val hasButtonStartedRevealing by remember { derivedStateOf { buttonReveal.value > 0f } }
     val isInspecting = LocalInspectionMode.current
-    val isSignedIn = state.phase == SignedIn
+    val isSignedIn = state.phase is SignedIn
     LaunchedEffect(isSignedIn) {
         when {
             isSignedIn -> buttonReveal.animateTo(0f, tween(durationMillis = BUTTON_HIDE_MS, easing = FastOutSlowInEasing))
@@ -169,14 +184,7 @@ private fun LoginContent(
                     .sharedElementByKey(SharedElementKey.APP_LOGO)
                     .width(LogoWidth),
             )
-            FlashcardsFilledButton(
-                text = stringResource(
-                    when (state.phase) {
-                        Idle -> R.string.login_google_signin_button
-                        SigningIn, SignedIn -> R.string.login_signing_in_label
-                    },
-                ),
-                onClick = onGoogleSignInClick,
+            LoginButtons(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = MaterialTheme.spacing.large)
@@ -184,20 +192,65 @@ private fun LoginContent(
                         alpha = buttonReveal.value
                         translationY = (1f - buttonReveal.value) * buttonRiseDistance.toPx()
                     },
-                size = FlashcardsComponentSize.Normal,
-                // Disabled until it starts to appear, so an invisible button can't be tapped.
+                phase = state.phase,
+                // Disabled until they start to appear, so an invisible button can't be tapped.
                 enabled = state.phase == Idle && hasButtonStartedRevealing,
-                style = FlashcardsComponentStyle.OnGradient,
+                onGoogleSignInClick = onGoogleSignInClick,
+                onGitHubSignInClick = onGitHubSignInClick,
             )
         }
     }
+}
+
+/** One button per sign-in provider, revealed and hidden together by [modifier]. */
+@Composable
+private fun LoginButtons(
+    modifier: Modifier = Modifier,
+    phase: LoginPhase,
+    enabled: Boolean,
+    onGoogleSignInClick: () -> Unit,
+    onGitHubSignInClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+    ) {
+        FlashcardsFilledButton(
+            text = stringResource(
+                if (phase.isSigningInWith(Google)) R.string.login_signing_in_label else R.string.login_google_signin_button,
+            ),
+            onClick = onGoogleSignInClick,
+            modifier = Modifier.fillMaxWidth(),
+            size = FlashcardsComponentSize.Normal,
+            enabled = enabled,
+            style = FlashcardsComponentStyle.OnGradient,
+        )
+        FlashcardsOutlinedButton(
+            text = stringResource(
+                if (phase.isSigningInWith(GitHub)) R.string.login_signing_in_label else R.string.login_github_signin_button,
+            ),
+            onClick = onGitHubSignInClick,
+            modifier = Modifier.fillMaxWidth(),
+            size = FlashcardsComponentSize.Normal,
+            enabled = enabled,
+            icon = ImageVector.vectorResource(R.drawable.ic_github_mark),
+            style = FlashcardsComponentStyle.OnGradient,
+        )
+    }
+}
+
+/** Whether [provider]'s button shows the signing-in label: its sign-in is running, or it succeeded and the screen is leaving. */
+private fun LoginPhase.isSigningInWith(provider: AuthProvider): Boolean = when (this) {
+    Idle -> false
+    is SigningIn -> this.provider == provider
+    is SignedIn -> this.provider == provider
 }
 
 @Preview
 @Composable
 private fun LoginContentPreview() {
     FlashcardsTheme {
-        LoginContent(state = LoginScreenState(), onGoogleSignInClick = {})
+        LoginContent(state = LoginScreenState(), onGoogleSignInClick = {}, onGitHubSignInClick = {})
     }
 }
 
@@ -205,6 +258,14 @@ private fun LoginContentPreview() {
 @Composable
 private fun LoginContentSigningInPreview() {
     FlashcardsTheme {
-        LoginContent(state = LoginScreenState(phase = SigningIn), onGoogleSignInClick = {})
+        LoginContent(state = LoginScreenState(phase = SigningIn(Google)), onGoogleSignInClick = {}, onGitHubSignInClick = {})
+    }
+}
+
+@Preview
+@Composable
+private fun LoginContentSigningInWithGitHubPreview() {
+    FlashcardsTheme {
+        LoginContent(state = LoginScreenState(phase = SigningIn(GitHub)), onGoogleSignInClick = {}, onGitHubSignInClick = {})
     }
 }

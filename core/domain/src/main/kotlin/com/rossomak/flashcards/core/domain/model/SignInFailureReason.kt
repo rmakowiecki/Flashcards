@@ -9,6 +9,12 @@ sealed interface SignInFailureReason {
     /** The sign-in service was not reached: the device is offline, or the request failed at the network level. */
     data object NoConnection : SignInFailureReason
 
+    /**
+     * The provider's email already belongs to a User who signs in with another provider. One email maps to one
+     * account, so nothing was signed in or linked.
+     */
+    data object AccountExistsWithDifferentProvider : SignInFailureReason
+
     /** Any other failure. */
     data object Unknown : SignInFailureReason
 }

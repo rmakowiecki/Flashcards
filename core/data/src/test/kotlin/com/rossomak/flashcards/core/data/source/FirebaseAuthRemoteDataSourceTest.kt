@@ -1,27 +1,34 @@
 package com.rossomak.flashcards.core.data.source
 
+import android.app.Activity
 import android.net.Uri
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GithubAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.UserInfo
+import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.SignInFailureReason.AccountExistsWithDifferentProvider
 import com.rossomak.flashcards.core.domain.model.SignInFailureReason.NoConnection
 import com.rossomak.flashcards.core.domain.model.SignInFailureReason.Unknown
+import com.rossomak.flashcards.core.domain.model.SignInResult.Cancelled
 import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
 import com.rossomak.flashcards.core.domain.model.SignInResult.SignedIn
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import java.io.IOException
@@ -34,8 +41,34 @@ import org.junit.Test
 class FirebaseAuthRemoteDataSourceTest {
 
     private val firebaseAuth: FirebaseAuth = mockk(relaxed = true)
+    private val currentActivityHolder = CurrentActivityHolder()
+    private val activity: Activity = mockk()
+    private val gitHubProvider: OAuthProvider = mockk()
+    private val requestedScopes = slot<List<String>>()
 
-    private fun createDataSource(): FirebaseAuthRemoteDataSource = FirebaseAuthRemoteDataSource(firebaseAuth)
+    private fun createDataSource(): FirebaseAuthRemoteDataSource =
+        FirebaseAuthRemoteDataSource(firebaseAuth, currentActivityHolder)
+
+    /** A signed-out, resumed GitHub sign-in, ready for one flow to be stubbed. */
+    private fun prepareGitHubSignIn(guest: FirebaseUser? = null) {
+        currentActivityHolder.onActivityResumed(activity)
+        every { firebaseAuth.currentUser } returns guest
+        val builder: OAuthProvider.Builder = mockk()
+        mockkStatic(OAuthProvider::class)
+        every { OAuthProvider.newBuilder(GithubAuthProvider.PROVIDER_ID, firebaseAuth) } returns builder
+        every { builder.setScopes(capture(requestedScopes)) } returns builder
+        every { builder.build() } returns gitHubProvider
+    }
+
+    private fun authResultFor(user: FirebaseUser): AuthResult = mockk { every { this@mockk.user } returns user }
+
+    /** A mock, since the real constructor cannot attach the updated credential a provider collision carries. */
+    private fun collision(errorCode: String, updatedCredential: AuthCredential?): FirebaseAuthUserCollisionException =
+        mockk(relaxed = true) {
+            every { this@mockk.errorCode } returns errorCode
+            every { this@mockk.updatedCredential } returns updatedCredential
+            every { cause } returns null
+        }
 
     private fun firebaseUser(
         uid: String = "uid-1",
@@ -88,6 +121,7 @@ class FirebaseAuthRemoteDataSourceTest {
     @After
     fun tearDown() {
         unmockkStatic(GoogleAuthProvider::class)
+        unmockkStatic(OAuthProvider::class)
     }
 
     @Test
@@ -419,7 +453,7 @@ class FirebaseAuthRemoteDataSourceTest {
 
         val result = createDataSource().signInWithGoogleIdToken(idToken)
 
-        result shouldBe Failed(Unknown)
+        result shouldBe Failed(AccountExistsWithDifferentProvider)
         verify(exactly = 1) { guest.linkWithCredential(credential) }
         verify(exactly = 0) { firebaseAuth.signInWithCredential(any()) }
     }
@@ -452,6 +486,137 @@ class FirebaseAuthRemoteDataSourceTest {
 
         result shouldBe Failed(NoConnection)
         verify(exactly = 1) { firebaseAuth.signInWithCredential(credential) }
+    }
+
+    @Test
+    fun `signInWithGitHub signs in a signed-out user with the github provider`() = runTest {
+        prepareGitHubSignIn()
+        val signedInUser = firebaseUser(uid = SIGNED_IN_UID, providerData = listOf(githubProfile()))
+        every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
+            Tasks.forResult(authResultFor(signedInUser))
+
+        val result = createDataSource().signInWithGitHub()
+
+        (result as SignedIn).user.uid shouldBe SIGNED_IN_UID
+        result.user.provider shouldBe GitHub
+        verify(exactly = 1) { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) }
+    }
+
+    @Test
+    fun `signInWithGitHub requests only the email scope`() = runTest {
+        prepareGitHubSignIn()
+        every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
+            Tasks.forResult(authResultFor(firebaseUser()))
+
+        createDataSource().signInWithGitHub()
+
+        requestedScopes.captured shouldBe listOf("user:email")
+        verify(exactly = 1) { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) }
+    }
+
+    @Test
+    fun `signInWithGitHub links a guest instead of signing in`() = runTest {
+        val guest = firebaseUser(uid = GUEST_UID, isAnonymous = true)
+        prepareGitHubSignIn(guest)
+        every { guest.startActivityForLinkWithProvider(activity, gitHubProvider) } returns
+            Tasks.forResult(authResultFor(firebaseUser(uid = GUEST_UID)))
+
+        val result = createDataSource().signInWithGitHub()
+
+        (result as SignedIn).user.uid shouldBe GUEST_UID
+        verify(exactly = 1) { guest.startActivityForLinkWithProvider(activity, gitHubProvider) }
+        verify(exactly = 0) { firebaseAuth.startActivityForSignInWithProvider(any(), any()) }
+    }
+
+    @Test
+    fun `signInWithGitHub signs in with the updated credential when the guest link credential is in use`() =
+        runTest {
+            val guest = firebaseUser(uid = GUEST_UID, isAnonymous = true)
+            val updatedCredential: AuthCredential = mockk()
+            prepareGitHubSignIn(guest)
+            every { guest.startActivityForLinkWithProvider(activity, gitHubProvider) } returns
+                Tasks.forException(collision(ERROR_CREDENTIAL_ALREADY_IN_USE, updatedCredential))
+            every { firebaseAuth.signInWithCredential(updatedCredential) } returns
+                Tasks.forResult(authResultFor(firebaseUser(uid = EXISTING_UID)))
+
+            val result = createDataSource().signInWithGitHub()
+
+            (result as SignedIn).user.uid shouldBe EXISTING_UID
+            verify(exactly = 1) { firebaseAuth.signInWithCredential(updatedCredential) }
+        }
+
+    @Test
+    fun `signInWithGitHub fails as unknown when the in-use collision has no updated credential`() = runTest {
+        val guest = firebaseUser(uid = GUEST_UID, isAnonymous = true)
+        prepareGitHubSignIn(guest)
+        every { guest.startActivityForLinkWithProvider(activity, gitHubProvider) } returns
+            Tasks.forException(collision(ERROR_CREDENTIAL_ALREADY_IN_USE, updatedCredential = null))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Failed(Unknown)
+        verify(exactly = 0) { firebaseAuth.signInWithCredential(any()) }
+    }
+
+    @Test
+    fun `signInWithGitHub keeps the guest when the guest link collides on the email`() = runTest {
+        val guest = firebaseUser(uid = GUEST_UID, isAnonymous = true)
+        prepareGitHubSignIn(guest)
+        every { guest.startActivityForLinkWithProvider(activity, gitHubProvider) } returns
+            Tasks.forException(collision(ERROR_EMAIL_ALREADY_IN_USE, updatedCredential = mockk()))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Failed(AccountExistsWithDifferentProvider)
+        verify(exactly = 0) { firebaseAuth.signInWithCredential(any()) }
+        verify(exactly = 0) { firebaseAuth.startActivityForSignInWithProvider(any(), any()) }
+    }
+
+    @Test
+    fun `signInWithGitHub maps an account that exists with a different credential to the email clash`() = runTest {
+        prepareGitHubSignIn()
+        every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
+            Tasks.forException(collision(ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL, updatedCredential = null))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Failed(AccountExistsWithDifferentProvider)
+        verify(exactly = 1) { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) }
+    }
+
+    @Test
+    fun `signInWithGitHub maps a closed custom tab to cancelled`() = runTest {
+        prepareGitHubSignIn()
+        every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
+            Tasks.forException(FirebaseAuthException(ERROR_WEB_CONTEXT_CANCELED, CANCELLED_MESSAGE))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Cancelled
+        verify(exactly = 1) { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) }
+    }
+
+    @Test
+    fun `signInWithGitHub maps a firebase network failure to no connection`() = runTest {
+        prepareGitHubSignIn()
+        every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
+            Tasks.forException(FirebaseNetworkException(NETWORK_DOWN_MESSAGE))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Failed(NoConnection)
+        verify(exactly = 1) { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) }
+    }
+
+    @Test
+    fun `signInWithGitHub fails as unknown without starting a flow when no activity is resumed`() = runTest {
+        prepareGitHubSignIn()
+        currentActivityHolder.onActivityPaused(activity)
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Failed(Unknown)
+        verify(exactly = 0) { firebaseAuth.startActivityForSignInWithProvider(any(), any()) }
     }
 
     @Test
@@ -512,7 +677,12 @@ class FirebaseAuthRemoteDataSourceTest {
         const val GITHUB_AVATAR = "https://avatars.githubusercontent.com/u/1?v=4"
         const val ERROR_CREDENTIAL_ALREADY_IN_USE = "ERROR_CREDENTIAL_ALREADY_IN_USE"
         const val ERROR_EMAIL_ALREADY_IN_USE = "ERROR_EMAIL_ALREADY_IN_USE"
+        const val ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL = "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL"
+        const val ERROR_WEB_CONTEXT_CANCELED = "ERROR_WEB_CONTEXT_CANCELED"
+        const val GUEST_UID = "guest-uid"
+        const val EXISTING_UID = "existing-uid"
         const val COLLISION_MESSAGE = "collision"
+        const val CANCELLED_MESSAGE = "cancelled"
         const val NETWORK_DOWN_MESSAGE = "network down"
     }
 }

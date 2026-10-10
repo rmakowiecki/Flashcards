@@ -76,6 +76,7 @@ class AccountViewModel @Inject constructor(
                 displayName = user.displayName,
                 email = user.email,
                 photoUrl = user.photoUrl,
+                provider = user.provider,
             )
         }
     }

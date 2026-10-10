@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.rossomak.flashcards.core.data.InterruptedAccountDeletionCompleter
 import com.rossomak.flashcards.core.data.SignedInWorkRunner
+import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import timber.log.Timber
@@ -26,6 +27,10 @@ import timber.log.Timber
  *
  * [InterruptedAccountDeletionCompleter.complete] runs first, so a User whose deletion a process death
  * interrupted is signed out before that drain is scheduled and before the start screen is chosen.
+ *
+ * [CurrentActivityHolder] is registered here, before anything else can start an Activity, because
+ * GitHub sign-in runs inside the data layer and needs the resumed Activity to open its Custom Tab.
+ * Registering it from the Application means it sees every Activity of the process from the first.
  */
 @HiltAndroidApp
 class FlashcardsApplication : Application(), Configuration.Provider {
@@ -39,6 +44,9 @@ class FlashcardsApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var signedInWorkRunner: SignedInWorkRunner
 
+    @Inject
+    lateinit var currentActivityHolder: CurrentActivityHolder
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(hiltWorkerFactory).build()
 
@@ -47,6 +55,7 @@ class FlashcardsApplication : Application(), Configuration.Provider {
         if (BuildConfig.LOGGING_ENABLED) {
             Timber.plant(Timber.DebugTree())
         }
+        registerActivityLifecycleCallbacks(currentActivityHolder)
         interruptedAccountDeletionCompleter.complete()
         signedInWorkRunner.start()
     }
