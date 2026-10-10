@@ -11,6 +11,7 @@ interface AuthRepository {
     fun observeAuthUser(): Flow<AuthUser?>
 
     suspend fun signInWithGoogleIdToken(idToken: String): SignInResult
+    suspend fun signInWithGitHub(): SignInResult
     suspend fun signInAnonymously(): Result<AuthUser>
     fun signOut()
 }

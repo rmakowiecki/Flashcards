@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="login_google_signin_button">Sign in with Google</string>
+    <string name="login_github_signin_button">Continue with GitHub</string>
     <string name="login_signing_in_label">Signing in…</string>
     <string name="login_no_credential_error">Couldn’t use a Google account. Make sure one is added in Settings → Accounts, then try again.</string>
     <string name="login_no_connection_error">No internet connection. Check your connection and try again.</string>
     <string name="login_signin_error">Sign-in failed. Please try again.</string>
+    <string name="login_account_exists_google_error">This email already has an account that signs in with Google. Use Sign in with Google instead.</string>
+    <string name="login_account_exists_github_error">This email already has an account that signs in with GitHub. Use Continue with GitHub instead.</string>
 </resources>

@@ -18,6 +18,8 @@ class FakeAuthRepository : AuthRepository {
             authUser.value = value
         }
     var signInResult: SignInResult = Failed(Unknown)
+    var signInWithGitHubResult: SignInResult = Failed(Unknown)
+    var signInWithGitHubCallCount: Int = 0
     var signInAnonymouslyResult: Result<AuthUser> = Result.failure(UnsupportedOperationException("not configured"))
     var signInAnonymouslyDelayMs: Long = 0L
     var signInAnonymouslyCallCount: Int = 0
@@ -28,6 +30,11 @@ class FakeAuthRepository : AuthRepository {
 
     override suspend fun signInWithGoogleIdToken(idToken: String): SignInResult = signInResult.also { result ->
         if (result is SignedIn) userToReturn = result.user
+    }
+
+    override suspend fun signInWithGitHub(): SignInResult {
+        signInWithGitHubCallCount++
+        return signInWithGitHubResult.also { result -> if (result is SignedIn) userToReturn = result.user }
     }
 
     override suspend fun signInAnonymously(): Result<AuthUser> {
