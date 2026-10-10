@@ -85,9 +85,12 @@ import kotlinx.coroutines.CancellationException
  * like any delivered session but left out of the report, so a waiting Summary shows its local preview.
  *
  * **Post-delivery refresh**: after each successful submission, [doWork] asks
- * [sessionServerStateRefresher] to re-read the User's scoring state and the session's Card Progress
- * documents from the server, updating the Firestore cache. Every failure of this step is ignored; the
- * entry is removed from the queue either way.
+ * [sessionServerStateRefresher] to re-read the User's scoring state and the Card Progress documents the
+ * session touched from the server, updating the Firestore cache. The entry is removed from the queue
+ * only if every read succeeded: the projection counts a session through the queue until the cache
+ * includes it, and through the cache once it leaves the queue. If any read failed, the entry stays
+ * queued and the run stops with [Result.retry]. The next run re-submits it, the server answers from its
+ * stored session, and that run refreshes and removes it. A failed refresh never dead-letters an entry.
  *
  * A queue entry that fails to convert back to a domain [com.rossomak.flashcards.core.domain.model.SessionResult]
  * (no owning uid, unknown `mode`/`state`, or a `Rated` card result missing
@@ -163,7 +166,10 @@ class SessionSubmissionDeliveryWorker @AssistedInject constructor(
         val failure = sessionSubmissionRemoteDataSource.submitSession(entry.uid, sessionResult).fold(
             onSuccess = { score ->
                 if (score != null) report(entry.id, DeliveredSessionDto.Scored(score.toDto()))
-                sessionServerStateRefresher.refresh(sessionResult)
+                sessionServerStateRefresher.refresh(sessionResult).onFailure { exception ->
+                    logw(exception) { "Session ${entry.id} delivered but the cache refresh failed, keeping it queued and returning retry" }
+                    return StopAndRetry
+                }
                 localDataSource.remove(entry.id)
                 logd { "Session ${entry.id} delivered and removed from queue" }
                 return Continue
