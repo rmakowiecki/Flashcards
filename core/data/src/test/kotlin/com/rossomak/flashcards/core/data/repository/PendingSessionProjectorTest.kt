@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.data.repository
 
 import com.google.firebase.Timestamp
+import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
@@ -19,6 +20,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
+import com.rossomak.flashcards.core.domain.scoring.SubcategoryProgressDelta
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -33,7 +35,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PendingSessionProjectorTest {
 
-    private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk()
+    private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk { coEvery { getScoringState(any()) } returns null }
     private val cardProgressRemoteDataSource: CardProgressRemoteDataSource = mockk()
     private val authRepository = FakeAuthRepository().apply { userToReturn = authUser(USER_ID) }
     private val pendingSessionQueue = FakePendingSessionSubmissionLocalDataSource()
@@ -352,6 +354,107 @@ class PendingSessionProjectorTest {
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
 
+    @Test
+    fun `three sessions queued offline chain their scoring states, the last projecting the XP of applying all three`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, OTHER_CARD_ID))
+        queue(fastSession(SESSION_THREE_ID, SESSION_THREE_START, THIRD_CARD_ID))
+        val projector = createProjector()
+
+        val state = projector.projectScoringState().getOrThrow()
+        val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
+
+        // Each: 1 new × 10 + 10 + 500, the first also a Streak of 1 × 20. 1580 crosses Level 1's 1000.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 540, SESSION_TWO_ID to 520, SESSION_THREE_ID to 520)
+        state shouldBe ScoringState(
+            xp = 1580,
+            level = 2,
+            xpIntoCurrentLevel = 580,
+            currentStreak = 1,
+            bestStreak = 1,
+            lastStudyDate = STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 180,
+        )
+    }
+
+    @Test
+    fun `a queued session listed as applied adds to no aggregate, but its Card Progress still shows`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns SCORING_STATE_AFTER_SESSION_ONE.copy(appliedSessionIds = listOf(SESSION_ONE_ID))
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, OTHER_CARD_ID))
+        val projector = createProjector()
+
+        val state = projector.projectScoringState().getOrThrow()
+        val summaryDeltas = projector.projectSummaryDeltas(projector.observePendingSessions().first())
+        val progress = projector.projectCardProgress(SUBCATEGORY_ID).getOrThrow()
+
+        state shouldBe SCORING_STATE_AFTER_SESSIONS_ONE_AND_TWO
+        summaryDeltas shouldBe mapOf(SUBCATEGORY_ID to SubcategoryProgressDelta(masteredDelta = 0, studiedDelta = 1))
+        progress?.cards?.keys shouldBe setOf(CARD_ID, OTHER_CARD_ID)
+    }
+
+    @Test
+    fun `a session delivered and removed from the queue with the cache refreshed is still counted exactly once`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns SCORING_STATE_AFTER_SESSION_ONE.copy(appliedSessionIds = listOf(SESSION_ONE_ID))
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns remoteProgress(CARD_ID to Seen)
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, OTHER_CARD_ID))
+
+        createProjector().projectScoringState().getOrThrow() shouldBe SCORING_STATE_AFTER_SESSIONS_ONE_AND_TWO
+    }
+
+    @Test
+    fun `projectSessionXpTotals scores an applied session without advancing the later sessions' chain`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns SCORING_STATE_AFTER_SESSION_ONE.copy(appliedSessionIds = listOf(SESSION_ONE_ID))
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID).copy(dailyGoalMinutes = 2))
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, OTHER_CARD_ID).copy(dailyGoalMinutes = 2))
+        val projector = createProjector()
+
+        val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
+
+        // Both are scored against the cached state's 60 seconds, so each meets the 2-minute goal: 10 + 10
+        // + 500 + 1000. Had the applied session advanced the chain, only it would have met the goal.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 1520, SESSION_TWO_ID to 1520)
+    }
+
+    @Test
+    fun `an excluded session is left out of the scoring state and Card Progress`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, OTHER_CARD_ID))
+        val projector = createProjector()
+
+        val state = projector.projectScoringState(excludedSessionId = SESSION_TWO_ID).getOrThrow()
+        val progress = projector.projectCardProgress(SUBCATEGORY_ID, excludedSessionId = SESSION_TWO_ID).getOrThrow()
+
+        state shouldBe SCORING_STATE_AFTER_SESSION_ONE.toDomain()
+        progress?.cards?.keys shouldBe setOf(CARD_ID)
+    }
+
+    @Test
+    fun `an excluded session the cached scoring state lists as applied fails the scoring-state read`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns SCORING_STATE_AFTER_SESSION_ONE.copy(appliedSessionIds = listOf(SESSION_ONE_ID))
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        val projector = createProjector()
+
+        projector.projectScoringState(excludedSessionId = SESSION_ONE_ID).isFailure shouldBe true
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        projector.projectScoringState(excludedSessionId = SESSION_ONE_ID).isFailure shouldBe true
+    }
+
+    @Test
+    fun `projectSummaryDeltas treats no session as applied when the scoring state is unreadable`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } throws IllegalStateException("offline, not cached")
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val projector = createProjector()
+
+        projector.projectSummaryDeltas(projector.observePendingSessions().first()) shouldBe
+            mapOf(SUBCATEGORY_ID to SubcategoryProgressDelta(masteredDelta = 0, studiedDelta = 1))
+    }
+
     private fun queue(sessionResult: SessionResult, uid: String = USER_ID) {
         pendingSessionQueue.seed(sessionResult.toDto(uid))
     }
@@ -407,16 +510,42 @@ class PendingSessionProjectorTest {
         const val CARD_ID = "card-1"
         const val SESSION_ONE_ID = "session-1"
         const val SESSION_TWO_ID = "session-2"
+        const val SESSION_THREE_ID = "session-3"
+        const val OTHER_CARD_ID = "card-2"
+        const val THIRD_CARD_ID = "card-3"
         const val PREVIOUS_STUDY_DATE = "2026-09-05"
         const val STUDY_DATE = "2026-09-06"
         const val NEXT_STUDY_DATE = "2026-09-07"
         val PREVIOUS_DAY_START: Instant = Instant.parse("2026-09-05T10:00:00Z")
         val SESSION_ONE_START: Instant = Instant.parse("2026-09-06T10:00:00Z")
         val SESSION_TWO_START: Instant = Instant.parse("2026-09-06T11:00:00Z")
+        val SESSION_THREE_START: Instant = Instant.parse("2026-09-06T12:00:00Z")
         val NEXT_DAY_START: Instant = Instant.parse("2026-09-07T10:00:00Z")
 
         // The bundled defaults, spelled out so the arithmetic in each test reads against known rates,
         // except a small Streak rate, so a Streak award stays inside Level 1.
+        // The cached state once the server applied a Fast session one studying one new card: 10 + 10 +
+        // 500 + a Streak of 1 × 20.
+        val SCORING_STATE_AFTER_SESSION_ONE = ScoringStateDto(
+            xp = 540,
+            xpIntoCurrentLevel = 540,
+            currentStreak = 1,
+            bestStreak = 1,
+            lastStudyDate = STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 60,
+        )
+
+        // Session two adds 1 new × 10 + 10 + 500 over it, crossing Level 1's 1000.
+        val SCORING_STATE_AFTER_SESSIONS_ONE_AND_TWO = ScoringState(
+            xp = 1060,
+            level = 2,
+            xpIntoCurrentLevel = 60,
+            currentStreak = 1,
+            bestStreak = 1,
+            lastStudyDate = STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 120,
+        )
+
         val CONFIG = XpConfig(
             newCardStudied = 10,
             cardMastered = 100,

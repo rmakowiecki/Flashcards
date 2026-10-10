@@ -7,14 +7,12 @@ import javax.inject.Inject
 /**
  * Serves the cached server scoring state with the signed-in User's Pending Sessions replayed on top
  * ([PendingSessionProjector.projectScoringState]), so a session studied offline counts toward XP and
- * Level as soon as it is queued. With an empty queue it is the plain remote read.
- *
- * **Known transient:** the delivery worker refreshes the cached server state before it removes the
- * delivered entry from the queue. In between, that session counts twice.
+ * Level as soon as it is queued. With an empty queue it is the plain remote read. A queued session the
+ * cached state already lists as applied counts once, through the cache.
  */
 class DefaultScoringStateRepository @Inject constructor(
     private val pendingSessionProjector: PendingSessionProjector,
 ) : ScoringStateRepository {
 
-    override suspend fun getScoringState(): Result<ScoringState?> = pendingSessionProjector.projectScoringState()
+    override suspend fun getScoringState(excludedSessionId: String?): Result<ScoringState?> = pendingSessionProjector.projectScoringState(excludedSessionId)
 }

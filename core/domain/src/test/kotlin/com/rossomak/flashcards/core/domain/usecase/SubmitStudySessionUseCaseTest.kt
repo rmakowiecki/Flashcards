@@ -201,6 +201,36 @@ class SubmitStudySessionUseCaseTest {
     }
 
     @Test
+    fun `a re-submission whose session is already queued previews the same score as the first submission`() = runTest {
+        scoringStateRepository.resultToReturn = Result.success(ScoringState(xp = 40, xpIntoCurrentLevel = 40))
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+        val first = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+        scoringStateRepository.resultsIncludingQueuedSession = mapOf(
+            session.id to Result.success(ScoringState(xp = 40L + first.breakdown.xpTotal, xpIntoCurrentLevel = 40L + first.breakdown.xpTotal)),
+        )
+        cardProgressRepository.progressIncludingQueuedSession = mapOf(
+            session.id to SubcategoryProgressDetails(subcategoryId = "sub-1", categoryId = "cat-1", cards = mapOf("card-1" to priorEntry(FlashcardStudyProgressState.Mastered))),
+        )
+
+        val resubmitted = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        resubmitted shouldBe first
+        scoringStateRepository.excludedSessionIds shouldBe listOf(session.id, session.id)
+        cardProgressRepository.excludedSessionIds shouldBe listOf(session.id, session.id)
+    }
+
+    @Test
+    fun `a session already applied in the cached scoring state with no server score fails the preview`() = runTest {
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+        scoringStateRepository.appliedSessionIds = setOf(session.id)
+
+        val result = createUseCase().invoke(session)
+
+        result.isFailure shouldBe true
+        sessionSubmissionRepository.submittedSessionResults shouldBe listOf(session)
+    }
+
+    @Test
     fun `a failed baseline read does not fail a server-scored result`() = runTest {
         scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
