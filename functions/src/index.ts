@@ -15,7 +15,9 @@ const elevenLabsApiKey = defineSecret("ELEVENLABS_API_KEY");
 
 const RUNTIME_OPTIONS = {
   region: "us-central1",
-  timeoutSeconds: 120,
+  // Below the Android SDK's default callable timeout (70 s), so a callable that keeps the default
+  // never sees the SDK give up while the function still runs.
+  timeoutSeconds: 60,
   memory: "512MiB" as const,
 };
 

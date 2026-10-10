@@ -12,4 +12,8 @@ class FakeDeadLetteredSessionSubmissionLocalDataSource : DeadLetteredSessionSubm
     }
 
     override suspend fun listAll(): List<DeadLetteredSessionSubmissionDto> = entries.toList()
+
+    override suspend fun removeAllForUser(uid: String) {
+        entries.removeAll { it.entry.uid == uid }
+    }
 }
