@@ -62,7 +62,7 @@ treats a Guest as authenticated.
 _Avoid_: Anonymous user, Temp user
 
 **User**:
-An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl`.
+An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl` and the sign-in `provider` (Google or GitHub; none for a Guest).
 _Avoid_: Account, Player, Learner
 
 **Study Session**:
