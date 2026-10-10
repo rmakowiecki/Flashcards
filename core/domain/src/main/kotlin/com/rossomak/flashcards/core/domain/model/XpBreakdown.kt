@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.core.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * One session's itemised XP award list — one field per source, matching the
  * `sessions/{sessionId}` document's own persisted field names 1:1, plus [xpTotal] as their sum, never
@@ -29,6 +31,7 @@ package com.rossomak.flashcards.core.domain.model
  * @param streakBonus `currentStreak x XpConfig.streakPerDay`, capped at [XpConfig.streakMaxPerDay].
  * Both modes.
  */
+@Serializable
 data class XpBreakdown(
     val newCards: Int = 0,
     val mastered: Int = 0,

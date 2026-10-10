@@ -121,6 +121,12 @@ const FIELD_BEST_STREAK = "bestStreak";
 const FIELD_LAST_STUDY_DATE = "lastStudyDate";
 const FIELD_GOAL_MET_DATE = "goalMetDate";
 const FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE = "studiedSecondsOnLastStudyDate";
+// The ids of the latest sessions applied to `user-stats`, oldest first. Kept out of ScoringState: the
+// device reads it only to tell which of its Pending Sessions this document already includes.
+const FIELD_APPLIED_SESSION_IDS = "appliedSessionIds";
+
+// How many applied session ids `user-stats` keeps. Only sessions still queued on some device matter.
+export const MAX_APPLIED_SESSION_IDS = 20;
 
 // The itemised XP breakdown's own fields — mirrors StudySessionRemoteDataSource.kt's FIELD_XP_* names.
 const FIELD_XP_NEW_CARDS = "newCards";
@@ -483,6 +489,15 @@ function scoringStateFields(state: ScoringState): Record<string, unknown> {
   };
 }
 
+function readAppliedSessionIds(snapshot: FirebaseFirestore.DocumentSnapshot): string[] {
+  return (snapshot.data()?.[FIELD_APPLIED_SESSION_IDS] as string[] | undefined) ?? [];
+}
+
+/** [prior] with [sessionId] moved to the end, keeping the latest [MAX_APPLIED_SESSION_IDS]. */
+function nextAppliedSessionIds(prior: string[], sessionId: string): string[] {
+  return [...prior.filter((appliedSessionId) => appliedSessionId !== sessionId), sessionId].slice(-MAX_APPLIED_SESSION_IDS);
+}
+
 function readScoringState(snapshot: FirebaseFirestore.DocumentSnapshot): ScoringState {
   if (!snapshot.exists) return DEFAULT_SCORING_STATE;
   const data = snapshot.data() ?? {};
@@ -592,7 +607,8 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  *    [ScoringState] and `recents/state`, computes the new progress writes, the [XpBreakdown] and the
  *    new [ScoringState] (mirrored by the client's `scoreSession`) with the server-owned XP
  *    configuration (`config/xp`, see `xpConfig.ts`), and writes the session document, every touched
- *    Subcategory's progress, the progress summary's increments, the full scoring-state overwrite and,
+ *    Subcategory's progress, the progress summary's increments, the full scoring-state overwrite (with
+ *    this session's id appended to its applied session ids) and,
  *    unless [nextRecentEntries] leaves it unchanged, the full `recents/state` overwrite — before
  *    answering from the session document it just built, through the same [resultFromSessionDocument]
  *    a retry uses. `recents/state` is read in this same transaction, so overwriting it whole loses no
@@ -747,7 +763,10 @@ export async function submitStudySession(db: Firestore, uid: string, request: Va
       transaction.set(progressSummaryDocRef(db, uid), { [FIELD_SUBCATEGORIES]: subcategories }, { merge: true });
     }
 
-    transaction.set(scoringRef, scoringStateFields(newScoringState));
+    transaction.set(scoringRef, {
+      ...scoringStateFields(newScoringState),
+      [FIELD_APPLIED_SESSION_IDS]: nextAppliedSessionIds(readAppliedSessionIds(scoringSnapshot), request.sessionId),
+    });
 
     const recentEntry: RecentEntry = {
       [FIELD_SESSION_ID]: request.sessionId,
