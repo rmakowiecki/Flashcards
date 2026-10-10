@@ -1,6 +1,14 @@
 package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.data.mapper.toDomain
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.LevelProgressEvent.PendingSessions
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.LevelProgressEvent.RemoteCompleted
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.LevelProgressEvent.RemoteScoringState
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.ProjectionResult.Projected
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.ProjectionResult.Stale
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.ProjectionResult.Stopped
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.ProjectionStep.Project
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.ProjectionStep.Stop
 import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.LevelProgress
 import com.rossomak.flashcards.core.domain.model.ScoringState
@@ -50,39 +58,39 @@ class DefaultLevelProgressRepository @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeLevelProgress(): Flow<LevelProgress> = flow {
         val remoteScoringState = scoringStateRemoteDataSource.observeScoringState()
-            .map<_, LevelProgressEvent> { dto -> LevelProgressEvent.RemoteScoringState(dto?.toDomain()) }
+            .map<_, LevelProgressEvent> { dto -> RemoteScoringState(dto?.toDomain()) }
             .retryOnFirestorePermissionDenied()
-            .onCompletion { cause -> if (cause == null) emit(LevelProgressEvent.RemoteCompleted) }
+            .onCompletion { cause -> if (cause == null) emit(RemoteCompleted) }
         val pendingSessions = pendingSessionProjector.observeDeliverablePendingSessions()
-            .map { sessions -> LevelProgressEvent.PendingSessions(sessions) }
+            .map { sessions -> PendingSessions(sessions) }
 
-        var latestRemoteScoringState: LevelProgressEvent.RemoteScoringState? = null
+        var latestRemoteScoringState: RemoteScoringState? = null
         var latestPendingSessions: List<SessionResult>? = null
         val projectionSteps = merge(remoteScoringState, pendingSessions).transformWhile { event ->
             when (event) {
-                is LevelProgressEvent.RemoteScoringState -> latestRemoteScoringState = event
-                is LevelProgressEvent.PendingSessions -> latestPendingSessions = event.sessions
-                LevelProgressEvent.RemoteCompleted -> {
-                    emit(ProjectionStep.Stop)
+                is RemoteScoringState -> latestRemoteScoringState = event
+                is PendingSessions -> latestPendingSessions = event.sessions
+                RemoteCompleted -> {
+                    emit(Stop)
                     return@transformWhile false
                 }
             }
             val remoteState = latestRemoteScoringState
             val queuedSessions = latestPendingSessions
-            if (remoteState != null && queuedSessions != null) emit(ProjectionStep.Project(remoteState.scoringState, queuedSessions))
+            if (remoteState != null && queuedSessions != null) emit(Project(remoteState.scoringState, queuedSessions))
             true
         }
         emitAll(
             projectionSteps
                 .mapLatest { step ->
                     when (step) {
-                        is ProjectionStep.Project -> project(step.remoteScoringState, step.pendingSessions)
-                        ProjectionStep.Stop -> ProjectionResult.Stopped
+                        is Project -> project(step.remoteScoringState, step.pendingSessions)
+                        Stop -> Stopped
                     }
                 }
                 .transformWhile { result ->
-                    if (result is ProjectionResult.Projected) emit(result.levelProgress)
-                    result != ProjectionResult.Stopped
+                    if (result is Projected) emit(result.levelProgress)
+                    result != Stopped
                 }
                 .distinctUntilChanged(),
         )
@@ -91,8 +99,8 @@ class DefaultLevelProgressRepository @Inject constructor(
     /** A stale projection (see [PendingSessionProjector.projectScoringStateOver]) is dropped; the queue change that made it stale re-emits. */
     private suspend fun project(remoteScoringState: ScoringState?, pendingSessions: List<SessionResult>): ProjectionResult {
         val config = xpConfigRepository.getXpConfig().getOrDefault(XpConfig())
-        val scoringState = pendingSessionProjector.projectScoringStateOver(remoteScoringState, pendingSessions, config) ?: return ProjectionResult.Stale
-        return ProjectionResult.Projected(scoringState.toLevelProgress(config))
+        val scoringState = pendingSessionProjector.projectScoringStateOver(remoteScoringState, pendingSessions, config) ?: return Stale
+        return Projected(scoringState.toLevelProgress(config))
     }
 
     /** One update from either source [observeLevelProgress] follows, including the remote flow's normal completion. */

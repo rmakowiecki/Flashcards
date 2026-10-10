@@ -8,11 +8,7 @@ import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
 import com.rossomak.flashcards.core.domain.model.ScoringState.Companion.STARTING_LEVEL
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -59,20 +55,11 @@ class ScoringStateRemoteDataSource @Inject constructor(
         emitAll(observeAuthenticatedScoringState(uid))
     }.distinctUntilChanged()
 
-    private fun observeAuthenticatedScoringState(uid: String): Flow<ScoringStateDto?> = callbackFlow {
-        // Delivered off the main thread one snapshot at a time, as ProgressSummaryRemoteDataSource does:
-        // a parallel executor could finish mapping an older snapshot last.
-        val executor = Dispatchers.Default.limitedParallelism(1).asExecutor()
-        val registration = document(uid).addSnapshotListener(executor, MetadataChanges.INCLUDE) { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
-            if (snapshot == null || (!snapshot.exists() && snapshot.metadata.isFromCache)) return@addSnapshotListener
-            trySend(snapshot.toScoringStateDto())
-        }
-        awaitClose { registration.remove() }
-    }
+    private fun observeAuthenticatedScoringState(uid: String): Flow<ScoringStateDto?> = document(uid).snapshotFlow(
+        metadataChanges = MetadataChanges.INCLUDE,
+        skipSnapshot = { snapshot -> snapshot == null || (!snapshot.exists() && snapshot.metadata.isFromCache) },
+        mapSnapshot = { snapshot -> requireNotNull(snapshot).toScoringStateDto() },
+    )
 
     private fun DocumentSnapshot.toScoringStateDto(): ScoringStateDto? {
         if (!exists()) return null

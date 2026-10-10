@@ -148,3 +148,7 @@ Further accepted inaccuracy, alongside the double counts listed under Consequenc
   reaches the device, the entry stays queued until a later drain succeeds. A live listener sees the new
   server state at once and replays the session over it, so the Level counts it twice until that drain
   removes it.
+- **One repeated value before sign-out completes.** Between sign-out and the permission-denied
+  teardown, a queue change can re-emit the same User's last value once. The screen is already leaving.
+- **Two screens can briefly disagree.** Each collector has its own listener and replays the same
+  snapshots, so two open screens (Home under the Summary) differ only while one is mid-replay.
