@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.domain.usecase.CheckInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 class LoginViewModel @Inject constructor(
     private val signInWithGoogle: SignInWithGoogleUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
+    private val checkInternetAvailability: CheckInternetAvailabilityUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginScreenState())
@@ -78,7 +80,12 @@ class LoginViewModel @Inject constructor(
     private fun handleSignInFailure(error: Throwable) {
         _state.update { it.copy(phase = Idle) }
         if (error.isGoogleSignInCancellation()) return
-        loge(error) { "Sign-in failed" }
-        _messages.tryEmit(SignInFailed(error.toLoginFailureReason()))
+        viewModelScope.launch {
+            // Read after the failure, not before the picker opens, so a wrong "offline" reading can
+            // never block the picker.
+            val isInternetAvailable = checkInternetAvailability()
+            loge(error) { "Sign-in failed, internet available: $isInternetAvailable" }
+            _messages.tryEmit(SignInFailed(error.toLoginFailureReason(isInternetAvailable)))
+        }
     }
 }

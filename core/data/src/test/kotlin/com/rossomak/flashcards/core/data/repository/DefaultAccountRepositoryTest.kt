@@ -53,7 +53,7 @@ class DefaultAccountRepositoryTest {
         authRemoteDataSource = authRemoteDataSource,
         accountDeletionMarkerLocalDataSource = accountDeletionMarkerLocalDataSource,
         deletedAccountQueuePurger = DeletedAccountQueuePurger(pendingSessionSubmissionLocalDataSource, deadLetters),
-        networkAvailability = { isInternetAvailable },
+        networkAvailabilityGateway = { isInternetAvailable },
     )
 
     @Test

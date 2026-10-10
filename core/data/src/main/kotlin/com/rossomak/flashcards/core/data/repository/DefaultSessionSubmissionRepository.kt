@@ -4,7 +4,6 @@ import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.SessionSubmissionDrainScheduler
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
-import com.rossomak.flashcards.core.data.network.NetworkAvailability
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.worker.sessionDeliveryStatusOf
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus
@@ -12,6 +11,7 @@ import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.repository.AuthRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository
 import java.util.UUID
 import javax.inject.Inject
@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.mapNotNull
  *
  * The returned flow reports this one session's delivery, read off the drain run's WorkManager state:
  * - [NotDelivered] at once when the session could not be queued (no signed-in User, a failed local
- *   write) or when [networkAvailability] reports no internet. Offline, the drain still waits for the
+ *   write) or when [networkAvailabilityGateway] reports no internet. Offline, the drain still waits for the
  *   network and delivers the session later; only the report ends early.
  * - Otherwise [InFlight], then the first final status the run reports for this session (see
  *   [sessionDeliveryStatusOf]).
@@ -47,12 +47,12 @@ class DefaultSessionSubmissionRepository @Inject constructor(
     private val localDataSource: PendingSessionSubmissionLocalDataSource,
     private val drainScheduler: SessionSubmissionDrainScheduler,
     private val authRepository: AuthRepository,
-    private val networkAvailability: NetworkAvailability,
+    private val networkAvailabilityGateway: NetworkAvailabilityGateway,
 ) : SessionSubmissionRepository {
 
     override suspend fun submitSession(sessionResult: SessionResult): Flow<SessionDeliveryStatus> {
         val requestId = queue(sessionResult) ?: return flowOf(NotDelivered)
-        if (!networkAvailability.isInternetAvailable()) {
+        if (!networkAvailabilityGateway.isInternetAvailable()) {
             logd { "Session ${sessionResult.id} queued with no internet, it is delivered once the network returns" }
             return flowOf(NotDelivered)
         }

@@ -6,10 +6,13 @@ import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
+import com.rossomak.flashcards.core.domain.usecase.CheckInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoConnection
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
 import com.rossomak.flashcards.feature.auth.LoginMessage.SignInFailed
@@ -18,6 +21,10 @@ import com.rossomak.flashcards.feature.auth.LoginPhase.SignedIn
 import com.rossomak.flashcards.feature.auth.LoginPhase.SigningIn
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -32,6 +39,9 @@ class LoginViewModelTest {
 
     private val authRepository = FakeAuthRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
+    private val networkAvailabilityGateway = mockk<NetworkAvailabilityGateway> {
+        every { isInternetAvailable() } returns true
+    }
 
     private val testUser = AuthUser("u1", "a@b.com", "Alex", null)
 
@@ -41,6 +51,7 @@ class LoginViewModelTest {
         return LoginViewModel(
             SignInWithGoogleUseCase(authRepository),
             ObserveUserPreferencesUseCase(userPreferencesRepository),
+            CheckInternetAvailabilityUseCase(networkAvailabilityGateway),
         )
     }
 
@@ -99,6 +110,8 @@ class LoginViewModelTest {
             }
             viewModel.state.value.phase shouldBe Idle
             viewModel.events.test { expectNoEvents() }
+
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
         }
 
     @Test
@@ -114,6 +127,8 @@ class LoginViewModelTest {
             }
             viewModel.state.value.phase shouldBe Idle
             viewModel.events.test { expectNoEvents() }
+
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
         }
 
     @Test
@@ -125,6 +140,8 @@ class LoginViewModelTest {
 
             awaitItem() shouldBe SignInFailed(Unknown)
         }
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
     }
 
     @Test
@@ -140,6 +157,8 @@ class LoginViewModelTest {
         }
         viewModel.state.value.phase shouldBe Idle
         viewModel.events.test { expectNoEvents() }
+
+        verify(exactly = 0) { networkAvailabilityGateway.isInternetAvailable() }
     }
 
     @Test
@@ -155,6 +174,8 @@ class LoginViewModelTest {
         }
         viewModel.state.value.phase shouldBe Idle
         viewModel.events.test { expectNoEvents() }
+
+        verify(exactly = 0) { networkAvailabilityGateway.isInternetAvailable() }
     }
 
     @Test
@@ -177,6 +198,112 @@ class LoginViewModelTest {
         viewModel.messages.test {
             expectNoEvents()
         }
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `an offline no-credential failure emits NoConnection rather than NoCredentialAvailable`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { networkAvailabilityGateway.isInternetAvailable() } returns false
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onGoogleSignInResult(Result.failure(NoCredentialException()))
+
+                awaitItem() shouldBe SignInFailed(NoConnection)
+            }
+
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+        }
+
+    @Test
+    fun `an offline unrelated failure emits NoConnection`() = runTest(mainDispatcherRule.testDispatcher) {
+        every { networkAvailabilityGateway.isInternetAvailable() } returns false
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.failure(IllegalStateException(NETWORK_DOWN_MESSAGE)))
+
+            awaitItem() shouldBe SignInFailed(NoConnection)
+        }
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `an online IOException failure emits NoConnection`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.failure(IOException(NETWORK_DOWN_MESSAGE)))
+
+            awaitItem() shouldBe SignInFailed(NoConnection)
+        }
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `an account picker failure caused by an IOException emits NoConnection`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onGoogleSignInResult(Result.failure(IllegalStateException(IOException(NETWORK_DOWN_MESSAGE))))
+
+                awaitItem() shouldBe SignInFailed(NoConnection)
+            }
+
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+        }
+
+    @Test
+    fun `a token exchange failure caused by an IOException emits NoConnection`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.signInResult = Result.failure(IllegalStateException(IOException(NETWORK_DOWN_MESSAGE)))
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
+
+            awaitItem() shouldBe SignInFailed(NoConnection)
+        }
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `an offline dismissed account picker emits nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        every { networkAvailabilityGateway.isInternetAvailable() } returns false
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.failure(GetCredentialCancellationException()))
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+
+        verify(exactly = 0) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `a failure stops signing in before connectivity is checked`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        var phaseAtCheck: LoginPhase? = null
+        every { networkAvailabilityGateway.isInternetAvailable() } answers {
+            phaseAtCheck = viewModel.state.value.phase
+            true
+        }
+        viewModel.onGoogleSignInStarted()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.failure(NoCredentialException()))
+
+            awaitItem() shouldBe SignInFailed(NoCredentialAvailable)
+        }
+        phaseAtCheck shouldBe Idle
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
     }
 
     private companion object {

@@ -3,5 +3,6 @@
     <string name="login_google_signin_button">Sign in with Google</string>
     <string name="login_signing_in_label">Signing in…</string>
     <string name="login_no_credential_error">Couldn’t use a Google account. Make sure one is added in Settings → Accounts, then try again.</string>
+    <string name="login_no_connection_error">No internet connection. Check your connection and try again.</string>
     <string name="login_signin_error">Sign-in failed. Please try again.</string>
 </resources>

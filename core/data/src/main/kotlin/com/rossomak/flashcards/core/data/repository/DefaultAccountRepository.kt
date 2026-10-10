@@ -3,10 +3,10 @@ package com.rossomak.flashcards.core.data.repository
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.functions.FirebaseFunctionsException.Code.DEADLINE_EXCEEDED
 import com.google.firebase.functions.FirebaseFunctionsException.Code.UNAVAILABLE
+import com.rossomak.flashcards.core.common.isConnectionFailure
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logi
-import com.rossomak.flashcards.core.data.network.NetworkAvailability
 import com.rossomak.flashcards.core.data.source.AccountDeletionMarkerLocalDataSource
 import com.rossomak.flashcards.core.data.source.AccountDeletionRemoteDataSource
 import com.rossomak.flashcards.core.data.source.AuthRemoteDataSource
@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.model.AccountDeletionResult
 import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Deleted
 import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Failed
 import com.rossomak.flashcards.core.domain.repository.AccountRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -37,7 +38,7 @@ class DefaultAccountRepository @Inject constructor(
     private val authRemoteDataSource: AuthRemoteDataSource,
     private val accountDeletionMarkerLocalDataSource: AccountDeletionMarkerLocalDataSource,
     private val deletedAccountQueuePurger: DeletedAccountQueuePurger,
-    private val networkAvailability: NetworkAvailability,
+    private val networkAvailabilityGateway: NetworkAvailabilityGateway,
 ) : AccountRepository {
 
     override suspend fun deleteAccount(): AccountDeletionResult {
@@ -45,7 +46,7 @@ class DefaultAccountRepository @Inject constructor(
             loge { "Account deletion not started: nobody is signed in" }
             return Failed(ServiceError)
         }
-        if (!networkAvailability.isInternetAvailable()) {
+        if (!networkAvailabilityGateway.isInternetAvailable()) {
             logd { "Account deletion not started: no internet" }
             return Failed(NoConnection)
         }
