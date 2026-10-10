@@ -13,6 +13,9 @@ import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
 import com.rossomak.flashcards.feature.auth.LoginMessage.SignInFailed
+import com.rossomak.flashcards.feature.auth.LoginPhase.Idle
+import com.rossomak.flashcards.feature.auth.LoginPhase.SignedIn
+import com.rossomak.flashcards.feature.auth.LoginPhase.SigningIn
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -68,6 +71,21 @@ class LoginViewModelTest {
         }
 
     @Test
+    fun `a token result with successful sign-in ends signed in rather than idle`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.signInResult = Result.success(testUser)
+            val viewModel = createViewModel()
+            viewModel.onGoogleSignInStarted()
+
+            viewModel.events.test {
+                viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
+
+                awaitItem() shouldBe Main
+            }
+            viewModel.state.value.phase shouldBe SignedIn
+        }
+
+    @Test
     fun `a token result with failed sign-in emits an Unknown failure message and stops signing in`() =
         runTest(mainDispatcherRule.testDispatcher) {
             authRepository.signInResult = Result.failure(IllegalStateException(NETWORK_DOWN_MESSAGE))
@@ -79,7 +97,7 @@ class LoginViewModelTest {
 
                 awaitItem() shouldBe SignInFailed(Unknown)
             }
-            viewModel.state.value.isSigningIn shouldBe false
+            viewModel.state.value.phase shouldBe Idle
             viewModel.events.test { expectNoEvents() }
         }
 
@@ -94,7 +112,7 @@ class LoginViewModelTest {
 
                 awaitItem() shouldBe SignInFailed(NoCredentialAvailable)
             }
-            viewModel.state.value.isSigningIn shouldBe false
+            viewModel.state.value.phase shouldBe Idle
             viewModel.events.test { expectNoEvents() }
         }
 
@@ -120,7 +138,7 @@ class LoginViewModelTest {
 
             expectNoEvents()
         }
-        viewModel.state.value.isSigningIn shouldBe false
+        viewModel.state.value.phase shouldBe Idle
         viewModel.events.test { expectNoEvents() }
     }
 
@@ -135,7 +153,7 @@ class LoginViewModelTest {
 
             expectNoEvents()
         }
-        viewModel.state.value.isSigningIn shouldBe false
+        viewModel.state.value.phase shouldBe Idle
         viewModel.events.test { expectNoEvents() }
     }
 
@@ -145,7 +163,7 @@ class LoginViewModelTest {
 
         viewModel.onGoogleSignInStarted()
 
-        viewModel.state.value.isSigningIn shouldBe true
+        viewModel.state.value.phase shouldBe SigningIn
     }
 
     @Test

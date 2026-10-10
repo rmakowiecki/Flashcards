@@ -26,6 +26,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -192,6 +193,8 @@ private fun OnboardingContent(
     // Both progressions stay at 1f afterwards, so the chrome is simply visible on every later step.
     val copyReveal = remember { Animatable(0f) }
     val chromeReveal = remember { Animatable(0f) }
+    // Read once it flips, not on every frame of the reveal.
+    val hasChromeStartedRevealing by remember { derivedStateOf { chromeReveal.value > 0f } }
     val isInspecting = LocalInspectionMode.current
     LaunchedEffect(Unit) {
         if (isInspecting) {
@@ -243,7 +246,7 @@ private fun OnboardingContent(
                 revealProgress = chromeReveal.value,
                 // Invisible while the entrance is still running, so it cannot be tapped before it
                 // has been shown.
-                enabled = !state.isCommitting && chromeReveal.value > 0f,
+                enabled = !state.isCommitting && hasChromeStartedRevealing,
                 onClick = {
                     if (currentStep == OnboardingStep.LAST) {
                         actions.onFinish()
