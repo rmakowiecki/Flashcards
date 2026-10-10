@@ -44,18 +44,18 @@ Formula: `ceil(base × level^exponent / 1000) × 1000`, where `base` and `expone
 
 ## Level-up rewards
 
-- Confetti/celebration animation on the Progress screen, and on the Session Summary screen when the level-up happened during that session
+- Confetti/celebration animation on the Progress screen, and (designed, not built yet) on the Session Summary screen when the level-up happened during that session
 - Milestone badges unlocked at levels 5, 10, 25, 50, 100 — displayed on the Progress screen
 - Badge/achievement system detail: deferred to a separate design session
 - No XP burst on level-up (keeps the curve clean)
 
 ## Session Summary XP presentation
 
-XP is calculated **on the Session Summary screen**, from the session result and the `XpConfig` snapshot the session carried, and written to Firestore there as the `xpBreakdown` map on the session document ([Session Stats & Data Model](session-stats-data-model.md)), as part of the single session-commit batch ([ADR-0014](../adr/0014-session-stats-written-at-summary-screen.md)). The screen shows an itemized breakdown as a sequential "pour" animation in the dark header zone (after the mastery ring sweep for Rated sessions).
+XP is calculated **on the Session Summary screen**, from the session result and the `XpConfig` snapshot the session carried, and written to Firestore there as the `xpBreakdown` map on the session document ([Session Stats & Data Model](session-stats-data-model.md)), as part of the single session-commit batch ([ADR-0014](../adr/0014-session-stats-written-at-summary-screen.md)). The screen shows the total with an info button that opens the itemized breakdown in a dialog: one row per source (icon, label, `{N} × {rate} = {amount} XP`) and the total. The sequential "pour" animation below is designed but not built yet: it will be a motion layer over that settled screen.
 
 **The animation renders `xpBreakdown`'s stored values, never a recomputation.** For a freshly-finished session this is the config in force right now; for a past session reopened later it is whatever was actually awarded, even if `XpConfig` has since changed. The `{N} × {rate}` notation below is illustrative — it shows the count and the rate that produced the figure — but the figure itself always comes from the stored field, so a later config change can never make an old Summary's total drift from what was actually committed.
 
-### Animation sequence
+### Animation sequence (designed, not built)
 
 1. **Total XP counter** appears prominently at top, starting at 0, counting up to the stored `xpTotal`.
 2. First **item tile** slides up from below into view, showing a math equation built from the stored `xpBreakdown` fields:
@@ -78,8 +78,8 @@ XP is calculated **on the Session Summary screen**, from the session result and 
 - Items worth 0 XP are omitted entirely
 - De-mastery items use error color (red) for the equation and the pour
 - `Session Completed` omitted for abandoned sessions
-- For Rated sessions, the mastery ring sweep plays **before** the XP pour begins
-- For Fast sessions, the pour begins immediately (no ring phase)
+- Lines appear in a fixed order: New Cards, Card Mastery, Partial, Mastery Defense, De-mastery, Time Studied, Streak, Session Completed, Daily Goal
+- A Fast session has no Rated-only lines
 
 ## Firestore storage
 
