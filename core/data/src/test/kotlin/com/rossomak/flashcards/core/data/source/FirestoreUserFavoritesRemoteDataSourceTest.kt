@@ -12,6 +12,7 @@ import com.google.firebase.firestore.EventListener
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -46,7 +47,7 @@ class FirestoreUserFavoritesRemoteDataSourceTest {
         val listenerSlot = slot<EventListener<DocumentSnapshot>>()
         val user: FirebaseUser = mockk { every { uid } returns USER_ID }
         val document: DocumentReference = mockk {
-            every { addSnapshotListener(any<Executor>(), capture(listenerSlot)) } returns mockk<ListenerRegistration>(relaxed = true)
+            every { addSnapshotListener(any<Executor>(), any<MetadataChanges>(), capture(listenerSlot)) } returns mockk<ListenerRegistration>(relaxed = true)
         }
         every { firebaseAuth.currentUser } returns user
         every { firestore.document("users/$USER_ID/favorites/state") } returns document

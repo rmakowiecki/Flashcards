@@ -6,11 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.rossomak.flashcards.core.data.model.ProgressSummaryDto
 import com.rossomak.flashcards.core.data.model.SubcategoryProgressSummaryDto
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 
@@ -33,26 +29,14 @@ class ProgressSummaryRemoteDataSource @Inject constructor(
      * No authenticated user (e.g. collection starting right after sign-out) completes silently
      * instead of registering a listener — mirrors the PERMISSION_DENIED-during-sign-out teardown
      * path. Captured once here rather than reread later, so a sign-out racing the flow's launch
-     * can't throw partway into the `callbackFlow` builder.
+     * can't throw partway into the [snapshotFlow] builder.
      */
     fun observeSummary(): Flow<ProgressSummaryDto?> = flow {
         val uid = firebaseAuth.currentUser?.uid ?: return@flow
         emitAll(observeAuthenticatedSummary(uid))
     }
 
-    private fun observeAuthenticatedSummary(uid: String): Flow<ProgressSummaryDto?> = callbackFlow {
-        // Delivered off the main thread so the snapshot-to-DTO mapping never costs a UI frame, one
-        // snapshot at a time: Firestore submits every snapshot to the executor separately, so a
-        // parallel one could finish mapping an older snapshot last and leave it as the latest value.
-        val registration = document(uid).addSnapshotListener(Dispatchers.Default.limitedParallelism(1).asExecutor()) { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
-            trySend(snapshot.toSummaryDto())
-        }
-        awaitClose { registration.remove() }
-    }
+    private fun observeAuthenticatedSummary(uid: String): Flow<ProgressSummaryDto?> = document(uid).snapshotFlow { snapshot -> snapshot.toSummaryDto() }
 
     @Suppress("UNCHECKED_CAST")
     private fun DocumentSnapshot?.toSummaryDto(): ProgressSummaryDto? {

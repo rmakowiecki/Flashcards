@@ -9,6 +9,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.EventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.rossomak.flashcards.core.data.model.RecentSessionEntryDto
 import com.rossomak.flashcards.core.data.model.RecentsStateDto
 import io.kotest.matchers.shouldBe
@@ -106,13 +107,13 @@ class FirestoreRecentsRemoteDataSourceTest {
 
     private fun verifyListenerRegistered() {
         verify(exactly = 1) { firestore.document("users/$USER_ID/recents/state") }
-        verify(exactly = 1) { document.addSnapshotListener(any<Executor>(), any()) }
+        verify(exactly = 1) { document.addSnapshotListener(any<Executor>(), any<MetadataChanges>(), any<EventListener<DocumentSnapshot>>()) }
     }
 
     private fun listenToRecentsDocument(): CapturingSlot<EventListener<DocumentSnapshot>> {
         val listenerSlot = slot<EventListener<DocumentSnapshot>>()
         val user: FirebaseUser = mockk { every { uid } returns USER_ID }
-        every { document.addSnapshotListener(any<Executor>(), capture(listenerSlot)) } returns mockk<ListenerRegistration>(relaxed = true)
+        every { document.addSnapshotListener(any<Executor>(), any<MetadataChanges>(), capture(listenerSlot)) } returns mockk<ListenerRegistration>(relaxed = true)
         every { firebaseAuth.currentUser } returns user
         every { firestore.document("users/$USER_ID/recents/state") } returns document
         return listenerSlot
