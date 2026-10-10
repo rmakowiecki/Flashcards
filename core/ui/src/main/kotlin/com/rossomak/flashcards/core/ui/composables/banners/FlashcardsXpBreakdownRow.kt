@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone.Gain
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone.Loss
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
@@ -55,6 +56,10 @@ private const val LOSS_BORDER_ALPHA = 0.5f
  * belong to the feature's string resources: the three rules mocked so far already have three
  * different sentence shapes, so a structured API would need a formula enum on day one.
  *
+ * [size] [FlashcardsComponentSize.Small] is the compact variant for a long list: tighter padding and
+ * a smaller value line, so a dozen rows still fit above the fold. The default leaves every other
+ * caller unchanged.
+ *
  * The row does not size itself — pass `Modifier.fillMaxWidth()` from the call site.
  */
 @Composable
@@ -64,7 +69,9 @@ fun FlashcardsXpBreakdownRow(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     tone: FlashcardsXpBreakdownTone = Gain,
+    size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
 ) {
+    val compact = size == FlashcardsComponentSize.Small
     val brandColors = MaterialTheme.brandColors
     val semanticColors = MaterialTheme.semanticColors
     val containerColor = when (tone) {
@@ -89,8 +96,8 @@ fun FlashcardsXpBreakdownRow(
     ) {
         Row(
             modifier = Modifier.padding(
-                horizontal = MaterialTheme.spacing.normal,
-                vertical = MaterialTheme.spacing.small,
+                horizontal = if (compact) MaterialTheme.spacing.small else MaterialTheme.spacing.normal,
+                vertical = if (compact) MaterialTheme.spacing.xxsmall else MaterialTheme.spacing.small,
             ),
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             verticalAlignment = Alignment.CenterVertically,
@@ -105,11 +112,11 @@ fun FlashcardsXpBreakdownRow(
                 Text(
                     text = label,
                     color = contentColor,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                 )
                 Text(
                     text = value,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
