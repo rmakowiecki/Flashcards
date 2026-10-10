@@ -164,6 +164,9 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
      * Linking a Guest to a sign-in provider can leave the user's own `displayName`, `email` and
      * `photoUrl` empty while the provider entry holds them, so each field falls back to that entry. A
      * blank value counts as empty.
+     *
+     * `provider` is the first sign-in provider in `providerData`. That is the only one: an email maps to
+     * one account, so a sign-in or link that would add a second provider fails instead.
      */
     private fun FirebaseUser.toAuthUser(): AuthUser {
         val providerProfile = providerData.firstOrNull { it.providerId in SIGN_IN_PROVIDERS }
