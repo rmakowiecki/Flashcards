@@ -54,11 +54,13 @@ _Avoid_: History, Last session
 A transient, pre-link Firebase Anonymous Auth session — never a standing alternate identity, never a
 permanent or optional mode. Started only at the moment onboarding's final step is committed, and only
 if the user picked at least one Favorite, so a uid exists to write that pick under before real sign-in.
-Always resolves into a real **User** via `linkWithCredential` at Login, which keeps the same uid and
-everything written under it (e.g. the Favorite); on a linking collision (the credential is already
-tied to a different existing User — a returning user on a new device) the session and anything written
-under it are discarded outright, not merged. Sign-in stays mandatory: nothing reachable past onboarding
-treats a Guest as authenticated.
+Always resolves into a real **User** by linking the sign-in provider they pick at Login (Google or
+GitHub), which keeps the same uid and everything written under it (e.g. the Favorite). When that
+sign-in already belongs to a different existing User (a returning user on a new device), the session
+and anything written under it are discarded outright, not merged. When the provider's email already
+belongs to a User who signs in with the other provider, nothing is linked: the Guest stays a Guest and
+is told to use that provider. Sign-in stays mandatory: nothing reachable past onboarding treats a Guest
+as authenticated.
 _Avoid_: Anonymous user, Temp user
 
 **User**:
