@@ -76,7 +76,7 @@ The domain type describing what happened in one Study Session, of either Study M
 _Avoid_: Ledger (retired name), Outcome, Session outcome, Session record
 
 **Pending Session**:
-A finished Study Session, of either Study Mode and completed or abandoned, that is queued on the device for delivery to the server and not yet confirmed. It belongs to exactly one User, and counts toward that User's Card Progress, progress summary, XP, Level, Streak and Daily Goal as soon as it is queued, on that device. It stops being Pending once the server records it or rejects it.
+A finished Study Session, of either Study Mode and completed or abandoned, that is queued on the device for delivery to the server and not yet confirmed. It belongs to exactly one User, and counts toward that User's Card Progress, progress summary, XP, Level, Streak and Daily Goal as soon as it is queued, on that device. It stops being Pending once the server records it or rejects it. A Study Session with no Studied Flashcards is never queued and never becomes a Pending Session: leaving it returns to the Preview Study Session Screen with nothing recorded.
 _Avoid_: Offline session, Unsynced session, Queued submission
 
 **Flashcard Result**:

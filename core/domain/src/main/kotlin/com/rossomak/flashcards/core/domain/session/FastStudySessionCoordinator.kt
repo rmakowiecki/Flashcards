@@ -192,16 +192,23 @@ class FastStudySessionCoordinator @Inject constructor(
     }
 
     /**
-     * Seals the result exactly once and reports it as [FastSessionEvent.SessionEnded]. One
-     * [FlashcardResult.Fast] per Studied card, in first-seen order; leaving before the cards load
-     * seals empty card results with zero duration. Playback stops here, not at `onCleared`, so nothing
-     * is read while the screen navigates away.
+     * Ends the session exactly once. With at least one Studied card, seals the result and reports it as
+     * [FastSessionEvent.SessionEnded], with one [FlashcardResult.Fast] per Studied card in first-seen
+     * order. With none, whether the user left before the cards loaded or before any answer was revealed,
+     * or the deck finished without one, reports [FastSessionEvent.SessionDiscarded] and seals nothing.
+     * Playback stops here, not at `onCleared`, so nothing is read while the screen navigates away.
      */
     fun end(abandoned: Boolean) {
         if (hasEnded) return
         hasEnded = true
         stop()
+        // A failed load already sent the screen back to Preview.
+        if (_sessionState.value == FastSessionStateSnapshot.LoadFailed) return
         val cardResults = state?.let(::sealFastCardResults) ?: emptyList()
+        if (cardResults.isEmpty()) {
+            eventChannel.trySend(FastSessionEvent.SessionDiscarded)
+            return
+        }
         val result = timekeeper.seal { at ->
             SessionResult.Fast(
                 id = timekeeper.sessionId,
@@ -226,7 +233,7 @@ class FastStudySessionCoordinator @Inject constructor(
 
     private suspend fun load() {
         val sessionStartData = getSessionStartData(setup.subcategoryIds)
-        // Left before the cards arrived: the session already ended on its way to the Summary.
+        // Left before the cards arrived: the session was already discarded.
         if (hasEnded) return
         val flashcards = sessionStartData.flashcardsResult.getOrElse {
             _sessionState.value = FastSessionStateSnapshot.LoadFailed

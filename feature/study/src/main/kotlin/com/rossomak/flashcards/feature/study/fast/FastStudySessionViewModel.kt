@@ -10,7 +10,11 @@ import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot.Runnin
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
-import com.rossomak.flashcards.core.domain.session.FastSessionEvent
+import com.rossomak.flashcards.core.domain.session.FastSessionEvent.ExternalTransportCommand
+import com.rossomak.flashcards.core.domain.session.FastSessionEvent.PlayIgnoredDuringCall
+import com.rossomak.flashcards.core.domain.session.FastSessionEvent.SessionDiscarded
+import com.rossomak.flashcards.core.domain.session.FastSessionEvent.SessionEnded
+import com.rossomak.flashcards.core.domain.session.FastSessionEvent.VoicePlaybackUnavailable
 import com.rossomak.flashcards.core.domain.session.FastSessionSetup
 import com.rossomak.flashcards.core.domain.session.FastStudySessionCoordinator
 import com.rossomak.flashcards.core.domain.usecase.SubmitCurationReportUseCase
@@ -119,10 +123,11 @@ class FastStudySessionViewModel @Inject constructor(
         viewModelScope.launch {
             coordinator.events.collect { event ->
                 when (event) {
-                    FastSessionEvent.VoicePlaybackUnavailable -> _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
-                    FastSessionEvent.PlayIgnoredDuringCall -> _messages.tryEmit(FastStudySessionMessage.PlayIgnoredDuringCall)
-                    is FastSessionEvent.ExternalTransportCommand -> onExternalTransportCommand(event.command)
-                    is FastSessionEvent.SessionEnded -> eventChannel.send(FastStudySessionDestination.Summary(event.result.toSummaryRoute()))
+                    VoicePlaybackUnavailable -> _messages.tryEmit(FastStudySessionMessage.VoicePlaybackUnavailable)
+                    PlayIgnoredDuringCall -> _messages.tryEmit(FastStudySessionMessage.PlayIgnoredDuringCall)
+                    is ExternalTransportCommand -> onExternalTransportCommand(event.command)
+                    is SessionEnded -> eventChannel.send(FastStudySessionDestination.Summary(event.result.toSummaryRoute()))
+                    SessionDiscarded -> eventChannel.send(FastStudySessionDestination.Back)
                 }
             }
         }
