@@ -463,19 +463,6 @@ describe("submitStudySession", () => {
     }
   });
 
-  it("a retry of a session stored before rates were recorded omits rates and still returns every other field", async () => {
-    const uid = randomUUID();
-    const request = validateSubmitStudySessionRequest(rawRatedRequest());
-    const first = await submitStudySession(admin.firestore(), uid, request);
-    await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).update({ xpRates: admin.firestore.FieldValue.delete() });
-
-    const second = await submitStudySession(admin.firestore(), uid, request);
-
-    assert.equal("rates" in second, false, "rates must be absent, not a placeholder");
-    const { rates, ...firstWithoutRates } = first;
-    assert.deepEqual(second, firstWithoutRates);
-  });
-
   it("two concurrent submissions of the same not-yet-processed session award exactly once (the actual race the idempotency check exists for)", async () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
@@ -914,6 +901,146 @@ describe("submitStudySession — streak and daily goal", () => {
   });
 });
 
+describe("submitStudySession — Level position before the session and current Streak", () => {
+  // DEFAULT_XP_CONFIG thresholds: Level 1 needs 1000, Level 2 needs 6000, Level 3 needs 16000.
+  const LEVEL_1_THRESHOLD = 1000;
+  const LEVEL_2_THRESHOLD = 6000;
+  const DAY_BEFORE_DEFAULT_STUDY_DATE = "2026-08-31";
+
+  interface SeededScoringState {
+    xp: number;
+    level: number;
+    xpIntoCurrentLevel: number;
+    currentStreak: number;
+    lastStudyDate: string;
+    goalMetDate: string;
+  }
+
+  async function seedScoringState(uid: string, state: SeededScoringState): Promise<void> {
+    await admin
+      .firestore()
+      .doc(`users/${uid}/progress/user-stats`)
+      .set({ ...state, bestStreak: state.currentStreak, studiedSecondsOnLastStudyDate: 0 });
+  }
+
+  function masteredCardResults(count: number): Array<Record<string, unknown>> {
+    return Array.from({ length: count }, (_, index) => ({
+      cardId: `card-${index}`,
+      subcategoryId: "sub-1",
+      state: "Mastered",
+      attemptsUsed: 1,
+      wasPreviouslyMastered: false,
+    }));
+  }
+
+  it("a first commit returns the prior user-stats as the before fields and the new Streak, and stores them on the session document", async () => {
+    const uid = randomUUID();
+    await seedScoringState(uid, {
+      xp: 1300,
+      level: 2,
+      xpIntoCurrentLevel: 300,
+      currentStreak: 7,
+      lastStudyDate: DAY_BEFORE_DEFAULT_STUDY_DATE,
+      goalMetDate: "",
+    });
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    const result = await submitStudySession(admin.firestore(), uid, request);
+
+    assert.equal(result.levelBefore, 2);
+    assert.equal(result.xpIntoCurrentLevelBefore, 300);
+    assert.equal(result.xpForNextLevelBefore, LEVEL_2_THRESHOLD);
+    assert.equal(result.currentStreak, 8, "studying the day after continues the 7-day Streak");
+
+    const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get();
+    assert.equal(sessionDoc.data()?.levelBefore, 2);
+    assert.equal(sessionDoc.data()?.xpIntoCurrentLevelBefore, 300);
+    assert.equal(sessionDoc.data()?.xpForNextLevelBefore, LEVEL_2_THRESHOLD);
+    assert.equal(sessionDoc.data()?.currentStreakAfter, 8);
+  });
+
+  it("a new account's first session starts from Level 1 with no points and Level 1's threshold", async () => {
+    const result = await submitStudySession(admin.firestore(), randomUUID(), validateSubmitStudySessionRequest(rawRatedRequest()));
+
+    assert.equal(result.levelBefore, 1);
+    assert.equal(result.xpIntoCurrentLevelBefore, 0);
+    assert.equal(result.xpForNextLevelBefore, LEVEL_1_THRESHOLD);
+    assert.equal(result.currentStreak, 1);
+  });
+
+  it("a retry answers with the stored before fields and Streak even after another session moved user-stats on", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+    const first = await submitStudySession(admin.firestore(), uid, request);
+    await submitStudySession(
+      admin.firestore(),
+      uid,
+      validateSubmitStudySessionRequest(rawRatedRequest({ cardResults: masteredCardResults(3) })),
+    );
+
+    const retry = await submitStudySession(admin.firestore(), uid, request);
+
+    assert.deepEqual(retry, first);
+  });
+
+  it("a multi-Level crossing reports the before position and every Level crossed", async () => {
+    const uid = randomUUID();
+    await seedScoringState(uid, {
+      xp: 990,
+      level: 1,
+      xpIntoCurrentLevel: 990,
+      currentStreak: 0,
+      lastStudyDate: "",
+      goalMetDate: "",
+    });
+    const request = validateSubmitStudySessionRequest(rawRatedRequest({ cardResults: masteredCardResults(50) }));
+
+    const result = await submitStudySession(admin.firestore(), uid, request);
+
+    assert.equal(result.levelBefore, 1);
+    assert.equal(result.xpIntoCurrentLevelBefore, 990);
+    assert.equal(result.xpForNextLevelBefore, LEVEL_1_THRESHOLD);
+    assert.equal(result.level, 3);
+    assert.deepEqual(result.levelsCrossed, [2, 3]);
+    assert.equal(result.xpIntoCurrentLevel, 990 + result.breakdown.xpTotal - LEVEL_1_THRESHOLD - LEVEL_2_THRESHOLD);
+  });
+
+  it("a negative delta larger than the points into the Level clamps at the Level floor, never a lower Level", async () => {
+    const uid = randomUUID();
+    await seedScoringState(uid, {
+      xp: 1050,
+      level: 2,
+      xpIntoCurrentLevel: 50,
+      currentStreak: 3,
+      lastStudyDate: DEFAULT_STUDY_DATE,
+      goalMetDate: DEFAULT_STUDY_DATE,
+    });
+    await admin
+      .firestore()
+      .doc(`users/${uid}/progress/details/subcategories/sub-1`)
+      .set({ cards: { "card-0": { state: "Mastered" }, "card-1": { state: "Mastered" } } });
+    const request = validateSubmitStudySessionRequest(
+      rawRatedRequest({
+        abandoned: true,
+        cardResults: [
+          { cardId: "card-0", subcategoryId: "sub-1", state: "Failed", attemptsUsed: 3, wasPreviouslyMastered: true },
+          { cardId: "card-1", subcategoryId: "sub-1", state: "Failed", attemptsUsed: 3, wasPreviouslyMastered: true },
+        ],
+      }),
+    );
+
+    const result = await submitStudySession(admin.firestore(), uid, request);
+
+    assert.ok(result.breakdown.xpTotal < -50, "the session loses more than the 50 points into Level 2");
+    assert.equal(result.levelBefore, 2);
+    assert.equal(result.xpIntoCurrentLevelBefore, 50);
+    assert.equal(result.level, 2);
+    assert.equal(result.xpIntoCurrentLevel, 0);
+    assert.deepEqual(result.levelsCrossed, []);
+    assert.equal(result.currentStreak, 3, "a same-day session neither advances nor breaks the Streak");
+  });
+});
+
 // The only tests in the suite that write `config/xp`. Every other test above relies on that document
 // being absent (scoring with DEFAULT_XP_CONFIG), so each test here deletes it again afterwards.
 describe("submitStudySession — server-owned XP configuration", () => {
@@ -951,8 +1078,9 @@ describe("submitStudySession — server-owned XP configuration", () => {
     assert.equal(result.breakdown.streakBonus, CUSTOM_XP_CONFIG.streakPerDay);
     assert.equal(result.breakdown.xpTotal, 3 + 7 + 23 + 19 + 31);
     assert.equal(result.xpForNextLevel, 2000, "the level curve also comes from the document: ceil(2000 * 1^1 / 1000) * 1000");
-    assert.equal(result.rates?.cardMastered, CUSTOM_XP_CONFIG.cardMastered, "the returned rates are the document's, not the default");
-    assert.equal(result.rates?.minuteStudied, CUSTOM_XP_CONFIG.minuteStudied);
+    assert.equal(result.xpForNextLevelBefore, 2000, "the Level-before threshold uses the same document's curve");
+    assert.equal(result.rates.cardMastered, CUSTOM_XP_CONFIG.cardMastered, "the returned rates are the document's, not the default");
+    assert.equal(result.rates.minuteStudied, CUSTOM_XP_CONFIG.minuteStudied);
   });
 
   it("scores with the bundled default when the document is missing, and still succeeds", async () => {
