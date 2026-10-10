@@ -23,7 +23,7 @@ import java.time.ZoneId
 @Composable
 internal fun RecentSessionsSection(
     items: List<RecentItem>,
-    now: Instant,
+    now: () -> Instant,
     zoneId: ZoneId,
     onRecentClick: (RecentItem) -> Unit,
     modifier: Modifier = Modifier,
@@ -72,7 +72,7 @@ private fun RecentSessionsSectionPreviewHost() {
         Surface {
             RecentSessionsSection(
                 items = previewRecentItems,
-                now = previewRecentsNow,
+                now = { previewRecentsNow },
                 zoneId = previewRecentsZoneId,
                 onRecentClick = {},
             )

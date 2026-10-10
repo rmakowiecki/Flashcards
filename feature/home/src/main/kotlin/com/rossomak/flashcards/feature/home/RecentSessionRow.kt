@@ -19,7 +19,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -68,11 +71,16 @@ private const val OTHER_YEAR_DATE_SKELETON = "MMMdy"
 @Composable
 internal fun RecentSessionRow(
     item: RecentItem,
-    now: Instant,
+    now: () -> Instant,
     zoneId: ZoneId,
     onClick: () -> Unit,
     modifier: Modifier,
 ) {
+    // Reads now() inside derivedStateOf, so a tick recomposes this row only when its RecentRelativeTime changes.
+    val currentNow by rememberUpdatedState(now)
+    val relativeTime by remember(item.session.startedAt, zoneId) {
+        derivedStateOf { recentRelativeTime(item.session.startedAt, currentNow(), zoneId) }
+    }
     Row(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
@@ -102,7 +110,7 @@ internal fun RecentSessionRow(
         ) {
             RecentDeliveryIcons(session = item.session)
             Text(
-                text = recentRelativeTimeText(recentRelativeTime(item.session.startedAt, now, zoneId)),
+                text = recentRelativeTimeText(relativeTime),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -250,7 +258,7 @@ private fun RecentSessionRowPreviewHost(item: RecentItem) {
     FlashcardsTheme {
         RecentSessionRow(
             item = item,
-            now = previewRecentsNow,
+            now = { previewRecentsNow },
             zoneId = previewRecentsZoneId,
             onClick = {},
             modifier = Modifier,
