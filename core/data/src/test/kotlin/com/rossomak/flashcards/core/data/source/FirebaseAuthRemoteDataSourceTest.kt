@@ -53,6 +53,7 @@ class FirebaseAuthRemoteDataSourceTest {
     private fun prepareGitHubSignIn(guest: FirebaseUser? = null) {
         currentActivityHolder.onActivityResumed(activity)
         every { firebaseAuth.currentUser } returns guest
+        every { firebaseAuth.pendingAuthResult } returns null
         val builder: OAuthProvider.Builder = mockk()
         mockkStatic(OAuthProvider::class)
         every { OAuthProvider.newBuilder(GithubAuthProvider.PROVIDER_ID, firebaseAuth) } returns builder
@@ -500,6 +501,33 @@ class FirebaseAuthRemoteDataSourceTest {
         (result as SignedIn).user.uid shouldBe SIGNED_IN_UID
         result.user.provider shouldBe GitHub
         verify(exactly = 1) { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) }
+    }
+
+    @Test
+    fun `signInWithGitHub completes a pending result instead of starting a flow`() = runTest {
+        val guest = firebaseUser(uid = GUEST_UID, isAnonymous = true)
+        prepareGitHubSignIn(guest)
+        every { firebaseAuth.pendingAuthResult } returns
+            Tasks.forResult(authResultFor(firebaseUser(uid = SIGNED_IN_UID, providerData = listOf(githubProfile()))))
+
+        val result = createDataSource().signInWithGitHub()
+
+        (result as SignedIn).user.uid shouldBe SIGNED_IN_UID
+        result.user.provider shouldBe GitHub
+        verify(exactly = 0) { guest.startActivityForLinkWithProvider(any(), any()) }
+        verify(exactly = 0) { firebaseAuth.startActivityForSignInWithProvider(any(), any()) }
+    }
+
+    @Test
+    fun `signInWithGitHub maps a failed pending result like a fresh flow`() = runTest {
+        prepareGitHubSignIn()
+        every { firebaseAuth.pendingAuthResult } returns
+            Tasks.forException(collision(ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL, updatedCredential = null))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result shouldBe Failed(AccountExistsWithDifferentProvider)
+        verify(exactly = 0) { firebaseAuth.startActivityForSignInWithProvider(any(), any()) }
     }
 
     @Test

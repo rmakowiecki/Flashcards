@@ -52,6 +52,10 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
      * Firebase runs GitHub's OAuth flow in a Custom Tab and signs in directly, so no token comes back
      * first. Only the `user:email` scope is requested, so the primary email is known even when it is
      * private on GitHub. The GitHub access token Firebase returns is never read.
+     *
+     * The flow backgrounds the app, so the system can kill the process while the Custom Tab is open.
+     * Firebase keeps the result of such a flow in [FirebaseAuth.getPendingAuthResult], which is
+     * completed here instead of starting a second flow.
      */
     override suspend fun signInWithGitHub(): SignInResult {
         // Read before any suspension: the caller is on the main thread, where the holder is written.
@@ -59,7 +63,7 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
             loge { "GitHub sign-in failed: no resumed Activity to open the Custom Tab from" }
             return Failed(Unknown)
         }
-        val gitHubFlow = startGitHubFlow(activity)
+        val gitHubFlow = firebaseAuth.pendingAuthResult ?: startGitHubFlow(activity)
         return completeSignIn(
             attempt = { gitHubFlow.await() },
             signInAfterCredentialInUse = ::signInWithUpdatedCredential,

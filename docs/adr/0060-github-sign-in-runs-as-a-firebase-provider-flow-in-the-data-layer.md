@@ -48,6 +48,8 @@ is private on GitHub. The GitHub access token Firebase returns is never read or 
 - Firebase types stay inside `core:data`.
 - The holder is the only `Activity` access in the data layer. A future data-layer call that needs one
   reuses it rather than adding another path.
+- A GitHub result that outlives a killed process is completed by the User's next GitHub tap
+  (`pendingAuthResult`), not when Login opens.
 - `AuthUser.provider` is read from the first sign-in entry in `providerData`, which is the only one
   while Firebase's "one account per email" setting is on (its default). Turning it off would let a
   User hold both providers, and the order of `providerData` is undocumented.
