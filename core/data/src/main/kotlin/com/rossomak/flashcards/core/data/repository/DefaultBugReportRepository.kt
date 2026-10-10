@@ -4,6 +4,8 @@ import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.source.BugReportRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.BugReport
 import com.rossomak.flashcards.core.domain.model.BugReportFailureReason
+import com.rossomak.flashcards.core.domain.model.BugReportFailureReason.NoConnection
+import com.rossomak.flashcards.core.domain.model.BugReportFailureReason.ServiceError
 import com.rossomak.flashcards.core.domain.model.BugReportSubmissionResult
 import com.rossomak.flashcards.core.domain.repository.BugReportRepository
 import javax.inject.Inject
@@ -23,13 +25,13 @@ class DefaultBugReportRepository @Inject constructor(
         // The data source never returns null, so null means the time budget ran out.
         if (result == null) {
             loge { "Bug report submission exceeded $BUG_REPORT_TIME_BUDGET" }
-            return BugReportSubmissionResult.Failed(BugReportFailureReason.NoConnection)
+            return BugReportSubmissionResult.Failed(NoConnection)
         }
         return result.fold(
             onSuccess = { BugReportSubmissionResult.Sent },
             onFailure = { exception ->
                 loge(exception) { "Bug report submission failed" }
-                BugReportSubmissionResult.Failed(exception.toBugReportFailureReason())
+                BugReportSubmissionResult.Failed(exception.toFailureReason(NoConnection, ServiceError))
             },
         )
     }

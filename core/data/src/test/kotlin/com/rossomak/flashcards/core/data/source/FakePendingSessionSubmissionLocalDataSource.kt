@@ -33,5 +33,9 @@ class FakePendingSessionSubmissionLocalDataSource : PendingSessionSubmissionLoca
         entries.update { queued -> queued.filterNot { it.id == sessionId } }
     }
 
+    override suspend fun removeAllForUser(uid: String) {
+        entries.update { queued -> queued.filterNot { it.uid == uid } }
+    }
+
     override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = entries.asStateFlow()
 }

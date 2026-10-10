@@ -1,11 +1,16 @@
 package com.rossomak.flashcards.feature.account
 
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.NoConnection
+import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.ServiceError
+import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Deleted
+import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Failed
 import com.rossomak.flashcards.core.domain.model.AppVersion
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DeviceInfo
 import com.rossomak.flashcards.core.domain.model.InstallationInfo
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.usecase.DeleteAccountUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetAppVersionUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetInstallationInfoUseCase
@@ -16,7 +21,9 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
+import com.rossomak.flashcards.feature.account.AccountDialog.DeleteAccount
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
+import com.rossomak.flashcards.feature.account.AccountMessage.DeletionFailed
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import com.rossomak.flashcards.testutil.MainDispatcherRule
@@ -26,6 +33,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -42,6 +50,7 @@ class AccountViewModelTest {
         coEvery { this@mockk() } returns APP_VERSION
     }
     private val signOut: SignOutUseCase = mockk()
+    private val deleteAccount: DeleteAccountUseCase = mockk()
 
     private val getInstallationInfo: GetInstallationInfoUseCase = mockk {
         coEvery { this@mockk() } returns INSTALLATION_INFO
@@ -53,6 +62,7 @@ class AccountViewModelTest {
         getInstallationInfo = getInstallationInfo,
         getCurrentAuthUser = GetCurrentAuthUserUseCase(authRepository),
         signOut = signOutOverride,
+        deleteAccount = deleteAccount,
     )
 
     private fun authUser(
@@ -336,6 +346,118 @@ class AccountViewModelTest {
             email shouldBe USER_EMAIL
             photoUrl shouldBe USER_PHOTO_URL
         }
+    }
+
+    @Test
+    fun `a Delete account click opens the delete account dialog`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(DeleteAccount))
+
+        viewModel.state.value.activeDialog shouldBe DeleteAccount
+    }
+
+    @Test
+    fun `dismissing the delete account dialog deletes nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(DeleteAccount))
+        viewModel.onDialogEvent(Dismiss)
+        advanceUntilIdle()
+
+        viewModel.state.value.activeDialog shouldBe null
+        viewModel.state.value.isDeletingAccount shouldBe false
+        coVerify(exactly = 0) { deleteAccount() }
+    }
+
+    @Test
+    fun `confirming the deletion closes the dialog and shows the overlay while it runs`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { deleteAccount() } coAnswers { awaitCancellation() }
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(DeleteAccount))
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            activeDialog shouldBe null
+            isDeletingAccount shouldBe true
+        }
+        coVerify(exactly = 1) { deleteAccount() }
+    }
+
+    @Test
+    fun `a deleted account keeps the overlay and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { deleteAccount() } returns Deleted
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onDialogEvent(Open(DeleteAccount))
+            viewModel.onDialogEvent(Confirm)
+
+            awaitItem() shouldBe AccountDestination.Login
+        }
+        viewModel.state.value.isDeletingAccount shouldBe true
+        coVerify(exactly = 1) { deleteAccount() }
+    }
+
+    @Test
+    fun `a deletion with no connection hides the overlay and emits the no connection message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { deleteAccount() } returns Failed(NoConnection)
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onDialogEvent(Open(DeleteAccount))
+                viewModel.onDialogEvent(Confirm)
+
+                awaitItem() shouldBe DeletionFailed(NoConnection)
+            }
+            viewModel.state.value.isDeletingAccount shouldBe false
+            coVerify(exactly = 1) { deleteAccount() }
+        }
+
+    @Test
+    fun `a deletion the service failed hides the overlay and emits the failure message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { deleteAccount() } returns Failed(ServiceError)
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onDialogEvent(Open(DeleteAccount))
+                viewModel.onDialogEvent(Confirm)
+
+                awaitItem() shouldBe DeletionFailed(ServiceError)
+            }
+            viewModel.state.value.isDeletingAccount shouldBe false
+            coVerify(exactly = 1) { deleteAccount() }
+        }
+
+    @Test
+    fun `a double confirm deletes once`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { deleteAccount() } coAnswers { awaitCancellation() }
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(DeleteAccount))
+        viewModel.onDialogEvent(Confirm)
+        viewModel.onDialogEvent(Confirm)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { deleteAccount() }
+    }
+
+    @Test
+    fun `dialogs cannot open while the account is being deleted`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { deleteAccount() } coAnswers { awaitCancellation() }
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(DeleteAccount))
+        viewModel.onDialogEvent(Confirm)
+        viewModel.onDialogEvent(Open(SignOut))
+        advanceUntilIdle()
+
+        viewModel.state.value.activeDialog shouldBe null
+        coVerify(exactly = 1) { deleteAccount() }
     }
 
     private companion object {
