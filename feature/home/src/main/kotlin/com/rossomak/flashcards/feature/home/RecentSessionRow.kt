@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -39,6 +38,8 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
+import com.rossomak.flashcards.core.ui.format.currentLocale
+import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
@@ -50,15 +51,12 @@ import com.rossomak.flashcards.feature.home.RecentRelativeTime.MinutesAgo
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.OtherYearDate
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.ThisYearDate
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.Yesterday
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.absoluteValue
 
 private const val SECONDS_PER_MINUTE = 60
-private const val MINUS_SIGN = '−'
 private const val THIS_YEAR_DATE_SKELETON = "MMMd"
 private const val OTHER_YEAR_DATE_SKELETON = "MMMdy"
 
@@ -175,16 +173,6 @@ private fun RecentStatPills(session: RecentSession) {
     }
 }
 
-/** `+N`, `−N` (real minus sign) or `0`. */
-private fun formatSignedXp(xpTotal: Int, locale: Locale): String {
-    val magnitude = NumberFormat.getIntegerInstance(locale).format(xpTotal.toLong().absoluteValue)
-    return when {
-        xpTotal > 0 -> "+$magnitude"
-        xpTotal < 0 -> "$MINUS_SIGN$magnitude"
-        else -> magnitude
-    }
-}
-
 @Composable
 private fun RecentDeliveryIcons(session: RecentSession) {
     Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall)) {
@@ -238,9 +226,6 @@ private fun recentRelativeTimeText(relativeTime: RecentRelativeTime): String {
 
 private fun localizedDateFormatter(skeleton: String, locale: Locale): DateTimeFormatter =
     DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale)
-
-@Composable
-private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
 
 @PreviewLightDark
 @Composable

@@ -8,11 +8,10 @@ package com.rossomak.flashcards.feature.study.summary
 sealed interface StudySessionSummaryMessage {
 
     /**
-     * The local XP preview, needed because the server's score did not arrive in time, could not be
-     * computed: a failed read of this account's prior card progress or scoring state
-     * ([com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s own local reads). The
-     * session is still queued for delivery either way. The screen's counts stay populated regardless;
-     * only the XP fields fall back to their zero defaults.
+     * No XP could be calculated for this session: neither the server's score arrived nor could the
+     * local preview be computed, because a read of this account's prior card progress or scoring
+     * state failed. The session itself is saved and queued for delivery either way; only the XP
+     * figures are missing, so the screen shows no numbers for them.
      */
-    data object SaveFailed : StudySessionSummaryMessage
+    data object XpUnavailable : StudySessionSummaryMessage
 }
