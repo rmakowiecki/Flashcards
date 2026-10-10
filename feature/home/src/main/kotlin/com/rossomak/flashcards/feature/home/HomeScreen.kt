@@ -1,8 +1,11 @@
 package com.rossomak.flashcards.feature.home
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -14,29 +17,31 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.Category
-import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
-import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
-import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
 import com.rossomak.flashcards.feature.home.HomeBody.LoadError
@@ -50,17 +55,9 @@ import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewSt
 import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Carousel
 import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Hint
 import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Omitted as FavoritesOmitted
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading as FavoritesLoading
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
-import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
-import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
-import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
-import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.time.Duration.Companion.minutes
@@ -161,13 +158,14 @@ fun HomeScreen(
 }
 
 /**
- * Renders [HomeScreenState.body] and nothing else, so what shows is decided in one place.
+ * Renders the Level card, then [HomeScreenState.body], in one scrolling column, so what shows below the card is
+ * decided in one place.
  *
  * @param now what Recents' start times are worded against; [HomeScreen] ticks it once a minute.
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
-private fun HomeContent(
+internal fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeScreenState,
     now: Instant,
@@ -182,52 +180,86 @@ private fun HomeContent(
     onRetry: () -> Unit,
 ) {
     // No top app bar: MainScreen leaves each tab root to pad for the status bar itself.
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding(),
+    ) {
+        val density = LocalDensity.current
+        val scrollState = rememberScrollState()
+        var levelCardHeightPx by remember { mutableIntStateOf(0) }
+        // verticalScroll gives its content an unbounded height, so a weight(1f) area would collapse instead of
+        // filling what the card leaves of the viewport. The area takes that space as a minimum height instead,
+        // and grows (and the screen scrolls) when its content is taller.
+        val belowCardMinHeight = (maxHeight - with(density) { levelCardHeightPx.toDp() }).coerceAtLeast(0.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .flashcardsScrollFade(scrollState)
+                .verticalScroll(scrollState),
+        ) {
+            HomeLevelCard(
+                state = state.levelCard,
+                modifier = Modifier.onSizeChanged { levelCardHeightPx = it.height },
+            )
+            when (val body = state.body) {
+                Resolving -> Unit
+
+                FirstSession -> CenteredBelowCard(minHeight = belowCardMinHeight) {
+                    FlashcardsEmptyState(
+                        icon = Icons.AutoMirrored.Filled.MenuBook,
+                        title = stringResource(R.string.home_empty_title),
+                        supportingText = stringResource(R.string.home_empty_message),
+                        button = {
+                            FlashcardsFilledButton(text = stringResource(R.string.home_empty_start_button), onClick = onBrowseClick)
+                        },
+                    )
+                }
+
+                LoadError -> CenteredBelowCard(minHeight = belowCardMinHeight) {
+                    FlashcardsEmptyState(
+                        icon = Icons.Filled.CloudOff,
+                        title = stringResource(R.string.home_error_title),
+                        supportingText = stringResource(R.string.home_error_message),
+                        tone = FlashcardsEmptyStateTone.Error,
+                        button = {
+                            FlashcardsFilledButton(
+                                text = stringResource(CoreUiR.string.common_retry_button),
+                                onClick = onRetry,
+                                icon = Icons.Filled.Refresh,
+                            )
+                        },
+                    )
+                }
+
+                is Sections -> HomeSections(
+                    sections = body,
+                    progressSummary = state.progressSummary,
+                    isProgressResolved = state.isProgressResolved,
+                    now = now,
+                    zoneId = zoneId,
+                    onCategoryClick = onCategoryClick,
+                    onCategoryQuickSessionClick = onCategoryQuickSessionClick,
+                    onSubcategoryClick = onSubcategoryClick,
+                    onSubcategoryPlayClick = onSubcategoryPlayClick,
+                    onRecentClick = onRecentClick,
+                    onFavoritesHintHide = onFavoritesHintHide,
+                )
+            }
+        }
+    }
+}
+
+/** Centers [content] in the viewport space the Level card leaves; see [HomeContent] for why it is a minimum height. */
+@Composable
+private fun CenteredBelowCard(minHeight: Dp, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight),
         contentAlignment = Alignment.Center,
     ) {
-        when (val body = state.body) {
-            Resolving -> Unit
-
-            FirstSession -> FlashcardsEmptyState(
-                icon = Icons.AutoMirrored.Filled.MenuBook,
-                title = stringResource(R.string.home_empty_title),
-                supportingText = stringResource(R.string.home_empty_message),
-                button = {
-                    FlashcardsFilledButton(text = stringResource(R.string.home_empty_start_button), onClick = onBrowseClick)
-                },
-            )
-
-            LoadError -> FlashcardsEmptyState(
-                icon = Icons.Filled.CloudOff,
-                title = stringResource(R.string.home_error_title),
-                supportingText = stringResource(R.string.home_error_message),
-                tone = FlashcardsEmptyStateTone.Error,
-                button = {
-                    FlashcardsFilledButton(
-                        text = stringResource(CoreUiR.string.common_retry_button),
-                        onClick = onRetry,
-                        icon = Icons.Filled.Refresh,
-                    )
-                },
-            )
-
-            is Sections -> HomeSections(
-                sections = body,
-                progressSummary = state.progressSummary,
-                isProgressResolved = state.isProgressResolved,
-                now = now,
-                zoneId = zoneId,
-                onCategoryClick = onCategoryClick,
-                onCategoryQuickSessionClick = onCategoryQuickSessionClick,
-                onSubcategoryClick = onSubcategoryClick,
-                onSubcategoryPlayClick = onSubcategoryPlayClick,
-                onRecentClick = onRecentClick,
-                onFavoritesHintHide = onFavoritesHintHide,
-            )
-        }
+        content()
     }
 }
 
@@ -246,13 +278,7 @@ private fun HomeSections(
     onRecentClick: (RecentItem) -> Unit,
     onFavoritesHintHide: () -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .flashcardsScrollFade(scrollState)
-            .verticalScroll(scrollState),
-    ) {
+    Column {
         when (val favorites = sections.favorites) {
             is Carousel -> FavoritesCarousel(
                 items = favorites.items,
@@ -282,130 +308,4 @@ private fun HomeSections(
             RecentsOmitted -> Unit
         }
     }
-}
-
-private val previewCategory = Category(
-    id = "android",
-    name = "Android",
-    order = 0,
-    subcategoryCount = 14,
-    iconSvg = null,
-    color = "#2B6AA5",
-    featuredSubcategoryNames = emptyList(),
-)
-private val previewSubcategory = Subcategory(
-    id = "compose",
-    name = "Compose",
-    categoryId = previewCategory.id,
-    categoryName = previewCategory.name,
-    order = 0,
-    cardCount = 30,
-)
-
-private val previewFavorites = FavoritesContent(
-    listOf(
-        FavoriteSubcategory(previewSubcategory, previewCategory, Instant.parse("2026-05-05T10:00:00Z")),
-        FavoriteCategory(previewCategory, Instant.parse("2026-05-05T10:00:00Z")),
-    ),
-)
-private val previewProgressSummary = ProgressSummary(
-    subcategories = mapOf(previewSubcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
-)
-
-@Composable
-private fun HomeContentPreviewHost(state: HomeScreenState) {
-    FlashcardsTheme {
-        HomeContent(
-            state = state,
-            now = previewRecentsNow,
-            zoneId = previewRecentsZoneId,
-            onCategoryClick = {},
-            onCategoryQuickSessionClick = {},
-            onSubcategoryClick = {},
-            onSubcategoryPlayClick = {},
-            onRecentClick = {},
-            onFavoritesHintHide = {},
-            onBrowseClick = {},
-            onRetry = {},
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentResolvingPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesLoading, recents = RecentsLoading))
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentFirstSessionPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsEmpty))
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentErrorPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsFailed))
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentRecentsOnlyPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsContent(previewRecentItems)))
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentFavoritesOnlyPreview() {
-    HomeContentPreviewHost(
-        state = HomeScreenState(
-            favorites = previewFavorites,
-            recents = RecentsFailed,
-            progressSummary = previewProgressSummary,
-            isProgressResolved = true,
-        ),
-    )
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentFavoritesAndRecentsPreview() {
-    HomeContentPreviewHost(
-        state = HomeScreenState(
-            favorites = previewFavorites,
-            recents = RecentsContent(previewRecentItems),
-            progressSummary = previewProgressSummary,
-            isProgressResolved = true,
-        ),
-    )
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentFavoritesHintPreview() {
-    HomeContentPreviewHost(
-        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), hasHiddenFavoritesHint = false),
-    )
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentFavoritesHintHiddenPreview() {
-    HomeContentPreviewHost(
-        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), hasHiddenFavoritesHint = true),
-    )
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentRecentsPlaceholderPreview() {
-    HomeContentPreviewHost(
-        state = HomeScreenState(
-            favorites = previewFavorites,
-            recents = RecentsEmpty,
-            progressSummary = previewProgressSummary,
-            isProgressResolved = true,
-        ),
-    )
 }
