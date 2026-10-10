@@ -44,40 +44,33 @@ Formula: `ceil(base × level^exponent / 1000) × 1000`, where `base` and `expone
 
 ## Level-up rewards
 
-- Confetti/celebration animation on the Progress screen, and (designed, not built yet) on the Session Summary screen when the level-up happened during that session
+- Confetti/celebration animation on the Progress screen, and on the Session Summary screen when the level-up happened during that session (the bar fills, resets and pulses the Level number for every Level crossed)
 - Milestone badges unlocked at levels 5, 10, 25, 50, 100 — displayed on the Progress screen
 - Badge/achievement system detail: deferred to a separate design session
 - No XP burst on level-up (keeps the curve clean)
 
 ## Session Summary XP presentation
 
-XP is calculated **on the Session Summary screen**, from the session result and the `XpConfig` snapshot the session carried, and written to Firestore there as the `xpBreakdown` map on the session document ([Session Stats & Data Model](session-stats-data-model.md)), as part of the single session-commit batch ([ADR-0014](../adr/0014-session-stats-written-at-summary-screen.md)). The screen shows the total with an info button that opens the itemized breakdown in a dialog: one row per source (icon, label, `{N} × {rate} = {amount} XP`) and the total. The sequential "pour" animation below is designed but not built yet: it will be a motion layer over that settled screen.
+XP is calculated **on the Session Summary screen**, from the session result and the `XpConfig` snapshot the session carried, and written to Firestore there as the `xpBreakdown` map on the session document ([Session Stats & Data Model](session-stats-data-model.md)), as part of the single session-commit batch ([ADR-0014](../adr/0014-session-stats-written-at-summary-screen.md)). The screen shows the total with an info button that opens the itemized breakdown in a dialog: one row per source (icon, label, `{N} × {rate} = {amount} XP`) and the total. The animation below is a motion layer over that settled screen: it plays once when the score arrives, and a restore, a rotation, reduced motion or an unavailable score show the settled screen directly.
 
 **The animation renders `xpBreakdown`'s stored values, never a recomputation.** For a freshly-finished session this is the config in force right now; for a past session reopened later it is whatever was actually awarded, even if `XpConfig` has since changed. The `{N} × {rate}` notation below is illustrative — it shows the count and the rate that produced the figure — but the figure itself always comes from the stored field, so a later config change can never make an old Summary's total drift from what was actually committed.
 
-### Animation sequence (designed, not built)
+### Animation sequence
 
-1. **Total XP counter** appears prominently at top, starting at 0, counting up to the stored `xpTotal`.
-2. First **item tile** slides up from below into view, showing a math equation built from the stored `xpBreakdown` fields:
-   - `{N} new cards × 10 = {xpBreakdown.newCards}` (New Cards)
-   - `{N} cards × 100 = {xpBreakdown.mastered}` (Card Mastery)
-   - `{N} cards × 25 = {xpBreakdown.partial}` (Partial)
-   - `{N} cards × 50 = {xpBreakdown.masteryDefenseBonus}` (Mastery Defense)
-   - `{N} cards × 80 = -{xpBreakdown.demastered}` (De-mastery)
-   - `{N} min × 10 = {xpBreakdown.timeStudied}` (Time Studied)
-   - `{N} day streak × 250 = {xpBreakdown.streakBonus}` (Streak, capped display)
-   - `Session completed = +{xpBreakdown.sessionCompletionBonus}` (flat, no multiplier)
-   - `Daily goal met = +{xpBreakdown.dailyGoalBonus}` (flat, no multiplier)
-3. The XP value after the `=` sign counts **down to 0** while the total counter counts **up** by the same amount simultaneously ("pouring" the number into the total).
-4. Item disappears once its value reaches 0. Next item slides up.
-5. After all items are consumed: session total animates into the user's overall XP progress.
-6. If a level-up occurred: level-up celebration (confetti + new level). Multiple level-ups play sequentially.
+1. **Total XP counter** sits under the app bar, reading "0 XP", with a Skip button in the app bar. The title and close button are not shown yet.
+2. Item tiles are revealed one at a time beneath it, each showing the stored `xpBreakdown` field as an equation built from its count and rate (a caption for lines that are not multiplications), and each adding its amount to the counter, which counts up for a gain and down for a loss. More than six lines switch to a compact tile, and the list scrolls to keep the newest tile in view.
+3. After the last tile and a short pause, confetti bursts from the total when it is positive, and the tile list fades out.
+4. The **Level card** drops in as the list fades, showing where the User stood before the session. The total is pushed down to its settled place beneath the card, and the headline and stat pills fade in. The settled stack, top to bottom, is the Level card, the headline, the total and the stat pills.
+5. The earned XP **pours** into the Level bar from that starting position. Every Level crossed fills the bar, resets it to empty and pulses the Level number. Levels crossed in the middle show only the bar and the number, because their thresholds are not known; the "x / y XP" text counts only for the first and last Level. A negative total drains the bar within the same Level. The whole pour stays within about two and a half seconds.
+6. The bottom sheet rises and the app bar's title and close button fade in, overlapping the end of the pour. Skip disappears, and the breakdown button appears once everything has settled.
+
+A tap anywhere, Skip or the first system back jumps to the end; confetti already under way finishes, and a skip before the burst means no burst. TalkBack announces the total and any Level-up once the screen has settled.
 
 ### Rules
 
 - Items worth 0 XP are omitted entirely
-- De-mastery items use error color (red) for the equation and the pour
-- `Session Completed` omitted for abandoned sessions
+- A loss uses the error colour for its tile
+- `Session Completed` is omitted for abandoned sessions
 - Lines appear in a fixed order: New Cards, Card Mastery, Partial, Mastery Defense, De-mastery, Time Studied, Streak, Session Completed, Daily Goal
 - A Fast session has no Rated-only lines
 
