@@ -39,8 +39,8 @@ dropped.
 
 `DefaultRecentSessionsRepository` merges the document with the User's Pending Sessions, scored with
 preview XP ([ADR-0055](0055-pending-sessions-and-local-progress-projection.md)). A server entry wins
-over a Pending Session with the same id, Pending Sessions with no Flashcard Results are dropped, and
-the merged list is capped at 15 after sorting.
+over a Pending Session with the same id, and the merged list is capped at 15 after sorting. A session
+with no Studied Flashcards is never queued, so it never reaches this merge.
 
 ## Alternatives considered
 

@@ -18,8 +18,7 @@ import kotlinx.coroutines.flow.transformLatest
 
 /**
  * Merges the server's `recents/state` with the signed-in User's Pending Sessions. A server entry wins
- * over a Pending Session with the same id, and Pending Sessions with no Flashcard Results are dropped,
- * since the server rejects them. The cap applies after sorting, so the list is as long offline as online.
+ * over a Pending Session with the same id. The cap applies after sorting, so the list is as long offline as online.
  *
  * On delivery, the queue entry may go before the server entry arrives, so a row can blink. Accepted.
  */
@@ -39,7 +38,7 @@ class DefaultRecentSessionsRepository @Inject constructor(
                 }
             }
             .retryOnFirestorePermissionDenied(),
-        pendingSessionProjector.observeDeliverablePendingSessions(),
+        pendingSessionProjector.observePendingSessions(),
     ) { remoteSessions, pendingSessions -> remoteSessions to pendingSessions }
         .transformLatest { (remoteSessions, pendingSessions) ->
             val xpTotals = pendingSessionProjector.projectSessionXpTotals(pendingSessions) ?: return@transformLatest
