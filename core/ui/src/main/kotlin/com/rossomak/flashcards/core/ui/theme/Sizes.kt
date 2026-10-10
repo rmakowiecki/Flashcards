@@ -122,6 +122,10 @@ object AppSizes {
     /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large] avatar (Account header). */
     val avatarLarge: Dp = 88.dp
 
+    val actionProgressStroke: Dp = 2.dp
+
+    val bulletDot: Dp = 4.dp
+
     /** Glyph inlined at the end of a favorited row's title text (see `FlashcardsRowTitleText`). */
     val favoriteInlineIcon: Dp = 16.dp
 }

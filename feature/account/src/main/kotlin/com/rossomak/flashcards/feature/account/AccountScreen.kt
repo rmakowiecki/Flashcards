@@ -46,6 +46,8 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.NoConnection
+import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.ServiceError
 import com.rossomak.flashcards.core.domain.model.AppVersion
 import com.rossomak.flashcards.core.domain.model.InstallationInfo
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
@@ -61,7 +63,10 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.Login
 import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
+import com.rossomak.flashcards.feature.account.AccountDestination.ReportBug
+import com.rossomak.flashcards.feature.account.AccountDialog.DeleteAccount
 import com.rossomak.flashcards.feature.account.AccountDialog.SignOut
+import com.rossomak.flashcards.feature.account.AccountMessage.DeletionFailed
 import com.rossomak.flashcards.feature.account.AccountMessage.NoEmailApp
 import com.rossomak.flashcards.feature.account.AccountMessage.OpenLinkFailed
 import kotlinx.coroutines.launch
@@ -71,6 +76,7 @@ fun AccountScreen(
     modifier: Modifier = Modifier,
     viewModel: AccountViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToReportBug: () -> Unit,
     onNavigateToOpenSourceLicenses: () -> Unit,
     onNavigateToLogin: () -> Unit,
 ) {
@@ -85,6 +91,7 @@ fun AccountScreen(
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
             Login -> onNavigateToLogin()
+            ReportBug -> onNavigateToReportBug()
             OpenSourceLicenses -> onNavigateToOpenSourceLicenses()
             is ContactSupport -> {
                 val emailIntent = supportEmailIntent(context, destination.installationInfo, destination.uid)
@@ -95,11 +102,17 @@ fun AccountScreen(
 
     val openLinkFailedMessage = stringResource(R.string.account_open_link_failed_message)
     val noEmailAppMessage = stringResource(R.string.account_no_email_app_message)
+    val deletionNoConnectionMessage = stringResource(R.string.account_delete_no_connection_message)
+    val deletionFailedMessage = stringResource(R.string.account_delete_failed_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         val text = when (message) {
             OpenLinkFailed -> openLinkFailedMessage
             NoEmailApp -> noEmailAppMessage
+            is DeletionFailed -> when (message.reason) {
+                NoConnection -> deletionNoConnectionMessage
+                ServiceError -> deletionFailedMessage
+            }
         }
         snackbarScope.launch {
             snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
@@ -120,7 +133,7 @@ fun AccountScreen(
             if (!context.tryStartActivity(manageIntent)) viewModel.onOpenLinkFailed()
         },
         onContactSupportClick = viewModel::onContactSupportClick,
-        onReportBugClick = {},
+        onReportBugClick = viewModel::onReportBugClick,
         onPrivacyPolicyClick = {
             if (!context.tryStartActivity(privacyPolicyIntent(surfaceColor, darkTheme))) viewModel.onOpenLinkFailed()
         },
@@ -128,7 +141,7 @@ fun AccountScreen(
         onAppVersionCopy = { versionLabel ->
             clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(clipLabel, versionLabel))) }
         },
-        onDeleteAccountClick = {},
+        onDeleteAccountClick = { viewModel.onDialogEvent(Open(DeleteAccount)) },
     )
 }
 
@@ -158,6 +171,7 @@ private fun AccountContent(
         activeDialog = state.activeDialog,
         onDialogEvent = onDialogEvent,
     )
+    if (state.isDeletingAccount) AccountDeletionOverlay()
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),

@@ -216,6 +216,8 @@ private class ThrowingPendingSessionSubmissionLocalDataSource : PendingSessionSu
 
     override suspend fun remove(sessionId: String) = Unit
 
+    override suspend fun removeAllForUser(uid: String) = Unit
+
     override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flowOf(emptyList())
 }
 
@@ -227,6 +229,8 @@ private class CancellingPendingSessionSubmissionLocalDataSource : PendingSession
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = emptyList()
 
     override suspend fun remove(sessionId: String) = Unit
+
+    override suspend fun removeAllForUser(uid: String) = Unit
 
     override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flowOf(emptyList())
 }
