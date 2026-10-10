@@ -3,7 +3,10 @@ package com.rossomak.flashcards.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Resolved
+import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Unresolved
 import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.RecentSession.Fast
 import com.rossomak.flashcards.core.domain.model.RecentSession.Rated
@@ -14,19 +17,27 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading as FavoritesLoading
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
-import com.rossomak.flashcards.feature.home.HomeRecentsState.Hidden as RecentsHidden
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -44,7 +55,13 @@ class HomeViewModel @Inject constructor(
     private val eventChannel = Channel<HomeDestination>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
 
+    // One handle per section collector: a thrown failure or a completion leaves its flow dead, so Retry relaunches it.
+    private var favoritesJob: Job? = null
+    private var recentsJob: Job? = null
+    private var revealCeilingJob: Job? = null
+
     init {
+        startRevealCeiling()
         collectFavoriteItems()
         collectProgressSummary()
         collectRecentSessions()
@@ -125,26 +142,69 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Both observed flows are live Firestore listeners that retry only a permission-denied error, so any
-     * other failure is caught here instead of crashing out of [viewModelScope]. A failure before the
-     * first emission degrades to [Hidden], the same rule the use case applies to a failed id fetch; a
-     * failure after one leaves the [Content] already shown alone.
+     * Relaunches only the sections that [Failed][FavoritesFailed], after setting them back to Loading, so the
+     * Retry button goes away at once and a second tap finds nothing to retry. Restarts the reveal ceiling, so
+     * the retried sections reveal together again. The progress summary is not part of Retry.
+     */
+    fun onRetry() {
+        val current = _state.value
+        val retriesFavorites = current.favorites is FavoritesFailed
+        val retriesRecents = current.recents is RecentsFailed
+        if (!retriesFavorites && !retriesRecents) return
+        _state.update {
+            it.copy(
+                favorites = if (retriesFavorites) FavoritesLoading else it.favorites,
+                recents = if (retriesRecents) RecentsLoading else it.recents,
+            )
+        }
+        startRevealCeiling()
+        if (retriesFavorites) collectFavoriteItems()
+        if (retriesRecents) collectRecentSessions()
+    }
+
+    /** One ceiling for both sections, so a hung read cannot hold back [HomeScreenState.body] forever. */
+    private fun startRevealCeiling() {
+        revealCeilingJob?.cancel()
+        _state.update { it.copy(hasRevealCeilingElapsed = false) }
+        revealCeilingJob = viewModelScope.launch {
+            delay(REVEAL_CEILING)
+            _state.update { it.copy(hasRevealCeilingElapsed = true) }
+        }
+    }
+
+    /**
+     * Both observed flows are live Firestore listeners that retry only a permission-denied error, so any other
+     * failure is caught here instead of crashing out of [viewModelScope]. The use case is called inside the flow
+     * so a failure building it is caught too. Before the first emission, a failure, an [Unresolved] emission or
+     * a completion (a permission-denied teardown ends the flow silently) gives [FavoritesFailed]; after one, the
+     * last state stays. A later [Resolved] recovers from [Unresolved]; a thrown failure or a completion leaves
+     * the flow dead until [onRetry] relaunches it.
      */
     private fun collectFavoriteItems() {
-        viewModelScope.launch {
-            observeFavoriteItems()
+        favoritesJob?.cancel()
+        favoritesJob = viewModelScope.launch {
+            flow { emitAll(observeFavoriteItems()) }
+                .onCompletion { cause -> if (cause == null) failFavoritesIfLoading { "Observing Favorites completed before its first emission" } }
                 .catch { error ->
                     loge(error) { "Observing Favorites failed" }
-                    _state.update { current ->
-                        if (current.favorites is Loading) current.copy(favorites = Hidden) else current
-                    }
+                    failFavoritesIfLoading()
                 }
-                .collect { favoriteItems ->
-                    _state.update { current ->
-                        current.copy(favorites = if (favoriteItems.isEmpty()) Hidden else Content(favoriteItems))
+                .collect { result ->
+                    when (result) {
+                        is Resolved -> _state.update { current ->
+                            current.copy(favorites = if (result.items.isEmpty()) FavoritesEmpty else FavoritesContent(result.items))
+                        }
+
+                        Unresolved -> failFavoritesIfLoading { "Favorites could not be fully fetched" }
                     }
                 }
         }
+    }
+
+    private fun failFavoritesIfLoading(logMessage: (() -> String)? = null) {
+        if (_state.value.favorites !is FavoritesLoading) return
+        logMessage?.let { message -> logw(message = message) }
+        _state.update { it.copy(favorites = FavoritesFailed) }
     }
 
     /**
@@ -153,7 +213,7 @@ class HomeViewModel @Inject constructor(
      */
     private fun collectProgressSummary() {
         viewModelScope.launch {
-            observeProgressSummary()
+            flow { emitAll(observeProgressSummary()) }
                 .catch { error -> loge(error) { "Observing the progress summary failed" } }
                 .collect { summary ->
                     _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
@@ -162,24 +222,35 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Runs independently of [collectFavoriteItems] and [collectProgressSummary] so neither section gates the
-     * other. Like Favorites, a failure before the first emission degrades to [RecentsHidden], and a failure
-     * after one leaves the [RecentsContent] already shown alone.
+     * Runs independently of [collectFavoriteItems] and [collectProgressSummary], with the same rules as
+     * Favorites: before the first emission a failure or a completion gives [RecentsFailed], after one the last
+     * state stays. The use case never drops a Recent, so it has no unresolved emission.
      */
     private fun collectRecentSessions() {
-        viewModelScope.launch {
-            observeRecentSessions()
+        recentsJob?.cancel()
+        recentsJob = viewModelScope.launch {
+            flow { emitAll(observeRecentSessions()) }
+                .onCompletion { cause -> if (cause == null) failRecentsIfLoading { "Observing Recents completed before its first emission" } }
                 .catch { error ->
                     loge(error) { "Observing Recents failed" }
-                    _state.update { current ->
-                        if (current.recents is RecentsLoading) current.copy(recents = RecentsHidden) else current
-                    }
+                    failRecentsIfLoading()
                 }
                 .collect { recentItems ->
                     _state.update { current ->
-                        current.copy(recents = if (recentItems.isEmpty()) RecentsHidden else RecentsContent(recentItems))
+                        current.copy(recents = if (recentItems.isEmpty()) RecentsEmpty else RecentsContent(recentItems))
                     }
                 }
         }
+    }
+
+    private fun failRecentsIfLoading(logMessage: (() -> String)? = null) {
+        if (_state.value.recents !is RecentsLoading) return
+        logMessage?.let { message -> logw(message = message) }
+        _state.update { it.copy(recents = RecentsFailed) }
+    }
+
+    internal companion object {
+        /** How long Favorites and Recents wait for each other before a still-loading one is left out. */
+        val REVEAL_CEILING = 2.seconds
     }
 }

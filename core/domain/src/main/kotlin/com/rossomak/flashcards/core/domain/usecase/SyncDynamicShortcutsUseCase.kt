@@ -1,12 +1,14 @@
 package com.rossomak.flashcards.core.domain.usecase
 
 import com.rossomak.flashcards.core.domain.model.FavoriteItem
+import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult
 import com.rossomak.flashcards.core.domain.model.ShortcutRoute
 import com.rossomak.flashcards.core.domain.model.ShortcutTarget
 import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 
 /**
@@ -16,6 +18,9 @@ import kotlinx.coroutines.flow.map
  * full [FavoriteItem]s sorted most-recently-favorited first; that order is preserved into the
  * [ShortcutTarget] list unchanged — [AppShortcutsRepository] treats list order as launcher display
  * rank and owns truncation to the platform's max dynamic shortcut count.
+ *
+ * A [FavoriteItemsResult.Unresolved] emission is skipped, so a transient fetch failure leaves the
+ * last synced shortcuts in place instead of wiping them.
  */
 class SyncDynamicShortcutsUseCase @Inject constructor(
     private val observeFavoriteItems: ObserveFavoriteItemsUseCase,
@@ -24,7 +29,8 @@ class SyncDynamicShortcutsUseCase @Inject constructor(
 
     override suspend operator fun invoke() {
         observeFavoriteItems()
-            .map { favorites -> favorites.map { it.toShortcutTarget() } }
+            .filterIsInstance<FavoriteItemsResult.Resolved>()
+            .map { favorites -> favorites.items.map { it.toShortcutTarget() } }
             .collect { shortcuts -> appShortcutsRepository.syncDynamicShortcuts(shortcuts) }
     }
 
