@@ -3,6 +3,8 @@ package com.rossomak.flashcards.feature.auth
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import app.cash.turbine.test
+import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
+import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.SignInFailureReason
 import com.rossomak.flashcards.core.domain.model.SignInResult
@@ -13,9 +15,11 @@ import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesReposit
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.usecase.CheckInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
+import com.rossomak.flashcards.core.domain.usecase.SignInWithGitHubUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
+import com.rossomak.flashcards.feature.auth.LoginFailureReason.AccountExistsWithDifferentProvider
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoConnection
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.NoCredentialAvailable
 import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
@@ -54,6 +58,7 @@ class LoginViewModelTest {
             userPreferencesRepository.preferences.value.copy(hasSeenOnboarding = hasSeenOnboarding)
         return LoginViewModel(
             SignInWithGoogleUseCase(authRepository),
+            SignInWithGitHubUseCase(authRepository),
             ObserveUserPreferencesUseCase(userPreferencesRepository),
             CheckInternetAvailabilityUseCase(networkAvailabilityGateway),
         )
@@ -97,7 +102,7 @@ class LoginViewModelTest {
 
                 awaitItem() shouldBe Main
             }
-            viewModel.state.value.phase shouldBe SignedIn
+            viewModel.state.value.phase shouldBe SignedIn(Google)
         }
 
     @Test
@@ -188,7 +193,7 @@ class LoginViewModelTest {
 
         viewModel.onGoogleSignInStarted()
 
-        viewModel.state.value.phase shouldBe SigningIn
+        viewModel.state.value.phase shouldBe SigningIn(Google)
     }
 
     @Test
@@ -362,6 +367,131 @@ class LoginViewModelTest {
                 awaitItem() shouldBe SignInFailed(Unknown)
             }
             phaseAtCheck shouldBe Idle
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+        }
+
+    @Test
+    fun `a GitHub click sets signing in with GitHub`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onGitHubSignInClick()
+
+        viewModel.state.value.phase shouldBe SigningIn(GitHub)
+    }
+
+    @Test
+    fun `a GitHub sign-in emits Main when onboarding was already seen and ends signed in with GitHub`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.signInWithGitHubResult = SignInResult.SignedIn(testUser)
+            val viewModel = createViewModel()
+
+            viewModel.events.test {
+                viewModel.onGitHubSignInClick()
+
+                awaitItem() shouldBe Main
+            }
+            viewModel.state.value.phase shouldBe SignedIn(GitHub)
+        }
+
+    @Test
+    fun `a GitHub sign-in emits Onboarding when onboarding was never seen`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.signInWithGitHubResult = SignInResult.SignedIn(testUser)
+            val viewModel = createViewModel(hasSeenOnboarding = false)
+
+            viewModel.events.test {
+                viewModel.onGitHubSignInClick()
+
+                awaitItem() shouldBe Onboarding
+            }
+        }
+
+    @Test
+    fun `a second GitHub click while signing in does not start another sign-in`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = createViewModel()
+
+            viewModel.onGitHubSignInClick()
+            viewModel.onGitHubSignInClick()
+            advanceUntilIdle()
+
+            authRepository.signInWithGitHubCallCount shouldBe 1
+        }
+
+    @Test
+    fun `a cancelled GitHub sign-in emits nothing and stops signing in`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.signInWithGitHubResult = Cancelled
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGitHubSignInClick()
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+        viewModel.state.value.phase shouldBe Idle
+        viewModel.events.test { expectNoEvents() }
+
+        verify(exactly = 0) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `a GitHub email clash points to Google`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.signInWithGitHubResult = Failed(SignInFailureReason.AccountExistsWithDifferentProvider)
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGitHubSignInClick()
+
+            awaitItem() shouldBe SignInFailed(AccountExistsWithDifferentProvider(existingProvider = Google))
+        }
+        viewModel.state.value.phase shouldBe Idle
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `a Google email clash points to GitHub`() = runTest(mainDispatcherRule.testDispatcher) {
+        authRepository.signInResult = Failed(SignInFailureReason.AccountExistsWithDifferentProvider)
+        val viewModel = createViewModel()
+
+        viewModel.messages.test {
+            viewModel.onGoogleSignInResult(Result.success(ID_TOKEN))
+
+            awaitItem() shouldBe SignInFailed(AccountExistsWithDifferentProvider(existingProvider = GitHub))
+        }
+
+        verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+    }
+
+    @Test
+    fun `a GitHub sign-in that failed for no connection emits NoConnection`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.signInWithGitHubResult = Failed(SignInFailureReason.NoConnection)
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onGitHubSignInClick()
+
+                awaitItem() shouldBe SignInFailed(NoConnection)
+            }
+
+            verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
+        }
+
+    @Test
+    fun `an offline GitHub sign-in that failed for an unknown reason emits NoConnection`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { networkAvailabilityGateway.isInternetAvailable() } returns false
+            authRepository.signInWithGitHubResult = Failed(SignInFailureReason.Unknown)
+            val viewModel = createViewModel()
+
+            viewModel.messages.test {
+                viewModel.onGitHubSignInClick()
+
+                awaitItem() shouldBe SignInFailed(NoConnection)
+            }
+
             verify(exactly = 1) { networkAvailabilityGateway.isInternetAvailable() }
         }
 

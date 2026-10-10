@@ -44,6 +44,17 @@ class DefaultAuthRepositoryTest {
     }
 
     @Test
+    fun `signInWithGitHub delegates to the remote data source`() = runTest {
+        val user = AuthUser(uid = "uid-1", email = "user@example.com", displayName = "Alex", photoUrl = null)
+        coEvery { remoteDataSource.signInWithGitHub() } returns SignedIn(user)
+
+        val result = createRepository().signInWithGitHub()
+
+        result shouldBe SignedIn(user)
+        coVerify(exactly = 1) { remoteDataSource.signInWithGitHub() }
+    }
+
+    @Test
     fun `signOut delegates to the remote data source`() {
         every { remoteDataSource.signOut() } returns Unit
 
