@@ -55,10 +55,13 @@ that report and returns one of two results:
 - **`LocalPreview`**: a `SessionScore` computed by `scoreSession` over the projected reads. The use case
   reads that baseline *before* it queues the session, so the preview never counts the session twice.
   The fallback comes at the earliest of:
-  1. no internet when the Summary opens, or the session could not be queued;
+  1. no internet when the Summary opens;
   2. `SERVER_RESULT_BUDGET` (6 seconds) passing;
   3. the server rejecting the session;
   4. the drain run ending, or going back into retry, without this session's score.
+
+A session that could not be queued at all (no signed-in User, a failed local write) gets no preview:
+the use case fails with `SessionNotSavedException` and the Summary says the session was not saved.
 
 The use case returns once. A server score arriving after the fallback does not replace it; other
 screens show the server's numbers the next time they read.
