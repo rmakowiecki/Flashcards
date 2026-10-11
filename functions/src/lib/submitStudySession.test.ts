@@ -14,6 +14,7 @@ import { after, afterEach, before, describe, it } from "node:test";
 import * as admin from "firebase-admin";
 import { callableRequestSignedInAt, nowEpochSeconds } from "./callableRequestFixtures";
 import {
+  MAX_APPLIED_SESSION_IDS,
   MAX_RECENT_ENTRIES,
   RecentEntry,
   ValidatedSubmitStudySessionRequest,
@@ -1038,6 +1039,68 @@ describe("submitStudySession — Level position before the session and current S
     assert.equal(result.xpIntoCurrentLevel, 0);
     assert.deepEqual(result.levelsCrossed, []);
     assert.equal(result.currentStreak, 3, "a same-day session neither advances nor breaks the Streak");
+  });
+});
+
+describe("submitStudySession — applied session ids", () => {
+  function userStatsDoc(uid: string): Promise<FirebaseFirestore.DocumentSnapshot> {
+    return admin.firestore().doc(`users/${uid}/progress/user-stats`).get();
+  }
+
+  async function seedAppliedSessionIds(uid: string, appliedSessionIds: string[]): Promise<void> {
+    await admin.firestore().doc(`users/${uid}/progress/user-stats`).set({ xp: 0, level: 1, appliedSessionIds });
+  }
+
+  it("a commit appends its id after the ids already applied", async () => {
+    const uid = randomUUID();
+    await seedAppliedSessionIds(uid, ["applied-1", "applied-2"]);
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    await submitStudySession(admin.firestore(), uid, request);
+
+    assert.deepEqual((await userStatsDoc(uid)).data()?.appliedSessionIds, ["applied-1", "applied-2", request.sessionId]);
+  });
+
+  it("a commit onto a full list evicts the oldest id", async () => {
+    const uid = randomUUID();
+    const priorIds = Array.from({ length: MAX_APPLIED_SESSION_IDS }, (_, index) => `applied-${index}`);
+    await seedAppliedSessionIds(uid, priorIds);
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    await submitStudySession(admin.firestore(), uid, request);
+
+    assert.deepEqual((await userStatsDoc(uid)).data()?.appliedSessionIds, [...priorIds.slice(1), request.sessionId]);
+  });
+
+  it("a retry leaves the list untouched", async () => {
+    const uid = randomUUID();
+    const first = validateSubmitStudySessionRequest(rawRatedRequest());
+    const second = validateSubmitStudySessionRequest(rawRatedRequest({ startedAtEpochMillis: DEFAULT_STARTED_AT_EPOCH_MILLIS + MINUTE_MILLIS }));
+    await submitStudySession(admin.firestore(), uid, first);
+    await submitStudySession(admin.firestore(), uid, second);
+
+    await submitStudySession(admin.firestore(), uid, first);
+
+    assert.deepEqual((await userStatsDoc(uid)).data()?.appliedSessionIds, [first.sessionId, second.sessionId]);
+  });
+
+  it("the scoring fields are written alongside the list exactly as before", async () => {
+    const uid = randomUUID();
+    const request = validateSubmitStudySessionRequest(rawRatedRequest());
+
+    const result = await submitStudySession(admin.firestore(), uid, request);
+
+    assert.deepEqual((await userStatsDoc(uid)).data(), {
+      xp: result.breakdown.xpTotal,
+      level: result.level,
+      xpIntoCurrentLevel: result.xpIntoCurrentLevel,
+      currentStreak: 1,
+      bestStreak: 1,
+      lastStudyDate: DEFAULT_STUDY_DATE,
+      goalMetDate: "",
+      studiedSecondsOnLastStudyDate: 60,
+      appliedSessionIds: [request.sessionId],
+    });
   });
 });
 

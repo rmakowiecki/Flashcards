@@ -15,6 +15,10 @@ import com.rossomak.flashcards.core.domain.model.ScoringState
  * fallback preview, so this is a one-shot read. An observable read belongs here once a screen shows
  * the Level live (such as a Home Level card).
  *
+ * [excludedSessionId] names a finished session to leave out, so a preview of that session never builds
+ * on itself. When the cached server state already includes that session, it cannot be subtracted, so
+ * the read fails.
+ *
  * @return `Result.success(null)` for an account with no scoring state document and nothing pending — a
  * genuinely new user, not a failure — leaving it to the caller to start from [ScoringState]'s own
  * defaults. `Result.failure` for a real read failure, which the fallback preview must never paper over
@@ -22,5 +26,5 @@ import com.rossomak.flashcards.core.domain.model.ScoringState
  */
 interface ScoringStateRepository {
 
-    suspend fun getScoringState(): Result<ScoringState?>
+    suspend fun getScoringState(excludedSessionId: String? = null): Result<ScoringState?>
 }

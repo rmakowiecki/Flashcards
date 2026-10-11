@@ -110,9 +110,9 @@ class SessionSubmissionDeliveryWorkerTest {
         subcategoryIds = subcategoryIds,
         subcategoryNames = subcategoryIds.map { "Name of $it" },
         sourceType = "SingleSubcategory",
-        cardResults = listOf(
-            PendingFlashcardResultDto(cardId = "card-1", subcategoryId = SUBCATEGORY_ID, state = "Mastered", attemptsUsed = 1, wasPreviouslyMastered = false),
-        ),
+        cardResults = subcategoryIds.mapIndexed { index, subcategoryId ->
+            PendingFlashcardResultDto(cardId = "card-${index + 1}", subcategoryId = subcategoryId, state = "Mastered", attemptsUsed = 1, wasPreviouslyMastered = false)
+        },
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
@@ -339,17 +339,73 @@ class SessionSubmissionDeliveryWorkerTest {
     }
 
     @Test
-    fun `a delivered entry is removed even when the post-delivery refresh fails`() = runTest {
+    fun `a delivered entry is removed once every refresh read succeeded`() = runTest {
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L, subcategoryIds = listOf("sub-1", "sub-2")))
         coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
-        coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
-        coEvery { cardProgressRemoteDataSource.getProgress("sub-1", any()) } throws IllegalStateException("offline")
 
         val result = createWorker().doWork()
 
         result.shouldBeInstanceOf<Result.Success>()
         localDataSource.listAll() shouldBe emptyList()
-        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress("sub-2", Source.SERVER) }
+    }
+
+    @Test
+    fun `a failed scoring-state refresh keeps the delivered entry, still reports it and returns retry`() = runTest {
+        val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
+        localDataSource.seed(entry)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
+
+        val result = createWorker().doWork()
+
+        result shouldBe Result.retry()
+        localDataSource.listAll() shouldBe listOf(entry)
+        deadLetterLocalDataSource.listAll() shouldBe emptyList()
+        SessionDeliveryReport.read(publishedProgress.last()) shouldBe mapOf("session-1" to DeliveredSessionDto.Scored(SCORE.toDto()))
+    }
+
+    @Test
+    fun `a failed Card Progress refresh keeps the delivered entry and stops before the next one`() = runTest {
+        val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L, subcategoryIds = listOf("sub-1", "sub-2"))
+        localDataSource.seed(entry)
+        localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { cardProgressRemoteDataSource.getProgress("sub-1", any()) } throws IllegalStateException("offline")
+
+        val result = createWorker().doWork()
+
+        result shouldBe Result.retry()
+        localDataSource.listAll().map { it.id } shouldBe listOf("session-1", "session-2")
+        coVerify(exactly = 1) { sessionSubmissionRemoteDataSource.submitSession(any(), any()) }
+    }
+
+    @Test
+    fun `a later run re-submits an entry kept by a failed refresh and removes it`() = runTest {
+        localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
+        createWorker().doWork()
+        coEvery { scoringStateRemoteDataSource.getScoringState(any()) } returns null
+
+        val result = createWorker(runAttemptCount = 1).doWork()
+
+        result.shouldBeInstanceOf<Result.Success>()
+        localDataSource.listAll() shouldBe emptyList()
+        coVerify(exactly = 2) { sessionSubmissionRemoteDataSource.submitSession(SIGNED_IN_UID, any()) }
+    }
+
+    @Test
+    fun `a failed refresh on a high run attempt count never dead-letters the entry`() = runTest {
+        val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
+        localDataSource.seed(entry)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
+
+        val result = createWorker(runAttemptCount = 1_000).doWork()
+
+        result shouldBe Result.retry()
+        localDataSource.listAll() shouldBe listOf(entry)
+        deadLetterLocalDataSource.listAll() shouldBe emptyList()
     }
 
     @Test

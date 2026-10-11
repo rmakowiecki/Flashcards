@@ -15,7 +15,8 @@ import kotlinx.coroutines.tasks.await
  * [com.rossomak.flashcards.core.domain.model.ScoringState] itself, so this client never composes a
  * write for it. [com.rossomak.flashcards.core.data.repository.PendingSessionProjector] reads it as the
  * baseline it replays Pending Sessions over, and its `studiedSecondsOnLastStudyDate` as the seconds
- * already studied that day when it judges a Pending Session's Daily Goal.
+ * already studied that day when it judges a Pending Session's Daily Goal, and its `appliedSessionIds`
+ * to skip the Pending Sessions the document already includes.
  *
  * [Source.SERVER] skips the local cache and, on success, refreshes it:
  * [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] reads that way after each
@@ -42,6 +43,7 @@ class ScoringStateRemoteDataSource @Inject constructor(
             lastStudyDate = document.getString(FIELD_LAST_STUDY_DATE) ?: "",
             goalMetDate = document.getString(FIELD_GOAL_MET_DATE) ?: "",
             studiedSecondsOnLastStudyDate = document.getLong(FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE) ?: 0,
+            appliedSessionIds = (document.get(FIELD_APPLIED_SESSION_IDS) as? List<*>).orEmpty().filterIsInstance<String>(),
         )
     }
 
@@ -56,5 +58,6 @@ class ScoringStateRemoteDataSource @Inject constructor(
         const val FIELD_LAST_STUDY_DATE = "lastStudyDate"
         const val FIELD_GOAL_MET_DATE = "goalMetDate"
         const val FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE = "studiedSecondsOnLastStudyDate"
+        const val FIELD_APPLIED_SESSION_IDS = "appliedSessionIds"
     }
 }

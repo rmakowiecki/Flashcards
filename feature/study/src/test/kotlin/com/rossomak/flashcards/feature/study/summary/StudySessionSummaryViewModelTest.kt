@@ -31,7 +31,6 @@ import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.every
-import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import java.time.Instant
@@ -45,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -60,7 +60,7 @@ class StudySessionSummaryViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val savedStateHandle: SavedStateHandle = mockk()
+    private val savedStateHandle = SavedStateHandle()
     private val sessionSubmissionRepository = FakeSessionSubmissionRepository()
     private val cardProgressRepository = FakeCardProgressRepository()
     private val scoringStateRepository = FakeScoringStateRepository()
@@ -334,6 +334,59 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
+    fun `a resolved server score is saved for a restore`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+
+        createViewModel()
+        advanceUntilIdle()
+
+        savedStateHandle.get<String>(SAVED_SCORE_KEY)?.let { json -> Json.decodeFromString<SessionScore>(json) } shouldBe SERVER_SCORE
+    }
+
+    @Test
+    fun `a resolved local preview is saved for a restore`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val savedScore = savedStateHandle.get<String>(SAVED_SCORE_KEY)?.let { json -> Json.decodeFromString<SessionScore>(json) }
+        savedScore?.breakdown?.xpTotal shouldBe viewModel.state.value.xpTotal
+    }
+
+    @Test
+    fun `a failed preview is not saved, so a restore submits again`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
+        stubRoute(ratedRoute())
+
+        createViewModel()
+        advanceUntilIdle()
+
+        savedStateHandle.contains(SAVED_SCORE_KEY) shouldBe false
+    }
+
+    @Test
+    fun `a restored ViewModel with a saved score shows it and never submits`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SERVER_SCORE)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        with(viewModel.state.value) {
+            xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
+            level shouldBe 3
+            levelBefore shouldBe 1
+            currentStreak shouldBe 8
+            xpLines.size shouldBe 7
+            isLoading shouldBe false
+        }
+        sessionSubmissionRepository.submittedSessionResults shouldBe emptyList()
+        scoringStateRepository.getScoringStateCallCount shouldBe 0
+    }
+
+    @Test
     fun `a server score needs none of the local preview's reads`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
         stubRoute(ratedRoute())
@@ -517,6 +570,7 @@ class StudySessionSummaryViewModelTest {
     }
 
     private companion object {
+        const val SAVED_SCORE_KEY = "savedScore"
         const val AUTH_USER_PHOTO_URL = "https://example.com/jane.jpg"
         const val AUTH_USER_DISPLAY_NAME = "Jane Doe"
         val AUTH_USER = AuthUser(

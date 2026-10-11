@@ -176,11 +176,13 @@ users/{uid}/progress/summary                          → { subcategories: { <su
 users/{uid}/progress/user-stats                       → { xp, level, xpIntoCurrentLevel,
                                                           currentStreak, bestStreak,
                                                           lastStudyDate, goalMetDate,
-                                                          studiedSecondsOnLastStudyDate }
+                                                          studiedSecondsOnLastStudyDate,
+                                                          appliedSessionIds: string[] }  // latest 20, oldest first
 ```
 
 - **`progress` holds the User's singleton documents** — the progress summary (`summary`) and the scoring state (`user-stats`) — alongside the fixed `details` anchor document that hosts the packed per-Subcategory documents one hop deeper. Firestore paths alternate collection and document, so each per-User singleton needs a fixed document id inside a collection; one security rule covers them all.
 - **`user-stats` is the scoring state**, written only by the `submitStudySession` Cloud Function. `lastStudyDate` and `goalMetDate` only move forward ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). `studiedSecondsOnLastStudyDate` is the seconds of every recorded session on `lastStudyDate`: a submission sets it to that day's total when its `studyDate` is not earlier than `lastStudyDate`, and leaves it unchanged otherwise. A missing field reads as `0`. The client reads it as the day's baseline when it previews the Daily Goal for a Pending Session ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
+- **`appliedSessionIds`** lists the latest 20 sessions applied to `user-stats`, oldest first. Only the function writes it, appending the session's id in the commit transaction in the same write as the scoring fields; a retry leaves it untouched. A missing field reads as empty. It is not part of the scoring state: the device's projection reads it to skip the Pending Sessions this document already includes ([ADR-0061](../adr/0061-delivered-sessions-applied-once-in-the-projection.md)).
 
 ## XP configuration
 

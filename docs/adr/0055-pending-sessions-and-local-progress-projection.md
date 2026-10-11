@@ -39,7 +39,9 @@ the client needs no query of the day's sessions.
   `PERMISSION_DENIED`) and entries that no longer parse move to a dead-letter file and the run
   continues. The dead-letter file is write-only diagnostics: nothing replays or projects it.
 - After each delivery, the worker re-reads the scoring state and the touched Card Progress documents
-  from the server, ignoring failures, and only then removes the entry. The cache then already holds
+  from the server, and only then removes the entry. (Amended by
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md): a failed read keeps the entry
+  queued.) The cache then already holds
   the delivered session when the projection stops replaying it.
 
 ### The Session Summary shows the server's score, and falls back to a local preview
@@ -66,7 +68,9 @@ screens show the server's numbers the next time they read.
 - **Firestore's offline write queue plus a trigger function.** Rejected: the client would write the
   session document itself, which ADR-0049's rules forbid, and the Summary could not learn the score.
 - **A revision field that gates the handover** from projected to server state. Rejected: the refresh
-  before removal closes most of the gap, and the rest is brief and self-correcting.
+  before removal closes most of the gap, and the rest is brief and self-correcting. **Superseded by
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md)**, which gates it with the
+  applied session ids on `user-stats`.
 - **Versioned XP configurations**, so a Pending Session is scored with the configuration of its
   start. Rejected: the server scores with its current configuration, so a versioned preview would
   disagree with the server.
@@ -81,7 +85,8 @@ screens show the server's numbers the next time they read.
 
 ## Consequences
 
-Accepted transient inaccuracies, all corrected by the next successful server read:
+Accepted transient inaccuracies, all corrected by the next successful server read. The first three are
+resolved by [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md):
 
 - **Under-count after delivery.** Between removal and a cache update (the refresh failed), a
   delivered session is in neither the queue nor the cache. A fallback preview in that window also
@@ -114,3 +119,9 @@ Pending Sessions into Home's Recents, so a session finished offline shows at onc
 cached XP configuration, so later
 Streak and Daily Goal awards build on earlier ones, and it drops Pending Sessions with no Flashcard
 Results, which the server rejects. See [ADR-0057](0057-recents-state-projection.md).
+
+**2026-10-10 — Delivered sessions are applied once.** `user-stats` lists the sessions applied to it,
+an applied Pending Session adds to no aggregate, the worker removes an entry only after every refresh
+read succeeds, and the Summary's baseline excludes its own session. This resolves the under-count after
+delivery, the double count after a crash and the double count between refresh and removal. See
+[ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).
