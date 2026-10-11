@@ -5,13 +5,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import kotlin.time.Duration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -28,32 +26,29 @@ internal data class SummaryFrame(
     val visibleLineCount: Int,
     val isListShown: Boolean,
     val cardProgress: Float,
-    val pour: LevelPosition,
-    val showsXpCount: Boolean,
+    val showsLevelAfter: Boolean,
     val sheetProgress: Float,
     val appBarProgress: Float,
     val isSettled: Boolean,
 ) {
     companion object {
-        fun start(before: LevelPosition) = SummaryFrame(
+        val start = SummaryFrame(
             runningTotal = 0f,
             visibleLineCount = 0,
             isListShown = true,
             cardProgress = 0f,
-            pour = before,
-            showsXpCount = true,
+            showsLevelAfter = false,
             sheetProgress = 0f,
             appBarProgress = 0f,
             isSettled = false,
         )
 
-        fun settled(xpTotal: Int, lineCount: Int, after: LevelPosition) = SummaryFrame(
+        fun settled(xpTotal: Int, lineCount: Int) = SummaryFrame(
             runningTotal = xpTotal.toFloat(),
             visibleLineCount = lineCount,
             isListShown = false,
             cardProgress = 1f,
-            pour = after,
-            showsXpCount = true,
+            showsLevelAfter = true,
             sheetProgress = 1f,
             appBarProgress = 1f,
             isSettled = true,
@@ -62,7 +57,7 @@ internal data class SummaryFrame(
 }
 
 /**
- * The Summary's scripted payoff: the XP tiles, the running total, the Level card and its pour, the
+ * The Summary's scripted payoff: the XP tiles, the running total, the Level card's entrance, the
  * sheet and the app bar, played once and ending on the settled screen.
  *
  * This is presentation-only motion, so it lives with the composables and changes no session or screen
@@ -70,6 +65,11 @@ internal data class SummaryFrame(
  * the layout depends on (a count, a flag) is Compose state. A payoff built [isSettled] never moves:
  * every value already holds its final reading, which is how reduced motion, a restore and a rotation
  * show the Summary.
+ *
+ * The pour itself belongs to the Level card: the payoff only says which position the card shows,
+ * before the session until [showsLevelAfter] flips at [POUR_START], and the card pours the change
+ * however it likes. The payoff does not wait for it. [wasSkipped] tells the screen to give the card a
+ * fresh identity, so a skip shows the after position without a pour.
  *
  * [play] runs the sequence and returns once it has settled, however it ended. [skip] jumps to the end
  * from anywhere in it. The confetti is deliberately not part of the sequence: [confettiOrigin] only
@@ -79,12 +79,8 @@ internal data class SummaryFrame(
 internal class SummaryPayoff(
     val lines: List<XpBreakdownLine>,
     val xpTotal: Int,
-    private val before: LevelPosition,
-    private val after: LevelPosition,
-    levelsCrossed: List<Int>,
     frame: SummaryFrame,
 ) {
-    private val pourPlan: List<PourSegment> = planPour(before, after, levelsCrossed, xpTotal)
     private val skipRequests = Channel<Unit>(Channel.CONFLATED)
 
     val runningTotal = Animatable(frame.runningTotal)
@@ -92,19 +88,18 @@ internal class SummaryPayoff(
     val cardProgress = Animatable(frame.cardProgress)
     val sheetProgress = Animatable(frame.sheetProgress)
     val appBarProgress = Animatable(frame.appBarProgress)
-    val levelPulse = Animatable(1f)
-    val pourFraction = Animatable(frame.pour.fraction)
-    val pourXpIntoLevel = Animatable(frame.pour.xpIntoLevel.toFloat())
 
     var visibleLineCount by mutableIntStateOf(frame.visibleLineCount)
         private set
     var isListShown by mutableStateOf(frame.isListShown)
         private set
-    var pourLevel by mutableIntStateOf(frame.pour.level)
+
+    /** The Level card shows the position after the session; before it, the position the session started from. */
+    var showsLevelAfter by mutableStateOf(frame.showsLevelAfter)
         private set
-    var pourXpForNextLevel by mutableLongStateOf(frame.pour.xpForNextLevel)
-        private set
-    var showsXpCount by mutableStateOf(frame.showsXpCount)
+
+    /** The sequence was skipped rather than played to its end. */
+    var wasSkipped by mutableStateOf(false)
         private set
 
     /** The headline, pills and Level card are on their way in or in: they are read out from here on. */
@@ -147,6 +142,11 @@ internal class SummaryPayoff(
             }
             sequence.join()
             skipWatcher.cancel()
+            // Both in one go, before anything suspends: a card recreated by the skip must already see the after position.
+            if (sequence.isCancelled) {
+                wasSkipped = true
+                showsLevelAfter = true
+            }
         }
         snapToSettled()
     }
@@ -175,7 +175,7 @@ internal class SummaryPayoff(
         launch { cardProgress.animateTo(1f, tween(CARD_ENTER.toMillisInt(), easing = SlideEasing)) }
         launch {
             delay(POUR_START)
-            pour()
+            showsLevelAfter = true
         }
         launch {
             delay(SHEET_START)
@@ -185,52 +185,15 @@ internal class SummaryPayoff(
         }
     }
 
-    /** Pulses run beside the next segment, so a cut never waits for its own pulse. */
-    private suspend fun pour() = coroutineScope {
-        pourPlan.forEachIndexed { index, segment ->
-            if (index > 0) launch { pulseLevel() }
-            pourLevel = segment.level
-            showsXpCount = segment.showXpCount
-            pourXpForNextLevel = segment.xpForNextLevel
-            pourFraction.snapTo(segment.fromFraction)
-            pourXpIntoLevel.snapTo(segment.xpFrom.toFloat())
-            pourSegment(segment)
-        }
-    }
-
-    private suspend fun pourSegment(segment: PourSegment) {
-        if (segment.duration <= Duration.ZERO) {
-            pourFraction.snapTo(segment.toFraction)
-            pourXpIntoLevel.snapTo(segment.xpTo.toFloat())
-            return
-        }
-        val spec = tween<Float>(segment.duration.toMillisInt(), easing = CountEasing)
-        coroutineScope {
-            launch { pourFraction.animateTo(segment.toFraction, spec) }
-            launch { pourXpIntoLevel.animateTo(segment.xpTo.toFloat(), spec) }
-        }
-    }
-
-    private suspend fun pulseLevel() {
-        val half = tween<Float>((LEVEL_PULSE / 2).toMillisInt())
-        levelPulse.animateTo(LEVEL_PULSE_SCALE, half)
-        levelPulse.animateTo(1f, half)
-    }
-
     private suspend fun snapToSettled() {
         runningTotal.snapTo(xpTotal.toFloat())
         listAlpha.snapTo(0f)
         cardProgress.snapTo(1f)
-        levelPulse.snapTo(1f)
-        pourFraction.snapTo(after.fraction)
-        pourXpIntoLevel.snapTo(after.xpIntoLevel.toFloat())
         sheetProgress.snapTo(1f)
         appBarProgress.snapTo(1f)
         visibleLineCount = lines.size
         isListShown = false
-        pourLevel = after.level
-        pourXpForNextLevel = after.xpForNextLevel
-        showsXpCount = true
+        showsLevelAfter = true
         isRevealed = true
         isSheetRaised = true
         isSettled = true
@@ -238,21 +201,9 @@ internal class SummaryPayoff(
 
     companion object {
         /** A payoff with nothing to play, for a Summary that has no score or that opens already settled. */
-        fun settled(
-            lines: List<XpBreakdownLine>,
-            xpTotal: Int,
-            before: LevelPosition,
-            after: LevelPosition,
-            levelsCrossed: List<Int>,
-        ) = SummaryPayoff(lines, xpTotal, before, after, levelsCrossed, SummaryFrame.settled(xpTotal, lines.size, after))
+        fun settled(lines: List<XpBreakdownLine>, xpTotal: Int) = SummaryPayoff(lines, xpTotal, SummaryFrame.settled(xpTotal, lines.size))
 
         /** A payoff at frame 0, ready for [play]. */
-        fun unplayed(
-            lines: List<XpBreakdownLine>,
-            xpTotal: Int,
-            before: LevelPosition,
-            after: LevelPosition,
-            levelsCrossed: List<Int>,
-        ) = SummaryPayoff(lines, xpTotal, before, after, levelsCrossed, SummaryFrame.start(before))
+        fun unplayed(lines: List<XpBreakdownLine>, xpTotal: Int) = SummaryPayoff(lines, xpTotal, SummaryFrame.start)
     }
 }

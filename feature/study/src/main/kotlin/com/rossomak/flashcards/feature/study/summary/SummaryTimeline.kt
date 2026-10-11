@@ -18,11 +18,12 @@ import kotlin.time.Duration.Companion.milliseconds
  * | Step | Starts after the list fade starts | Lasts |
  * |---|---|---|
  * | Level card drops in | 0 | [CARD_ENTER] |
- * | Pour | [POUR_START] | [POUR_BASE] split by share, capped at [POUR_CAP] (see [planPour]) |
+ * | Level card switches to the after position, and pours it | [POUR_START] | The card's own pour, at most 2.5 s |
  * | Sheet rises | [SHEET_START] | [SHEET_RISE] |
  * | App bar title and close fade in | [SHEET_START] | [APP_BAR_FADE] |
  *
- * The sheet and app bar overlap the end of the card entrance and the pour on purpose.
+ * The sheet and app bar overlap the end of the card entrance and the pour on purpose. The pour is the
+ * Level card's own animation: nothing here waits for it to end.
  */
 internal val FIRST_TILE_DELAY: Duration = 560.milliseconds
 internal val TILE_INTERVAL: Duration = 720.milliseconds
@@ -36,23 +37,6 @@ internal val POUR_START: Duration = 680.milliseconds
 internal val SHEET_START: Duration = 920.milliseconds
 internal val SHEET_RISE: Duration = 640.milliseconds
 internal val APP_BAR_FADE: Duration = 640.milliseconds
-
-/** How long the whole Level pour takes for a session whose XP all lands in one segment. */
-internal val POUR_BASE: Duration = 1_500.milliseconds
-
-/** The floor of the first and last pour segment, however small their share of the XP. */
-internal val POUR_SEGMENT_MIN: Duration = 520.milliseconds
-
-/** A Level crossed in the middle of a pour: its bar fills and resets, nothing else. */
-internal val POUR_INTERMEDIATE: Duration = 300.milliseconds
-internal val POUR_INTERMEDIATE_MIN: Duration = 80.milliseconds
-
-/** The whole pour stays at or under this, unless the floors alone exceed it. */
-internal val POUR_CAP: Duration = 2_500.milliseconds
-
-/** The Level number's scale up and back down at every Level crossed. */
-internal val LEVEL_PULSE: Duration = 250.milliseconds
-internal const val LEVEL_PULSE_SCALE = 1.15f
 
 /** The tile list switches to its compact variant above this many lines. */
 internal const val COMPACT_TILE_THRESHOLD = 6

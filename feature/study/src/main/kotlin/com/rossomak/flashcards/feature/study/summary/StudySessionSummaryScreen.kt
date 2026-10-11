@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,7 +83,6 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
-import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.currentLocale
@@ -102,7 +102,6 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreSta
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Scored
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Unavailable
 import kotlin.math.roundToInt
-import kotlin.math.roundToLong
 import kotlinx.coroutines.launch
 
 private const val SECONDS_PER_MINUTE = 60
@@ -223,7 +222,7 @@ fun StudySessionSummaryContent(
 
 private fun StudySessionSummaryScreenState.toPayoff(settled: Boolean): SummaryPayoff {
     val build = if (settled) SummaryPayoff::settled else SummaryPayoff::unplayed
-    return build(xpLines, xpTotal, positionBefore(), positionAfter(), levelsCrossed)
+    return build(xpLines, xpTotal)
 }
 
 /**
@@ -587,10 +586,9 @@ private fun SummaryXpTotal(
 }
 
 /**
- * The account's Level card, driven by the pour: the Level number, the bar and the "x / y XP" text all
- * follow [payoff]. The card is handed lambdas, so a frame of the pour only redraws the bar and pulse;
- * the readout recomposes only when its whole-XP figure changes. The card stays out of accessibility
- * until the payoff settles, so its description never carries an in-flight figure.
+ * The account's Level card on a scored Summary: the position before the session until the payoff
+ * flips it, then the position after, which the card pours on its own. The card stays out of
+ * accessibility until the payoff settles, so it is read out once, with its final figures.
  */
 @Composable
 private fun SummaryLevelCard(
@@ -598,20 +596,16 @@ private fun SummaryLevelCard(
     state: StudySessionSummaryScreenState,
     modifier: Modifier = Modifier,
 ) {
-    val xpIntoLevel by remember(payoff) { derivedStateOf { payoff.pourXpIntoLevel.value.roundToLong() } }
-    FlashcardsLevelCard(
-        state = LevelCardContent(
-            level = payoff.pourLevel,
-            xpIntoCurrentLevel = xpIntoLevel,
-            xpForNextLevel = payoff.pourXpForNextLevel,
-            photoUrl = state.photoUrl,
-            displayName = state.displayName,
-        ),
-        modifier = modifier
-            .fillMaxWidth()
-            .then(if (payoff.isSettled) Modifier else Modifier.clearAndSetSemantics {}),
-        style = FlashcardsComponentStyle.OnGradient,
-    )
+    // A skip gives the card a new identity, whose first composition shows the after position without a pour.
+    key(payoff.wasSkipped) {
+        FlashcardsLevelCard(
+            state = if (payoff.showsLevelAfter) state.levelCard else state.levelCardBefore,
+            modifier = modifier
+                .fillMaxWidth()
+                .then(if (payoff.isSettled) Modifier else Modifier.clearAndSetSemantics {}),
+            style = FlashcardsComponentStyle.OnGradient,
+        )
+    }
 }
 
 @Composable

@@ -75,4 +75,15 @@ data class StudySessionSummaryScreenState(
             isLiveLevelUnavailable -> LevelCardUnavailable
             else -> LevelCardLoading
         }
+
+    /**
+     * The card a scored Summary shows before its pour: the score's Level position before the session.
+     * Without a score there is no pour, so this is [levelCard].
+     */
+    val levelCardBefore: FlashcardsLevelCardState
+        get() = when (scoreStatus) {
+            StudySessionSummaryScoreStatus.Scored ->
+                LevelCardContent(levelBefore, xpIntoCurrentLevelBefore, xpForNextLevelBefore, photoUrl, displayName)
+            else -> levelCard
+        }
 }

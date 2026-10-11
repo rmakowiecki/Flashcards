@@ -151,13 +151,12 @@ private val LevelUpState = ScoredState.copy(
 )
 
 private const val MID_ITEMIZATION_LINES = 5
-private const val MID_POUR_XP = 5_700L
 
 /** A frame of the payoff held still, drawn through the same layout the live sequence uses. */
 @Composable
 private fun PayoffFramePreview(state: StudySessionSummaryScreenState, frame: SummaryFrame) {
     val payoff = remember {
-        SummaryPayoff(state.xpLines, state.xpTotal, state.positionBefore(), state.positionAfter(), state.levelsCrossed, frame)
+        SummaryPayoff(state.xpLines, state.xpTotal, frame)
     }
     FlashcardsTheme {
         SummaryLayout(
@@ -177,7 +176,7 @@ private fun StudySessionSummaryMidItemizationPreview() {
     val shownLines = EveryLine.take(MID_ITEMIZATION_LINES)
     PayoffFramePreview(
         state = LevelUpState,
-        frame = SummaryFrame.start(LevelUpState.positionBefore()).copy(
+        frame = SummaryFrame.start.copy(
             runningTotal = shownLines.sumOf { it.amount }.toFloat(),
             visibleLineCount = shownLines.size,
         ),
@@ -186,11 +185,11 @@ private fun StudySessionSummaryMidItemizationPreview() {
 
 @PreviewLightDark
 @Composable
-private fun StudySessionSummaryMidPourPreview() {
+private fun StudySessionSummaryBeforePourPreview() {
     PayoffFramePreview(
         state = LevelUpState,
-        frame = SummaryFrame.settled(LevelUpState.xpTotal, LevelUpState.xpLines.size, LevelUpState.positionBefore()).copy(
-            pour = LevelPosition(level = LevelUpState.levelBefore, xpIntoLevel = MID_POUR_XP, xpForNextLevel = LevelUpState.xpForNextLevelBefore),
+        frame = SummaryFrame.settled(LevelUpState.xpTotal, LevelUpState.xpLines.size).copy(
+            showsLevelAfter = false,
             isSettled = false,
         ),
     )
