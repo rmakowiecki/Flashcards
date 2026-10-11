@@ -23,7 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
@@ -89,10 +92,15 @@ fun HomeScreen(
     onNavigateToBrowse: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val now by produceState(initialValue = Instant.now()) {
-        while (true) {
-            delay(1.minutes)
-            value = Instant.now()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // Ticks only while Home is STARTED and refreshes at once on every start. Held as State, not read with `by`, so
+    // only the Recent rows that read it recompose per tick.
+    val nowState = produceState(initialValue = Instant.now(), lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = Instant.now()
+                delay(1.minutes)
+            }
         }
     }
 
@@ -140,7 +148,7 @@ fun HomeScreen(
     HomeContent(
         modifier = modifier,
         state = state,
-        now = now,
+        now = { nowState.value },
         onCategoryClick = viewModel::onFavoriteCategorySelect,
         onCategoryQuickSessionClick = viewModel::onFavoriteCategoryQuickSessionStart,
         onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
@@ -156,14 +164,15 @@ fun HomeScreen(
  * Renders the Level card, then [HomeScreenState.body], in one scrolling column, so what shows below the card is
  * decided in one place.
  *
- * @param now what Recents' start times are worded against; [HomeScreen] ticks it once a minute.
+ * @param now provider of what Recents' start times are worded against, read only where a Recent's start time is
+ * worded so a tick recomposes just those rows.
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
 internal fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeScreenState,
-    now: Instant,
+    now: () -> Instant,
     zoneId: ZoneId = ZoneId.systemDefault(),
     onCategoryClick: (Category) -> Unit,
     onCategoryQuickSessionClick: (Category) -> Unit,
@@ -269,7 +278,7 @@ private fun HomeSections(
     sections: Sections,
     progressSummary: ProgressSummary?,
     isProgressResolved: Boolean,
-    now: Instant,
+    now: () -> Instant,
     zoneId: ZoneId,
     onCategoryClick: (Category) -> Unit,
     onCategoryQuickSessionClick: (Category) -> Unit,

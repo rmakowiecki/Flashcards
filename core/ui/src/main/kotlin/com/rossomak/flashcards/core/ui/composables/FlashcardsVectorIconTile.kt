@@ -63,7 +63,7 @@ fun FlashcardsVectorIconTile(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
-    val tintColor = color.toCategoryColorOrNull() ?: MaterialTheme.colorScheme.onSecondaryContainer
+    val tintColor = remember(color) { color.toCategoryColorOrNull() } ?: MaterialTheme.colorScheme.onSecondaryContainer
     val containerColor = tintColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
     val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = ICON_CONTENT_SIZE)
 
