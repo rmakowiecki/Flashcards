@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.domain.usecase
 
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryWithParentCategory
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -54,7 +55,10 @@ class SearchCategoriesUseCaseTest {
 
         val results = search(query = "compose").getOrThrow()
 
-        results.subcategories shouldContainExactly listOf(compose, composeNavigation)
+        results.subcategories shouldContainExactly listOf(
+            SubcategoryWithParentCategory(compose, android),
+            SubcategoryWithParentCategory(composeNavigation, android),
+        )
     }
 
     @Test
@@ -93,14 +97,14 @@ class SearchCategoriesUseCaseTest {
     }
 
     @Test
-    fun `a parent id missing from the supplied categories is dropped rather than faked`() = runTest {
+    fun `a parent id missing from the supplied categories drops its subcategory and category rather than faking them`() = runTest {
         repository.searchResultsByPrefix["testing"] = Result.success(listOf(androidTesting, pythonTesting))
 
         val results = searchCategories(
             SearchCategoriesParams(query = "testing", categories = listOf(android)),
         ).getOrThrow()
 
-        results.subcategories shouldContainExactly listOf(androidTesting, pythonTesting)
+        results.subcategories.map { it.subcategory } shouldContainExactly listOf(androidTesting)
         results.categories.map { it.category } shouldContainExactly listOf(android)
     }
 
@@ -153,7 +157,7 @@ class SearchCategoriesUseCaseTest {
         val second = search(query = "compose").getOrThrow()
 
         repository.searchedPrefixes shouldContainExactly listOf("compose")
-        second.subcategories shouldContainExactly listOf(compose)
+        second.subcategories.map { it.subcategory } shouldContainExactly listOf(compose)
     }
 
     @Test
@@ -165,7 +169,7 @@ class SearchCategoriesUseCaseTest {
         val refined = search(query = "compos").getOrThrow()
 
         repository.searchedPrefixes shouldContainExactly listOf("compose", "compos")
-        refined.subcategories shouldContainExactly listOf(compose, composeNavigation)
+        refined.subcategories.map { it.subcategory } shouldContainExactly listOf(compose, composeNavigation)
     }
 
     @Test
@@ -175,7 +179,7 @@ class SearchCategoriesUseCaseTest {
         search(query = "compose").isFailure shouldBe true
 
         repository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
-        search(query = "compose").getOrThrow().subcategories shouldContainExactly listOf(compose)
+        search(query = "compose").getOrThrow().subcategories.map { it.subcategory } shouldContainExactly listOf(compose)
         repository.searchedPrefixes shouldContainExactly listOf("compose", "compose")
     }
 

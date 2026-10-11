@@ -37,7 +37,7 @@ CATEGORIES
         13 topics
 ```
 
-**TOPICS** — one flat row per matched Subcategory (`FlashcardsListGroupItem.Row`): a mastery ring, the topic name, a secondary line reading `in <CategoryName>` prefixed by the parent Category's small tinted icon glyph, and two distinct tap targets — a play button and a chevron. The parent's name and glyph cost nothing extra: `categoryName` is already denormalized onto the Subcategory doc (ADR-0007), and the glyph comes from the cached `categories` list keyed by `categoryId`.
+**TOPICS** — one flat row per matched Subcategory (`FlashcardsListGroupItem.Row`): a mastery ring, the topic name, a secondary line led by the parent Category's small icon glyph in that Category's color (its name reaches only screen readers), then the card and studied counts, and two distinct tap targets — a play button and a chevron. The glyph costs nothing extra: `SearchCategoriesUseCase` pairs each matched Subcategory with its parent from the cached `categories` list keyed by `categoryId`, and drops a match whose parent is missing.
 
 **CATEGORIES** — the existing Browse category row shape (`FlashcardsListGroupItem.DetailedRow`): icon tile, name, chip line, subcategory count, chevron. **No play button** — starting a session is a Subcategory-level action, and a Category is not a study unit.
 

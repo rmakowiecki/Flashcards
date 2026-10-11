@@ -55,6 +55,7 @@ import com.rossomak.flashcards.core.domain.model.CategoryWithSubcategorySummary
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
+import com.rossomak.flashcards.core.domain.model.SubcategoryWithParentCategory
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -233,7 +234,6 @@ fun BrowseContent(
     ) {
         ExpandedSearchContent(
             searchStatus = state.searchStatus,
-            categories = state.categories,
             favorites = state.favorites,
             progressFor = progressFor,
             onCategoryClick = onCategoryClick,
@@ -346,7 +346,6 @@ private fun containedSearchBarColors(): SearchBarColors = SearchBarDefaults.colo
 @Composable
 private fun ExpandedSearchContent(
     searchStatus: SearchStatus,
-    categories: List<Category>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgressState,
     onCategoryClick: (String, String) -> Unit,
@@ -366,7 +365,6 @@ private fun ExpandedSearchContent(
 
         is SearchStatus.Results -> SearchResults(
             results = searchStatus.results,
-            categories = categories,
             favorites = favorites,
             progressFor = progressFor,
             onCategoryClick = onCategoryClick,
@@ -462,7 +460,6 @@ internal fun CategoryList(
 @Composable
 internal fun SearchResults(
     results: CategorySearchResults,
-    categories: List<Category>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgressState,
     onCategoryClick: (String, String) -> Unit,
@@ -474,7 +471,6 @@ internal fun SearchResults(
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_topics_label))
             SubcategoryListGroup(
                 subcategories = results.subcategories,
-                categories = categories,
                 favorites = favorites,
                 progressFor = progressFor,
                 onSubcategoryClick = onSubcategoryClick,
@@ -502,26 +498,22 @@ internal fun SearchResults(
 
 @Composable
 private fun SubcategoryListGroup(
-    subcategories: List<Subcategory>,
-    categories: List<Category>,
+    subcategories: List<SubcategoryWithParentCategory>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgressState,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
-    val categoriesById = remember(categories) { categories.associateBy { it.id } }
     FlashcardsListGroup(
         modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
         items = subcategories,
-        key = { subcategory -> subcategory.id },
-    ) { subcategory, rowModifier ->
+        key = { (subcategory) -> subcategory.id },
+    ) { (subcategory, parentCategory), rowModifier ->
         SubcategorySearchResultRow(
             modifier = rowModifier,
             subcategory = subcategory,
+            parentCategory = parentCategory,
             progress = progressFor(subcategory.id),
-            // Not found only for a stale/inconsistent categoryId — falls back to the glyph's own
-            // generic icon, same as a category with no iconSvg curated yet.
-            iconSvg = categoriesById[subcategory.categoryId]?.iconSvg,
             isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
             onSubcategoryClick = onSubcategoryClick,
             onSubcategorySessionStart = onSubcategorySessionStart,
@@ -621,22 +613,28 @@ private val previewCategories = listOf(
     ),
 )
 
-private val previewAndroidSubcategories = listOf(
-    Subcategory(
-        id = "android-compose",
-        name = "Compose",
-        categoryId = "android",
-        categoryName = "Android",
-        order = 0,
-        cardCount = 120,
+private val previewSearchSubcategories = listOf(
+    SubcategoryWithParentCategory(
+        subcategory = Subcategory(
+            id = "android-collections",
+            name = "Collections",
+            categoryId = "android",
+            categoryName = "Android",
+            order = 0,
+            cardCount = 120,
+        ),
+        parentCategory = previewCategories[0],
     ),
-    Subcategory(
-        id = "android-compose-navigation",
-        name = "Compose Navigation",
-        categoryId = "android",
-        categoryName = "Android",
-        order = 2,
-        cardCount = 34,
+    SubcategoryWithParentCategory(
+        subcategory = Subcategory(
+            id = "python-collections",
+            name = "Collections",
+            categoryId = "python",
+            categoryName = "Python",
+            order = 2,
+            cardCount = 34,
+        ),
+        parentCategory = previewCategories[1],
     ),
 )
 
@@ -664,7 +662,7 @@ private fun BrowseContentPreview() {
 @Composable
 private fun SearchResultsPreview() {
     val previewProgressFor: (String) -> SubcategoryProgressState = { subcategoryId ->
-        if (subcategoryId == previewAndroidSubcategories.first().id) {
+        if (subcategoryId == previewSearchSubcategories.first().subcategory.id) {
             SubcategoryProgressState.Resolved(studiedCount = 25, masteredCount = 10)
         } else {
             SubcategoryProgressState.Resolved(studiedCount = 0, masteredCount = 0)
@@ -672,15 +670,14 @@ private fun SearchResultsPreview() {
     }
     SearchResults(
         results = CategorySearchResults(
-            subcategories = previewAndroidSubcategories,
+            subcategories = previewSearchSubcategories,
             categories = listOf(
                 CategoryWithSubcategorySummary(
                     category = previewCategories.first(),
-                    subcategorySummary = listOf("Compose", "Compose Navigation", "Coroutines"),
+                    subcategorySummary = listOf("Collections", "Compose", "Coroutines"),
                 ),
             ),
         ),
-        categories = previewCategories,
         favorites = UserFavorites.EMPTY,
         progressFor = previewProgressFor,
         onCategoryClick = { _, _ -> },

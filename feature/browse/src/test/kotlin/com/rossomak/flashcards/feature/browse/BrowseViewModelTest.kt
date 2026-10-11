@@ -53,6 +53,11 @@ class BrowseViewModelTest {
         featuredSubcategoryNames = listOf("Compose", "Coroutines"),
     )
 
+    init {
+        // Search drops a matched Subcategory whose parent Category is not loaded.
+        flashcardRepository.categoriesToReturn = Result.success(listOf(android))
+    }
+
     private val compose = Subcategory(
         id = "android-compose",
         name = "Compose",
@@ -117,7 +122,6 @@ class BrowseViewModelTest {
 
     @Test
     fun `a typed query is not searched until the debounce elapses`() = runTest(mainDispatcherRule.testDispatcher) {
-        flashcardRepository.categoriesToReturn = Result.success(listOf(android))
         flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
 
         val viewModel = createViewModel()
@@ -131,13 +135,12 @@ class BrowseViewModelTest {
         flashcardRepository.searchedPrefixes shouldContainExactly listOf("compose")
         val status = viewModel.state.value.searchStatus
         status.shouldBeInstanceOf<SearchStatus.Results>()
-        status.results.subcategories shouldContainExactly listOf(compose)
+        status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose)
     }
 
     @Test
     fun `a query still below the debounce reports loading rather than the too-short prompt once it is long enough`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.categoriesToReturn = Result.success(listOf(android))
             flashcardRepository.searchResultsByPrefix["ap"] = Result.success(emptyList())
 
             val viewModel = createViewModel()
@@ -159,7 +162,6 @@ class BrowseViewModelTest {
         // result), replaying the unchanged query. onSearchQueryChange must no-op on that replay
         // rather than reset searchStatus, since distinctUntilChanged downstream never reruns
         // the search for a query that didn't actually change.
-        flashcardRepository.categoriesToReturn = Result.success(listOf(android))
         flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
 
         val viewModel = createViewModel()
@@ -171,13 +173,12 @@ class BrowseViewModelTest {
 
         val status = viewModel.state.value.searchStatus
         status.shouldBeInstanceOf<SearchStatus.Results>()
-        status.results.subcategories shouldContainExactly listOf(compose)
+        status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose)
     }
 
     @Test
     fun `keystrokes inside the debounce window only search the final query`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.categoriesToReturn = Result.success(listOf(android))
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
 
             val viewModel = createViewModel()
@@ -209,7 +210,6 @@ class BrowseViewModelTest {
     @Test
     fun `a query at or above the minimum length reports loading until the debounce elapses`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.categoriesToReturn = Result.success(listOf(android))
             flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
 
             val viewModel = createViewModel()
@@ -315,7 +315,7 @@ class BrowseViewModelTest {
 
             val status = viewModel.state.value.searchStatus
             status.shouldBeInstanceOf<SearchStatus.Results>()
-            status.results.subcategories shouldContainExactly listOf(compose)
+            status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose)
             viewModel.state.value.isProgressResolved shouldBe false
             viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Unresolved
 
@@ -370,7 +370,7 @@ class BrowseViewModelTest {
 
             val status = viewModel.state.value.searchStatus
             status.shouldBeInstanceOf<SearchStatus.Results>()
-            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
+            status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose, coroutines)
         }
 
     /** Structural per ADR-0016, but a fixture bug producing the reverse must still fail loudly. */
@@ -423,7 +423,7 @@ class BrowseViewModelTest {
             // Results are in, favorites are still parked: rows exist but none is badged yet.
             var status = viewModel.state.value.searchStatus
             status.shouldBeInstanceOf<SearchStatus.Results>()
-            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
+            status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose, coroutines)
             viewModel.state.value.favorites shouldBe UserFavorites.EMPTY
 
             favoritesGate.complete(Unit)
@@ -432,7 +432,7 @@ class BrowseViewModelTest {
             // Releasing favorites changes only the badge data, never the results themselves.
             status = viewModel.state.value.searchStatus
             status.shouldBeInstanceOf<SearchStatus.Results>()
-            status.results.subcategories shouldContainExactly listOf(compose, coroutines)
+            status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose, coroutines)
             viewModel.state.value.favorites.subcategoryIds.keys shouldBe setOf(coroutines.id)
         }
 
