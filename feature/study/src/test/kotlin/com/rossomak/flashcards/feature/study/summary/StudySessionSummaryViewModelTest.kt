@@ -34,6 +34,9 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Loading as LevelCardLoading
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
@@ -61,6 +64,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -96,17 +100,30 @@ class StudySessionSummaryViewModelTest {
 
     private fun createViewModel(
         observeLevelProgress: ObserveLevelProgressUseCase = ObserveLevelProgressUseCase(levelProgressRepository),
+        observeAuthUser: ObserveAuthUserUseCase = ObserveAuthUserUseCase(authRepository),
     ): StudySessionSummaryViewModel = StudySessionSummaryViewModel(
         savedStateHandle,
         ObserveUserPreferencesUseCase(userPreferencesRepository),
         SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, GetXpConfigUseCase(xpConfigRepository), sessionSubmissionRepository),
-        ObserveAuthUserUseCase(authRepository),
+        observeAuthUser,
         observeLevelProgress,
     )
 
     private fun levelProgressReturning(levelProgress: Flow<LevelProgress>): ObserveLevelProgressUseCase = mockk {
         coEvery { this@mockk() } returns levelProgress
     }
+
+    private fun authUserReturning(authUser: Flow<AuthUser?>): ObserveAuthUserUseCase = mockk {
+        coEvery { this@mockk() } returns authUser
+    }
+
+    private fun liveLevelCard(levelProgress: LevelProgress, photoUrl: String?, displayName: String?) = LevelCardContent(
+        level = levelProgress.level,
+        xpIntoCurrentLevel = levelProgress.xpIntoCurrentLevel,
+        xpForNextLevel = levelProgress.xpForNextLevel,
+        photoUrl = photoUrl,
+        displayName = displayName,
+    )
 
     @Before
     fun setUp() {
@@ -546,46 +563,75 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
-    fun `the Level card is Loading until the Level stream emits`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(ratedRoute())
+    fun `a scored Summary's Level card shows the score's Level position, not the live Level`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            authRepository.userToReturn = AUTH_USER
+            stubRoute(ratedRoute())
+            sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+            levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
 
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Loading
-    }
+            viewModel.state.assertValue {
+                levelCard shouldBe LevelCardContent(
+                    level = SERVER_SCORE.level,
+                    xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevel,
+                    xpForNextLevel = SERVER_SCORE.xpForNextLevel,
+                    photoUrl = AUTH_USER_PHOTO_URL,
+                    displayName = AUTH_USER_DISPLAY_NAME,
+                )
+                levelsCrossed shouldBe listOf(2, 3)
+            }
+        }
 
     @Test
-    fun `the Level card shows the live Level, not the one on the score`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a scored Level card stays on the score when the live Level changes`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
         levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
-
         val viewModel = createViewModel()
         advanceUntilIdle()
-
-        viewModel.state.assertValue {
-            levelCard shouldBe StudySessionSummaryLevelCardState.Content(LIVE_LEVEL_PROGRESS)
-            levelsCrossed shouldBe listOf(2, 3)
-        }
-    }
-
-    @Test
-    fun `a later Level emission updates the Level card`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(ratedRoute())
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val scoredCard = viewModel.state.value.levelCard
 
         levelProgressRepository.emit(NEXT_LEVEL_PROGRESS)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Content(NEXT_LEVEL_PROGRESS)
+        viewModel.state.value.levelCard shouldBe scoredCard
     }
 
     @Test
-    fun `an unavailable score still gets the live Level for its card`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a scored Level card does not wait for the auth user`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+
+        val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { awaitCancellation() }))
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardContent(
+            level = SERVER_SCORE.level,
+            xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevel,
+            xpForNextLevel = SERVER_SCORE.xpForNextLevel,
+            photoUrl = null,
+            displayName = null,
+        )
+    }
+
+    @Test
+    fun `an unscored Level card is Loading until the Level stream emits`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardLoading
+    }
+
+    @Test
+    fun `an unscored Level card follows the live Level and the auth user`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        authRepository.userToReturn = AUTH_USER
         stubRoute(ratedRoute())
         levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
 
@@ -594,12 +640,50 @@ class StudySessionSummaryViewModelTest {
 
         viewModel.state.assertValue {
             scoreStatus shouldBe Unavailable
-            levelCard shouldBe StudySessionSummaryLevelCardState.Content(LIVE_LEVEL_PROGRESS)
+            levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, AUTH_USER_PHOTO_URL, AUTH_USER_DISPLAY_NAME)
         }
     }
 
     @Test
-    fun `the Level card does not wait for the submission`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `an unscored Level card stays Loading until the auth user has emitted`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+
+        val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { awaitCancellation() }))
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe LevelCardLoading
+    }
+
+    @Test
+    fun `an unscored Level card with no signed-in User still shows content`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, photoUrl = null, displayName = null)
+    }
+
+    @Test
+    fun `a later Level emission updates an unscored Level card`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        levelProgressRepository.emit(NEXT_LEVEL_PROGRESS)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe liveLevelCard(NEXT_LEVEL_PROGRESS, photoUrl = null, displayName = null)
+    }
+
+    @Test
+    fun `the live Level is collected while the score is still loading`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flow {
             emit(InFlight)
@@ -613,49 +697,67 @@ class StudySessionSummaryViewModelTest {
 
         viewModel.state.assertValue {
             scoreStatus shouldBe Loading
-            levelCard shouldBe StudySessionSummaryLevelCardState.Content(LIVE_LEVEL_PROGRESS)
+            liveLevel shouldBe LIVE_LEVEL_PROGRESS
         }
     }
 
     @Test
-    fun `the Level card is Unavailable when the Level stream fails before its first emission`() =
+    fun `an unscored Level card is Unavailable when the Level stream fails before its first emission`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
             levelProgressRepository.levelProgressReadFailure = IllegalStateException("level listener failed")
 
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Unavailable
+            viewModel.state.value.levelCard shouldBe LevelCardUnavailable
         }
 
     @Test
-    fun `the Level card is Unavailable when the Level stream completes before its first emission`() =
+    fun `an unscored Level card is Unavailable when the Level stream completes before its first emission`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
             levelProgressRepository.completesWithoutEmitting = true
 
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Unavailable
+            viewModel.state.value.levelCard shouldBe LevelCardUnavailable
         }
 
     @Test
-    fun `the Level card is Unavailable when building the Level stream fails`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(ratedRoute())
-        val observeLevelProgress = mockk<ObserveLevelProgressUseCase>()
-        coEvery { observeLevelProgress() } throws IllegalStateException("could not build the stream")
+    fun `an unscored Level card is Unavailable when building the Level stream fails`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+            stubRoute(ratedRoute())
+            val observeLevelProgress = mockk<ObserveLevelProgressUseCase>()
+            coEvery { observeLevelProgress() } throws IllegalStateException("could not build the stream")
 
-        val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
-        advanceUntilIdle()
+            val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
+            advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Unavailable
-        coVerify(exactly = 1) { observeLevelProgress() }
-    }
+            viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+            coVerify(exactly = 1) { observeLevelProgress() }
+        }
+
+    @Test
+    fun `an unscored Level card is Unavailable when the auth user fails before content`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+            stubRoute(ratedRoute())
+            levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+
+            val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { error("auth listener failed") }))
+            advanceUntilIdle()
+
+            viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+        }
 
     @Test
     fun `a Level stream failure after the first emission keeps the last Level`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
         val observeLevelProgress = levelProgressReturning(
             flow {
@@ -667,19 +769,20 @@ class StudySessionSummaryViewModelTest {
         val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Content(LIVE_LEVEL_PROGRESS)
+        viewModel.state.value.levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, photoUrl = null, displayName = null)
         coVerify(exactly = 1) { observeLevelProgress() }
     }
 
     @Test
     fun `a Level stream completion after the first emission keeps the last Level`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
         val observeLevelProgress = levelProgressReturning(flow { emit(LIVE_LEVEL_PROGRESS) })
 
         val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe StudySessionSummaryLevelCardState.Content(LIVE_LEVEL_PROGRESS)
+        viewModel.state.value.levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, photoUrl = null, displayName = null)
         coVerify(exactly = 1) { observeLevelProgress() }
     }
 

@@ -18,13 +18,13 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Loading as LevelCardLoading
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading as FavoritesLoading
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Content as LevelCardContent
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Loading as LevelCardLoading
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
@@ -202,8 +202,9 @@ class HomeViewModel @Inject constructor(
      * emitted; a null auth user still gives [LevelCardContent], with no name or photo. The Level stream's end is
      * handled on that stream itself, not on the combined flow: the auth stream never ends, so `combine` would
      * wait on it forever. Before the Level's first emission a failure or a completion (a signed-out start ends
-     * the stream silently) gives [LevelCardUnavailable]; after one, the card keeps waiting for the auth user or
-     * keeps its last content, and auth changes still update it in place.
+     * the stream silently) gives [LevelCardUnavailable], which the card draws like [LevelCardLoading] without
+     * the shimmer; after one, the card keeps waiting for the auth user or keeps its last content, and auth
+     * changes still update it in place.
      */
     private fun collectLevelCard() {
         levelCardJob?.cancel()
@@ -226,7 +227,15 @@ class HomeViewModel @Inject constructor(
                 }
                 .collect { (levelProgress, authUser) ->
                     _state.update {
-                        it.copy(levelCard = LevelCardContent(levelProgress, authUser?.photoUrl, authUser?.displayName))
+                        it.copy(
+                            levelCard = LevelCardContent(
+                                level = levelProgress.level,
+                                xpIntoCurrentLevel = levelProgress.xpIntoCurrentLevel,
+                                xpForNextLevel = levelProgress.xpForNextLevel,
+                                photoUrl = authUser?.photoUrl,
+                                displayName = authUser?.displayName,
+                            ),
+                        )
                     }
                 }
         }

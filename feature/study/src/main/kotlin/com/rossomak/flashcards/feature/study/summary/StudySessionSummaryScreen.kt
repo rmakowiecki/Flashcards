@@ -1,9 +1,5 @@
 package com.rossomak.flashcards.feature.study.summary
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,7 +64,6 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButto
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
-import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardSkeleton
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.currentLocale
@@ -160,10 +155,11 @@ fun StudySessionSummaryScreen(
  * The Summary in its final, settled state, which is the frame every other state lands on.
  *
  * While the score loads, only a spinner shows on the gradient: no app bar, and nothing to tap. Once
- * it resolves, the app bar, a scrolling stack (headline, pills, and for a [Scored] session the XP
- * total and Level card) and the bottom sheet appear. An [Unavailable] score shows the same screen
- * without the total or its breakdown button, and its Level card follows the live Level stream instead
- * of the score.
+ * it resolves, the app bar, a scrolling stack (headline, pills, for a [Scored] session the XP total,
+ * and the Level card) and the bottom sheet appear. An [Unavailable] score shows the same screen
+ * without the total or its breakdown button. The Level card always shows: a scored Summary draws the
+ * score's Level position, and an unscored one follows the live Level stream like Home's card, with the
+ * same skeleton while it loads or when it is unavailable.
  */
 @Composable
 fun StudySessionSummaryContent(
@@ -277,61 +273,12 @@ private fun SummaryBody(
                 locale = locale,
                 onShowBreakdown = { onDialogEvent(Open(XpBreakdown)) },
             )
-            FlashcardsLevelCard(
-                level = state.level,
-                xpIntoCurrentLevel = state.xpIntoCurrentLevel,
-                xpForNextLevel = state.xpForNextLevel,
-                progress = levelProgress(state.xpIntoCurrentLevel, state.xpForNextLevel),
-                photoUrl = state.photoUrl,
-                displayName = state.displayName,
-                modifier = Modifier.fillMaxWidth(),
-                style = FlashcardsComponentStyle.OnGradient,
-            )
         }
-        if (state.scoreStatus == Unavailable) {
-            SummaryLiveLevelCard(state = state.levelCard, photoUrl = state.photoUrl, displayName = state.displayName)
-        }
-    }
-}
-
-/**
- * The Level card of a Summary with no score, which has no Level position of its own: Home's live Level
- * stream instead. The on-gradient skeleton shows until the stream has emitted, with a fade to the card,
- * and a stream that fails or ends first leaves the slot empty.
- */
-@Composable
-private fun SummaryLiveLevelCard(
-    state: StudySessionSummaryLevelCardState,
-    photoUrl: String?,
-    displayName: String?,
-    modifier: Modifier = Modifier,
-) {
-    AnimatedContent(
-        targetState = state,
-        modifier = modifier,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        contentKey = { it::class },
-        label = "SummaryLiveLevelCard",
-    ) { shownState ->
-        when (shownState) {
-            StudySessionSummaryLevelCardState.Loading -> FlashcardsLevelCardSkeleton(
-                modifier = Modifier.fillMaxWidth(),
-                style = FlashcardsComponentStyle.OnGradient,
-            )
-            is StudySessionSummaryLevelCardState.Content -> with(shownState.levelProgress) {
-                FlashcardsLevelCard(
-                    level = level,
-                    xpIntoCurrentLevel = xpIntoCurrentLevel,
-                    xpForNextLevel = xpForNextLevel,
-                    progress = progress,
-                    photoUrl = photoUrl,
-                    displayName = displayName,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = FlashcardsComponentStyle.OnGradient,
-                )
-            }
-            StudySessionSummaryLevelCardState.Unavailable -> Unit
-        }
+        FlashcardsLevelCard(
+            state = state.levelCard,
+            modifier = Modifier.fillMaxWidth(),
+            style = FlashcardsComponentStyle.OnGradient,
+        )
     }
 }
 
@@ -450,6 +397,3 @@ private fun SummarySheet(
         )
     }
 }
-
-private fun levelProgress(xpIntoCurrentLevel: Long, xpForNextLevel: Long): Float =
-    if (xpForNextLevel <= 0L) 0f else (xpIntoCurrentLevel.toFloat() / xpForNextLevel.toFloat()).coerceIn(0f, 1f)

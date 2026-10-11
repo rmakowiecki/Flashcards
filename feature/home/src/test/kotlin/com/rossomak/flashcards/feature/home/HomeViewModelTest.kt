@@ -32,6 +32,9 @@ import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Loading as LevelCardLoading
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
 import com.rossomak.flashcards.feature.home.HomeBody.LoadError
 import com.rossomak.flashcards.feature.home.HomeBody.Resolving
@@ -43,9 +46,6 @@ import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Content as LevelCardContent
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Loading as LevelCardLoading
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
@@ -1231,6 +1231,16 @@ class HomeViewModelTest {
 
     private val startingLevelProgress = LevelProgress(level = 1, xpIntoCurrentLevel = 0, xpForNextLevel = 1_000)
     private val levelThreeProgress = LevelProgress(level = 3, xpIntoCurrentLevel = 250, xpForNextLevel = 1_000)
+
+    private fun levelCardContent(levelProgress: LevelProgress, photoUrl: String?, displayName: String?) = LevelCardContent(
+        level = levelProgress.level,
+        xpIntoCurrentLevel = levelProgress.xpIntoCurrentLevel,
+        xpForNextLevel = levelProgress.xpForNextLevel,
+        photoUrl = photoUrl,
+        displayName = displayName,
+    )
+
+    private fun LevelCardContent.toLevelProgress() = LevelProgress(level, xpIntoCurrentLevel, xpForNextLevel)
     private val janeDoe = AuthUser(uid = "uid", email = null, displayName = DISPLAY_NAME, photoUrl = AVATAR_URL)
 
     @Test
@@ -1244,7 +1254,7 @@ class HomeViewModelTest {
         levelProgressRepository.emit(levelThreeProgress)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
     }
 
     @Test
@@ -1254,7 +1264,7 @@ class HomeViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>().levelProgress shouldBe startingLevelProgress
+        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>().toLevelProgress() shouldBe startingLevelProgress
     }
 
     @Test
@@ -1264,7 +1274,7 @@ class HomeViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
     }
 
     @Test
@@ -1277,7 +1287,7 @@ class HomeViewModelTest {
         authRepository.userToReturn = janeDoe.copy(displayName = RENAMED_DISPLAY_NAME, photoUrl = null)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = RENAMED_DISPLAY_NAME)
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, photoUrl = null, displayName = RENAMED_DISPLAY_NAME)
     }
 
     @Test
@@ -1290,7 +1300,7 @@ class HomeViewModelTest {
         levelProgressRepository.emit(levelThreeProgress)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
     }
 
     @Test
@@ -1337,7 +1347,7 @@ class HomeViewModelTest {
         val viewModel = createViewModel(observeLevelProgress = levelProgress)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
         coVerify(exactly = 1) { levelProgress() }
     }
 
@@ -1348,7 +1358,7 @@ class HomeViewModelTest {
         val viewModel = createViewModel(observeLevelProgress = levelProgress)
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
         coVerify(exactly = 1) { levelProgress() }
     }
 
@@ -1367,7 +1377,7 @@ class HomeViewModelTest {
             authUserGate.complete(janeDoe)
             advanceUntilIdle()
 
-            viewModel.state.value.levelCard shouldBe LevelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
+            viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, AVATAR_URL, DISPLAY_NAME)
             coVerify(exactly = 1) { levelProgress() }
             coVerify(exactly = 1) { authUser() }
         }
@@ -1447,7 +1457,7 @@ class HomeViewModelTest {
         viewModel.state.value.levelCard shouldBe LevelCardLoading
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>().levelProgress shouldBe levelThreeProgress
+        viewModel.state.value.levelCard.shouldBeInstanceOf<LevelCardContent>().toLevelProgress() shouldBe levelThreeProgress
     }
 
     @Test

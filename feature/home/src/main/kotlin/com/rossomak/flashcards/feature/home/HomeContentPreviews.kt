@@ -7,18 +7,18 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
-import com.rossomak.flashcards.core.domain.model.LevelProgress
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Loading as LevelCardLoading
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading as FavoritesLoading
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Content as LevelCardContent
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Loading as LevelCardLoading
-import com.rossomak.flashcards.feature.home.HomeLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
@@ -50,7 +50,9 @@ private val previewFavorites = FavoritesContent(
     ),
 )
 private val previewLevelCard = LevelCardContent(
-    levelProgress = LevelProgress(level = 7, xpIntoCurrentLevel = 2_300L, xpForNextLevel = 6_000L),
+    level = 7,
+    xpIntoCurrentLevel = 2_300L,
+    xpForNextLevel = 6_000L,
     photoUrl = null,
     displayName = "Jane Doe",
 )
@@ -66,7 +68,7 @@ private val previewFavoritesAndRecentsState = HomeScreenState(
 )
 
 @Composable
-private fun HomeContentPreviewHost(state: HomeScreenState, levelCard: HomeLevelCardState = previewLevelCard) {
+private fun HomeContentPreviewHost(state: HomeScreenState, levelCard: FlashcardsLevelCardState = previewLevelCard) {
     FlashcardsTheme {
         HomeContent(
             state = state.copy(levelCard = levelCard),
