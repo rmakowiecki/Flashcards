@@ -20,7 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -115,12 +116,15 @@ internal fun SummaryConfetti(origin: Offset?, modifier: Modifier = Modifier) {
         isBursting = false
     }
 
+    // Composed only while a burst plays, on its own layer, so its frames redraw the canvas and nothing under it.
+    if (origin == null || !isBursting) return
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .onGloballyPositioned { coordinates -> canvasOrigin = coordinates.positionInWindow() },
+            .graphicsLayer()
+            .onPlaced { coordinates -> canvasOrigin = coordinates.positionInWindow() },
     ) {
-        if (origin != null && isBursting) drawBurst(origin - canvasOrigin, elapsed.value)
+        drawBurst(origin - canvasOrigin, elapsed.value)
     }
 }
 

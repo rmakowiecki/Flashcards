@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +55,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -349,13 +350,14 @@ private fun SummaryAnnouncement(payoff: SummaryPayoff, levelsCrossed: List<Int>)
  */
 @Composable
 private fun SummaryTopBar(payoff: SummaryPayoff, onNavigateBack: () -> Unit) {
-    val progress = payoff.appBarProgress.value
+    // The fade itself is read in the draw phase; composition only learns when the close button appears.
+    val isCloseShown by remember(payoff) { derivedStateOf { payoff.appBarProgress.value > 0f } }
     FlashcardsGradientTopBar(
         title = stringResource(R.string.study_session_summary_title_label),
-        titleAlpha = progress,
+        titleAlpha = { payoff.appBarProgress.value },
         navigationIcon = {
-            if (progress > 0f) {
-                IconButton(onClick = onNavigateBack, modifier = Modifier.alpha(progress)) {
+            if (isCloseShown) {
+                IconButton(onClick = onNavigateBack, modifier = Modifier.graphicsLayer { alpha = payoff.appBarProgress.value }) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.study_session_summary_close_cd),
@@ -425,12 +427,15 @@ private fun SummaryBody(
                 SummaryLevelCard(
                     payoff = payoff,
                     state = state,
-                    modifier = revealModifier
+                    modifier = Modifier
                         .onSizeChanged { size -> cardHeightPx = size.height }
+                        // One layer for the fade and the drop, rather than revealModifier's plus its own.
                         .graphicsLayer {
                             val enter = payoff.cardProgress.value
+                            alpha = enter
                             translationY = -(1f - enter) * CARD_SLIDE_DP.dp.toPx()
-                        },
+                        }
+                        .then(if (payoff.isRevealed) Modifier else Modifier.clearAndSetSemantics {}),
                 )
             }
             if (state.scoreStatus == Unavailable) {
@@ -457,22 +462,33 @@ private fun SummaryBody(
             }
             SummaryPills(state = state, modifier = revealModifier)
         }
-        if (isScored && payoff.isListShown) {
-            // Under the total's floating spot, over the part of the stack that has not appeared yet.
-            SummaryXpTiles(
-                lines = payoff.lines,
-                visibleCount = payoff.visibleLineCount,
-                alpha = { payoff.listAlpha.value },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = spacing.normal)
-                    .padding(
-                        top = spacing.small + with(LocalDensity.current) { totalHeightPx.toDp() } + spacing.medium,
-                        bottom = spacing.normal,
-                    ),
-            )
+        if (isScored) {
+            SummaryXpTileOverlay(payoff = payoff, totalHeightPx = { totalHeightPx })
         }
     }
+}
+
+/**
+ * The XP tiles, under the total's floating spot, over the part of the stack that has not appeared yet.
+ * Reads the payoff's list flag and the total's measured height in its own scope, so a new tile or the
+ * list leaving recomposes the tiles and not the stack.
+ */
+@Composable
+private fun SummaryXpTileOverlay(payoff: SummaryPayoff, totalHeightPx: () -> Int) {
+    if (!payoff.isListShown) return
+    val spacing = MaterialTheme.spacing
+    SummaryXpTiles(
+        lines = payoff.lines,
+        visibleCount = { payoff.visibleLineCount },
+        alpha = { payoff.listAlpha.value },
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = spacing.normal)
+            .padding(
+                top = spacing.small + with(LocalDensity.current) { totalHeightPx().toDp() } + spacing.medium,
+                bottom = spacing.normal,
+            ),
+    )
 }
 
 /** Fades with [progress] and, until [isRevealed], stays out of accessibility too. */
@@ -537,17 +553,17 @@ private fun SummaryXpTotal(
     modifier: Modifier = Modifier,
 ) {
     val locale = currentLocale()
+    // Recomposes when the whole-XP figure changes, not on every frame of the count.
+    val shownTotal by remember(payoff) { derivedStateOf { payoff.runningTotal.value.roundToInt() } }
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stringResource(
-                R.string.study_session_summary_xp_row_amount_label,
-                formatSignedXp(payoff.runningTotal.value.roundToInt(), locale),
-            ),
-            modifier = Modifier.onGloballyPositioned { coordinates -> payoff.totalTextCoordinates = coordinates },
+            text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(shownTotal, locale)),
+            // Only the coordinates object is kept; the confetti reads its position live when it bursts.
+            modifier = Modifier.onPlaced { coordinates -> payoff.totalTextCoordinates = coordinates },
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.brandColors.onGradientContent,
@@ -570,8 +586,9 @@ private fun SummaryXpTotal(
 
 /**
  * The account's Level card, driven by the pour: the Level number, the bar and the "x / y XP" text all
- * follow [payoff]. Reads its animated values here, in its own scope, so a frame of the pour recomposes
- * this card and nothing around it.
+ * follow [payoff]. The card is handed lambdas, so a frame of the pour only redraws the bar and pulse;
+ * the readout recomposes only when its whole-XP figure changes. The card stays out of accessibility
+ * until the payoff settles, so its description never carries an in-flight figure.
  */
 @Composable
 private fun SummaryLevelCard(
@@ -579,17 +596,19 @@ private fun SummaryLevelCard(
     state: StudySessionSummaryScreenState,
     modifier: Modifier = Modifier,
 ) {
+    val xpIntoLevel by remember(payoff) { derivedStateOf { payoff.pourXpIntoLevel.value.roundToLong() } }
     FlashcardsLevelCard(
         level = payoff.pourLevel,
-        xpIntoCurrentLevel = payoff.pourXpIntoLevel.value.roundToLong(),
+        xpIntoCurrentLevel = { xpIntoLevel },
         xpForNextLevel = payoff.pourXpForNextLevel,
-        progress = payoff.pourFraction.value,
+        progress = { payoff.pourFraction.value },
         photoUrl = state.photoUrl,
         displayName = state.displayName,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (payoff.isSettled) Modifier else Modifier.clearAndSetSemantics {}),
         style = FlashcardsComponentStyle.OnGradient,
         showXpCount = payoff.showsXpCount,
-        animateProgress = false,
         levelScale = { payoff.levelPulse.value },
     )
 }

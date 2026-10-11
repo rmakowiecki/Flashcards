@@ -16,9 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,7 +46,8 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
  * and keeps its own users; this component is for screens that paint the gradient themselves.
  *
  * [titleAlpha] fades the title in or out while the bar keeps its height, for a screen that reveals
- * the bar after an entrance sequence. At `0f` the title is also hidden from accessibility.
+ * the bar after an entrance sequence. It is read in the draw phase, so a running fade never recomposes
+ * the bar; at `0f` the title is also hidden from accessibility.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -53,9 +57,10 @@ fun FlashcardsGradientTopBar(
     navigationIcon: @Composable () -> Unit = {},
     scrollBehavior: TopAppBarScrollBehavior? = null,
     actions: @Composable RowScope.() -> Unit = {},
-    titleAlpha: Float = 1f,
+    titleAlpha: () -> Float = { 1f },
 ) {
     val onGradientContent = MaterialTheme.brandColors.onGradientContent
+    val isTitleShown by remember(titleAlpha) { derivedStateOf { titleAlpha() > 0f } }
 
     CenterAlignedTopAppBar(
         title = {
@@ -68,8 +73,8 @@ fun FlashcardsGradientTopBar(
                 text = title,
                 modifier = Modifier
                     .basicMarquee()
-                    .alpha(titleAlpha)
-                    .then(if (titleAlpha > 0f) Modifier else Modifier.clearAndSetSemantics {}),
+                    .graphicsLayer { alpha = titleAlpha() }
+                    .then(if (isTitleShown) Modifier else Modifier.clearAndSetSemantics {}),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,

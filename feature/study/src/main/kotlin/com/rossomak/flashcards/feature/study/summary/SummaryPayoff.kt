@@ -123,7 +123,11 @@ internal class SummaryPayoff(
     var confettiOrigin by mutableStateOf<Offset?>(null)
         private set
 
-    /** The total's text, read live at the moment of the burst: its on-screen position moves as the card drops in. */
+    /**
+     * The total's text, read live at the moment of the burst: its on-screen position moves as the card drops in.
+     * A plain field, not snapshot state, despite [Stable]: only the sequence's coroutine reads it, never a
+     * composition, so a write never needs to invalidate anything.
+     */
     var totalTextCoordinates: LayoutCoordinates? = null
 
     /** Skip, a tap and the first back all end here. False once the sheet starts to rise, or when settled. */

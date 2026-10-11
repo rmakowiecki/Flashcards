@@ -56,6 +56,44 @@ fun FlashcardsLinearProgressBar(
         animationSpec = if (animate) flashcardsProgressBarDefaultAnimationSpec else snap(),
         label = "FlashcardsLinearProgressBarProgress",
     )
+    LinearProgressBarCanvas(
+        progress = { animatedProgress.value },
+        modifier = modifier.semantics { progressBarRangeInfo = ProgressBarRangeInfo(clampedProgress, 0f..1f) },
+        size = size,
+        style = style,
+    )
+}
+
+/**
+ * [FlashcardsLinearProgressBar] for a caller that animates the fill itself, frame by frame, such as a
+ * scripted sequence: [progress] is read in the draw phase only, so each frame redraws the bar and
+ * recomposes nothing. It is drawn exactly as given (clamped to `0..1`), with no easing of its own.
+ *
+ * It carries no progress semantics, since an in-flight value is not worth announcing: the caller
+ * describes the progress to accessibility itself, typically on the enclosing component.
+ */
+@Composable
+fun FlashcardsLinearProgressBar(
+    progress: () -> Float,
+    modifier: Modifier = Modifier,
+    size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
+    style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+) {
+    LinearProgressBarCanvas(
+        progress = { clampProgressBarProgress(progress()) },
+        modifier = modifier,
+        size = size,
+        style = style,
+    )
+}
+
+@Composable
+private fun LinearProgressBarCanvas(
+    progress: () -> Float,
+    modifier: Modifier,
+    size: FlashcardsComponentSize,
+    style: FlashcardsComponentStyle,
+) {
     val trackHeight = size.linearProgressBarMetrics().trackHeight
     val fillColor = progressBarFillColorFor(style)
     val trackColor = progressBarTrackColorFor(style)
@@ -63,17 +101,14 @@ fun FlashcardsLinearProgressBar(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(trackHeight)
-            .semantics {
-                progressBarRangeInfo = ProgressBarRangeInfo(clampedProgress, 0f..1f)
-            },
+            .height(trackHeight),
     ) {
         // `this.size` (DrawScope's own size, the resolved canvas bounds) — bare `size` inside
         // this lambda resolves to the outer FlashcardsComponentSize param instead, since a
         // parameter from the enclosing function scope shadows the lambda receiver's member here.
         val corner = CornerRadius(this.size.height / 2f)
         drawRoundRect(color = trackColor, cornerRadius = corner)
-        val fillWidth = this.size.width * animatedProgress.value
+        val fillWidth = this.size.width * progress()
         if (fillWidth > 0f) {
             drawRoundRect(color = fillColor, size = Size(fillWidth, this.size.height), cornerRadius = corner)
         }

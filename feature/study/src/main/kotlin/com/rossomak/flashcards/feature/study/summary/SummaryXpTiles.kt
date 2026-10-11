@@ -22,6 +22,7 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSiz
 import com.rossomak.flashcards.core.ui.format.currentLocale
 import com.rossomak.flashcards.core.ui.theme.spacing
 import java.util.Locale
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * The tiles revealed so far, one per [XpBreakdownLine], newest last. The list scrolls itself to keep
@@ -31,7 +32,7 @@ import java.util.Locale
 @Composable
 internal fun SummaryXpTiles(
     lines: List<XpBreakdownLine>,
-    visibleCount: Int,
+    visibleCount: () -> Int,
     alpha: () -> Float,
     modifier: Modifier = Modifier,
 ) {
@@ -41,7 +42,7 @@ internal fun SummaryXpTiles(
 
     // A new tile grows the scroll range once it is laid out, so follow the range rather than the count.
     LaunchedEffect(scrollState) {
-        snapshotFlow { scrollState.maxValue }.collect { maxValue -> scrollState.animateScrollTo(maxValue) }
+        snapshotFlow { scrollState.maxValue }.collectLatest { maxValue -> scrollState.animateScrollTo(maxValue) }
     }
 
     Column(
@@ -50,7 +51,8 @@ internal fun SummaryXpTiles(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
     ) {
-        lines.take(visibleCount).forEach { line ->
+        repeat(visibleCount().coerceAtMost(lines.size)) { index ->
+            val line = lines[index]
             SummaryXpTile(line = line, size = size, locale = locale)
         }
     }
