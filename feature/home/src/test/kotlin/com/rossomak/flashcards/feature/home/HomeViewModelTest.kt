@@ -1278,6 +1278,18 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `a failed auth user still gives Content, without a name or photo`() = runTest(mainDispatcherRule.testDispatcher) {
+        val authUser = mockk<ObserveAuthUserUseCase>()
+        coEvery { authUser() } returns flow { error("auth listener failed") }
+        levelProgressRepository.emit(levelThreeProgress)
+
+        val viewModel = createViewModel(observeAuthUser = authUser)
+        advanceUntilIdle()
+
+        viewModel.state.value.levelCard shouldBe levelCardContent(levelThreeProgress, photoUrl = null, displayName = null)
+    }
+
+    @Test
     fun `an auth update changes the Level card in place`() = runTest(mainDispatcherRule.testDispatcher) {
         authRepository.userToReturn = janeDoe
         levelProgressRepository.emit(levelThreeProgress)
