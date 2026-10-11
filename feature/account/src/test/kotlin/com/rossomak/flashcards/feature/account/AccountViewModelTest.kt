@@ -6,6 +6,9 @@ import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.Se
 import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Deleted
 import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Failed
 import com.rossomak.flashcards.core.domain.model.AppVersion
+import com.rossomak.flashcards.core.domain.model.AuthProvider
+import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
+import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.DeviceInfo
 import com.rossomak.flashcards.core.domain.model.InstallationInfo
@@ -69,7 +72,8 @@ class AccountViewModelTest {
         displayName: String? = USER_NAME,
         email: String? = USER_EMAIL,
         photoUrl: String? = USER_PHOTO_URL,
-    ) = AuthUser(uid = USER_UID, email = email, displayName = displayName, photoUrl = photoUrl)
+        provider: AuthProvider? = Google,
+    ) = AuthUser(uid = USER_UID, email = email, displayName = displayName, photoUrl = photoUrl, provider = provider)
 
     @Test
     fun `the state starts with no user data and no dialog`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -100,6 +104,7 @@ class AccountViewModelTest {
             displayName = USER_NAME,
             email = USER_EMAIL,
             photoUrl = USER_PHOTO_URL,
+            provider = Google,
             appVersion = APP_VERSION,
         )
     }
@@ -126,13 +131,15 @@ class AccountViewModelTest {
         authRepository.userToReturn = authUser()
         advanceUntilIdle()
 
-        authRepository.userToReturn = authUser(displayName = OTHER_NAME, email = OTHER_EMAIL, photoUrl = null)
+        authRepository.userToReturn =
+            authUser(displayName = OTHER_NAME, email = OTHER_EMAIL, photoUrl = null, provider = GitHub)
         advanceUntilIdle()
 
         viewModel.state.assertValue {
             displayName shouldBe OTHER_NAME
             email shouldBe OTHER_EMAIL
             photoUrl shouldBe null
+            provider shouldBe GitHub
         }
     }
 
@@ -142,7 +149,7 @@ class AccountViewModelTest {
         authRepository.userToReturn = authUser()
         advanceUntilIdle()
 
-        authRepository.userToReturn = authUser(displayName = null, email = null, photoUrl = null)
+        authRepository.userToReturn = authUser(displayName = null, email = null, photoUrl = null, provider = null)
         advanceUntilIdle()
 
         viewModel.state.value shouldBe AccountScreenState(appVersion = APP_VERSION)

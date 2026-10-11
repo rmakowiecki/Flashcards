@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDomain
+import com.rossomak.flashcards.core.data.model.ScoringStateDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
@@ -42,6 +43,15 @@ import kotlinx.coroutines.flow.map
  * applies, each against the Card Progress and scoring state the sessions before it left. It scores
  * with the cached XP configuration, as the server scores with its current one at delivery.
  *
+ * **Applied sessions.** The cached `user-stats` lists the latest sessions the server applied to it. A
+ * Pending Session listed there is already in the cached server state, so it adds to no aggregate: no
+ * scoring state, Streak, Daily Goal seconds or Studied/Mastered delta. Its Card Progress is still
+ * replayed, since that merge is idempotent and covers a Card Progress cache older than `user-stats`.
+ *
+ * **Excluded session.** The Session Summary's baseline reads name their own session as excluded, so a
+ * re-submission after process death never scores the session over itself. The excluded session is left
+ * out of the queue before replaying, and a scoring state that already lists it as applied fails the read.
+ *
  * Baselines are read from the Firestore cache or the server (default source). A Card Progress read
  * that fails (typically offline with no cached copy) projects over no record; see
  * [DefaultCardProgressRepository] for that limitation.
@@ -63,14 +73,6 @@ class PendingSessionProjector @Inject constructor(
         .distinctUntilChanged()
 
     /**
-     * [observePendingSessions] without the sessions that have no Flashcard Result: the server rejects
-     * those, so they never become a recorded session and are never shown as one.
-     */
-    fun observeDeliverablePendingSessions(): Flow<List<SessionResult>> = observePendingSessions()
-        .map { sessions -> sessions.filter { session -> session.cardResults.isNotEmpty() } }
-        .distinctUntilChanged()
-
-    /**
      * The Card Progress of [subcategoryId] with the Pending Sessions that touch it replayed on top.
      *
      * With no such session, this is the plain remote read, failure included. Otherwise a failed remote
@@ -81,9 +83,9 @@ class PendingSessionProjector @Inject constructor(
      * changes between the two reads, the queue and the remote document may belong to different Users,
      * so the read fails rather than projecting one User's sessions over the other's progress.
      */
-    suspend fun projectCardProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> {
+    suspend fun projectCardProgress(subcategoryId: String, excludedSessionId: String? = null): Result<SubcategoryProgressDetails?> {
         val uidAtStart = signedInUid()
-        val pendingSessions = pendingSessions().filter { session -> session.touches(subcategoryId) }
+        val pendingSessions = pendingSessions(excludedSessionId).filter { session -> session.touches(subcategoryId) }
         val remoteProgress = readRemoteProgress(subcategoryId)
         if (pendingSessions.isEmpty()) return remoteProgress
         if (signedInUid() != uidAtStart) {
@@ -103,71 +105,84 @@ class PendingSessionProjector @Inject constructor(
      * different list means the User (or the queue) changed, and a projection mixing the two would be
      * wrong. Another User's list never equals a non-empty one, since entries are owned by uid and ids
      * are unique. The caller drops a `null` result; the queue change that made it stale re-emits.
+     *
+     * A session the cached scoring state lists as applied adds no delta. If that state is unreadable, no
+     * session counts as applied: a double count is better than dropping real deltas on a guess.
      */
-    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta>? {
-        if (pendingSessions.isEmpty()) return emptyMap()
-        val baselines = readProgressBaselines(pendingSessions)
-        if (pendingSessions() != pendingSessions) return null
-        return replay(baselines, pendingSessions).summaryDeltas
+    suspend fun projectSummaryDeltas(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDelta>? = coroutineScope {
+        if (pendingSessions.isEmpty()) return@coroutineScope emptyMap()
+        val progressBaselines = async { readProgressBaselines(pendingSessions) }
+        val remoteScoringState = async { readRemoteScoringState() }
+        val baselines = progressBaselines.await()
+        val appliedSessionIds = remoteScoringState.await()
+            .onFailure { exception -> logw(exception) { "Scoring state unreadable, treating no pending session as applied" } }
+            .getOrNull()
+            .appliedSessionIds()
+        if (pendingSessions() != pendingSessions) return@coroutineScope null
+        replay(baselines, pendingSessions, appliedSessionIds = appliedSessionIds).summaryDeltas
     }
 
     /**
-     * The User's scoring state with every deliverable Pending Session ([observeDeliverablePendingSessions])
-     * replayed on top. A session with no Flashcard Result is left out: the server rejects it, so it never
-     * earns XP.
+     * The User's scoring state with every Pending Session but [excludedSessionId] replayed on top.
      *
-     * With no such session, this is the plain remote read: `null` for an account with no document yet.
-     * Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state read
-     * always fails: a guessed low starting state would show a misleading number.
+     * With no Pending Session, this is the plain remote read: `null` for an account with no document
+     * yet. Otherwise a missing document replays from [ScoringState]'s defaults. A failed scoring-state
+     * read always fails: a guessed low starting state would show a misleading number. So does a cached
+     * state that already lists [excludedSessionId] as applied, since it cannot be subtracted.
      *
      * If the signed-in User changes while the reads are in flight, the queue and the remote documents
      * may belong to different Users, so the read fails rather than projecting one User's sessions over
      * the other's scoring state. A queue that merely changes meanwhile is not checked: a delivery
      * removing an older session during the read must not fail the caller.
      */
-    suspend fun projectScoringState(): Result<ScoringState?> = coroutineScope {
+    suspend fun projectScoringState(excludedSessionId: String? = null): Result<ScoringState?> = coroutineScope {
         val uidAtStart = signedInUid()
-        val pendingSessions = observeDeliverablePendingSessions().first()
-        val remoteScoringState = async { readRemoteScoringState() }
-        if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await()
+        val pendingSessions = pendingSessions(excludedSessionId)
+        val remoteScoringState = async { readRemoteScoringState().failingIfApplied(excludedSessionId) }
+        if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await().map { dto -> dto?.toDomain() }
 
         val progressBaselines = async { readProgressBaselines(pendingSessions) }
         val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
-        val scoringState = remoteScoringState.await().getOrElse { exception -> return@coroutineScope Result.failure(exception) } ?: ScoringState()
+        val scoringStateDto = remoteScoringState.await().getOrElse { exception -> return@coroutineScope Result.failure(exception) }
         val baselines = progressBaselines.await()
         val xpConfig = config.await()
         if (signedInUid() != uidAtStart) {
             return@coroutineScope Result.failure(IllegalStateException("Signed-in User changed while reading the scoring state"))
         }
-        Result.success(replay(baselines, pendingSessions, scoringState, xpConfig).scoringState)
+        val scoringState = scoringStateDto?.toDomain() ?: ScoringState()
+        Result.success(replay(baselines, pendingSessions, scoringState, xpConfig, scoringStateDto.appliedSessionIds()).scoringState)
     }
 
     /**
-     * [remoteScoringState] with [pendingSessions] (a snapshot of [observeDeliverablePendingSessions])
-     * replayed on top and scored with [config], or `null` when [pendingSessions] is stale by the time
-     * the Card Progress baselines are read. A missing remote document (`null`) replays from
-     * [ScoringState]'s defaults. With no session, this returns the remote state, or the defaults,
-     * without reading anything.
+     * [remoteScoringState] with [pendingSessions] (a snapshot of [observePendingSessions]) replayed on
+     * top and scored with [config], or `null` when [pendingSessions] is stale by the time the Card
+     * Progress baselines are read. A missing remote document (`null`) replays from [ScoringState]'s
+     * defaults. A session [remoteScoringState] lists as applied is already in it, so it does not advance
+     * the result. With no session, this returns the remote state, or the defaults, without reading anything.
      *
-     * The queue is read again after the baselines and compared with [pendingSessions], against the
-     * deliverable list they were taken from: a different list means the queue changed meanwhile. The
-     * same check covers a User switch, so there is no separate uid check: after sign-out the list is
-     * empty, and another User's list never equals a non-empty one, since entries are owned by uid and
-     * ids are unique. The caller drops a `null` result; the queue change that made it stale re-emits.
+     * The queue is read again after the baselines and compared with [pendingSessions]: a different list
+     * means the queue changed meanwhile. The same check covers a User switch, so there is no separate uid
+     * check: after sign-out the list is empty, and another User's list never equals a non-empty one, since
+     * entries are owned by uid and ids are unique. The caller drops a `null` result; the queue change that
+     * made it stale re-emits.
      */
-    suspend fun projectScoringStateOver(remoteScoringState: ScoringState?, pendingSessions: List<SessionResult>, config: XpConfig): ScoringState? {
-        val scoringState = remoteScoringState ?: ScoringState()
+    suspend fun projectScoringStateOver(remoteScoringState: ScoringStateDto?, pendingSessions: List<SessionResult>, config: XpConfig): ScoringState? {
+        val scoringState = remoteScoringState?.toDomain() ?: ScoringState()
         if (pendingSessions.isEmpty()) return scoringState
         val baselines = readProgressBaselines(pendingSessions)
-        if (observeDeliverablePendingSessions().first() != pendingSessions) return null
-        return replay(baselines, pendingSessions, scoringState, config).scoringState
+        if (observePendingSessions().first() != pendingSessions) return null
+        return replay(baselines, pendingSessions, scoringState, config, remoteScoringState.appliedSessionIds()).scoringState
     }
 
     /**
-     * The preview `xpTotal` of each of [pendingSessions] (a snapshot of [observeDeliverablePendingSessions]),
+     * The preview `xpTotal` of each of [pendingSessions] (a snapshot of [observePendingSessions]),
      * keyed by session id. Replayed oldest first, so later Streak and Daily Goal awards build on earlier ones.
      * `null` when the queue changed meanwhile; that change re-emits. An unreadable scoring state replays
      * from [ScoringState]'s defaults: the values are approximate until the server's replace them.
+     *
+     * A session the cached scoring state lists as applied still gets an entry, scored against the state
+     * the sessions before it left without advancing it, so a Recents row never lacks a total while the
+     * recents listener lags behind; the server's entry replaces the row moments later.
      */
     suspend fun projectSessionXpTotals(pendingSessions: List<SessionResult>): Map<String, Int>? = coroutineScope {
         if (pendingSessions.isEmpty()) return@coroutineScope emptyMap()
@@ -175,15 +190,17 @@ class PendingSessionProjector @Inject constructor(
         val remoteScoringState = async { readRemoteScoringState() }
         val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
         val baselines = progressBaselines.await()
-        val scoringState = remoteScoringState.await()
+        val scoringStateDto = remoteScoringState.await()
             .onFailure { exception -> logw(exception) { "Scoring state unreadable, replaying pending session XP from defaults" } }
-            .getOrNull() ?: ScoringState()
+            .getOrNull()
         val xpConfig = config.await()
-        if (observeDeliverablePendingSessions().first() != pendingSessions) return@coroutineScope null
-        replay(baselines, pendingSessions, scoringState, xpConfig).xpTotalBySessionId
+        if (observePendingSessions().first() != pendingSessions) return@coroutineScope null
+        val scoringState = scoringStateDto?.toDomain() ?: ScoringState()
+        replay(baselines, pendingSessions, scoringState, xpConfig, scoringStateDto.appliedSessionIds()).xpTotalBySessionId
     }
 
-    private suspend fun pendingSessions(): List<SessionResult> = observePendingSessions().first()
+    private suspend fun pendingSessions(excludedSessionId: String? = null): List<SessionResult> =
+        observePendingSessions().first().filterNot { session -> session.id == excludedSessionId }
 
     private fun signedInUid(): String? = authRepository.getCurrentUser()?.uid
 
@@ -191,8 +208,11 @@ class PendingSessionProjector @Inject constructor(
      * Replays [pendingSessions] over [baselineBySubcategory], the cached server Card Progress of each
      * Subcategory they touch (`null` for one with no document), and over [scoringState]. A Subcategory
      * missing from [baselineBySubcategory] replays over no record at all. The Card Progress results
-     * never depend on [scoringState] or [config], so a caller after those alone may leave both at
-     * their defaults.
+     * never depend on [scoringState], [config] or [appliedSessionIds], so a caller after those alone may
+     * leave them at their defaults.
+     *
+     * A session in [appliedSessionIds] merges its Card Progress and gets its own `xpTotal`, but adds no
+     * summary delta and does not advance the scoring state.
      *
      * Replayed entries are stamped with their session's start. The server stamps at delivery instead;
      * no current reader looks at the stamps closely enough to tell the difference.
@@ -202,6 +222,7 @@ class PendingSessionProjector @Inject constructor(
         pendingSessions: List<SessionResult>,
         scoringState: ScoringState = ScoringState(),
         config: XpConfig = XpConfig(),
+        appliedSessionIds: Set<String> = emptySet(),
     ): Replay {
         val progressBySubcategory = baselineBySubcategory.mapNotNull { (subcategoryId, progress) -> progress?.let { subcategoryId to it } }.toMap().toMutableMap()
         val summaryDeltas = mutableMapOf<String, SubcategoryProgressDelta>()
@@ -223,10 +244,12 @@ class PendingSessionProjector @Inject constructor(
                     cards = prior?.cards.orEmpty() + updatedCards,
                 )
             }
+            xpTotalBySessionId[session.id] = scoring.score.breakdown.xpTotal
+            if (session.id in appliedSessionIds) return@forEach
+
             scoring.cardProgressMerge.summaryDeltas.forEach { (subcategoryId, delta) ->
                 summaryDeltas[subcategoryId] = summaryDeltas[subcategoryId]?.plus(delta) ?: delta
             }
-            xpTotalBySessionId[session.id] = scoring.score.breakdown.xpTotal
             projectedScoringState = scoring.newScoringState
         }
 
@@ -254,8 +277,15 @@ class PendingSessionProjector @Inject constructor(
     private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> =
         runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
 
-    private suspend fun readRemoteScoringState(): Result<ScoringState?> =
-        runCatchingFirestore { scoringStateRemoteDataSource.getScoringState()?.toDomain() }
+    private suspend fun readRemoteScoringState(): Result<ScoringStateDto?> = runCatchingFirestore { scoringStateRemoteDataSource.getScoringState() }
+
+    /** Fails when the cached scoring state already lists [excludedSessionId] as applied: a baseline cannot subtract it. */
+    private fun Result<ScoringStateDto?>.failingIfApplied(excludedSessionId: String?): Result<ScoringStateDto?> {
+        if (excludedSessionId == null || excludedSessionId !in getOrNull().appliedSessionIds()) return this
+        return Result.failure(IllegalStateException("Session $excludedSessionId is already applied to the cached scoring state"))
+    }
+
+    private fun ScoringStateDto?.appliedSessionIds(): Set<String> = this?.appliedSessionIds.orEmpty().toSet()
 
     private fun ownedPendingSessions(uid: String, entries: List<PendingSessionSubmissionDto>): List<SessionResult> = entries
         .filter { entry -> entry.uid == uid }

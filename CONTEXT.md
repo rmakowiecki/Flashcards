@@ -54,15 +54,17 @@ _Avoid_: History, Last session
 A transient, pre-link Firebase Anonymous Auth session — never a standing alternate identity, never a
 permanent or optional mode. Started only at the moment onboarding's final step is committed, and only
 if the user picked at least one Favorite, so a uid exists to write that pick under before real sign-in.
-Always resolves into a real **User** via `linkWithCredential` at Login, which keeps the same uid and
-everything written under it (e.g. the Favorite); on a linking collision (the credential is already
-tied to a different existing User — a returning user on a new device) the session and anything written
-under it are discarded outright, not merged. Sign-in stays mandatory: nothing reachable past onboarding
-treats a Guest as authenticated.
+Always resolves into a real **User** by linking the sign-in provider they pick at Login (Google or
+GitHub), which keeps the same uid and everything written under it (e.g. the Favorite). When that
+sign-in already belongs to a different existing User (a returning user on a new device), the session
+and anything written under it are discarded outright, not merged. When the provider's email already
+belongs to a User who signs in with the other provider, nothing is linked: the Guest stays a Guest and
+is told to use that provider. Sign-in stays mandatory: nothing reachable past onboarding treats a Guest
+as authenticated.
 _Avoid_: Anonymous user, Temp user
 
 **User**:
-An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl`.
+An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl` and the sign-in `provider` (Google or GitHub; none for a Guest).
 _Avoid_: Account, Player, Learner
 
 **Study Session**:
@@ -76,7 +78,7 @@ The domain type describing what happened in one Study Session, of either Study M
 _Avoid_: Ledger (retired name), Outcome, Session outcome, Session record
 
 **Pending Session**:
-A finished Study Session, of either Study Mode and completed or abandoned, that is queued on the device for delivery to the server and not yet confirmed. It belongs to exactly one User, and counts toward that User's Card Progress, progress summary, XP, Level, Streak and Daily Goal as soon as it is queued, on that device. It stops being Pending once the server records it or rejects it.
+A finished Study Session, of either Study Mode and completed or abandoned, that is queued on the device for delivery to the server and not yet confirmed. It belongs to exactly one User, and counts toward that User's Card Progress, progress summary, XP, Level, Streak and Daily Goal as soon as it is queued, on that device. It stops being Pending once the server records it or rejects it. A Study Session with no Studied Flashcards is never queued and never becomes a Pending Session: leaving it returns to the Preview Study Session Screen with nothing recorded.
 _Avoid_: Offline session, Unsynced session, Queued submission
 
 **Flashcard Result**:
@@ -141,7 +143,7 @@ The flow a user goes through to start a Study Session. All entry points route th
 - **Single-subcategory**: tap a Subcategory's **play button** on Category Details (or "Start session" in the bottom toolbar of Subcategory Details, or the play button on a Favorite Subcategory card on Home) → Preview Study Session Screen → session begins. Tapping the Subcategory row itself opens **Subcategory Details** and starts nothing — the row browses, the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
 - **Quick Session**: tap "Quick Session" on Category Details, or the Quick session button on a Favorite Category card on Home → system samples a random count of Subcategories — bounded by the user's `subcategoryCountRange` preference — then randomly selects that many Subcategories and draws Flashcards from them → Preview Study Session Screen → session begins. Re-randomize re-rolls the Subcategory sample itself, not just the card draw. Category Details hands Preview the Category's Subcategory list to sample from; Home sends only the Category, and Preview fetches that list itself ([ADR-0056](docs/adr/0056-preview-resolves-quick-session-candidate-pool.md)).
 - **Custom**: enter **Selection Mode** on Category Details (bottom-toolbar toggle, or long-press any Subcategory row) → user manually chooses every Subcategory that enters the session → taps "Custom session" → Preview Study Session Screen → session begins. A Composite session when multiple Subcategories are selected (see **Study Session**) — a single selection makes it a single-subcategory session instead. Not every Composite session is Custom — Quick is the other way in.
-- **Replay**: tap a **Recent** on Home → Preview Study Session Screen → session begins. A single-subcategory Recent opens with the same Subcategory; a Quick Recent sends only the Category, so Preview samples the whole Category afresh; a Custom Recent sends its stored Subcategories. Preview starts with the past session's Study Mode and Voice Answering or read-aloud choice, without saving them as defaults. Everything else comes from the saved defaults, and Flashcards are drawn fresh.
+- **Replay**: tap a **Recent** on Home, or **Study Again** on a Session Summary (which acts as that session's own Recent) → Preview Study Session Screen → session begins. A single-subcategory Recent opens with the same Subcategory; a Quick Recent sends only the Category, so Preview samples the whole Category afresh; a Custom Recent sends its stored Subcategories. Preview starts with the past session's Study Mode and Voice Answering or read-aloud choice, without saving them as defaults. Everything else comes from the saved defaults, and Flashcards are drawn fresh.
 _Avoid_: Composite Session (retired name for this entry point; Composite itself survives as the broader structural term)
 _Avoid_: "Start Custom Session" (retired label — never built; the entry point is the Selection Mode toggle, and the CTA it reveals reads "Custom session")
 _Avoid_: Session setup, Session wizard

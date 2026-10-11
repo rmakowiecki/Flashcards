@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.core.data.repository
 
-import com.rossomak.flashcards.core.data.mapper.toDomain
+import com.rossomak.flashcards.core.data.model.ScoringStateDto
 import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.LevelProgressEvent.PendingSessions
 import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.LevelProgressEvent.RemoteCompleted
 import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.LevelProgressEvent.RemoteScoringState
@@ -11,7 +11,6 @@ import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressReposito
 import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository.ProjectionStep.Stop
 import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.LevelProgress
-import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.toLevelProgress
@@ -30,18 +29,15 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.transformWhile
 
 /**
- * Follows the User's scoring state live and replays their deliverable Pending Sessions on top
+ * Follows the User's scoring state live and replays their Pending Sessions on top
  * ([PendingSessionProjector]), so a session studied offline counts toward XP and Level as soon as it
- * is queued. Once a Pending Session is delivered it leaves the queue, and the server's state takes its
- * place.
+ * is queued. A Pending Session the live document already lists as applied adds nothing, so a delivered
+ * session counts once while it waits to leave the queue
+ * (ADR-0061).
  *
  * Each collector registers its own snapshot listener; nothing is shared or kept alive between
  * collectors. The Firestore client serves duplicate listeners on one document from a single watch, so
  * a second collector costs only its own replay.
- *
- * **Known transient:** the delivery worker refreshes the cached server state before it removes the
- * delivered entry from the queue. In between, that session counts twice. A session the server recorded
- * but whose response never reached the device counts twice until a later delivery attempt removes it.
  */
 class DefaultLevelProgressRepository @Inject constructor(
     private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource,
@@ -58,10 +54,10 @@ class DefaultLevelProgressRepository @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeLevelProgress(): Flow<LevelProgress> = flow {
         val remoteScoringState = scoringStateRemoteDataSource.observeScoringState()
-            .map<_, LevelProgressEvent> { dto -> RemoteScoringState(dto?.toDomain()) }
+            .map<_, LevelProgressEvent> { dto -> RemoteScoringState(dto) }
             .retryOnFirestorePermissionDenied()
             .onCompletion { cause -> if (cause == null) emit(RemoteCompleted) }
-        val pendingSessions = pendingSessionProjector.observeDeliverablePendingSessions()
+        val pendingSessions = pendingSessionProjector.observePendingSessions()
             .map { sessions -> PendingSessions(sessions) }
 
         var latestRemoteScoringState: RemoteScoringState? = null
@@ -97,7 +93,7 @@ class DefaultLevelProgressRepository @Inject constructor(
     }
 
     /** A stale projection (see [PendingSessionProjector.projectScoringStateOver]) is dropped; the queue change that made it stale re-emits. */
-    private suspend fun project(remoteScoringState: ScoringState?, pendingSessions: List<SessionResult>): ProjectionResult {
+    private suspend fun project(remoteScoringState: ScoringStateDto?, pendingSessions: List<SessionResult>): ProjectionResult {
         val config = xpConfigRepository.getXpConfig().getOrDefault(XpConfig())
         val scoringState = pendingSessionProjector.projectScoringStateOver(remoteScoringState, pendingSessions, config) ?: return Stale
         return Projected(scoringState.toLevelProgress(config))
@@ -105,7 +101,7 @@ class DefaultLevelProgressRepository @Inject constructor(
 
     /** One update from either source [observeLevelProgress] follows, including the remote flow's normal completion. */
     private sealed interface LevelProgressEvent {
-        data class RemoteScoringState(val scoringState: ScoringState?) : LevelProgressEvent
+        data class RemoteScoringState(val scoringState: ScoringStateDto?) : LevelProgressEvent
 
         data class PendingSessions(val sessions: List<SessionResult>) : LevelProgressEvent
 
@@ -114,7 +110,7 @@ class DefaultLevelProgressRepository @Inject constructor(
 
     /** What to project next: the latest value of each source once both are known, or nothing more once the remote flow completed. */
     private sealed interface ProjectionStep {
-        data class Project(val remoteScoringState: ScoringState?, val pendingSessions: List<SessionResult>) : ProjectionStep
+        data class Project(val remoteScoringState: ScoringStateDto?, val pendingSessions: List<SessionResult>) : ProjectionStep
 
         data object Stop : ProjectionStep
     }

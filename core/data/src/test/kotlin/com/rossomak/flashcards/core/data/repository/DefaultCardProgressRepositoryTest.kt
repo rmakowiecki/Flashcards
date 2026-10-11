@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ProgressSummaryDto
+import com.rossomak.flashcards.core.data.model.ScoringStateDto
 import com.rossomak.flashcards.core.data.model.SubcategoryProgressDetailsDto
 import com.rossomak.flashcards.core.data.model.SubcategoryProgressSummaryDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
@@ -48,7 +49,7 @@ class DefaultCardProgressRepositoryTest {
     private val progressSummaryRemoteDataSource: ProgressSummaryRemoteDataSource = mockk()
     private val authRepository = FakeAuthRepository().apply { userToReturn = authUser(USER_ID) }
     private val pendingSessionQueue = FakePendingSessionSubmissionLocalDataSource()
-    private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk()
+    private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk { coEvery { getScoringState(any()) } returns null }
 
     private fun createProjector() = PendingSessionProjector(authRepository, pendingSessionQueue, remoteDataSource, scoringStateRemoteDataSource, FakeXpConfigRepository())
 
@@ -210,7 +211,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress reads a card Mastered in a pending session as Mastered, stamped with the session start`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
 
         val progress = createRepository().getProgress(SUBCATEGORY_ID).getOrThrow()
 
@@ -221,8 +222,8 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress reads a card de-mastered in a later pending session as Failed`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
-        queue(ratedSession("session-2", SESSION_TWO_START, CARD_ID to Failed))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID to Failed))
 
         val progress = createRepository().getProgress(SUBCATEGORY_ID).getOrThrow()
 
@@ -232,8 +233,8 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress replays pending sessions oldest first, whatever their queue order`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(ratedSession("session-2", SESSION_TWO_START, CARD_ID to Failed))
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID to Failed))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
 
         val progress = createRepository().getProgress(SUBCATEGORY_ID).getOrThrow()
 
@@ -243,7 +244,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress adds Seen from a Fast pending session only for cards with no record`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns remoteProgress(CARD_ID to Mastered)
-        queue(fastSession("session-1", SESSION_ONE_START, CARD_ID, OTHER_CARD_ID))
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID, OTHER_CARD_ID))
 
         val progress = createRepository().getProgress(SUBCATEGORY_ID).getOrThrow()
 
@@ -253,7 +254,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress ignores another User's pending sessions`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered), uid = OTHER_USER_ID)
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered), uid = OTHER_USER_ID)
 
         createRepository().getProgress(SUBCATEGORY_ID).getOrThrow() shouldBe null
     }
@@ -261,7 +262,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress drops the first User's projection once another User signs in`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
         val repository = createRepository()
 
         authRepository.userToReturn = authUser(OTHER_USER_ID)
@@ -275,7 +276,7 @@ class DefaultCardProgressRepositoryTest {
             authRepository.userToReturn = authUser(OTHER_USER_ID)
             null
         }
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
 
         createRepository().getProgress(SUBCATEGORY_ID).isFailure shouldBe true
     }
@@ -283,9 +284,9 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress skips a malformed pending session and still projects the others`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        val malformed = ratedSession("session-1", SESSION_ONE_START, OTHER_CARD_ID to Mastered).toDto(USER_ID)
+        val malformed = ratedSession(SESSION_ONE_ID, SESSION_ONE_START, OTHER_CARD_ID to Mastered).toDto(USER_ID)
         pendingSessionQueue.seed(malformed.copy(cardResults = malformed.cardResults.map { it.copy(attemptsUsed = null) }))
-        queue(ratedSession("session-2", SESSION_TWO_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID to Mastered))
 
         val progress = createRepository().getProgress(SUBCATEGORY_ID).getOrThrow()
 
@@ -295,10 +296,10 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress stops replaying a pending session once it leaves the queue`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
         val repository = createRepository()
 
-        pendingSessionQueue.remove("session-1")
+        pendingSessionQueue.remove(SESSION_ONE_ID)
 
         repository.getProgress(SUBCATEGORY_ID).getOrThrow() shouldBe null
     }
@@ -306,7 +307,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress projects over an empty baseline when the remote read fails`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } throws IllegalStateException("offline, not cached")
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
 
         val result = createRepository().getProgress(SUBCATEGORY_ID)
 
@@ -316,7 +317,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `getProgress keeps the remote document's other cards and stamps under a pending session`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns remoteProgress(CARD_ID to Mastered)
-        queue(ratedSession("session-1", SESSION_ONE_START, OTHER_CARD_ID to Failed))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, OTHER_CARD_ID to Failed))
 
         val cards = createRepository().getProgress(SUBCATEGORY_ID).getOrThrow()?.cards
 
@@ -334,10 +335,41 @@ class DefaultCardProgressRepositoryTest {
         createRepository().observeProgressSummary().test {
             awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 1)
 
-            queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Failed, OTHER_CARD_ID to Mastered))
+            queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Failed, OTHER_CARD_ID to Mastered))
             awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 2)
 
-            pendingSessionQueue.remove("session-1")
+            pendingSessionQueue.remove(SESSION_ONE_ID)
+            awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 1)
+        }
+    }
+
+    @Test
+    fun `observeProgressSummary does not add a queued session the cached scoring state lists as applied`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        coEvery { scoringStateRemoteDataSource.getScoringState(any()) } returns ScoringStateDto(appliedSessionIds = listOf(SESSION_ONE_ID))
+        every { progressSummaryRemoteDataSource.observeSummary() } returns MutableStateFlow(
+            ProgressSummaryDto(subcategories = mapOf(SUBCATEGORY_ID to SubcategoryProgressSummaryDto(masteredCount = 1, studiedCount = 2))),
+        )
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered, OTHER_CARD_ID to Failed))
+
+        createRepository().observeProgressSummary().test {
+            awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 2)
+        }
+    }
+
+    @Test
+    fun `observeProgressSummary stops adding a queued session once the live summary and the scoring state include it`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        val liveSummary = MutableStateFlow<ProgressSummaryDto?>(null)
+        every { progressSummaryRemoteDataSource.observeSummary() } returns liveSummary
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+
+        createRepository().observeProgressSummary().test {
+            awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 1)
+
+            coEvery { scoringStateRemoteDataSource.getScoringState(any()) } returns ScoringStateDto(appliedSessionIds = listOf(SESSION_ONE_ID))
+            liveSummary.value = ProgressSummaryDto(subcategories = mapOf(SUBCATEGORY_ID to SubcategoryProgressSummaryDto(masteredCount = 1, studiedCount = 1)))
+            awaitItem() shouldBe summaryOf(masteredCount = 2, studiedCount = 2)
             awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 1)
         }
     }
@@ -346,8 +378,8 @@ class DefaultCardProgressRepositoryTest {
     fun `observeProgressSummary projects a first summary from pending sessions alone`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         every { progressSummaryRemoteDataSource.observeSummary() } returns MutableStateFlow(null)
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered))
-        queue(ratedSession("session-2", SESSION_TWO_START, CARD_ID to Mastered, OTHER_CARD_ID to Failed))
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+        queue(ratedSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID to Mastered, OTHER_CARD_ID to Failed))
 
         createRepository().observeProgressSummary().test {
             awaitItem() shouldBe summaryOf(masteredCount = 1, studiedCount = 2)
@@ -357,7 +389,7 @@ class DefaultCardProgressRepositoryTest {
     @Test
     fun `observeProgressSummary ignores another User's pending sessions`() = runTest {
         every { progressSummaryRemoteDataSource.observeSummary() } returns MutableStateFlow(null)
-        queue(ratedSession("session-1", SESSION_ONE_START, CARD_ID to Mastered), uid = OTHER_USER_ID)
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered), uid = OTHER_USER_ID)
 
         createRepository().observeProgressSummary().test {
             awaitItem() shouldBe null
@@ -417,6 +449,8 @@ class DefaultCardProgressRepositoryTest {
     private companion object {
         const val USER_ID = "user-1"
         const val OTHER_USER_ID = "user-2"
+        const val SESSION_ONE_ID = "session-1"
+        const val SESSION_TWO_ID = "session-2"
         const val CATEGORY_ID = "cat-1"
         const val SUBCATEGORY_ID = "sub-1"
         const val CARD_ID = "card-1"

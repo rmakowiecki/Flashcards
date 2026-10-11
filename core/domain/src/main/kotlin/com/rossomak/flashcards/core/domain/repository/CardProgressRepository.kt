@@ -28,8 +28,11 @@ import kotlinx.coroutines.flow.Flow
  * Firestore transaction alongside the session document itself.
  */
 interface CardProgressRepository {
-    /** `null` when the User has never studied a card in this Subcategory yet. */
-    suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgressDetails?>
+    /**
+     * `null` when the User has never studied a card in this Subcategory yet. [excludedSessionId] names a
+     * finished session whose own results to leave out, so a preview of that session never builds on itself.
+     */
+    suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null): Result<SubcategoryProgressDetails?>
 
     /**
      * A live Firestore listener on the summary singleton, not a one-shot read — re-emits on every

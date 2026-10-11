@@ -140,6 +140,7 @@ class ScoringStateRemoteDataSourceTest {
         every { getString("lastStudyDate") } returns scoringState.lastStudyDate
         every { getString("goalMetDate") } returns scoringState.goalMetDate
         every { getLong("studiedSecondsOnLastStudyDate") } returns scoringState.studiedSecondsOnLastStudyDate
+        every { this@mockk.get("appliedSessionIds") } returns scoringState.appliedSessionIds
     }
 
     private companion object {
@@ -154,6 +155,7 @@ class ScoringStateRemoteDataSourceTest {
             lastStudyDate = "2026-09-06",
             goalMetDate = "2026-09-05",
             studiedSecondsOnLastStudyDate = 900,
+            appliedSessionIds = listOf("session-1", "session-2"),
         )
     }
 }
