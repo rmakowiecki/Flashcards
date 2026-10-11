@@ -1,57 +1,44 @@
 package com.rossomak.flashcards.core.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import com.rossomak.flashcards.core.ui.R
 
-val googleFontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs,
+/**
+ * Bundled variable Roboto, instanced at the three weights the M3 type scale uses: Normal for the
+ * regular slots, Medium and Bold for the regular and `*Emphasized` slots that ask for them.
+ */
+private val robotoFontFamily = FontFamily(
+    robotoFont(FontWeight.Normal),
+    robotoFont(FontWeight.Medium),
+    robotoFont(FontWeight.Bold),
 )
 
-val bodyFontFamily = try {
-    FontFamily(
-        Font(
-            googleFont = GoogleFont("Roboto"),
-            fontProvider = googleFontProvider,
-        )
-    )
-} catch (_: Throwable) {
-    // Fallback for Previews where Google Fonts might fail due to library mismatches
-    FontFamily.Default
-}
-
-val displayFontFamily = try {
-    FontFamily(
-        Font(
-            googleFont = GoogleFont("Roboto Serif"),
-            fontProvider = googleFontProvider,
-        )
-    )
-} catch (_: Throwable) {
-    // Fallback for Previews where Google Fonts might fail due to library mismatches
-    FontFamily.Default
-}
-
-private val baseline = Typography()
-
-val AppTypography = Typography(
-    displayLarge = baseline.displayLarge.copy(fontFamily = displayFontFamily),
-    displayMedium = baseline.displayMedium.copy(fontFamily = displayFontFamily),
-    displaySmall = baseline.displaySmall.copy(fontFamily = displayFontFamily),
-    headlineLarge = baseline.headlineLarge.copy(fontFamily = displayFontFamily),
-    headlineMedium = baseline.headlineMedium.copy(fontFamily = displayFontFamily),
-    headlineSmall = baseline.headlineSmall.copy(fontFamily = displayFontFamily),
-    titleLarge = baseline.titleLarge.copy(fontFamily = displayFontFamily),
-    titleMedium = baseline.titleMedium.copy(fontFamily = displayFontFamily),
-    titleSmall = baseline.titleSmall.copy(fontFamily = displayFontFamily),
-    bodyLarge = baseline.bodyLarge.copy(fontFamily = bodyFontFamily),
-    bodyMedium = baseline.bodyMedium.copy(fontFamily = bodyFontFamily),
-    bodySmall = baseline.bodySmall.copy(fontFamily = bodyFontFamily),
-    labelLarge = baseline.labelLarge.copy(fontFamily = bodyFontFamily),
-    labelMedium = baseline.labelMedium.copy(fontFamily = bodyFontFamily),
-    labelSmall = baseline.labelSmall.copy(fontFamily = bodyFontFamily),
+private fun robotoFont(weight: FontWeight) = Font(
+    resId = R.font.roboto,
+    weight = weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
 )
+
+/** The stock M3 type scale, every slot and its `*Emphasized` twin set in [robotoFontFamily]. */
+val AppTypography = Typography(fontFamily = robotoFontFamily)
+
+/** Code shown as its own block of text (code blocks, raw debug data): [Typography.bodySmall] in monospace. */
+val Typography.code: TextStyle
+    get() = bodySmall.copy(fontFamily = FontFamily.Monospace)
+
+/**
+ * Code inside running text: monospace at a fraction of the surrounding text's size. Monospace glyphs
+ * are wider and taller than Roboto's, so at full size the code would outweigh its sentence; the
+ * relative size keeps the ratio the same next to any slot.
+ */
+val InlineCodeSpanStyle = SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 0.85.em)
+
+/** Emphasis inside running text, at the weight the body `*Emphasized` slots use. */
+val EmphasizedSpanStyle = SpanStyle(fontWeight = FontWeight.Medium)
