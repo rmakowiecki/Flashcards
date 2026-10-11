@@ -227,16 +227,23 @@ class RatedStudySessionCoordinator @Inject constructor(
     }
 
     /**
-     * Seals the result exactly once and reports it as [RatedSessionEvent.SessionEnded], whether the
-     * last card finished or the user left. Leaving before the cards load seals empty card results
-     * with zero duration. The voice stack stops here, not at `onCleared`, so nothing is read or heard
-     * while the screen navigates away.
+     * Ends the session exactly once, whether the last card finished or the user left. With at least one
+     * Studied card, seals the result and reports it as [RatedSessionEvent.SessionEnded]. With none,
+     * such as leaving before the cards load or before any rating, reports
+     * [RatedSessionEvent.SessionDiscarded] and seals nothing. The voice stack stops here, not at
+     * `onCleared`, so nothing is read or heard while the screen navigates away.
      */
     fun end(abandoned: Boolean) {
         if (hasEnded) return
         hasEnded = true
         stop()
+        // A failed load already sent the screen back to Preview.
+        if (_sessionState.value == RatedSessionStateSnapshot.LoadFailed) return
         val cardResults = state?.let { sealRatedCardResults(it, abandoned) } ?: emptyList()
+        if (cardResults.isEmpty()) {
+            eventChannel.trySend(RatedSessionEvent.SessionDiscarded)
+            return
+        }
         val result = timekeeper.seal { at ->
             SessionResult.Rated(
                 id = timekeeper.sessionId,
@@ -265,7 +272,7 @@ class RatedStudySessionCoordinator @Inject constructor(
     // ids, in routed order.
     private suspend fun load() {
         val sessionStartData = getSessionStartData(setup.subcategoryIds)
-        // Left before the cards arrived: the session already ended on its way to the Summary.
+        // Left before the cards arrived: the session was already discarded.
         if (hasEnded) return
         val flashcards = sessionStartData.flashcardsResult.getOrElse {
             _sessionState.value = RatedSessionStateSnapshot.LoadFailed

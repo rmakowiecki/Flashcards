@@ -18,6 +18,12 @@ sealed interface FastSessionEvent {
      */
     data class ExternalTransportCommand(val command: TransportCommand) : FastSessionEvent
 
-    /** The session ended, completed or abandoned. Sent exactly once. */
+    /** The session ended, completed or abandoned, with at least one Studied Flashcard. Sent exactly once. */
     data class SessionEnded(val result: SessionResult) : FastSessionEvent
+
+    /**
+     * The session ended with no Studied Flashcard, so nothing is recorded. Sent exactly once, instead
+     * of [SessionEnded].
+     */
+    data object SessionDiscarded : FastSessionEvent
 }

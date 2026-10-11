@@ -88,8 +88,15 @@ const FIELD_LEVELS_CROSSED = "levelsCrossed";
 const FIELD_LEVEL_AFTER = "levelAfter";
 const FIELD_XP_INTO_CURRENT_LEVEL_AFTER = "xpIntoCurrentLevelAfter";
 const FIELD_XP_FOR_NEXT_LEVEL_AFTER = "xpForNextLevelAfter";
+// The account's Level position right before this session, so the Summary can fill the Level bar from
+// where the User stood and animate any Level-up.
+const FIELD_LEVEL_BEFORE = "levelBefore";
+const FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore";
+const FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore";
+// The account's Streak right after this session.
+const FIELD_CURRENT_STREAK_AFTER = "currentStreakAfter";
 // The per-line XP rates this session was scored with, so a retried call answers with the same rates
-// even after the admin-edited XP configuration has changed. Absent on documents written before it.
+// even after the admin-edited XP configuration has changed.
 const FIELD_XP_RATES = "xpRates";
 
 // Shared between a card's stored result fields and a card's stored progress fields.
@@ -114,6 +121,12 @@ const FIELD_BEST_STREAK = "bestStreak";
 const FIELD_LAST_STUDY_DATE = "lastStudyDate";
 const FIELD_GOAL_MET_DATE = "goalMetDate";
 const FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE = "studiedSecondsOnLastStudyDate";
+// The ids of the latest sessions applied to `user-stats`, oldest first. Kept out of ScoringState: the
+// device reads it only to tell which of its Pending Sessions this document already includes.
+const FIELD_APPLIED_SESSION_IDS = "appliedSessionIds";
+
+// How many applied session ids `user-stats` keeps. Only sessions still queued on some device matter.
+export const MAX_APPLIED_SESSION_IDS = 20;
 
 // The itemised XP breakdown's own fields — mirrors StudySessionRemoteDataSource.kt's FIELD_XP_* names.
 const FIELD_XP_NEW_CARDS = "newCards";
@@ -208,11 +221,18 @@ export interface SubmitStudySessionResult {
   xpIntoCurrentLevel: number;
   xpForNextLevel: number;
   levelsCrossed: number[];
+  /** The account's Level right before this session. */
+  levelBefore: number;
+  /** Points into [levelBefore] right before this session. */
+  xpIntoCurrentLevelBefore: number;
+  /** Points [levelBefore] needs in total before the next Level. */
+  xpForNextLevelBefore: number;
+  /** The account's Streak right after this session. */
+  currentStreak: number;
   /** The session's wall-clock duration, as submitted and stored. */
   durationSeconds: number;
   counts: SubmitStudySessionCounts;
-  /** Absent only when answering from a session document stored before rates were recorded. */
-  rates?: XpRates;
+  rates: XpRates;
 }
 
 /**
@@ -469,6 +489,15 @@ function scoringStateFields(state: ScoringState): Record<string, unknown> {
   };
 }
 
+function readAppliedSessionIds(snapshot: FirebaseFirestore.DocumentSnapshot): string[] {
+  return (snapshot.data()?.[FIELD_APPLIED_SESSION_IDS] as string[] | undefined) ?? [];
+}
+
+/** [prior] with [sessionId] moved to the end, keeping the latest [MAX_APPLIED_SESSION_IDS]. */
+function nextAppliedSessionIds(prior: string[], sessionId: string): string[] {
+  return [...prior.filter((appliedSessionId) => appliedSessionId !== sessionId), sessionId].slice(-MAX_APPLIED_SESSION_IDS);
+}
+
 function readScoringState(snapshot: FirebaseFirestore.DocumentSnapshot): ScoringState {
   if (!snapshot.exists) return DEFAULT_SCORING_STATE;
   const data = snapshot.data() ?? {};
@@ -546,16 +575,19 @@ function readSessionCounts(data: FirebaseFirestore.DocumentData): SubmitStudySes
  * same session both answer through here, so their responses are identical field for field.
  */
 function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): SubmitStudySessionResult {
-  const rates = data[FIELD_XP_RATES] as XpRates | undefined;
   return {
     breakdown: readXpBreakdownFields(data),
     level: data[FIELD_LEVEL_AFTER],
     xpIntoCurrentLevel: data[FIELD_XP_INTO_CURRENT_LEVEL_AFTER],
     xpForNextLevel: data[FIELD_XP_FOR_NEXT_LEVEL_AFTER],
     levelsCrossed: (data[FIELD_LEVELS_CROSSED] as number[]) ?? [],
+    levelBefore: data[FIELD_LEVEL_BEFORE],
+    xpIntoCurrentLevelBefore: data[FIELD_XP_INTO_CURRENT_LEVEL_BEFORE],
+    xpForNextLevelBefore: data[FIELD_XP_FOR_NEXT_LEVEL_BEFORE],
+    currentStreak: data[FIELD_CURRENT_STREAK_AFTER],
     durationSeconds: data[FIELD_DURATION_SECONDS] ?? 0,
     counts: readSessionCounts(data),
-    ...(rates !== undefined ? { rates } : {}),
+    rates: data[FIELD_XP_RATES] as XpRates,
   };
 }
 
@@ -565,8 +597,9 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  * 1. Reads `sessions/{sessionId}` first. If it already exists, every other document this function
  *    would otherwise touch was necessarily already written alongside it in that earlier, successful
  *    transaction — so this is a pure cache hit: the session document's own stored fields (its XP
- *    breakdown, rates, line counts, duration and the level/xp-into-level/xp-for-next-level/levels-crossed
- *    *as they stood right after that original commit*) are returned unchanged, with no further reads
+ *    breakdown, rates, line counts, duration, the Level position before the session and the
+ *    level/xp-into-level/xp-for-next-level/levels-crossed/streak *as they stood right after that
+ *    original commit*) are returned unchanged, with no further reads
  *    or writes at all.
  *    Returning the account's *current* scoring state here instead would break idempotency — other
  *    sessions committed since would have moved it on.
@@ -574,7 +607,8 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  *    [ScoringState] and `recents/state`, computes the new progress writes, the [XpBreakdown] and the
  *    new [ScoringState] (mirrored by the client's `scoreSession`) with the server-owned XP
  *    configuration (`config/xp`, see `xpConfig.ts`), and writes the session document, every touched
- *    Subcategory's progress, the progress summary's increments, the full scoring-state overwrite and,
+ *    Subcategory's progress, the progress summary's increments, the full scoring-state overwrite (with
+ *    this session's id appended to its applied session ids) and,
  *    unless [nextRecentEntries] leaves it unchanged, the full `recents/state` overwrite — before
  *    answering from the session document it just built, through the same [resultFromSessionDocument]
  *    a retry uses. `recents/state` is read in this same transaction, so overwriting it whole loses no
@@ -684,6 +718,10 @@ export async function submitStudySession(db: Firestore, uid: string, request: Va
       [FIELD_LEVEL_AFTER]: newScoringState.level,
       [FIELD_XP_INTO_CURRENT_LEVEL_AFTER]: newScoringState.xpIntoCurrentLevel,
       [FIELD_XP_FOR_NEXT_LEVEL_AFTER]: xpForNextLevel,
+      [FIELD_LEVEL_BEFORE]: currentScoringState.level,
+      [FIELD_XP_INTO_CURRENT_LEVEL_BEFORE]: currentScoringState.xpIntoCurrentLevel,
+      [FIELD_XP_FOR_NEXT_LEVEL_BEFORE]: levelThreshold(config, currentScoringState.level),
+      [FIELD_CURRENT_STREAK_AFTER]: newScoringState.currentStreak,
       [FIELD_XP_RATES]: xpRatesFields(config),
       ...xpBreakdownFields(breakdown),
     };
@@ -725,7 +763,10 @@ export async function submitStudySession(db: Firestore, uid: string, request: Va
       transaction.set(progressSummaryDocRef(db, uid), { [FIELD_SUBCATEGORIES]: subcategories }, { merge: true });
     }
 
-    transaction.set(scoringRef, scoringStateFields(newScoringState));
+    transaction.set(scoringRef, {
+      ...scoringStateFields(newScoringState),
+      [FIELD_APPLIED_SESSION_IDS]: nextAppliedSessionIds(readAppliedSessionIds(scoringSnapshot), request.sessionId),
+    });
 
     const recentEntry: RecentEntry = {
       [FIELD_SESSION_ID]: request.sessionId,

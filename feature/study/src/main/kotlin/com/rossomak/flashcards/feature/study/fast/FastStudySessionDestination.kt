@@ -11,14 +11,14 @@ import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 sealed interface FastStudySessionDestination : NavigationEvent {
 
     /**
-     * The session ended — the deck was exhausted, or the user confirmed "Exit session?" — carrying
-     * the sealed result on to the Session Summary.
+     * The session ended with at least one Studied Flashcard — the deck was exhausted, or the user
+     * confirmed "Exit session?" — carrying the sealed result on to the Session Summary.
      */
     data class Summary(val route: StudySessionSummaryRoute) : FastStudySessionDestination
 
     /**
-     * The cards failed to load, so no session started. Returns to Preview to load them again. Only for
-     * that failure: leaving a session, even before its cards load, goes to [Summary].
+     * No session was recorded: the cards failed to load, or the session ended with no Studied
+     * Flashcard. Returns to Preview.
      */
     data object Back : FastStudySessionDestination
 }
