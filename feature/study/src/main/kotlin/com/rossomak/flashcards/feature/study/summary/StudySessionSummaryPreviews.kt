@@ -153,16 +153,14 @@ private val LevelUpState = ScoredState.copy(
 
 private const val MID_ITEMIZATION_LINES = 5
 
-/** A frame of the payoff held still, drawn through the same layout the live sequence uses. */
+/** A step of the sequence held still, drawn through the same layout the live sequence uses. */
 @Composable
-private fun PayoffFramePreview(state: StudySessionSummaryScreenState, frame: SummaryFrame) {
-    val payoff = remember {
-        SummaryPayoff(state.xpLines, state.xpTotal, frame)
-    }
+private fun SequencePhasePreview(state: StudySessionSummaryScreenState, phase: SummaryPhase, visibleLineCount: Int) {
+    val sequence = remember { SummarySequence(state.xpLines, state.xpTotal, phase, visibleLineCount) }
     FlashcardsTheme {
         SummaryLayout(
             state = state,
-            payoff = payoff,
+            sequence = sequence,
             snackbarHostState = remember { SnackbarHostState() },
             onNavigateBack = {},
             onStudyAgainClick = {},
@@ -174,24 +172,11 @@ private fun PayoffFramePreview(state: StudySessionSummaryScreenState, frame: Sum
 @PreviewLightDark
 @Composable
 private fun StudySessionSummaryMidItemizationPreview() {
-    val shownLines = EveryLine.take(MID_ITEMIZATION_LINES)
-    PayoffFramePreview(
-        state = LevelUpState,
-        frame = SummaryFrame.start.copy(
-            runningTotal = shownLines.sumOf { it.amount }.toFloat(),
-            visibleLineCount = shownLines.size,
-        ),
-    )
+    SequencePhasePreview(state = LevelUpState, phase = SummaryPhase.Counting, visibleLineCount = MID_ITEMIZATION_LINES)
 }
 
 @PreviewLightDark
 @Composable
 private fun StudySessionSummaryBeforePourPreview() {
-    PayoffFramePreview(
-        state = LevelUpState,
-        frame = SummaryFrame.settled(LevelUpState.xpTotal, LevelUpState.xpLines.size).copy(
-            showsLevelAfter = false,
-            isSettled = false,
-        ),
-    )
+    SequencePhasePreview(state = LevelUpState, phase = SummaryPhase.Revealing, visibleLineCount = LevelUpState.xpLines.size)
 }

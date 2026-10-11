@@ -1,7 +1,9 @@
 package com.rossomak.flashcards.feature.study.summary
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,9 +15,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
@@ -25,15 +24,13 @@ import java.util.Locale
 import kotlinx.coroutines.flow.collectLatest
 
 /**
- * The tiles revealed so far, one per [XpBreakdownLine], newest last. The list scrolls itself to keep
- * the newest tile in view, and switches to compact tiles above [COMPACT_TILE_THRESHOLD] lines. It is
- * measured by whatever it is placed in, never positioned by coordinates.
+ * The first [visibleCount] tiles, one per [XpBreakdownLine], newest last. The list scrolls itself to keep
+ * the newest tile in view, and switches to compact tiles above [COMPACT_TILE_THRESHOLD] lines.
  */
 @Composable
 internal fun SummaryXpTiles(
     lines: List<XpBreakdownLine>,
-    visibleCount: () -> Int,
-    alpha: () -> Float,
+    visibleCount: Int,
     modifier: Modifier = Modifier,
 ) {
     val locale = currentLocale()
@@ -46,36 +43,25 @@ internal fun SummaryXpTiles(
     }
 
     Column(
-        modifier = modifier
-            .graphicsLayer { this.alpha = alpha() }
-            .verticalScroll(scrollState),
+        modifier = modifier.verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
     ) {
-        repeat(visibleCount().coerceAtMost(lines.size)) { index ->
-            val line = lines[index]
-            SummaryXpTile(line = line, size = size, locale = locale)
-        }
+        lines.take(visibleCount).forEach { line -> SummaryXpTile(line = line, size = size, locale = locale) }
     }
 }
 
-/** Slides up 24dp and fades in as it first appears. */
+/** Slides up and fades in as it first appears. */
 @Composable
 private fun SummaryXpTile(line: XpBreakdownLine, size: FlashcardsComponentSize, locale: Locale) {
-    val enter = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { enter.animateTo(1f, tween(TILE_ENTER.toMillisInt(), easing = SlideEasing)) }
-    val slidePx = with(LocalDensity.current) { TILE_SLIDE_DP.dp.toPx() }
-
-    FlashcardsXpBreakdownRow(
-        label = xpSourceLabel(line.source),
-        value = xpLineValue(line, locale),
-        icon = xpSourceIcon(line.source),
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                alpha = enter.value
-                translationY = (1f - enter.value) * slidePx
-            },
-        tone = if (line.isLoss) FlashcardsXpBreakdownTone.Loss else FlashcardsXpBreakdownTone.Gain,
-        size = size,
-    )
+    val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(visibleState = visibility, enter = fadeIn() + slideInVertically { height -> height / 2 }) {
+        FlashcardsXpBreakdownRow(
+            label = xpSourceLabel(line.source),
+            value = xpLineValue(line, locale),
+            icon = xpSourceIcon(line.source),
+            modifier = Modifier.fillMaxWidth(),
+            tone = if (line.isLoss) FlashcardsXpBreakdownTone.Loss else FlashcardsXpBreakdownTone.Gain,
+            size = size,
+        )
+    }
 }

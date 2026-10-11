@@ -142,7 +142,7 @@ class StudySessionSummaryViewModel @Inject constructor(
 
     /**
      * Mirrors the live Level stream into [StudySessionSummaryScreenState.liveLevel], in its own coroutine
-     * so the payoff never waits for it. Collected whatever the score does; only a Summary without a score
+     * so the Summary's sequence never waits for it. Collected whatever the score does; only a Summary without a score
      * draws its card from it. A failure or a normal completion before the first emission sets
      * [StudySessionSummaryScreenState.isLiveLevelUnavailable]; after a value the last one stays.
      * The use case is called inside the flow so a failure to build it is caught the same way.

@@ -28,7 +28,7 @@ import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardStat
  * waits for the auth user, as Home's does: [FlashcardsLevelCardState.Loading] until [hasAuthUserResolved],
  * which a failed auth read sets too, leaving the card without a name. A
  * [StudySessionSummaryScoreStatus.Scored] Summary then draws the score's own Level position, frozen once
- * it lands: the score is this session's payoff, so a later stream value never moves it. Without a score the
+ * it lands: the score is this session's own result, so a later stream value never moves it. Without a score the
  * card follows the live Level stream like Home's: Loading until [liveLevel] has emitted, then content, and
  * [FlashcardsLevelCardState.Unavailable] when [isLiveLevelUnavailable] is set before that. Only a Summary
  * with a settled score status shows the card. [levelCardBefore] is the scored card's starting point.
