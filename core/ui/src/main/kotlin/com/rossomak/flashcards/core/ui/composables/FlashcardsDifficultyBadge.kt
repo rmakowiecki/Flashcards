@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
@@ -48,8 +47,7 @@ fun FlashcardsDifficultyBadge(
     ) {
         Text(
             text = level.toString(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelLargeEmphasized,
             color = MaterialTheme.difficultyColors.onRamp,
         )
     }

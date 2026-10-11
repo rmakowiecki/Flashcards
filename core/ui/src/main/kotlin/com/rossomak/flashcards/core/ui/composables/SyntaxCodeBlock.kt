@@ -10,16 +10,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.sp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.gallatinapps.syntaxmp.compose.SyntaxTheme
 import com.gallatinapps.syntaxmp.compose.rememberSyntaxAnnotatedString
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
 import com.rossomak.flashcards.core.ui.theme.CodeBlockColors
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.code
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.spacing
 
@@ -37,11 +35,8 @@ fun SyntaxCodeBlock(
             engine = engine,
             theme = SyntaxTheme.DefaultDark,
         ),
-        style = TextStyle(
-            fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp,
-            color = CodeBlockColors.foreground,
-        ),
+        style = MaterialTheme.typography.code,
+        color = { CodeBlockColors.foreground },
         modifier = modifier
             .fillMaxWidth()
             .background(

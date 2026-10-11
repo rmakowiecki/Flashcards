@@ -33,7 +33,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -185,8 +184,7 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
                     modifier = Modifier.weight(1f).alignByBaseline(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                 )
             } else {
                 Spacer(modifier = Modifier.weight(1f))
@@ -204,8 +202,7 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
                 Text(
                     text = level.toString(),
                     modifier = Modifier.alignByBaseline(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                 )
             }
         }
@@ -223,8 +220,7 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
             Text(
                 text = stringResource(R.string.level_card_xp_unit_label),
                 modifier = Modifier.padding(start = MaterialTheme.spacing.xxsmall),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelMediumEmphasized,
             )
         }
     }

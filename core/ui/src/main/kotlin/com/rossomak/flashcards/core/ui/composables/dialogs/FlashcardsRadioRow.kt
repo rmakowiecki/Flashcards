@@ -16,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
@@ -69,7 +68,6 @@ fun FlashcardsRadioRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         )
     }
 }

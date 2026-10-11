@@ -18,7 +18,6 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
@@ -61,8 +60,7 @@ fun FlashcardsGradientTopBar(
             Text(
                 text = title,
                 modifier = Modifier.basicMarquee(),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmallEmphasized,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
