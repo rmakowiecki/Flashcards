@@ -1,5 +1,7 @@
 package com.rossomak.flashcards.core.ui.theme
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 
 private val HEX_COLOR_PATTERN = Regex("^#[0-9A-Fa-f]{6}$")
@@ -31,3 +33,7 @@ fun String.toCategoryColor(): Color {
  * so the caller falls back to its own default tint.
  */
 fun String?.toCategoryColorOrNull(): Color? = this?.let { runCatching { it.toCategoryColor() }.getOrNull() }
+
+/** [hex] parsed once per value, or [fallback] when it is absent or malformed. */
+@Composable
+fun rememberCategoryColor(hex: String?, fallback: Color): Color = remember(hex) { hex.toCategoryColorOrNull() } ?: fallback

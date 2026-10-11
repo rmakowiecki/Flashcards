@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -34,9 +33,9 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconB
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsLinearProgressBar
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.ui.theme.toCategoryColorOrNull
 import kotlin.math.roundToInt
 
 private const val PERCENT_SCALE = 100
@@ -58,8 +57,7 @@ internal fun FavoriteSubcategoryCard(
     onPlayClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val parentColor = remember(parentCategory.color) { parentCategory.color.toCategoryColorOrNull() }
-        ?: MaterialTheme.colorScheme.primary
+    val parentColor = rememberCategoryColor(hex = parentCategory.color, fallback = MaterialTheme.colorScheme.primary)
     val playButtonSize = MaterialTheme.sizes.buttonHeightSmall
 
     FavoriteCardContainer(modifier = modifier) {

@@ -29,8 +29,8 @@ import com.rossomak.flashcards.core.ui.glyph.rememberCategoryGlyph
 import com.rossomak.flashcards.core.ui.theme.AppSizes
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.toCategoryColorOrNull
 
 /**
  * Glyph shown when [iconSvg] is absent (not yet curated) or malformed (invalid SVG) — both cases
@@ -63,7 +63,7 @@ fun FlashcardsVectorIconTile(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
-    val tintColor = remember(color) { color.toCategoryColorOrNull() } ?: MaterialTheme.colorScheme.onSecondaryContainer
+    val tintColor = rememberCategoryColor(hex = color, fallback = MaterialTheme.colorScheme.onSecondaryContainer)
     val containerColor = tintColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
     val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = ICON_CONTENT_SIZE)
 
