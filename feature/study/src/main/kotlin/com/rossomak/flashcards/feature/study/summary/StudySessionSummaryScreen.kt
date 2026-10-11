@@ -77,6 +77,7 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.X
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.PerfectRun
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryMessage.SaveFailed
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryMessage.XpUnavailable
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Loading
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Scored
@@ -113,10 +114,12 @@ fun StudySessionSummaryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val xpUnavailableMessage = stringResource(R.string.study_session_summary_xp_unavailable_message)
+    val saveFailedMessage = stringResource(R.string.study_session_summary_save_failed_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         val text = when (message) {
             XpUnavailable -> xpUnavailableMessage
+            SaveFailed -> saveFailedMessage
         }
         snackbarScope.launch { snackbarHostState.showSnackbar(text) }
     }

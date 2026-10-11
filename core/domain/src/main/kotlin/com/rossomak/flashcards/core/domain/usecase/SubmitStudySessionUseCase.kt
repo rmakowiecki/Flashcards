@@ -5,7 +5,9 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
+import com.rossomak.flashcards.core.domain.model.SessionNotSavedException
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
@@ -38,12 +40,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  *    it, the scoring-state read fails and so does the preview.
  * 2. Submits the session through [SessionSubmissionRepository] and waits at most [SERVER_RESULT_BUDGET]
  *    for a final delivery status. The budget covers only this wait, not the baseline read before it.
- * 3. [SessionDeliveryStatus.Scored] returns [ServerScored]. Any other final status, or the budget
- *    running out, returns [LocalPreview], scored by [scoreSession] from the baseline with the cached
- *    XP configuration ([GetXpConfigUseCase]).
+ * 3. [SessionDeliveryStatus.Scored] returns [ServerScored]. [SessionDeliveryStatus.NotQueued] fails
+ *    with [SessionNotSavedException]: the session is lost, so no preview is offered for XP that will
+ *    never be awarded. Any other final status, or the budget running out, returns [LocalPreview],
+ *    scored by [scoreSession] from the baseline with the cached XP configuration ([GetXpConfigUseCase]).
  *
  * It returns exactly once and stops observing the delivery, so a server score arriving after the
- * fallback can never replace what the Summary already shows. The session stays queued either way.
+ * fallback can never replace what the Summary already shows. Unless it failed to queue, the session
+ * stays queued either way.
  *
  * A failed baseline read fails the result only when the fallback is needed; the session is submitted
  * regardless, since the function needs nothing from this client's reads.
@@ -60,6 +64,7 @@ class SubmitStudySessionUseCase @Inject constructor(
         val deliveryStatus = sessionSubmissionRepository.submitSession(params)
         val finalStatus = withTimeoutOrNull(SERVER_RESULT_BUDGET) { deliveryStatus.first { status -> status != InFlight } }
         if (finalStatus is Scored) return Result.success(ServerScored(finalStatus.score))
+        if (finalStatus == NotQueued) return Result.failure(SessionNotSavedException(params.id))
         return baseline.map { (priorCardStatesBySubcategory, scoringState) ->
             LocalPreview(scoreSession(priorCardStatesBySubcategory, scoringState, params, getXpConfig()).score)
         }

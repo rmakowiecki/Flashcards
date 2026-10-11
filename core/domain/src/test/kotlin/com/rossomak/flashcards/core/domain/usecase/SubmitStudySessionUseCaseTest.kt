@@ -6,8 +6,10 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
+import com.rossomak.flashcards.core.domain.model.SessionNotSavedException
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
@@ -141,6 +143,17 @@ class SubmitStudySessionUseCaseTest {
         val result = createUseCase().invoke(session)
 
         result.getOrThrow().shouldBeInstanceOf<LocalPreview>()
+        currentTime shouldBe 0L
+    }
+
+    @Test
+    fun `NotQueued fails with SessionNotSavedException instead of a local preview`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(NotQueued)
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result.exceptionOrNull().shouldBeInstanceOf<SessionNotSavedException>()
         currentTime shouldBe 0L
     }
 
