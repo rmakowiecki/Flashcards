@@ -11,9 +11,8 @@ import com.rossomak.flashcards.core.domain.model.ScoringState
  * `submitStudySession` Cloud Function is the sole writer of this document, computing and overwriting
  * the whole next [ScoringState] inside its own Firestore transaction.
  *
- * The only reader today is [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s
- * fallback preview, so this is a one-shot read. An observable read belongs here once a screen shows
- * the Level live (such as a Home Level card).
+ * A one-shot read, for [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s
+ * fallback preview. A screen that shows the Level live reads [LevelProgressRepository] instead.
  *
  * [excludedSessionId] names a finished session to leave out, so a preview of that session never builds
  * on itself. When the cached server state already includes that session, it cannot be subtracted, so

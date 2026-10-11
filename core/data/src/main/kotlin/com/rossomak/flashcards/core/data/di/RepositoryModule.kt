@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCurationRepository
 import com.rossomak.flashcards.core.data.repository.DefaultFlashcardRepository
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultOnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.data.repository.DefaultRecentSessionsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultScoringStateRepository
@@ -31,6 +32,7 @@ import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.LevelProgressRepository
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.OnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.domain.repository.RecentSessionsRepository
@@ -46,6 +48,7 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
+@Suppress("TooManyFunctions") // one binding per repository and data source.
 abstract class RepositoryModule {
 
     @Binds
@@ -122,6 +125,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindScoringStateRepository(defaultScoringStateRepository: DefaultScoringStateRepository): ScoringStateRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindLevelProgressRepository(defaultLevelProgressRepository: DefaultLevelProgressRepository): LevelProgressRepository
 
     @Binds
     @Singleton

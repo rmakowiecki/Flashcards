@@ -246,6 +246,102 @@ class PendingSessionProjectorTest {
     }
 
     @Test
+    fun `projectScoringState still succeeds when a pending session leaves the queue during the reads`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState() } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } coAnswers {
+            pendingSessionQueue.remove(SESSION_ONE_ID)
+            null
+        }
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+
+        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 540L
+        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectScoringStateOver with no sessions returns the remote state without reading anything`() = runTest {
+        val remoteScoringState = ScoringStateDto(xp = 300, xpIntoCurrentLevel = 300)
+
+        createProjector().projectScoringStateOver(remoteScoringState, emptyList(), CONFIG) shouldBe remoteScoringState.toDomain()
+        createProjector().projectScoringStateOver(null, emptyList(), CONFIG) shouldBe ScoringState()
+        coVerify(exactly = 0) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 0) { cardProgressRemoteDataSource.getProgress(any()) }
+        xpConfigRepository.getXpConfigCallCount shouldBe 0
+    }
+
+    @Test
+    fun `projectScoringStateOver replays over the given state with the given configuration`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val projector = createProjector()
+        val pendingSessions = projector.observePendingSessions().first()
+
+        val state = projector.projectScoringStateOver(ScoringStateDto(xp = 300, xpIntoCurrentLevel = 300), pendingSessions, CONFIG.copy(sessionCompleted = 7))
+
+        // 300 + 1 new × 10 + 10 + 7 completion + a Streak of 1 × 20.
+        state?.xp shouldBe 347L
+        coVerify(exactly = 0) { scoringStateRemoteDataSource.getScoringState() }
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+        xpConfigRepository.getXpConfigCallCount shouldBe 0
+    }
+
+    @Test
+    fun `projectScoringStateOver replays a missing remote document from the starting state`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val projector = createProjector()
+
+        projector.projectScoringStateOver(null, projector.observePendingSessions().first(), CONFIG) shouldBe ScoringState(
+            xp = 540,
+            level = 1,
+            xpIntoCurrentLevel = 540,
+            currentStreak = 1,
+            bestStreak = 1,
+            lastStudyDate = STUDY_DATE,
+            studiedSecondsOnLastStudyDate = 60,
+        )
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectScoringStateOver does not advance the state for a session it already lists as applied`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val projector = createProjector()
+        val remoteScoringState = SCORING_STATE_AFTER_SESSION_ONE.copy(appliedSessionIds = listOf(SESSION_ONE_ID))
+
+        projector.projectScoringStateOver(remoteScoringState, projector.observePendingSessions().first(), CONFIG) shouldBe remoteScoringState.toDomain()
+    }
+
+    @Test
+    fun `projectScoringStateOver drops a snapshot once a pending session leaves the queue during the baseline read`() = runTest {
+        val projector = createProjector()
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } coAnswers {
+            pendingSessionQueue.remove(SESSION_ONE_ID)
+            null
+        }
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val snapshot = projector.observePendingSessions().first()
+
+        projector.projectScoringStateOver(null, snapshot, CONFIG) shouldBe null
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
+    fun `projectScoringStateOver drops a snapshot taken under a User who has since signed out`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
+        val projector = createProjector()
+        val staleSnapshot = projector.observePendingSessions().first()
+
+        authRepository.userToReturn = authUser(OTHER_USER_ID)
+
+        projector.projectScoringStateOver(null, staleSnapshot, CONFIG) shouldBe null
+        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
+    }
+
+    @Test
     fun `projectSummaryDeltas drops a snapshot taken under a User who has since signed out`() = runTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))

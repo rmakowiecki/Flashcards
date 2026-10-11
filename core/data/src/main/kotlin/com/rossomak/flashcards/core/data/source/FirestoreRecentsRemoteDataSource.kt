@@ -8,11 +8,7 @@ import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.model.RecentSessionEntryDto
 import com.rossomak.flashcards.core.data.model.RecentsStateDto
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 
@@ -32,19 +28,7 @@ class FirestoreRecentsRemoteDataSource @Inject constructor(
         emitAll(observeAuthenticatedRecents(uid))
     }
 
-    private fun observeAuthenticatedRecents(uid: String): Flow<RecentsStateDto> = callbackFlow {
-        // Delivered off the main thread so the snapshot-to-DTO mapping never costs a UI frame, one
-        // snapshot at a time: Firestore submits every snapshot to the executor separately, so a
-        // parallel one could finish mapping an older snapshot last and leave it as the latest value.
-        val registration = document(uid).addSnapshotListener(Dispatchers.Default.limitedParallelism(1).asExecutor()) { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
-            trySend(snapshot.toRecentsStateDto())
-        }
-        awaitClose { registration.remove() }
-    }
+    private fun observeAuthenticatedRecents(uid: String): Flow<RecentsStateDto> = document(uid).snapshotFlow { snapshot -> snapshot.toRecentsStateDto() }
 
     private fun DocumentSnapshot?.toRecentsStateDto(): RecentsStateDto {
         val entries = this?.get(FIELD_ENTRIES) as? Map<*, *> ?: return RecentsStateDto()
