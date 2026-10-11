@@ -3,9 +3,9 @@ package com.rossomak.flashcards.feature.study.summary
 import com.rossomak.flashcards.core.domain.model.LevelProgress
 
 /**
- * What the Session Summary knows about its Level card, read from the live Level stream rather than
- * from the session's own score. It never gates the reveal sequence: the card slot shows whatever
- * this is when the sequence reaches it.
+ * What the Session Summary knows about the live Level stream, the same one Home's card reads. Only a
+ * Summary whose score is unavailable draws its Level card from it; a scored Summary draws the score's
+ * Level position instead.
  */
 sealed interface StudySessionSummaryLevelCardState {
 

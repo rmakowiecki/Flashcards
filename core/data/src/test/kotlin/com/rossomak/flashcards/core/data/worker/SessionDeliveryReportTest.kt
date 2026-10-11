@@ -100,6 +100,10 @@ class SessionDeliveryReportTest {
             xpIntoCurrentLevel = 120,
             xpForNextLevel = 16000,
             levelsCrossed = listOf(2, 3),
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 900,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 8,
             counts = SessionScoreCounts(newCardsStudied = 2, newlyMastered = 1, partial = 1, defended = 0, demastered = 0),
             rates = SessionScoreRates(
                 newCardStudied = 10,

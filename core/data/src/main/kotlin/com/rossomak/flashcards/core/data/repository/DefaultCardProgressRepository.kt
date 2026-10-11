@@ -10,6 +10,9 @@ import com.rossomak.flashcards.core.domain.scoring.SubcategoryProgressDelta
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
@@ -17,7 +20,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.transformWhile
+import kotlinx.coroutines.flow.update
 
 /**
  * Serves the cached server Card Progress and progress summary with the signed-in User's Pending
@@ -31,10 +36,12 @@ import kotlinx.coroutines.flow.transformWhile
  * studied on other devices read as new, and previously Mastered ones are not seen as Mastered. The
  * next online read or delivery corrects it.
  *
- * **Known transient:** the delivery worker refreshes the cached server state before it removes the
- * delivered entry from the queue. In between, the progress summary counts that session twice. Card
- * Progress itself is unaffected, since replaying a session over state that already includes it
- * changes nothing.
+ * A queued session the cached scoring state lists as applied adds nothing to the progress summary: the
+ * live summary already includes it. The server writes both documents in one transaction, so the deltas
+ * are recomputed whenever the live summary changes, not only when the queue does: online, that
+ * recompute reads the scoring state from the server and sees the session applied. Card Progress still
+ * replays an applied session, since replaying a session over state that already includes it changes
+ * nothing.
  */
 class DefaultCardProgressRepository @Inject constructor(
     private val progressSummaryRemoteDataSource: ProgressSummaryRemoteDataSource,
@@ -42,21 +49,27 @@ class DefaultCardProgressRepository @Inject constructor(
 ) : CardProgressRepository {
 
     /** See [PendingSessionProjector.projectCardProgress] for when a failed remote read still succeeds. */
-    override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> = pendingSessionProjector.projectCardProgress(subcategoryId)
+    override suspend fun getProgress(subcategoryId: String, excludedSessionId: String?): Result<SubcategoryProgressDetails?> =
+        pendingSessionProjector.projectCardProgress(subcategoryId, excludedSessionId)
 
     /**
      * Completes when the remote summary flow completes (on sign-out), even though the queue is still
      * observed. The two sources are merged rather than combined, so a summary the remote flow emits
      * just before completing is never conflated away. That last summary may carry deltas from before a
      * recalculation still in flight; nothing collects it past sign-out, so it is not worth guarding.
+     *
+     * A live summary change emits once with the previous deltas, then again once they are recomputed.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {
+        val remoteSummaryChanges = MutableStateFlow(0)
         val remoteSummary = progressSummaryRemoteDataSource.observeSummary()
             .map<_, SummaryEvent> { dto -> SummaryEvent.RemoteSummary(dto?.toDomain()) }
             .retryOnFirestorePermissionDenied()
+            .onEach { remoteSummaryChanges.update { count -> count + 1 } }
             .onCompletion { cause -> if (cause == null) emit(SummaryEvent.RemoteCompleted) }
         val pendingDeltas = pendingSessionProjector.observePendingSessions()
+            .combine(remoteSummaryChanges) { pendingSessions, _ -> pendingSessions }
             .mapLatest { pendingSessions -> pendingSessionProjector.projectSummaryDeltas(pendingSessions)?.let { deltas -> SummaryEvent.PendingDeltas(deltas) } }
             .filterNotNull()
 
@@ -78,7 +91,7 @@ class DefaultCardProgressRepository @Inject constructor(
                 !remoteCompleted || (summary != null && summaryDeltas == null)
             },
         )
-    }
+    }.distinctUntilChanged()
 
     /** A count never drops below zero, even if the summary and the cached Card Progress disagree. */
     private fun ProgressSummary?.plus(summaryDeltas: Map<String, SubcategoryProgressDelta>): ProgressSummary? {

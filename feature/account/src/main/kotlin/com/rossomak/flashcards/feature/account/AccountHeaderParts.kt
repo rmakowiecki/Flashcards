@@ -29,6 +29,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.domain.model.AuthProvider
+import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
+import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.theme.spacing
 import kotlin.math.roundToInt
@@ -95,11 +98,17 @@ internal fun AccountSignOutAction(
 
 /** One string with a clickable span, so a screen reader announces a single line with a link in it. */
 @Composable
-internal fun AccountSignedInWithGoogleLine(
+internal fun AccountSignedInWithLine(
     modifier: Modifier = Modifier,
+    provider: AuthProvider,
     onManageAccountClick: () -> Unit,
 ) {
-    val signedInLabel = stringResource(R.string.account_signed_in_with_google_label)
+    val signedInLabel = stringResource(
+        when (provider) {
+            Google -> R.string.account_signed_in_with_google_label
+            GitHub -> R.string.account_signed_in_with_github_label
+        },
+    )
     val separator = stringResource(CoreUiR.string.common_middle_dot_separator)
     val manageLabel = stringResource(R.string.account_manage_button)
     val manageStyle = SpanStyle(

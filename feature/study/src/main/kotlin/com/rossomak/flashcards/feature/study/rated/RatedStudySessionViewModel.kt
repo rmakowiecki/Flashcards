@@ -16,6 +16,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEvent
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.ExternalTransportCommand
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.MicPermissionRevoked
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.PlayIgnoredDuringCall
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.SessionDiscarded
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.SessionEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerGradingFailed
@@ -164,6 +165,7 @@ class RatedStudySessionViewModel @Inject constructor(
             is SessionEnded -> viewModelScope.launch {
                 eventChannel.send(RatedStudySessionDestination.Summary(event.result.toSummaryRoute()))
             }
+            SessionDiscarded -> viewModelScope.launch { eventChannel.send(RatedStudySessionDestination.Back) }
         }
     }
 

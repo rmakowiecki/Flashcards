@@ -7,23 +7,31 @@ import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.SessionResult.Rated
 import com.rossomak.flashcards.core.domain.model.SessionScore
-import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
-import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.StudyMode
-import com.rossomak.flashcards.core.domain.model.XpBreakdown
+import com.rossomak.flashcards.core.domain.model.StudySessionReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.PerfectRun
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Loading
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Scored
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Unavailable
 import com.rossomak.flashcards.feature.study.toSessionResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -36,8 +44,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 /**
  * Reads the terminated session's result straight from the route arguments — the only load path this
@@ -49,10 +59,14 @@ import kotlinx.coroutines.launch
  * flag to maintain. There is likewise no branch to skip a past-session load: [StudySessionSummaryRoute]
  * has no sessionId-only shape today, only ever a complete [SessionResult][com.rossomak.flashcards.core.domain.model.SessionResult] —
  * a future past-session detail view is a separate screen and route (ADR-0014), not a branch of this one.
+ *
+ * A resolved score is saved in [savedStateHandle], so a ViewModel restored after process death shows
+ * the same award without submitting again. Only a death before the score resolved submits again; the
+ * use case's baseline then leaves this session out, so the preview never builds on the session itself.
  */
 @HiltViewModel
 class StudySessionSummaryViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
     private val submitStudySession: SubmitStudySessionUseCase,
     private val observeAuthUser: ObserveAuthUserUseCase,
@@ -68,26 +82,24 @@ class StudySessionSummaryViewModel @Inject constructor(
 
     val messages: SharedFlow<StudySessionSummaryMessage> = _messages.asSharedFlow()
 
+    private val eventChannel = Channel<StudySessionSummaryDestination>(Channel.BUFFERED)
+    val events = eventChannel.receiveAsFlow()
+
+    private var studyAgainSent = false
+
     init {
         // Written directly in init, not inside submitSession()'s coroutine: this must land before
         // the ViewModel instance is handed back to hiltViewModel(), so the very first state Compose
-        // ever observes already carries the real mode/counts — never the StudySessionSummaryScreenState
-        // default. All five fields sit on `route` already (no dailyGoalMinutes/I-O dependency), so
-        // there is no reason to make them wait behind submitSession()'s async read. Getting this
-        // wrong previously let a screen-composition race latch the summary's Ring/XpPour phase (and
-        // its headline/meta text) onto the default StudyMode.Rated for one frame, e.g. flashing the
-        // mastery ring on a genuine Fast session before the real mode arrived.
+        // ever observes already carries the real mode and counts, never the
+        // StudySessionSummaryScreenState default. They all sit on `route` already, with no
+        // I/O dependency, so there is no reason to make them wait behind submitSession()'s async read.
         //
-        // 0/0/0 for a Fast result is a UI-state convention only (see StudySessionSummaryScreenState's
-        // own KDoc) — the screen chooses its layout off `mode`, never off these being zero. The
-        // domain SessionResult itself has no such fields on its Fast branch at all (sealed).
-        val terminalStateCounts = when (route.mode) {
-            StudyMode.Rated -> Triple(
-                route.cardStates.count { it == FlashcardStudyProgressState.Mastered },
-                route.cardStates.count { it == FlashcardStudyProgressState.Partial },
-                route.cardStates.count { it == FlashcardStudyProgressState.Failed },
-            )
-            StudyMode.Fast -> Triple(0, 0, 0)
+        // masteredCount is 0 for a Fast result, which has no Terminal States (see
+        // StudySessionSummaryScreenState's own KDoc): the screen chooses its layout off `mode`, never
+        // off this being zero.
+        val masteredCount = when (route.mode) {
+            StudyMode.Rated -> route.cardStates.count { it == FlashcardStudyProgressState.Mastered }
+            StudyMode.Fast -> 0
         }
         _state.update {
             it.copy(
@@ -95,12 +107,12 @@ class StudySessionSummaryViewModel @Inject constructor(
                 durationSeconds = route.durationSeconds,
                 studiedCount = route.cardIds.size,
                 abandoned = route.abandoned,
-                masteredCount = terminalStateCounts.first,
-                partialCount = terminalStateCounts.second,
-                failedCount = terminalStateCounts.third,
+                masteredCount = masteredCount,
+                headline = resolveHeadline(route.mode, route.abandoned, masteredCount, route.cardIds.size, scoredXpTotal = null),
             )
         }
-        submitSession()
+        val savedScore = savedStateHandle.get<String>(KEY_SAVED_SCORE)?.let { json -> Json.decodeFromString<SessionScore>(json) }
+        if (savedScore != null) applyScore(savedScore) else submitSession()
         observeAvatarSource()
         observeLevelCard()
     }
@@ -123,7 +135,7 @@ class StudySessionSummaryViewModel @Inject constructor(
 
     /**
      * Mirrors the live Level stream into [StudySessionSummaryScreenState.levelCard], in its own coroutine
-     * so the reveal sequence never waits for it. A failure or a normal completion before the first
+     * so the payoff never waits for it. Collected whatever the score does; only an unavailable score shows it. A failure or a normal completion before the first
      * emission gives [StudySessionSummaryLevelCardState.Unavailable]; after content the last value stays.
      * The use case is called inside the flow so a failure to build it is caught the same way.
      */
@@ -165,12 +177,13 @@ class StudySessionSummaryViewModel @Inject constructor(
      * preferences read, not re-read at eventual delivery time if the session sits in the offline queue
      * (ADR-0048), baked into the immutable [SessionResult] from this point on.
      *
-     * [state] keeps `isLoading` until [SubmitStudySessionUseCase] returns, which it does exactly once:
+     * [state] keeps [Loading] until [SubmitStudySessionUseCase] returns, which it does exactly once:
      * with the server's score ([ServerScored]) when it arrives in time, otherwise with the local preview
-     * ([LocalPreview]). Only a failed local read behind that preview — this account's prior card
-     * progress or scoring state — surfaces [StudySessionSummaryMessage.SaveFailed] and leaves [state]'s
-     * XP fields at their zero defaults. [state]'s non-XP fields (mode, duration, counts, …) are already
-     * set synchronously in `init`, above, and are not touched again here.
+     * ([LocalPreview]). Only a failed local read behind that preview, of this account's prior card
+     * progress or scoring state, makes it [Unavailable], surfaces [StudySessionSummaryMessage.XpUnavailable]
+     * and leaves [state]'s XP fields at their zero defaults. A resolved score is saved for a restore; a
+     * failed preview is not, so a restore tries again. [state]'s non-XP fields (mode, duration, counts, …)
+     * are already set synchronously in `init`, above, and are not touched again here.
      */
     private fun submitSession() {
         viewModelScope.launch {
@@ -178,69 +191,124 @@ class StudySessionSummaryViewModel @Inject constructor(
             val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
 
             submitStudySession(result)
-                .onSuccess { submissionResult -> applyScore(result, submissionResult.score) }
+                .onSuccess { submissionResult ->
+                    savedStateHandle[KEY_SAVED_SCORE] = Json.encodeToString(submissionResult.score)
+                    applyScore(submissionResult.score)
+                }
                 .onFailure { onPreviewFailed() }
         }
     }
 
     /**
-     * Every line's count, rate and amount come from [score], whether the server or the local preview
-     * scored it. A server answer missing its counts or its rates shows each line's amount only: no
-     * client-side value is mixed into the server's lines.
+     * Every line's count, rate and amount, and the Level position before and after the session, come
+     * from [score], whether the server or the local preview scored it: no client-side value is mixed
+     * into the server's lines.
      */
-    private fun applyScore(result: SessionResult, score: SessionScore) {
+    private fun applyScore(score: SessionScore) {
         _state.update {
             it.copy(
-                xpLines = buildXpBreakdownLines(result, score.breakdown, score.counts, score.rates),
-                isLoading = false,
+                xpLines = buildXpBreakdownLines(route, score),
+                scoreStatus = Scored,
+                headline = resolveHeadline(it.mode, it.abandoned, it.masteredCount, it.studiedCount, scoredXpTotal = score.breakdown.xpTotal),
                 xpTotal = score.breakdown.xpTotal,
+                level = score.level,
+                xpIntoCurrentLevel = score.xpIntoCurrentLevel,
+                xpForNextLevel = score.xpForNextLevel,
                 levelsCrossed = score.levelsCrossed,
+                levelBefore = score.levelBefore,
+                xpIntoCurrentLevelBefore = score.xpIntoCurrentLevelBefore,
+                xpForNextLevelBefore = score.xpForNextLevelBefore,
+                currentStreak = score.currentStreak,
             )
         }
     }
 
     private fun onPreviewFailed() {
-        _state.update { it.copy(isLoading = false) }
-        _messages.tryEmit(StudySessionSummaryMessage.SaveFailed)
+        _state.update { it.copy(scoreStatus = Unavailable) }
+        _messages.tryEmit(StudySessionSummaryMessage.XpUnavailable)
+    }
+
+    /**
+     * Opens Preview for this session's scope, Study Mode and delivery, exactly as its Recent would. Only
+     * the first click navigates: the channel is buffered, so a double tap would otherwise send twice.
+     */
+    fun onStudyAgainClick() {
+        if (studyAgainSent) return
+        studyAgainSent = true
+        val replay = StudySessionReplay.of(
+            categoryId = route.categoryId,
+            categoryName = route.categoryName,
+            sourceType = route.sourceType,
+            subcategoryIds = route.subcategoryIds,
+            subcategoryNames = route.subcategoryNames,
+            studyMode = route.mode,
+            voiceAnsweringEnabled = route.voiceAnsweringEnabled,
+            readAloudEnabled = route.readAloudEnabled,
+        )
+        viewModelScope.launch { eventChannel.send(StudySessionSummaryDestination.StudyAgain(replay)) }
+    }
+
+    /** Single entry point for every dialog on this screen. */
+    fun onDialogEvent(event: StudySessionSummaryDialogEvent) {
+        when (event) {
+            // The breakdown only exists once there is a score to itemise.
+            is Open -> if (_state.value.scoreStatus == Scored) _state.update { it.copy(activeDialog = event.dialog) }
+            // Nothing in a read-only dialog is editable.
+            is DraftChange -> Unit
+            Confirm, Dismiss -> _state.update { it.copy(activeDialog = null) }
+        }
+    }
+
+    private companion object {
+        /** The resolved [SessionScore] as JSON, so a restored ViewModel shows it without submitting again. */
+        const val KEY_SAVED_SCORE = "savedScore"
     }
 }
 
 private const val SECONDS_PER_MINUTE = 60
 
 /**
- * The plain itemised breakdown: one [XpBreakdownLine] per source [breakdown] actually awarded XP for,
- * in the same order as [XpBreakdown]'s fields, zero-[XpBreakdownLine.amount] sources dropped entirely.
- * [counts] and [rates] supply each multiplied line's [XpBreakdownLine.count] and
- * [XpBreakdownLine.rate]; [breakdown]'s already-multiplied totals supply the amounts — nothing here
- * recomputes an amount. When [counts] or [rates] is `null`, every multiplied line carries its amount
- * only. The Daily Goal and Streak lines are not multiplied per item, so they always carry their amount
- * only.
+ * Abandoned sessions and sessions that lost XP read as [NiceEffort], whatever else is true; a Rated
+ * session with every studied card Mastered (defended cards included) is a [PerfectRun]. A negative
+ * total can only be known once the score exists, so [scoredXpTotal] is `null` before then.
  */
-private fun buildXpBreakdownLines(
-    result: SessionResult,
-    breakdown: XpBreakdown,
-    counts: SessionScoreCounts?,
-    rates: SessionScoreRates?,
-): List<XpBreakdownLine> {
-    val minutesStudied = result.durationSeconds / SECONDS_PER_MINUTE
+private fun resolveHeadline(
+    mode: StudyMode,
+    abandoned: Boolean,
+    masteredCount: Int,
+    studiedCount: Int,
+    scoredXpTotal: Int?,
+): StudySessionSummaryHeadline = when {
+    abandoned || (scoredXpTotal != null && scoredXpTotal < 0) -> NiceEffort
+    mode == StudyMode.Rated && masteredCount == studiedCount -> PerfectRun
+    else -> GreatWork
+}
+
+/**
+ * The itemised breakdown: one [XpBreakdownLine] per source [score] actually awarded XP for, in the
+ * order the breakdown dialog shows them, zero-[XpBreakdownLine.amount] sources dropped entirely.
+ * [score]'s counts and rates supply each multiplied line's [XpBreakdownLine.count] and
+ * [XpBreakdownLine.rate], and its already-multiplied totals supply the amounts: nothing here
+ * recomputes an amount. A Fast session never has the Rated-only lines.
+ */
+private fun buildXpBreakdownLines(route: StudySessionSummaryRoute, score: SessionScore): List<XpBreakdownLine> {
+    val minutesStudied = route.durationSeconds / SECONDS_PER_MINUTE
     val lines = mutableListOf<XpBreakdownLine>()
-    fun addMultiplied(source: XpAwardSource, amount: Int, count: (SessionScoreCounts) -> Int?, rate: (SessionScoreRates) -> Int) {
-        lines += if (counts == null || rates == null) {
-            XpBreakdownLine(source, count = null, rate = null, amount = amount)
-        } else {
-            XpBreakdownLine(source, count = count(counts) ?: 0, rate = rate(rates), amount = amount)
+    fun addMultiplied(source: XpAwardSource, amount: Int, count: Int, rate: Int) {
+        lines += XpBreakdownLine(source, count = count, rate = rate, amount = amount)
+    }
+    with(score) {
+        addMultiplied(XpAwardSource.NewCards, breakdown.newCards, counts.newCardsStudied, rates.newCardStudied)
+        if (route.mode == StudyMode.Rated) {
+            addMultiplied(XpAwardSource.Mastered, breakdown.mastered, counts.newlyMastered ?: 0, rates.cardMastered)
+            addMultiplied(XpAwardSource.Partial, breakdown.partial, counts.partial ?: 0, rates.cardPartial)
+            addMultiplied(XpAwardSource.MasteryDefended, breakdown.masteryDefenseBonus, counts.defended ?: 0, rates.masteryDefended)
+            addMultiplied(XpAwardSource.MasteryLost, breakdown.demastered, counts.demastered ?: 0, rates.cardDemastered)
         }
+        addMultiplied(XpAwardSource.TimeStudied, breakdown.timeStudied, minutesStudied, rates.minuteStudied)
+        lines += XpBreakdownLine(XpAwardSource.Streak, count = currentStreak, rate = null, amount = breakdown.streakBonus)
+        lines += XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = breakdown.sessionCompletionBonus)
+        lines += XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = breakdown.dailyGoalBonus)
     }
-    addMultiplied(XpAwardSource.NewCards, breakdown.newCards, { it.newCardsStudied }, { it.newCardStudied })
-    if (result is Rated) {
-        addMultiplied(XpAwardSource.Mastered, breakdown.mastered, { it.newlyMastered }, { it.cardMastered })
-        addMultiplied(XpAwardSource.Partial, breakdown.partial, { it.partial }, { it.cardPartial })
-        addMultiplied(XpAwardSource.MasteryDefended, breakdown.masteryDefenseBonus, { it.defended }, { it.masteryDefended })
-        addMultiplied(XpAwardSource.MasteryLost, breakdown.demastered, { it.demastered }, { it.cardDemastered })
-    }
-    addMultiplied(XpAwardSource.TimeStudied, breakdown.timeStudied, { minutesStudied }, { it.minuteStudied })
-    addMultiplied(XpAwardSource.SessionCompleted, breakdown.sessionCompletionBonus, { if (result.abandoned) 0 else 1 }, { it.sessionCompleted })
-    lines += XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = breakdown.dailyGoalBonus)
-    lines += XpBreakdownLine(XpAwardSource.Streak, count = null, rate = null, amount = breakdown.streakBonus)
     return lines.filter { it.amount != 0 }
 }

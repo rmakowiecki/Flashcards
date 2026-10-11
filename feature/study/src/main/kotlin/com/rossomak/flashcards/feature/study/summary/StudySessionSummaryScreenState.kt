@@ -1,28 +1,32 @@
 package com.rossomak.flashcards.feature.study.summary
 
+import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.StudyMode
 
 /**
- * Everything the Session Summary screen renders — deliberately plain: mode,
- * duration, how many cards were studied, whether the deck was completed or the session was
- * abandoned, and the three Terminal State counts. [masteredCount]/[partialCount]/[failedCount] are
- * always zero for a Fast result — Fast never produces those outcomes — and the content chooses the
- * reduced Fast variant off [mode] rather than inferring it from the counts being zero.
+ * Everything the Session Summary screen renders.
  *
- * [xpLines]/[xpTotal]/[levelsCrossed] all stay at their zero defaults until the session's submission
- * resolves — the state is populated from the route synchronously, before that I/O-dependent
- * calculation can possibly have run. [xpLines] never
- * includes a zero-[XpBreakdownLine.amount] entry; a future redesign replaces this plain
- * list with the animated pour, against content this makes real for the first time.
+ * [mode], [durationSeconds], [studiedCount], [abandoned], [masteredCount] and [headline] come from
+ * the route and are set before the first frame. [masteredCount] is always zero for a Fast result,
+ * which has no Terminal States, and the content chooses its Fast variant off [mode] rather than
+ * inferring it from that zero.
  *
- * [levelsCrossed] is carried for a Level-up celebration and not rendered yet.
+ * [scoreStatus] is [StudySessionSummaryScoreStatus.Loading] until the session's score resolves. The
+ * XP fields ([xpLines], [xpTotal], the Level fields, [levelsCrossed], the before-session Level
+ * fields and [currentStreak]) hold their zero defaults until it is
+ * [StudySessionSummaryScoreStatus.Scored], and stay there when it is
+ * [StudySessionSummaryScoreStatus.Unavailable]. [headline] starts from route data only and is
+ * recomputed once a score lands, since a negative total changes it. [xpLines] never includes a
+ * zero-[XpBreakdownLine.amount] entry.
  *
- * [levelCard] is the Level card's own state, read from the live Level stream and independent of the
- * session's score and of [isLoading]: it starts as [StudySessionSummaryLevelCardState.Loading] and
- * its value comes from the same stream as Home's card, so both screens always agree.
+ * [levelCard] follows the live Level stream, the same one Home's card reads, and is independent of
+ * [scoreStatus]. Only a Summary whose score is [StudySessionSummaryScoreStatus.Unavailable] renders
+ * it: a scored Summary draws its card from the score's own Level position.
  *
  * [photoUrl]/[displayName] are the signed-in User's avatar source for the Level card. Both are null
  * until the auth user arrives, and again whenever there is no signed-in User.
+ *
+ * [activeDialog] is the dialog on screen, if any. It lives here so a dialog survives rotation.
  */
 data class StudySessionSummaryScreenState(
     val mode: StudyMode = StudyMode.Rated,
@@ -30,13 +34,20 @@ data class StudySessionSummaryScreenState(
     val studiedCount: Int = 0,
     val abandoned: Boolean = false,
     val masteredCount: Int = 0,
-    val partialCount: Int = 0,
-    val failedCount: Int = 0,
+    val headline: StudySessionSummaryHeadline = StudySessionSummaryHeadline.GreatWork,
+    val scoreStatus: StudySessionSummaryScoreStatus = StudySessionSummaryScoreStatus.Loading,
     val xpLines: List<XpBreakdownLine> = emptyList(),
-    val isLoading: Boolean = true,
     val xpTotal: Int = 0,
+    val level: Int = ScoringState.STARTING_LEVEL,
+    val xpIntoCurrentLevel: Long = 0,
+    val xpForNextLevel: Long = 0,
     val levelsCrossed: List<Int> = emptyList(),
+    val levelBefore: Int = ScoringState.STARTING_LEVEL,
+    val xpIntoCurrentLevelBefore: Long = 0,
+    val xpForNextLevelBefore: Long = 0,
+    val currentStreak: Int = 0,
     val levelCard: StudySessionSummaryLevelCardState = StudySessionSummaryLevelCardState.Loading,
     val photoUrl: String? = null,
     val displayName: String? = null,
+    val activeDialog: StudySessionSummaryDialog? = null,
 )
