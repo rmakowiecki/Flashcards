@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
@@ -515,6 +516,25 @@ class StudySessionSummaryViewModelTest {
 
             receivedMessage shouldBe StudySessionSummaryMessage.XpUnavailable
             viewModel.state.value.studiedCount shouldBe 4
+            collectJob.cancel()
+        }
+
+    @Test
+    fun `a session that could not be queued surfaces the save failed message instead of XP unavailable`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            sessionSubmissionRepository.deliveryStatusToReturn = flowOf(NotQueued)
+            stubRoute(ratedRoute())
+            var receivedMessage: StudySessionSummaryMessage? = null
+
+            val viewModel = createViewModel()
+            val collectJob = launch { viewModel.messages.collect { message -> receivedMessage = message } }
+            advanceUntilIdle()
+
+            receivedMessage shouldBe StudySessionSummaryMessage.SaveFailed
+            with(viewModel.state.value) {
+                scoreStatus shouldBe Unavailable
+                xpLines shouldBe emptyList()
+            }
             collectJob.cancel()
         }
 

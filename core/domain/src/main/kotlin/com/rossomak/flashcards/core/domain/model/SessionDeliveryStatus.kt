@@ -17,9 +17,15 @@ sealed interface SessionDeliveryStatus {
     data object Rejected : SessionDeliveryStatus
 
     /**
-     * No result is coming soon: no network when the session was queued, the queue write failed, the
-     * delivery run ended without this session, or the server recorded it but its answer was unreadable.
-     * Except in those last two cases, the session stays queued and is still delivered later.
+     * Queued, but no result is coming soon: no network when the session was queued, the delivery run
+     * ended without this session, or the server recorded it but its answer was unreadable. Except in
+     * that last case, the session stays queued and is still delivered later.
      */
     data object NotDelivered : SessionDeliveryStatus
+
+    /**
+     * The session could not be queued at all (no signed-in User, a failed local write), so nothing
+     * on the device holds it and it will never be delivered.
+     */
+    data object NotQueued : SessionDeliveryStatus
 }

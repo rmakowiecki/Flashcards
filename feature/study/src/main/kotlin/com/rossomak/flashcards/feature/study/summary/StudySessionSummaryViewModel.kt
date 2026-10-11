@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
+import com.rossomak.flashcards.core.domain.model.SessionNotSavedException
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
@@ -132,10 +133,12 @@ class StudySessionSummaryViewModel @Inject constructor(
      *
      * [state] keeps [Loading] until [SubmitStudySessionUseCase] returns, which it does exactly once:
      * with the server's score ([ServerScored]) when it arrives in time, otherwise with the local preview
-     * ([LocalPreview]). Only a failed local read behind that preview, of this account's prior card
-     * progress or scoring state, makes it [Unavailable], surfaces [StudySessionSummaryMessage.XpUnavailable]
-     * and leaves [state]'s XP fields at their zero defaults. A resolved score is saved for a restore; a
-     * failed preview is not, so a restore tries again. [state]'s non-XP fields (mode, duration, counts, …)
+     * ([LocalPreview]). A failure makes it [Unavailable] and leaves [state]'s XP fields at their zero
+     * defaults: a session that could not be queued ([SessionNotSavedException]) surfaces
+     * [StudySessionSummaryMessage.SaveFailed], while a failed local read behind the preview, of this
+     * account's prior card progress or scoring state, surfaces [StudySessionSummaryMessage.XpUnavailable]
+     * since the session itself is queued. A resolved score is saved for a restore; a failure is not, so a
+     * restore tries again. [state]'s non-XP fields (mode, duration, counts, …)
      * are already set synchronously in `init`, above, and are not touched again here.
      */
     private fun submitSession() {
@@ -148,7 +151,7 @@ class StudySessionSummaryViewModel @Inject constructor(
                     savedStateHandle[KEY_SAVED_SCORE] = Json.encodeToString(submissionResult.score)
                     applyScore(submissionResult.score)
                 }
-                .onFailure { onPreviewFailed() }
+                .onFailure { exception -> onSubmissionFailed(exception) }
         }
     }
 
@@ -176,9 +179,13 @@ class StudySessionSummaryViewModel @Inject constructor(
         }
     }
 
-    private fun onPreviewFailed() {
+    private fun onSubmissionFailed(exception: Throwable) {
         _state.update { it.copy(scoreStatus = Unavailable) }
-        _messages.tryEmit(StudySessionSummaryMessage.XpUnavailable)
+        val message = when (exception) {
+            is SessionNotSavedException -> StudySessionSummaryMessage.SaveFailed
+            else -> StudySessionSummaryMessage.XpUnavailable
+        }
+        _messages.tryEmit(message)
     }
 
     /** Single entry point for every dialog on this screen. */
