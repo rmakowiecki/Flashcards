@@ -27,6 +27,15 @@ class FakeCardProgressRepository : CardProgressRepository {
     /** When set, [observeProgressSummary] throws this before its first emission, like a failing snapshot listener. */
     var summaryReadFailure: Throwable? = null
 
+    /**
+     * Simulates queued sessions: while a session id here is not excluded, a read of the Subcategory its
+     * progress belongs to returns that progress (including the session) instead of the seeded one.
+     */
+    var progressIncludingQueuedSession: Map<String, SubcategoryProgressDetails> = emptyMap()
+
+    /** The excluded session id of every [getProgress] call, in call order. */
+    val excludedSessionIds: MutableList<String?> = mutableListOf()
+
     /** Every Subcategory id [getProgress] was actually called with, in call order. */
     val requestedSubcategoryIds: MutableList<String> = mutableListOf()
 
@@ -48,10 +57,14 @@ class FakeCardProgressRepository : CardProgressRepository {
      * genuine `withContext(Dispatchers.IO)` dispatcher hop — the same reasoning as
      * [FakeSessionSubmissionRepository]'s own [yield].
      */
-    override suspend fun getProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> {
+    override suspend fun getProgress(subcategoryId: String, excludedSessionId: String?): Result<SubcategoryProgressDetails?> {
         requestedSubcategoryIds.add(subcategoryId)
+        excludedSessionIds.add(excludedSessionId)
         yield()
-        return resultToReturn ?: Result.success(progressBySubcategoryId[subcategoryId])
+        val queuedProgress = progressIncludingQueuedSession.entries.firstOrNull { (sessionId, progress) ->
+            sessionId != excludedSessionId && progress.subcategoryId == subcategoryId
+        }?.value
+        return resultToReturn ?: Result.success(queuedProgress ?: progressBySubcategoryId[subcategoryId])
     }
 
     override fun observeProgressSummary(): Flow<ProgressSummary?> = flow {
