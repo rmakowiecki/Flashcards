@@ -5,8 +5,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The timings of the Summary's sequence ([SummaryPhase]). The sequence only waits between steps; each
- * element brings its own transition, mostly Compose's default one.
+ * Waits between [SummaryPhase] steps; each element brings its own transition.
  *
  * | Step | Starts |
  * |---|---|
@@ -17,13 +16,10 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 internal val TILE_INTERVAL: Duration = 720.milliseconds
 internal val COUNT_DURATION: Duration = 600.milliseconds
-internal val LIST_PAUSE: Duration = 520.milliseconds
+internal val LIST_PAUSE: Duration = 1_400.milliseconds
 internal val POUR_START: Duration = 680.milliseconds
 internal val SHEET_START: Duration = 240.milliseconds
 internal val SHEET_RISE: Duration = 640.milliseconds
-
-/** The tile list switches to its compact variant above this many lines. */
-internal const val COMPACT_TILE_THRESHOLD = 6
 
 /** Cubic ease-out, the curve of the counting total. */
 internal val CountEasing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
