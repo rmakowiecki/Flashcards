@@ -195,7 +195,7 @@ fun StudySessionSummaryScreen(
 
 /**
  * Plays the sequence once when the score resolves during this composition with animations on. A restore,
- * a rotation, an [Unavailable] score or disabled animations show the settled state directly.
+ * a rotation once the sequence has started, an [Unavailable] score or disabled animations show the settled state directly.
  */
 @Composable
 fun StudySessionSummaryContent(
