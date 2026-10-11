@@ -122,15 +122,15 @@ class StudySessionSummaryViewModel @Inject constructor(
      * Mirrors the signed-in User's photo and name into [state] for the Level card's avatar. Runs in
      * its own coroutine so it neither delays nor reorders the synchronous `init` writes or the
      * submission; a `null` emission (no signed-in User) clears both fields, and the first emission of
-     * either kind marks the auth user resolved. A failed read leaves the avatar on its fallback and,
-     * like Home, makes a live Level card that has not reached content unavailable.
+     * either kind marks the auth user resolved. A failed read resolves it too, with no photo or name: the
+     * Level card then shows its figures without a name, as Home's does.
      */
     private fun observeAvatarSource() {
         viewModelScope.launch {
             observeAuthUser()
                 .catch { exception ->
                     logw(exception) { "Failed to observe the auth user for the Level card avatar" }
-                    _state.update { it.copy(isLiveLevelUnavailable = true) }
+                    _state.update { it.copy(hasAuthUserResolved = true, photoUrl = null, displayName = null) }
                 }
                 .collect { authUser ->
                     _state.update {

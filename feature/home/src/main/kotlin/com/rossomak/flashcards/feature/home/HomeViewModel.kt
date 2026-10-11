@@ -199,9 +199,9 @@ class HomeViewModel @Inject constructor(
 
     /**
      * The card needs the Level and the auth user together, so it stays [LevelCardLoading] until both have
-     * emitted; a null auth user still gives [LevelCardContent], with no name or photo. The Level stream's end is
-     * handled on that stream itself, not on the combined flow: the auth stream never ends, so `combine` would
-     * wait on it forever. Before the Level's first emission a failure or a completion (a signed-out start ends
+     * emitted; a null auth user still gives [LevelCardContent], with no name or photo, and so does a failed
+     * auth read. The Level stream's end is handled on that stream itself, not on the combined flow: the auth
+     * stream never ends, so `combine` would wait on it forever. Before the Level's first emission a failure or a completion (a signed-out start ends
      * the stream silently) gives [LevelCardUnavailable], which the card draws like [LevelCardLoading] without
      * the shimmer; after one, the card keeps waiting for the auth user or keeps its last content, and auth
      * changes still update it in place.
@@ -219,7 +219,12 @@ class HomeViewModel @Inject constructor(
                     loge(error) { "Observing the Level failed" }
                     if (!hasLevelEmitted) failLevelCardIfLoading()
                 }
+            // A failed auth read is not worth hiding the Level for: the card shows its figures without a name.
             val authUserFlow = flow { emitAll(observeAuthUser()) }
+                .catch { error ->
+                    logw(error) { "Observing the auth user for the Level card failed, showing it without a name" }
+                    emit(null)
+                }
             combine(levelProgressFlow, authUserFlow) { levelProgress, authUser -> levelProgress to authUser }
                 .catch { error ->
                     loge(error) { "Observing the auth user for the Level card failed" }

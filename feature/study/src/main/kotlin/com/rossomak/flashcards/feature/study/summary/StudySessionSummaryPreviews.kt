@@ -39,6 +39,7 @@ private val ScoredState = StudySessionSummaryScreenState(
     level = 7,
     xpIntoCurrentLevel = 2_300,
     xpForNextLevel = 6_000,
+    hasAuthUserResolved = true,
     displayName = "Jane Doe",
 )
 

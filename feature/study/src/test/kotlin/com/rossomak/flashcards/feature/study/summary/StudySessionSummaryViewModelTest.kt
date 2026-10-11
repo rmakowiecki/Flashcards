@@ -621,20 +621,43 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `a scored Level card does not wait for the auth user`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a scored Level card waits for the auth user, like Home's`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
 
         val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { awaitCancellation() }))
         advanceUntilIdle()
 
-        viewModel.state.value.levelCard shouldBe LevelCardContent(
-            level = SERVER_SCORE.level,
-            xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevel,
-            xpForNextLevel = SERVER_SCORE.xpForNextLevel,
-            photoUrl = null,
-            displayName = null,
-        )
+        viewModel.state.assertValue {
+            levelCard shouldBe LevelCardLoading
+            levelCardBefore shouldBe LevelCardLoading
+        }
+    }
+
+    @Test
+    fun `a scored Level card shows the score without a name when the auth user fails`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(ratedRoute())
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+
+        val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { error("auth listener failed") }))
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            levelCard shouldBe LevelCardContent(
+                level = SERVER_SCORE.level,
+                xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevel,
+                xpForNextLevel = SERVER_SCORE.xpForNextLevel,
+                photoUrl = null,
+                displayName = null,
+            )
+            levelCardBefore shouldBe LevelCardContent(
+                level = SERVER_SCORE.levelBefore,
+                xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevelBefore,
+                xpForNextLevel = SERVER_SCORE.xpForNextLevelBefore,
+                photoUrl = null,
+                displayName = null,
+            )
+        }
     }
 
     @Test
@@ -763,7 +786,7 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
-    fun `an unscored Level card is Unavailable when the auth user fails before content`() =
+    fun `an unscored Level card shows the live Level without a name when the auth user fails`() =
         runTest(mainDispatcherRule.testDispatcher) {
             scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
@@ -772,7 +795,7 @@ class StudySessionSummaryViewModelTest {
             val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { error("auth listener failed") }))
             advanceUntilIdle()
 
-            viewModel.state.value.levelCard shouldBe LevelCardUnavailable
+            viewModel.state.value.levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, photoUrl = null, displayName = null)
         }
 
     @Test
