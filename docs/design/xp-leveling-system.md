@@ -61,10 +61,12 @@ XP is calculated **on the Session Summary screen**, from the session result and 
 2. Item tiles are revealed one at a time beneath it, each showing the stored `xpBreakdown` field as an equation built from its count and rate (a caption for lines that are not multiplications), and each adding its amount to the counter, which counts up for a gain and down for a loss. More than six lines switch to a compact tile, and the list scrolls to keep the newest tile in view.
 3. After the last tile and a short pause, confetti bursts from the total when it is positive, and the tile list fades out.
 4. The **Level card** drops in as the list fades, showing where the User stood before the session. The total is pushed down to its settled place beneath the card, and the headline and stat pills fade in. The settled stack, top to bottom, is the Level card, the headline, the total and the stat pills.
-5. The earned XP **pours** into the Level bar from that starting position. Every Level crossed fills the bar, resets it to empty and pulses the Level number. Levels crossed in the middle show only the bar and the number, because their thresholds are not known; the "x / y XP" text counts only for the first and last Level. A negative total drains the bar within the same Level. The whole pour stays within about two and a half seconds.
+5. The card switches to the User's position after the session, and the earned XP **pours** into the Level bar from the starting position. Every Level crossed fills the bar, resets it to empty and pulses the Level number. Levels crossed in the middle show only the bar and the number, because their thresholds are not known; the "x / y XP" text counts only for the first and last Level. A negative total drains the bar within the same Level. The whole pour stays within about two and a half seconds.
 6. The bottom sheet rises and the app bar's title and close button fade in, overlapping the end of the pour. Skip disappears, and the breakdown button appears once everything has settled.
 
-A tap anywhere, Skip or the first system back jumps to the end; confetti already under way finishes, and a skip before the burst means no burst. TalkBack announces the total and any Level-up once the screen has settled.
+A tap anywhere, Skip or the first system back jumps to the end, and the Level card shows the after position without a pour; confetti already under way finishes, and a skip before the burst means no burst. TalkBack announces the total and any Level-up once the screen has settled.
+
+**The pour is the Level card's own animation**, not the Summary's: the Summary only shows the card's before position and then its after one, and its timeline never waits for the pour to end. The same card pours on Home whenever the live Level moves while Home is open. It pours only a rise or a change within one Level; a lower Level (another User) and a system with animations off snap to the new figures.
 
 ### Rules
 
