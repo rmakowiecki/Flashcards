@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
@@ -91,8 +90,7 @@ private fun XpBreakdownDialogRow(line: XpBreakdownLine, locale: Locale, modifier
             Text(text = xpSourceLabel(line.source), style = MaterialTheme.typography.labelMedium, color = labelColor)
             Text(
                 text = xpLineValue(line, locale),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmallEmphasized,
                 color = valueColor,
             )
         }
@@ -114,8 +112,7 @@ private fun XpBreakdownTotalRow(xpTotal: Int, locale: Locale, modifier: Modifier
         )
         Text(
             text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(xpTotal, locale)),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMediumEmphasized,
         )
     }
 }

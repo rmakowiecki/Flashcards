@@ -46,13 +46,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
+import com.rossomak.flashcards.core.ui.theme.code
 import com.rossomak.flashcards.feature.debug.R
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.StateFlow
@@ -177,8 +177,7 @@ fun VoiceDebugContent(
                 }
                 Text(
                     text = stringResource(R.string.voice_debug_vad_probability_label, state.vadSpeechProbability),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.code,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = onPlayCapturedUtterance, enabled = state.hasCapturedUtterance) {
@@ -372,7 +371,6 @@ private fun RawDataText(text: String) {
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(8.dp)
             .horizontalScroll(rememberScrollState()),
-        style = MaterialTheme.typography.bodySmall,
-        fontFamily = FontFamily.Monospace,
+        style = MaterialTheme.typography.code,
     )
 }

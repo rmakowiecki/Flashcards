@@ -49,7 +49,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -342,8 +341,7 @@ private fun SummaryXpTotal(
     ) {
         Text(
             text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(xpTotal, locale)),
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.brandColors.onGradientContent,
         )
         IconButton(

@@ -26,13 +26,13 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.domain.model.AuthProvider
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.theme.EmphasizedSpanStyle
 import com.rossomak.flashcards.core.ui.theme.spacing
 import kotlin.math.roundToInt
 
@@ -87,9 +87,8 @@ internal fun AccountSignOutAction(
                     }
                 }
                 .padding(start = MaterialTheme.spacing.xsmall, end = MaterialTheme.spacing.xxsmall),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelLargeEmphasized,
             color = color,
-            fontWeight = FontWeight.Bold,
             maxLines = 1,
             softWrap = false,
         )
@@ -111,10 +110,7 @@ internal fun AccountSignedInWithLine(
     )
     val separator = stringResource(CoreUiR.string.common_middle_dot_separator)
     val manageLabel = stringResource(R.string.account_manage_button)
-    val manageStyle = SpanStyle(
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-    )
+    val manageStyle = EmphasizedSpanStyle.merge(SpanStyle(color = MaterialTheme.colorScheme.primary))
     Text(
         text = buildAnnotatedString {
             append(signedInLabel)
