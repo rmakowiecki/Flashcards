@@ -73,7 +73,6 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.Voic
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionMessage.VoicePlaybackUnavailable
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -213,6 +212,12 @@ class RatedStudySessionViewModelTest {
         answerSpoken = null,
         extendedContext = extendedContext,
     )
+
+    /** Reveals the first card's answer and rates it Correct, so the session has one Studied card. */
+    private fun rateFirstCardCorrect(viewModel: RatedStudySessionViewModel) {
+        viewModel.onShowAnswer()
+        viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+    }
 
     /** Rates every other head Correct until [cardId] is presented again; fails instead of looping forever. */
     private fun rateCorrectUntilPresented(viewModel: RatedStudySessionViewModel, cardId: String) {
@@ -590,12 +595,26 @@ class RatedStudySessionViewModelTest {
         loadThreeCards()
         val viewModel = createViewModel()
         advanceUntilIdle()
+        rateFirstCardCorrect(viewModel)
         viewModel.onDialogEvent(Open(ExitSession))
 
         viewModel.onDialogEvent(Confirm)
 
         viewModel.state.value.activeDialog shouldBe null
         viewModel.events.test { awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>() }
+    }
+
+    @Test
+    fun `confirming the exit dialog before any rating navigates back, not to the summary`() = runTest(mainDispatcherRule.testDispatcher) {
+        loadThreeCards()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.onShowAnswer()
+        viewModel.onDialogEvent(Open(ExitSession))
+
+        viewModel.onDialogEvent(Confirm)
+
+        viewModel.events.test { awaitItem() shouldBe RatedStudySessionDestination.Back }
     }
 
     @Test
@@ -1959,7 +1978,7 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a session restored with the mic permission revoked ends the session`() =
+    fun `a session restored with the mic permission revoked before any rating returns to Preview`() =
         runTest(mainDispatcherRule.testDispatcher) {
             // Revoking in system Settings kills the process; the restored route starts voice
             // answering again and finds the permission gone.
@@ -1974,7 +1993,7 @@ class RatedStudySessionViewModelTest {
                 awaitItem() shouldBe VoiceAnswerMicPermissionRevoked
             }
             viewModel.events.test {
-                awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
+                awaitItem() shouldBe RatedStudySessionDestination.Back
             }
             playbackGateway.startCalls.size shouldBe 0
         }
@@ -2103,7 +2122,7 @@ class RatedStudySessionViewModelTest {
         }
 
     @Test
-    fun `a card that received only a silence timeout is absent from cardResults`() =
+    fun `a card that received only a silence timeout is not Studied, so leaving returns to Preview`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createVoiceViewModel()
             emitSilenceTimeout()
@@ -2111,9 +2130,8 @@ class RatedStudySessionViewModelTest {
 
             viewModel.events.test {
                 viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
 
-                destination.route.cardIds shouldNotContain "card-1"
+                awaitItem() shouldBe RatedStudySessionDestination.Back
             }
         }
 
@@ -2146,6 +2164,7 @@ class RatedStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
+            rateFirstCardCorrect(viewModel)
             clock.instant = FIXED_INSTANT.plusSeconds(42)
             viewModel.onDialogEvent(Open(ExitSession))
 
@@ -2166,6 +2185,7 @@ class RatedStudySessionViewModelTest {
 
             // Simulates a long backgrounded gap (a phone call, switching apps) with no lifecycle
             // hook to react to it — v1 is deliberately simplistic: wall time only, no pausing.
+            rateFirstCardCorrect(viewModel)
             clock.instant = FIXED_INSTANT.plusSeconds(1_200)
             viewModel.onDialogEvent(Open(ExitSession))
 

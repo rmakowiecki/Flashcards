@@ -1,6 +1,9 @@
 package com.rossomak.flashcards.domain.usecase
 
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.SignInFailureReason.Unknown
+import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
+import com.rossomak.flashcards.core.domain.model.SignInResult.SignedIn
 import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
 import io.kotest.matchers.shouldBe
@@ -16,27 +19,25 @@ class SignInWithGoogleUseCaseTest {
     private val useCase = SignInWithGoogleUseCase(authRepository)
 
     @Test
-    fun `forwards token to repository and returns success result`() = runTest {
+    fun `forwards token to repository and returns the signed in result`() = runTest {
         val token = "token-xyz"
-        val user = AuthUser(uid = "u1", email = "a@b.com", displayName = "Alex", photoUrl = null)
-        coEvery { authRepository.signInWithGoogleIdToken(token) } returns Result.success(user)
+        val signedIn = SignedIn(AuthUser(uid = "u1", email = "a@b.com", displayName = "Alex", photoUrl = null))
+        coEvery { authRepository.signInWithGoogleIdToken(token) } returns signedIn
 
         val result = useCase(token)
 
-        result.isSuccess shouldBe true
-        result.getOrNull() shouldBe user
+        result shouldBe signedIn
         coVerify(exactly = 1) { authRepository.signInWithGoogleIdToken(token) }
     }
 
     @Test
-    fun `forwards failure result unchanged`() = runTest {
-        val error = IllegalStateException("bad token")
-        coEvery { authRepository.signInWithGoogleIdToken(any()) } returns Result.failure(error)
+    fun `forwards failed result unchanged`() = runTest {
+        val failed = Failed(Unknown)
+        coEvery { authRepository.signInWithGoogleIdToken(any()) } returns failed
 
         val result = useCase("anything")
 
-        result.isFailure shouldBe true
-        result.exceptionOrNull() shouldBe error
+        result shouldBe failed
         coVerify(exactly = 1) { authRepository.signInWithGoogleIdToken("anything") }
     }
 }

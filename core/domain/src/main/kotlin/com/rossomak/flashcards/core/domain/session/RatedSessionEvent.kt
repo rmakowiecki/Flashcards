@@ -27,6 +27,12 @@ sealed interface RatedSessionEvent {
      */
     data class ExternalTransportCommand(val command: TransportCommand) : RatedSessionEvent
 
-    /** The session ended, completed or abandoned. Sent exactly once. */
+    /** The session ended, completed or abandoned, with at least one Studied Flashcard. Sent exactly once. */
     data class SessionEnded(val result: SessionResult) : RatedSessionEvent
+
+    /**
+     * The session ended with no Studied Flashcard, so nothing is recorded. Sent exactly once, instead
+     * of [SessionEnded].
+     */
+    data object SessionDiscarded : RatedSessionEvent
 }

@@ -127,15 +127,20 @@ class DefaultLevelProgressRepositoryTest {
     }
 
     @Test
-    fun `a pending session with no Flashcard Result is left out`() = runTest {
-        every { scoringStateRemoteDataSource.observeScoringState() } returns MutableStateFlow(REMOTE_SCORING_STATE)
-        queue(fastSession(SESSION_ONE_ID))
+    fun `a pending session the document already lists as applied counts once`() = runTest {
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
+        val remoteScoringState = MutableStateFlow<ScoringStateDto?>(REMOTE_SCORING_STATE)
+        every { scoringStateRemoteDataSource.observeScoringState() } returns remoteScoringState
+        queue(fastSession(SESSION_ONE_ID, CARD_ID))
 
         createRepository().observeLevelProgress().test {
-            awaitItem() shouldBe levelOneProgress(REMOTE_XP)
+            awaitItem() shouldBe levelOneProgress(REMOTE_XP + SESSION_XP)
+
+            val deliveredXp = REMOTE_XP + SESSION_XP
+            remoteScoringState.value = ScoringStateDto(xp = deliveredXp, xpIntoCurrentLevel = deliveredXp, appliedSessionIds = listOf(SESSION_ONE_ID))
+            expectNoEvents()
         }
         verify(exactly = 1) { scoringStateRemoteDataSource.observeScoringState() }
-        coVerify(exactly = 0) { cardProgressRemoteDataSource.getProgress(any()) }
     }
 
     @Test
@@ -175,26 +180,26 @@ class DefaultLevelProgressRepositoryTest {
     fun `a stale projection is dropped and the next one emits`() = runTest {
         val pendingSessionProjector: PendingSessionProjector = mockk()
         val queuedSession = fastSession(SESSION_ONE_ID, CARD_ID)
-        val deliverablePendingSessions = MutableStateFlow(listOf(queuedSession))
+        val pendingSessions = MutableStateFlow(listOf(queuedSession))
         val staleProjectionStarted = CompletableDeferred<Unit>()
         every { scoringStateRemoteDataSource.observeScoringState() } returns MutableStateFlow(REMOTE_SCORING_STATE)
-        every { pendingSessionProjector.observeDeliverablePendingSessions() } returns deliverablePendingSessions
-        coEvery { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE.toDomain(), listOf(queuedSession), CONFIG) } coAnswers {
+        every { pendingSessionProjector.observePendingSessions() } returns pendingSessions
+        coEvery { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE, listOf(queuedSession), CONFIG) } coAnswers {
             staleProjectionStarted.complete(Unit)
             null
         }
-        coEvery { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE.toDomain(), emptyList(), CONFIG) } returns REMOTE_SCORING_STATE.toDomain()
+        coEvery { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE, emptyList(), CONFIG) } returns REMOTE_SCORING_STATE.toDomain()
 
         createRepository(pendingSessionProjector).observeLevelProgress().test {
             staleProjectionStarted.await()
-            deliverablePendingSessions.value = emptyList()
+            pendingSessions.value = emptyList()
 
             awaitItem() shouldBe levelOneProgress(REMOTE_XP)
         }
         verify(exactly = 1) { scoringStateRemoteDataSource.observeScoringState() }
-        verify(exactly = 1) { pendingSessionProjector.observeDeliverablePendingSessions() }
-        coVerify(exactly = 1) { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE.toDomain(), listOf(queuedSession), CONFIG) }
-        coVerify(exactly = 1) { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE.toDomain(), emptyList(), CONFIG) }
+        verify(exactly = 1) { pendingSessionProjector.observePendingSessions() }
+        coVerify(exactly = 1) { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE, listOf(queuedSession), CONFIG) }
+        coVerify(exactly = 1) { pendingSessionProjector.projectScoringStateOver(REMOTE_SCORING_STATE, emptyList(), CONFIG) }
     }
 
     @Test

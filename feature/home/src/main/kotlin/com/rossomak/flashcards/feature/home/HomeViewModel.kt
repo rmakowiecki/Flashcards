@@ -5,12 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.RecentItem
-import com.rossomak.flashcards.core.domain.model.RecentSession.Fast
-import com.rossomak.flashcards.core.domain.model.RecentSession.Rated
-import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
-import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
-import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.toReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
@@ -99,26 +95,18 @@ class HomeViewModel @Inject constructor(
      * Quick sends no Subcategories, so Preview samples the Category again.
      */
     fun onRecentSelect(item: RecentItem) {
-        val session = item.session
-        val (subcategoryIds, subcategoryNames) = when (session.sourceType) {
-            SingleSubcategory, Custom -> session.subcategoryIds to session.subcategoryNames
-            Quick -> emptyList<String>() to emptyList()
-        }
-        val (voiceAnsweringEnabled, readAloudEnabled) = when (session) {
-            is Rated -> session.voiceAnsweringEnabled to null
-            is Fast -> null to session.readAloudEnabled
-        }
+        val replay = item.session.toReplay()
         viewModelScope.launch {
             eventChannel.send(
                 HomeDestination.RecentPreviewStudySession(
-                    categoryId = session.categoryId,
-                    categoryName = session.categoryName,
-                    sourceType = session.sourceType,
-                    subcategoryIds = subcategoryIds,
-                    subcategoryNames = subcategoryNames,
-                    studyMode = session.mode,
-                    voiceAnsweringEnabled = voiceAnsweringEnabled,
-                    readAloudEnabled = readAloudEnabled,
+                    categoryId = replay.categoryId,
+                    categoryName = replay.categoryName,
+                    sourceType = replay.sourceType,
+                    subcategoryIds = replay.subcategoryIds,
+                    subcategoryNames = replay.subcategoryNames,
+                    studyMode = replay.studyMode,
+                    voiceAnsweringEnabled = replay.voiceAnsweringEnabled,
+                    readAloudEnabled = replay.readAloudEnabled,
                 )
             )
         }

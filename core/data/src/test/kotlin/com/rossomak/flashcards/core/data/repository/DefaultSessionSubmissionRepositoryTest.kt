@@ -15,10 +15,13 @@ import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
@@ -142,21 +145,21 @@ class DefaultSessionSubmissionRepositoryTest {
     }
 
     @Test
-    fun `with nobody signed in submitSession emits NotDelivered without queuing or scheduling`() = runTest {
+    fun `with nobody signed in submitSession emits NotQueued without queuing or scheduling`() = runTest {
         authRepository.userToReturn = null
 
         val statuses = createRepository().submitSession(sessionResult()).toList()
 
-        statuses shouldBe listOf(NotDelivered)
+        statuses shouldBe listOf(NotQueued)
         localDataSource.listAll() shouldBe emptyList()
         verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
     @Test
-    fun `a local append failure is logged and emits NotDelivered, never thrown`() = runTest {
+    fun `a local append failure is logged and emits NotQueued, never thrown`() = runTest {
         val statuses = createRepository(ThrowingPendingSessionSubmissionLocalDataSource()).submitSession(sessionResult()).toList()
 
-        statuses shouldBe listOf(NotDelivered)
+        statuses shouldBe listOf(NotQueued)
         verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
@@ -188,8 +191,20 @@ class DefaultSessionSubmissionRepositoryTest {
             xpIntoCurrentLevel = 360,
             xpForNextLevel = 1000,
             levelsCrossed = emptyList(),
-            counts = null,
-            rates = null,
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 0,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 1,
+            counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
+            rates = SessionScoreRates(
+                newCardStudied = 10,
+                cardMastered = 100,
+                cardPartial = 25,
+                masteryDefended = 50,
+                cardDemastered = -80,
+                minuteStudied = 10,
+                sessionCompleted = 500,
+            ),
         )
 
         fun workInfo(
