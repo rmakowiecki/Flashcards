@@ -18,5 +18,6 @@ data class UserPreferences(
     val hasSeenOnboarding: Boolean = false,
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
     val hasSeenVoiceAnsweringInfo: Boolean = false,
+    val hasHiddenFavoritesHint: Boolean = false,
     val localCacheSeed: Int? = null,
 )

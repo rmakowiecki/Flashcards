@@ -7,6 +7,8 @@
     <string name="home_error_message">Check your connection and try again.</string>
 
     <string name="favorites_section_title">Favorites</string>
+    <string name="favorites_hint_message">Tap the bookmark on any category or topic to pin it here for quick access.</string>
+    <string name="favorites_hint_hide_button">Hide</string>
 
     <plurals name="favorites_category_topics">
         <item quantity="one">%d topic</item>
@@ -19,6 +21,7 @@
     <string name="favorites_subcategory_play_cd">Start session, %1$s</string>
 
     <string name="recents_section_title">Recently studied</string>
+    <string name="recents_placeholder_message">Your recent sessions will appear here</string>
 
     <plurals name="recents_quick_session_topics">
         <item quantity="one">Quick session · %d topic</item>
