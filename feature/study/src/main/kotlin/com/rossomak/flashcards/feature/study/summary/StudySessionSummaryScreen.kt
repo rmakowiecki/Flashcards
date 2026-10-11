@@ -64,6 +64,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButto
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.currentLocale
@@ -272,12 +273,13 @@ private fun SummaryBody(
                 onShowBreakdown = { onDialogEvent(Open(XpBreakdown)) },
             )
             FlashcardsLevelCard(
-                level = state.level,
-                xpIntoCurrentLevel = state.xpIntoCurrentLevel,
-                xpForNextLevel = state.xpForNextLevel,
-                progress = levelProgress(state.xpIntoCurrentLevel, state.xpForNextLevel),
-                photoUrl = state.photoUrl,
-                displayName = state.displayName,
+                state = FlashcardsLevelCardState.Content(
+                    level = state.level,
+                    xpIntoCurrentLevel = state.xpIntoCurrentLevel,
+                    xpForNextLevel = state.xpForNextLevel,
+                    photoUrl = state.photoUrl,
+                    displayName = state.displayName,
+                ),
                 modifier = Modifier.fillMaxWidth(),
                 style = FlashcardsComponentStyle.OnGradient,
             )
@@ -400,6 +402,3 @@ private fun SummarySheet(
         )
     }
 }
-
-private fun levelProgress(xpIntoCurrentLevel: Long, xpForNextLevel: Long): Float =
-    if (xpForNextLevel <= 0L) 0f else (xpIntoCurrentLevel.toFloat() / xpForNextLevel.toFloat()).coerceIn(0f, 1f)

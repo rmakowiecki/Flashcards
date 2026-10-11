@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.home
 
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
 import com.rossomak.flashcards.feature.home.HomeBody.LoadError
 import com.rossomak.flashcards.feature.home.HomeBody.Resolving
@@ -21,6 +22,8 @@ import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFa
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
 
 /**
+ * @param levelCard what Home knows about the Level card; [FlashcardsLevelCardState.Loading] until the Level and
+ * the auth user have both emitted. Stored on its own and never part of [body].
  * @param favorites what Home knows about the Favorites; [HomeFavoritesState.Loading] until the first emission.
  * @param recents what Home knows about the Recents; [HomeRecentsState.Loading] until the first emission.
  * @param hasRevealCeilingElapsed whether the reveal ceiling ran out. Once it has, a section still loading is left
@@ -32,6 +35,7 @@ import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsL
  * progress as unknown, which is not the same as a resolved zero.
  */
 data class HomeScreenState(
+    val levelCard: FlashcardsLevelCardState = FlashcardsLevelCardState.Loading,
     val favorites: HomeFavoritesState = FavoritesLoading,
     val recents: HomeRecentsState = RecentsLoading,
     val hasRevealCeilingElapsed: Boolean = false,

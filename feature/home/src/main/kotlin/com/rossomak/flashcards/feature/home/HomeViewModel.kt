@@ -11,11 +11,16 @@ import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
 import com.rossomak.flashcards.core.domain.model.toReplay
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Loading as LevelCardLoading
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable as LevelCardUnavailable
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content as FavoritesContent
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty as FavoritesEmpty
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed as FavoritesFailed
@@ -34,16 +39,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    private val observeAuthUser: ObserveAuthUserUseCase,
     private val observeFavoriteItems: ObserveFavoriteItemsUseCase,
+    private val observeLevelProgress: ObserveLevelProgressUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
     private val observeRecentSessions: ObserveRecentSessionsUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
@@ -57,12 +66,14 @@ class HomeViewModel @Inject constructor(
     val events = eventChannel.receiveAsFlow()
 
     // One handle per section collector: a thrown failure or a completion leaves its flow dead, so Retry relaunches it.
+    private var levelCardJob: Job? = null
     private var favoritesJob: Job? = null
     private var recentsJob: Job? = null
     private var revealCeilingJob: Job? = null
 
     init {
         startRevealCeiling()
+        collectLevelCard()
         collectFavoriteItems()
         collectProgressSummary()
         collectRecentSessions()
@@ -138,22 +149,30 @@ class HomeViewModel @Inject constructor(
     /**
      * Relaunches only the sections that [Failed][FavoritesFailed], after setting them back to Loading, so the
      * Retry button goes away at once and a second tap finds nothing to retry. Restarts the reveal ceiling, so
-     * the retried sections reveal together again. The progress summary is not part of Retry.
+     * the retried sections reveal together again. The progress summary is not part of Retry. The Level card
+     * is retried whenever it is not [Content][LevelCardContent], with no ceiling of its own; a card that has
+     * content is left alone.
      */
     fun onRetry() {
         val current = _state.value
         val retriesFavorites = current.favorites is FavoritesFailed
         val retriesRecents = current.recents is RecentsFailed
-        if (!retriesFavorites && !retriesRecents) return
-        _state.update {
-            it.copy(
-                favorites = if (retriesFavorites) FavoritesLoading else it.favorites,
-                recents = if (retriesRecents) RecentsLoading else it.recents,
-            )
+        val retriesLevelCard = current.levelCard !is LevelCardContent
+        if (retriesFavorites || retriesRecents) {
+            _state.update {
+                it.copy(
+                    favorites = if (retriesFavorites) FavoritesLoading else it.favorites,
+                    recents = if (retriesRecents) RecentsLoading else it.recents,
+                )
+            }
+            startRevealCeiling()
+            if (retriesFavorites) collectFavoriteItems()
+            if (retriesRecents) collectRecentSessions()
         }
-        startRevealCeiling()
-        if (retriesFavorites) collectFavoriteItems()
-        if (retriesRecents) collectRecentSessions()
+        if (retriesLevelCard) {
+            _state.update { it.copy(levelCard = LevelCardLoading) }
+            collectLevelCard()
+        }
     }
 
     /**
@@ -176,6 +195,56 @@ class HomeViewModel @Inject constructor(
             delay(REVEAL_CEILING)
             _state.update { it.copy(hasRevealCeilingElapsed = true) }
         }
+    }
+
+    /**
+     * The card needs the Level and the auth user together, so it stays [LevelCardLoading] until both have
+     * emitted; a null auth user still gives [LevelCardContent], with no name or photo. The Level stream's end is
+     * handled on that stream itself, not on the combined flow: the auth stream never ends, so `combine` would
+     * wait on it forever. Before the Level's first emission a failure or a completion (a signed-out start ends
+     * the stream silently) gives [LevelCardUnavailable], which the card draws like [LevelCardLoading] without
+     * the shimmer; after one, the card keeps waiting for the auth user or keeps its last content, and auth
+     * changes still update it in place.
+     */
+    private fun collectLevelCard() {
+        levelCardJob?.cancel()
+        levelCardJob = viewModelScope.launch {
+            var hasLevelEmitted = false
+            val levelProgressFlow = flow { emitAll(observeLevelProgress()) }
+                .onEach { hasLevelEmitted = true }
+                .onCompletion { cause ->
+                    if (cause == null && !hasLevelEmitted) failLevelCardIfLoading { "Observing the Level completed before its first emission" }
+                }
+                .catch { error ->
+                    loge(error) { "Observing the Level failed" }
+                    if (!hasLevelEmitted) failLevelCardIfLoading()
+                }
+            val authUserFlow = flow { emitAll(observeAuthUser()) }
+            combine(levelProgressFlow, authUserFlow) { levelProgress, authUser -> levelProgress to authUser }
+                .catch { error ->
+                    loge(error) { "Observing the auth user for the Level card failed" }
+                    failLevelCardIfLoading()
+                }
+                .collect { (levelProgress, authUser) ->
+                    _state.update {
+                        it.copy(
+                            levelCard = LevelCardContent(
+                                level = levelProgress.level,
+                                xpIntoCurrentLevel = levelProgress.xpIntoCurrentLevel,
+                                xpForNextLevel = levelProgress.xpForNextLevel,
+                                photoUrl = authUser?.photoUrl,
+                                displayName = authUser?.displayName,
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun failLevelCardIfLoading(logMessage: (() -> String)? = null) {
+        if (_state.value.levelCard !is LevelCardLoading) return
+        logMessage?.let { message -> logw(message = message) }
+        _state.update { it.copy(levelCard = LevelCardUnavailable) }
     }
 
     /**
