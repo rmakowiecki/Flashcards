@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
@@ -58,8 +57,7 @@ internal fun WelcomeStep(copyRevealProgress: Float, modifier: Modifier = Modifie
         ) {
             Text(
                 text = stringResource(R.string.welcome_headline_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineMediumEmphasized,
                 color = OnboardingContentColors.primary,
                 textAlign = TextAlign.Center,
             )
