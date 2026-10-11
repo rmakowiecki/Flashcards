@@ -79,7 +79,7 @@ screens show the server's numbers the next time they read.
 - **Delivering in-process from the Summary** instead of through the worker. Rejected: two delivery
   paths for one queue, and the Summary dies with its process.
 - **An app-lifetime snapshot listener on the scoring state**, to keep it cached. Deferred until a
-  screen needs a live scoring state.
+  screen needs a live scoring state; resolved as a listener per collecting screen (see Amendments).
 - **A client query of the day's sessions** for the Daily Goal. Rejected: nothing keeps session
   documents cached, so the query is empty offline, exactly when it is needed.
 
@@ -119,6 +119,39 @@ Pending Sessions into Home's Recents, so a session finished offline shows at onc
 cached XP configuration, so later
 Streak and Daily Goal awards build on earlier ones, and it drops Pending Sessions with no Flashcard
 Results, which the server rejects. See [ADR-0057](0057-recents-state-projection.md).
+
+**2026-10-10 — The Level is followed live, one listener per collecting screen.**
+`DefaultLevelProgressRepository` serves `LevelProgress` (Level, XP into it, XP that completes it) as a
+flow: a snapshot listener on `progress/user-stats` with the User's Pending Sessions replayed on top
+through `PendingSessionProjector`. This resolves the deferred app-lifetime listener option without an
+always-on listener and without a shared replay: every collecting screen gets its own cold flow and
+listener. The Firestore client serves duplicate listeners on one document from a single watch, so a
+second screen costs only its own replay. A shared hot flow was rejected: an upstream failure in an
+application scope has no collector to reach, its collectors never see completion, and a resubscription
+inside a sharing grace window never restarts a completed upstream.
+
+- **Applied sessions add nothing.** The live replay reads `appliedSessionIds` off the same snapshot it
+  replays over, so a delivered session still in the queue counts once, as in the one-shot read. See
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).
+- **Stale replays are dropped.** The live replay reads the Card Progress baselines, then checks the
+  queue against the snapshot it replays; a changed queue (a delivery, or a User switch) drops the result
+  and the change re-emits. The one-shot read keeps its own uid check and has no stale check, so a
+  delivery during the Summary's fallback preview read never fails the save.
+- **No false starting state offline.** A cache miss for a missing document is not read as a brand-new
+  account: the listener runs with metadata changes, drops a from-cache non-existent snapshot, and emits
+  nothing until the server answers. A consumer shows its loading state rather than Level 1.
+- **One configuration per value.** Each emission reads the cached XP configuration once and uses it for
+  both the replay and the Level threshold. A configuration refreshed while a screen is open applies
+  from the next emission.
+- **Sign-out ends the flow.** Permission denied completes the listener, and the flow completes with no
+  further value, cancelling a replay still in flight.
+
+Further accepted inaccuracy:
+
+- **One repeated value before sign-out completes.** Between sign-out and the permission-denied
+  teardown, a queue change can re-emit the same User's last value once. The screen is already leaving.
+- **Two screens can briefly disagree.** Each collector has its own listener and replays the same
+  snapshots, so two open screens (Home under the Summary) differ only while one is mid-replay.
 
 **2026-10-10 — Delivered sessions are applied once.** `user-stats` lists the sessions applied to it,
 an applied Pending Session adds to no aggregate, the worker removes an entry only after every refresh

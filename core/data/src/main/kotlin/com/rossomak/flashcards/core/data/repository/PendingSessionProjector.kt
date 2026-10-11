@@ -132,7 +132,8 @@ class PendingSessionProjector @Inject constructor(
      *
      * If the signed-in User changes while the reads are in flight, the queue and the remote documents
      * may belong to different Users, so the read fails rather than projecting one User's sessions over
-     * the other's scoring state.
+     * the other's scoring state. A queue that merely changes meanwhile is not checked: a delivery
+     * removing an older session during the read must not fail the caller.
      */
     suspend fun projectScoringState(excludedSessionId: String? = null): Result<ScoringState?> = coroutineScope {
         val uidAtStart = signedInUid()
@@ -150,6 +151,27 @@ class PendingSessionProjector @Inject constructor(
         }
         val scoringState = scoringStateDto?.toDomain() ?: ScoringState()
         Result.success(replay(baselines, pendingSessions, scoringState, xpConfig, scoringStateDto.appliedSessionIds()).scoringState)
+    }
+
+    /**
+     * [remoteScoringState] with [pendingSessions] (a snapshot of [observePendingSessions]) replayed on
+     * top and scored with [config], or `null` when [pendingSessions] is stale by the time the Card
+     * Progress baselines are read. A missing remote document (`null`) replays from [ScoringState]'s
+     * defaults. A session [remoteScoringState] lists as applied is already in it, so it does not advance
+     * the result. With no session, this returns the remote state, or the defaults, without reading anything.
+     *
+     * The queue is read again after the baselines and compared with [pendingSessions]: a different list
+     * means the queue changed meanwhile. The same check covers a User switch, so there is no separate uid
+     * check: after sign-out the list is empty, and another User's list never equals a non-empty one, since
+     * entries are owned by uid and ids are unique. The caller drops a `null` result; the queue change that
+     * made it stale re-emits.
+     */
+    suspend fun projectScoringStateOver(remoteScoringState: ScoringStateDto?, pendingSessions: List<SessionResult>, config: XpConfig): ScoringState? {
+        val scoringState = remoteScoringState?.toDomain() ?: ScoringState()
+        if (pendingSessions.isEmpty()) return scoringState
+        val baselines = readProgressBaselines(pendingSessions)
+        if (observePendingSessions().first() != pendingSessions) return null
+        return replay(baselines, pendingSessions, scoringState, config, remoteScoringState.appliedSessionIds()).scoringState
     }
 
     /**

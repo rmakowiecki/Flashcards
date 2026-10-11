@@ -19,6 +19,11 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
  * recomputed once a score lands, since a negative total changes it. [xpLines] never includes a
  * zero-[XpBreakdownLine.amount] entry.
  *
+ * [levelCard] follows the live Level stream, the same one Home's card reads, and is independent of
+ * [scoreStatus]. Only a Summary whose score is [StudySessionSummaryScoreStatus.Unavailable] renders
+ * it: a scored Summary drives its card from the score's before and after positions, which the pour
+ * needs and the stream does not carry.
+ *
  * [photoUrl]/[displayName] are the signed-in User's avatar source for the Level card. Both are null
  * until the auth user arrives, and again whenever there is no signed-in User.
  *
@@ -42,6 +47,7 @@ data class StudySessionSummaryScreenState(
     val xpIntoCurrentLevelBefore: Long = 0,
     val xpForNextLevelBefore: Long = 0,
     val currentStreak: Int = 0,
+    val levelCard: StudySessionSummaryLevelCardState = StudySessionSummaryLevelCardState.Loading,
     val photoUrl: String? = null,
     val displayName: String? = null,
     val activeDialog: StudySessionSummaryDialog? = null,

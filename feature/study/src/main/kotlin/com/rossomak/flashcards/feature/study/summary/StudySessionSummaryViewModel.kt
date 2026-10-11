@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.summary
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
@@ -12,6 +13,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerS
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -37,7 +39,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -64,6 +70,7 @@ class StudySessionSummaryViewModel @Inject constructor(
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
     private val submitStudySession: SubmitStudySessionUseCase,
     private val observeAuthUser: ObserveAuthUserUseCase,
+    private val observeLevelProgress: ObserveLevelProgressUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<StudySessionSummaryRoute>()
@@ -107,6 +114,7 @@ class StudySessionSummaryViewModel @Inject constructor(
         val savedScore = savedStateHandle.get<String>(KEY_SAVED_SCORE)?.let { json -> Json.decodeFromString<SessionScore>(json) }
         if (savedScore != null) applyScore(savedScore) else submitSession()
         observeAvatarSource()
+        observeLevelCard()
     }
 
     /**
@@ -123,6 +131,37 @@ class StudySessionSummaryViewModel @Inject constructor(
                     _state.update { it.copy(photoUrl = authUser?.photoUrl, displayName = authUser?.displayName) }
                 }
         }
+    }
+
+    /**
+     * Mirrors the live Level stream into [StudySessionSummaryScreenState.levelCard], in its own coroutine
+     * so the payoff never waits for it. Collected whatever the score does; only an unavailable score shows it. A failure or a normal completion before the first
+     * emission gives [StudySessionSummaryLevelCardState.Unavailable]; after content the last value stays.
+     * The use case is called inside the flow so a failure to build it is caught the same way.
+     */
+    private fun observeLevelCard() {
+        viewModelScope.launch {
+            var hasLevelEmitted = false
+            flow { emitAll(observeLevelProgress()) }
+                .onEach { hasLevelEmitted = true }
+                .onCompletion { cause ->
+                    if (cause == null && !hasLevelEmitted) {
+                        loge { "Observing the Level for the Summary's Level card completed before its first emission" }
+                        setLevelCardUnavailable()
+                    }
+                }
+                .catch { exception ->
+                    loge(exception) { "Observing the Level for the Summary's Level card failed" }
+                    if (!hasLevelEmitted) setLevelCardUnavailable()
+                }
+                .collect { levelProgress ->
+                    _state.update { it.copy(levelCard = StudySessionSummaryLevelCardState.Content(levelProgress)) }
+                }
+        }
+    }
+
+    private fun setLevelCardUnavailable() {
+        _state.update { it.copy(levelCard = StudySessionSummaryLevelCardState.Unavailable) }
     }
 
     /**

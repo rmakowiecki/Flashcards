@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
 
@@ -26,10 +27,20 @@ class FakeUserFavoritesRepository : UserFavoritesRepository {
     /** When set, [observeFavorites] throws this before its first emission, like a failing snapshot listener. */
     var favoritesReadFailure: Throwable? = null
 
+    /**
+     * When set, [observeFavorites] completes after this many emissions, like a listener torn down on permission
+     * denied; `0` completes before the first. `null` (the default) never completes.
+     */
+    var favoritesEmissionLimit: Int? = null
+
     override fun observeFavorites(): Flow<UserFavorites> = flow {
         favoritesReadGate?.await() ?: yield()
         favoritesReadFailure?.let { throw it }
-        emitAll(favorites)
+        when (val limit = favoritesEmissionLimit) {
+            null -> emitAll(favorites)
+            0 -> Unit
+            else -> emitAll(favorites.take(limit))
+        }
     }
 
     override suspend fun setCategoryFavorite(categoryId: String, isFavorite: Boolean): Result<Unit> {

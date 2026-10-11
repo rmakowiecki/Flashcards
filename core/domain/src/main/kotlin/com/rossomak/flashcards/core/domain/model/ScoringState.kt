@@ -7,7 +7,8 @@ package com.rossomak.flashcards.core.domain.model
  * only writer. The client reads it through
  * [com.rossomak.flashcards.core.domain.repository.ScoringStateRepository], with its Pending Sessions
  * replayed on top by [com.rossomak.flashcards.core.domain.scoring.scoreSession], for the Session
- * Summary's fallback preview.
+ * Summary's fallback preview, and follows its Level live through
+ * [com.rossomak.flashcards.core.domain.repository.LevelProgressRepository].
  *
  * [currentStreak], [bestStreak], [lastStudyDate], [goalMetDate] and [studiedSecondsOnLastStudyDate]
  * advance by the Streak and Daily Goal rules

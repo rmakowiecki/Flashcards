@@ -1,6 +1,10 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -81,6 +85,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardSkeleton
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.currentLocale
@@ -172,9 +177,9 @@ fun StudySessionSummaryScreen(
  * While the score loads, only a spinner shows on the gradient: no app bar, and nothing to tap. When it
  * resolves during this composition and animations are on, the payoff plays once (see [SummaryPayoff]).
  * A restored or rotated screen, an [Unavailable] score and a system with animations off all show the
- * settled state directly. Settled, the app bar, a scrolling stack (for a [Scored]
- * session the Level card, headline, XP total and pills; otherwise headline and pills) and the bottom sheet are all in place. An [Unavailable] score
- * shows the same screen without the total, its breakdown button or the Level card.
+ * settled state directly. Settled, the app bar, a scrolling stack (the Level card, headline, XP total
+ * and pills) and the bottom sheet are all in place. An [Unavailable] score shows the same screen without
+ * the total or its breakdown button, and its Level card follows the live Level stream instead of the score.
  */
 @Composable
 fun StudySessionSummaryContent(
@@ -428,6 +433,9 @@ private fun SummaryBody(
                         },
                 )
             }
+            if (state.scoreStatus == Unavailable) {
+                SummaryLiveLevelCard(state = state.levelCard, photoUrl = state.photoUrl, displayName = state.displayName)
+            }
             SummaryHeadline(
                 headline = state.headline,
                 modifier = revealModifier.onSizeChanged { size -> headlineHeightPx = size.height },
@@ -584,6 +592,47 @@ private fun SummaryLevelCard(
         animateProgress = false,
         levelScale = { payoff.levelPulse.value },
     )
+}
+
+/**
+ * The Level card of a Summary with no score, which has no before and after positions to pour between:
+ * Home's live Level stream instead, static. The on-gradient skeleton shows until the stream has emitted,
+ * with a fade to the card, and a stream that fails or ends first leaves the slot empty.
+ */
+@Composable
+private fun SummaryLiveLevelCard(
+    state: StudySessionSummaryLevelCardState,
+    photoUrl: String?,
+    displayName: String?,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedContent(
+        targetState = state,
+        modifier = modifier,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        contentKey = { it::class },
+        label = "SummaryLiveLevelCard",
+    ) { shownState ->
+        when (shownState) {
+            StudySessionSummaryLevelCardState.Loading -> FlashcardsLevelCardSkeleton(
+                modifier = Modifier.fillMaxWidth(),
+                style = FlashcardsComponentStyle.OnGradient,
+            )
+            is StudySessionSummaryLevelCardState.Content -> with(shownState.levelProgress) {
+                FlashcardsLevelCard(
+                    level = level,
+                    xpIntoCurrentLevel = xpIntoCurrentLevel,
+                    xpForNextLevel = xpForNextLevel,
+                    progress = progress,
+                    photoUrl = photoUrl,
+                    displayName = displayName,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = FlashcardsComponentStyle.OnGradient,
+                )
+            }
+            StudySessionSummaryLevelCardState.Unavailable -> Unit
+        }
+    }
 }
 
 @Composable

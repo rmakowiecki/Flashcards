@@ -86,7 +86,7 @@ fun StudySessionHeader(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     // alignByBaseline, not Alignment.Bottom: labelMedium and titleLarge have
                     // different descent, so box-bottom alignment leaves their glyphs visibly
-                    // offset — see the LEVEL/level-number pair in FlashcardsLevelCard.
+                    // offset — see the LVL/level-number pair in FlashcardsLevelCard.
                     Text(
                         text = progress.label,
                         modifier = Modifier.alignByBaseline(),

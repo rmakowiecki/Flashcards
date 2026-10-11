@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.yield
 
 class FakeRecentSessionsRepository : RecentSessionsRepository {
@@ -21,6 +22,12 @@ class FakeRecentSessionsRepository : RecentSessionsRepository {
     /** When set, [observeRecentSessions] throws this before its first emission, like a failing snapshot listener. */
     var recentSessionsReadFailure: Throwable? = null
 
+    /**
+     * When set, [observeRecentSessions] completes after this many emissions, like a listener torn down on permission
+     * denied; `0` completes before the first. `null` (the default) never completes.
+     */
+    var recentSessionsEmissionLimit: Int? = null
+
     fun setRecentSessions(sessions: List<RecentSession>) {
         recentSessions.value = sessions
     }
@@ -28,6 +35,10 @@ class FakeRecentSessionsRepository : RecentSessionsRepository {
     override fun observeRecentSessions(): Flow<List<RecentSession>> = flow {
         recentSessionsReadGate?.await() ?: yield()
         recentSessionsReadFailure?.let { throw it }
-        emitAll(recentSessions)
+        when (val limit = recentSessionsEmissionLimit) {
+            null -> emitAll(recentSessions)
+            0 -> Unit
+            else -> emitAll(recentSessions.take(limit))
+        }
     }
 }
