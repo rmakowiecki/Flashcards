@@ -15,18 +15,11 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-/** How long the whole pour takes when all of its XP lands in one segment. */
-internal val POUR_BASE: Duration = 1_500.milliseconds
-
-/** The floor of the first and last pour segment, however small their share of the XP. */
-internal val POUR_SEGMENT_MIN: Duration = 520.milliseconds
+/** A pour inside one Level, and the first and last stretch of a Level-up. */
+internal val POUR_SEGMENT: Duration = 700.milliseconds
 
 /** A Level crossed in the middle of a pour: its bar fills and resets, nothing else. */
-internal val POUR_INTERMEDIATE: Duration = 300.milliseconds
-internal val POUR_INTERMEDIATE_MIN: Duration = 80.milliseconds
-
-/** The whole pour stays at or under this, unless the floors alone exceed it. */
-internal val POUR_CAP: Duration = 2_500.milliseconds
+internal val POUR_INTERMEDIATE: Duration = 250.milliseconds
 
 /** The Level number's scale up and back down at every Level crossed. */
 internal val LEVEL_PULSE: Duration = 250.milliseconds
@@ -73,11 +66,8 @@ internal data class LevelCardPourSegment(
  *   to its position. At every cut the bar snaps to 0, the Level number moves on and the text restarts
  *   at 0.
  *
- * Durations: the first and last segment share [POUR_BASE] in proportion to their XP, never less than
- * [POUR_SEGMENT_MIN] each. A middle segment takes [POUR_INTERMEDIATE]. When the whole pour would exceed
- * [POUR_CAP], the middle segments shrink first, down to [POUR_INTERMEDIATE_MIN], and only then the first
- * and last, down to their floor. A last segment that does not move (a Level-up exactly to the boundary)
- * takes no time of its own.
+ * The first and last segment take [POUR_SEGMENT], a middle one [POUR_INTERMEDIATE]. A last segment
+ * that does not move (a Level-up exactly to the boundary) takes no time of its own.
  */
 internal fun planLevelCardPour(from: LevelCardPosition, to: LevelCardPosition): List<LevelCardPourSegment> = when {
     to.level > from.level -> planLevelUpPour(from, to)
@@ -91,20 +81,13 @@ internal fun planLevelCardPour(from: LevelCardPosition, to: LevelCardPosition): 
             xpFrom = from.xpIntoLevel,
             xpTo = to.xpIntoLevel,
             showXpCount = true,
-            duration = POUR_BASE,
+            duration = POUR_SEGMENT,
         ),
     )
 }
 
 private fun planLevelUpPour(from: LevelCardPosition, to: LevelCardPosition): List<LevelCardPourSegment> {
     val middleLevels = (from.level + 1 until to.level).toList()
-    val firstXp = (from.xpForNextLevel - from.xpIntoLevel).coerceAtLeast(0L)
-    val lastXp = to.xpIntoLevel.coerceAtLeast(0L)
-    val durations = fitToCap(
-        first = shareOfBase(firstXp, firstXp + lastXp),
-        last = shareOfBase(lastXp, firstXp + lastXp),
-        middleCount = middleLevels.size,
-    )
     val lastMoves = to.fraction > 0f || to.xpIntoLevel > 0L
 
     val first = LevelCardPourSegment(
@@ -115,7 +98,7 @@ private fun planLevelUpPour(from: LevelCardPosition, to: LevelCardPosition): Lis
         xpFrom = from.xpIntoLevel,
         xpTo = from.xpForNextLevel,
         showXpCount = true,
-        duration = durations.first,
+        duration = POUR_SEGMENT,
     )
     val middle = middleLevels.map { level ->
         LevelCardPourSegment(
@@ -126,7 +109,7 @@ private fun planLevelUpPour(from: LevelCardPosition, to: LevelCardPosition): Lis
             xpFrom = 0L,
             xpTo = 0L,
             showXpCount = false,
-            duration = durations.middle,
+            duration = POUR_INTERMEDIATE,
         )
     }
     val last = LevelCardPourSegment(
@@ -137,34 +120,9 @@ private fun planLevelUpPour(from: LevelCardPosition, to: LevelCardPosition): Lis
         xpFrom = 0L,
         xpTo = to.xpIntoLevel,
         showXpCount = true,
-        duration = if (lastMoves) durations.last else Duration.ZERO,
+        duration = if (lastMoves) POUR_SEGMENT else Duration.ZERO,
     )
     return listOf(first) + middle + last
-}
-
-private fun shareOfBase(segmentXp: Long, pouredXp: Long): Duration {
-    val totalXp = pouredXp.coerceAtLeast(1L).toDouble()
-    val proportional = (POUR_BASE.inWholeMilliseconds * segmentXp / totalXp).roundToLong().milliseconds
-    return maxOf(POUR_SEGMENT_MIN, proportional)
-}
-
-private data class PourDurations(val first: Duration, val middle: Duration, val last: Duration)
-
-private fun fitToCap(first: Duration, last: Duration, middleCount: Int): PourDurations {
-    val middleTotal = { middle: Duration -> middle * middleCount }
-    var middle = POUR_INTERMEDIATE
-    if (first + last + middleTotal(middle) > POUR_CAP && middleCount > 0) {
-        middle = ((POUR_CAP - first - last) / middleCount).coerceIn(POUR_INTERMEDIATE_MIN, POUR_INTERMEDIATE)
-    }
-    var fitFirst = first
-    var fitLast = last
-    if (fitFirst + fitLast + middleTotal(middle) > POUR_CAP) {
-        val available = maxOf(POUR_CAP - middleTotal(middle), POUR_SEGMENT_MIN * 2)
-        val scale = available / (fitFirst + fitLast)
-        fitFirst = maxOf(POUR_SEGMENT_MIN, fitFirst * scale)
-        fitLast = maxOf(POUR_SEGMENT_MIN, fitLast * scale)
-    }
-    return PourDurations(first = fitFirst, middle = middle, last = fitLast)
 }
 
 /**

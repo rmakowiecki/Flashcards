@@ -1,9 +1,7 @@
 package com.rossomak.flashcards.core.ui.composables.level
 
-import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import org.junit.Test
 
 class LevelCardPourPlanTest {
@@ -11,7 +9,6 @@ class LevelCardPourPlanTest {
     private val sameLevelBefore = LevelCardPosition(level = 7, xpIntoLevel = 2_300, xpForNextLevel = 6_000)
     private val levelUpBefore = LevelCardPosition(level = 12, xpIntoLevel = 2_840, xpForNextLevel = 5_000)
     private val levelUpAfter = LevelCardPosition(level = 13, xpIntoLevel = 1_520, xpForNextLevel = 6_000)
-    private val levelUpPouredXp = 3_680
 
     @Test
     fun `a gain inside one Level pours in a single segment`() {
@@ -28,7 +25,7 @@ class LevelCardPourPlanTest {
                 xpFrom = sameLevelBefore.xpIntoLevel,
                 xpTo = after.xpIntoLevel,
                 showXpCount = true,
-                duration = POUR_BASE,
+                duration = POUR_SEGMENT,
             ),
         )
     }
@@ -75,26 +72,6 @@ class LevelCardPourPlanTest {
     }
 
     @Test
-    fun `the first and last segments share the base duration in proportion to the XP they pour`() {
-        val plan = planLevelCardPour(levelUpBefore, levelUpAfter)
-
-        val baseMillis = POUR_BASE.inWholeMilliseconds.toDouble()
-        val firstShare = (levelUpBefore.xpForNextLevel - levelUpBefore.xpIntoLevel) * baseMillis / levelUpPouredXp
-        val lastShare = levelUpAfter.xpIntoLevel * baseMillis / levelUpPouredXp
-        plan.first().duration.inWholeMilliseconds shouldBe Math.round(firstShare)
-        plan.last().duration.inWholeMilliseconds shouldBe Math.round(lastShare)
-    }
-
-    @Test
-    fun `a tiny share of the XP still gets the minimum duration`() {
-        val barelyCrossed = LevelCardPosition(level = 13, xpIntoLevel = 5, xpForNextLevel = 6_000)
-
-        val plan = planLevelCardPour(levelUpBefore, barelyCrossed)
-
-        plan.last().duration shouldBe POUR_SEGMENT_MIN
-    }
-
-    @Test
     fun `three Levels crossed pour the middle ones as a bar and a Level number only`() {
         val after = LevelCardPosition(level = 15, xpIntoLevel = 900, xpForNextLevel = 8_000)
 
@@ -105,34 +82,9 @@ class LevelCardPourPlanTest {
         middle.map { it.showXpCount } shouldBe listOf(false, false)
         middle.map { it.fromFraction } shouldBe listOf(0f, 0f)
         middle.map { it.toFraction } shouldBe listOf(1f, 1f)
-        middle.map { it.duration } shouldBe listOf(POUR_INTERMEDIATE, POUR_INTERMEDIATE)
+        plan.map { it.duration } shouldBe listOf(POUR_SEGMENT, POUR_INTERMEDIATE, POUR_INTERMEDIATE, POUR_SEGMENT)
         plan.last().xpTo shouldBe after.xpIntoLevel
         plan.last().xpForNextLevel shouldBe after.xpForNextLevel
-    }
-
-    @Test
-    fun `many Levels crossed shrink the middle segments first so the pour stays under the cap`() {
-        val after = LevelCardPosition(level = 22, xpIntoLevel = 4_000, xpForNextLevel = 20_000)
-
-        val plan = planLevelCardPour(levelUpBefore, after)
-
-        val middle = plan.subList(1, plan.size - 1)
-        middle.all { it.duration < POUR_INTERMEDIATE } shouldBe true
-        middle.all { it.duration >= POUR_INTERMEDIATE_MIN } shouldBe true
-        (plan.first().duration >= POUR_SEGMENT_MIN) shouldBe true
-        (plan.last().duration >= POUR_SEGMENT_MIN) shouldBe true
-        plan.fold(Duration.ZERO) { total, segment -> total + segment.duration } shouldBeLessThanOrEqualTo (POUR_CAP + 1.milliseconds)
-    }
-
-    @Test
-    fun `an extreme number of Levels bottoms out the middle segments even above the cap`() {
-        val after = LevelCardPosition(level = 60, xpIntoLevel = 4_000, xpForNextLevel = 20_000)
-
-        val plan = planLevelCardPour(levelUpBefore, after)
-
-        plan.subList(1, plan.size - 1).all { it.duration == POUR_INTERMEDIATE_MIN } shouldBe true
-        plan.first().duration shouldBe POUR_SEGMENT_MIN
-        (plan.last().duration >= POUR_SEGMENT_MIN) shouldBe true
     }
 
     @Test

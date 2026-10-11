@@ -117,8 +117,8 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  *   A later [Content] pours into the bar ([LevelCardPour]): a change inside one Level fills or drains the
  *   bar while the XP text counts; a higher Level fills the old Level to the top, pulses the Level number,
  *   restarts the bar from 0 for every Level crossed and ends at the new position. A Level crossed in the
- *   middle shows only the bar and the number, since its threshold is not known. The whole pour stays
- *   within [POUR_CAP]. A lower Level (another User) is not poured: the figures snap to it, as they do for
+ *   middle shows only the bar and the number, since its threshold is not known, and pours faster. A
+ *   lower Level (another User) is not poured: the figures snap to it, as they do for
  *   every change when the system's animations are off.
  * - [Unavailable]: the same skeleton blocks without the shimmer. It has no UI of its own yet.
  *
