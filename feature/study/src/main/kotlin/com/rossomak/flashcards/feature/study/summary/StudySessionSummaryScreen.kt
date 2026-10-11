@@ -453,25 +453,31 @@ private fun SummaryBody(
             Spacer(Modifier.weight(1f))
         }
         if (isScored) {
-            AnimatedVisibility(visible = sequence.phase == SummaryPhase.Counting, enter = EnterTransition.None, exit = fadeOut()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = spacing.normal)
-                        .padding(top = topPadding + COUNTING_TOTAL_DROP, bottom = contentPadding.calculateBottomPadding() + spacing.normal),
-                ) {
-                    // An invisible copy of the total's row, so the tiles start under the total without measuring it.
-                    SummaryXpTotalSlot(text = "", modifier = Modifier.alpha(0f).clearAndSetSemantics {})
-                    SummaryXpTiles(
-                        lines = sequence.lines,
-                        visibleCount = sequence.visibleLineCount,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .fillMaxWidth()
-                            .padding(top = COUNTING_TILES_GAP),
-                    )
-                }
-            }
+            SummaryCountingTiles(
+                sequence = sequence,
+                modifier = Modifier
+                    .padding(horizontal = spacing.normal)
+                    .padding(top = topPadding + COUNTING_TOTAL_DROP, bottom = contentPadding.calculateBottomPadding() + spacing.normal),
+            )
+        }
+    }
+}
+
+/** The tiles under the counting total, on their own layer so their exit never moves the total. */
+@Composable
+private fun SummaryCountingTiles(sequence: SummarySequence, modifier: Modifier = Modifier) {
+    AnimatedVisibility(visible = sequence.phase == SummaryPhase.Counting, enter = EnterTransition.None, exit = fadeOut()) {
+        Column(modifier = Modifier.fillMaxSize().then(modifier)) {
+            // An invisible copy of the total's row, so the tiles start under the total without measuring it.
+            SummaryXpTotalSlot(text = "", modifier = Modifier.alpha(0f).clearAndSetSemantics {})
+            SummaryXpTiles(
+                lines = sequence.lines,
+                visibleCount = sequence.visibleLineCount,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .fillMaxWidth()
+                    .padding(top = COUNTING_TILES_GAP),
+            )
         }
     }
 }
