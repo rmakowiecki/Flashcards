@@ -64,7 +64,6 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButto
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
-import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.currentLocale
@@ -156,9 +155,11 @@ fun StudySessionSummaryScreen(
  * The Summary in its final, settled state, which is the frame every other state lands on.
  *
  * While the score loads, only a spinner shows on the gradient: no app bar, and nothing to tap. Once
- * it resolves, the app bar, a scrolling stack (headline, pills, and for a [Scored] session the XP
- * total and Level card) and the bottom sheet appear. An [Unavailable] score shows the same screen
- * without the total, its breakdown button or the Level card.
+ * it resolves, the app bar, a scrolling stack (headline, pills, for a [Scored] session the XP total,
+ * and the Level card) and the bottom sheet appear. An [Unavailable] score shows the same screen
+ * without the total or its breakdown button. The Level card always shows: a scored Summary draws the
+ * score's Level position, and an unscored one follows the live Level stream like Home's card, with the
+ * same skeleton while it loads or when it is unavailable.
  */
 @Composable
 fun StudySessionSummaryContent(
@@ -272,18 +273,12 @@ private fun SummaryBody(
                 locale = locale,
                 onShowBreakdown = { onDialogEvent(Open(XpBreakdown)) },
             )
-            FlashcardsLevelCard(
-                state = FlashcardsLevelCardState.Content(
-                    level = state.level,
-                    xpIntoCurrentLevel = state.xpIntoCurrentLevel,
-                    xpForNextLevel = state.xpForNextLevel,
-                    photoUrl = state.photoUrl,
-                    displayName = state.displayName,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                style = FlashcardsComponentStyle.OnGradient,
-            )
         }
+        FlashcardsLevelCard(
+            state = state.levelCard,
+            modifier = Modifier.fillMaxWidth(),
+            style = FlashcardsComponentStyle.OnGradient,
+        )
     }
 }
 

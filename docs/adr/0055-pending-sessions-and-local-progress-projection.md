@@ -158,3 +158,9 @@ an applied Pending Session adds to no aggregate, the worker removes an entry onl
 read succeeds, and the Summary's baseline excludes its own session. This resolves the under-count after
 delivery, the double count after a crash and the double count between refresh and removal. See
 [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).
+
+**2026-10-11 — The Summary's Level card follows its score.** A scored Summary draws its Level card
+from the session's score; only a Summary with no score follows the live Level stream. Accepted: a
+scored card can differ from Home's when the server scored with a newer XP configuration than the
+device's cached one, or when the Summary shows a local preview that the server later scores
+differently. The Summary never replaces a score it has shown.

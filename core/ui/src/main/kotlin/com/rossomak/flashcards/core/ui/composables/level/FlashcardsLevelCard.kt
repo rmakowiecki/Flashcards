@@ -117,6 +117,11 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  * The skeleton and the figures have the same height, so the fade between them moves nothing. A change
  * inside [Content] (a progress or name update) is not a transition: it recomposes in place, as does a
  * change between [Loading] and [Unavailable].
+ *
+ * The card owns its animation: a caller supplies states and never directs frames. A screen that wants a
+ * richer entrance, such as a pour from a before position to an after position, shows the before [Content]
+ * and then the after one, and the card decides how that change plays. The card exposes no animation
+ * parameter and has no state variant carrying one.
  */
 @Composable
 fun FlashcardsLevelCard(
