@@ -23,12 +23,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.key
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -40,6 +43,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.animation.rememberAnimationsEnabled
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
@@ -57,6 +61,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.valentinilk.shimmer.LocalShimmerTheme
 import com.valentinilk.shimmer.defaultShimmerTheme
 import com.valentinilk.shimmer.shimmer
+import kotlin.math.roundToLong
 
 /**
  * Alpha applied to the "LVL" label and the xp-count text — the two pieces the design mock renders
@@ -107,11 +112,14 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  *
  * What the card draws follows [state]:
  * - [Loading]: a same-height skeleton whose blocks shimmer, standing where each piece of text sits.
- * - [Content]: the figures. The bar's fill is derived from the two XP values ([levelCardProgress]). The bar
- *   animates changes to its fill but not its first composition, so a screen does not replay a sweep from 0
- *   on every launch. The figures are keyed on the Level, so a Level change starts the bar at its new fill
- *   instead of sweeping backwards; the same snap softens the short false level-up a double-counted delivery
- *   can cause.
+ * - [Content]: the figures. The bar's fill is derived from the two XP values ([levelCardProgress]). The
+ *   first composition shows them as they are, so a screen does not replay a sweep from 0 on every launch.
+ *   A later [Content] pours into the bar ([LevelCardPour]): a change inside one Level fills or drains the
+ *   bar while the XP text counts; a higher Level fills the old Level to the top, pulses the Level number,
+ *   restarts the bar from 0 for every Level crossed and ends at the new position. A Level crossed in the
+ *   middle shows only the bar and the number, since its threshold is not known. The whole pour stays
+ *   within [POUR_CAP]. A lower Level (another User) is not poured: the figures snap to it, as they do for
+ *   every change when the system's animations are off.
  * - [Unavailable]: the same skeleton blocks without the shimmer. It has no UI of its own yet.
  *
  * The skeleton and the figures have the same height, so the fade between them moves nothing. A change
@@ -119,8 +127,9 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  * change between [Loading] and [Unavailable].
  *
  * The card owns its animation: a caller supplies states and never directs frames. A screen that wants a
- * richer entrance, such as a pour from a before position to an after position, shows the before [Content]
- * and then the after one, and the card decides how that change plays. The card exposes no animation
+ * pour from a before position to an after position shows the before [Content] and then the after one, and
+ * the card decides how that change plays. A caller that needs the figures to jump instead gives the card
+ * a new identity (`key`), whose first composition is not animated. The card exposes no animation
  * parameter and has no state variant carrying one.
  */
 @Composable
@@ -141,7 +150,7 @@ fun FlashcardsLevelCard(
 
             Unavailable -> LevelCardSkeleton(isShimmering = false, style = style)
 
-            is Content -> key(shownState.level) { LevelCardFigures(content = shownState, style = style) }
+            is Content -> LevelCardFigures(content = shownState, style = style)
         }
     }
 }
@@ -152,6 +161,10 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
     val xpIntoCurrentLevel = content.xpIntoCurrentLevel
     val xpForNextLevel = content.xpForNextLevel
     val displayName = content.displayName
+    val target = LevelCardPosition(level, xpIntoCurrentLevel, xpForNextLevel)
+    val pour = remember { LevelCardPour(target) }
+    val animationsEnabled = rememberAnimationsEnabled()
+    LaunchedEffect(pour, target) { pour.moveTo(target, animate = animationsEnabled) }
     val mutedContentColor = MaterialTheme.brandColors.onGradientContent.copy(alpha = LEVEL_CARD_MUTED_TEXT_ALPHA)
     val name = remember(displayName) { levelCardName(displayName) }
     val description = when (name) {
@@ -202,31 +215,49 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    text = level.toString(),
-                    modifier = Modifier.alignByBaseline(),
+                    text = pour.level.toString(),
+                    modifier = Modifier
+                        .alignByBaseline()
+                        .graphicsLayer {
+                            scaleX = pour.levelScale.value
+                            scaleY = pour.levelScale.value
+                        },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
                 )
             }
         }
-        FlashcardsLinearProgressBar(progress = levelCardProgress(xpIntoCurrentLevel, xpForNextLevel), style = OnGradient)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text(
-                text = stringResource(R.string.level_card_xp_count_label, xpIntoCurrentLevel, xpForNextLevel),
-                color = mutedContentColor,
-                style = MaterialTheme.typography.labelMedium,
-            )
-            Text(
-                text = stringResource(R.string.level_card_xp_unit_label),
-                modifier = Modifier.padding(start = MaterialTheme.spacing.xxsmall),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        FlashcardsLinearProgressBar(progress = { pour.fraction.value }, style = OnGradient)
+        LevelCardXpCount(pour = pour, mutedContentColor = mutedContentColor)
+    }
+}
+
+/**
+ * The "x / y XP" readout under the bar, counting with [pour]. Its own scope, so the count recomposes only
+ * this row, once per whole point. Always laid out, so a middle Level of a pour, which hides the count,
+ * never changes the card's height.
+ */
+@Composable
+private fun LevelCardXpCount(pour: LevelCardPour, mutedContentColor: Color) {
+    val shownXpIntoLevel by remember(pour) { derivedStateOf { pour.xpIntoLevel.value.roundToLong() } }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = if (pour.showsXpCount) 1f else 0f },
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = stringResource(R.string.level_card_xp_count_label, shownXpIntoLevel, pour.xpForNextLevel),
+            color = mutedContentColor,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Text(
+            text = stringResource(R.string.level_card_xp_unit_label),
+            modifier = Modifier.padding(start = MaterialTheme.spacing.xxsmall),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

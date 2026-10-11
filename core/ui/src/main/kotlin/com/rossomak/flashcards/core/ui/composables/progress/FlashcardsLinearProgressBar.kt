@@ -65,15 +65,16 @@ fun FlashcardsLinearProgressBar(
 }
 
 /**
- * [FlashcardsLinearProgressBar] for a caller that animates the fill itself, frame by frame, such as a
- * scripted sequence: [progress] is read in the draw phase only, so each frame redraws the bar and
- * recomposes nothing. It is drawn exactly as given (clamped to `0..1`), with no easing of its own.
+ * [FlashcardsLinearProgressBar] for a `core:ui` component that animates the fill itself, frame by frame,
+ * such as the Level card's pour: [progress] is read in the draw phase only, so each frame redraws the bar
+ * and recomposes nothing. It is drawn exactly as given (clamped to `0..1`), with no easing of its own.
+ * Internal so that screens never direct a bar's frames; they hand a component its states instead.
  *
  * It carries no progress semantics, since an in-flight value is not worth announcing: the caller
  * describes the progress to accessibility itself, typically on the enclosing component.
  */
 @Composable
-fun FlashcardsLinearProgressBar(
+internal fun FlashcardsLinearProgressBar(
     progress: () -> Float,
     modifier: Modifier = Modifier,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
