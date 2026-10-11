@@ -26,7 +26,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.Category
@@ -89,7 +88,6 @@ internal fun RecentSessionRow(
             Text(
                 text = recentTitle(item),
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -103,7 +101,7 @@ internal fun RecentSessionRow(
             RecentDeliveryIcons(session = item.session)
             Text(
                 text = recentRelativeTimeText(recentRelativeTime(item.session.startedAt, now, zoneId)),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
@@ -129,8 +127,7 @@ private fun RecentCategoryOverline(categoryName: String, category: Category?) {
         }
         Text(
             text = categoryName,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelMediumEmphasized,
             color = categoryColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
