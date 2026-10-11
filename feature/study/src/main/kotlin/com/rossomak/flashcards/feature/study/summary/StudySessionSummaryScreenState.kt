@@ -9,39 +9,11 @@ import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardStat
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable as LevelCardUnavailable
 
 /**
- * Everything the Session Summary screen renders.
+ * XP and Level fields keep their defaults until [scoreStatus] is [StudySessionSummaryScoreStatus.Scored].
+ * [masteredCount] is zero for Fast, so pick the Fast variant off [mode]. [xpLines] omits zero amounts.
  *
- * [mode], [durationSeconds], [studiedCount], [abandoned], [masteredCount] and [headline] come from
- * the route and are set before the first frame. [masteredCount] is always zero for a Fast result,
- * which has no Terminal States, and the content chooses its Fast variant off [mode] rather than
- * inferring it from that zero.
- *
- * [scoreStatus] is [StudySessionSummaryScoreStatus.Loading] until the session's score resolves. The
- * XP fields ([xpLines], [xpTotal], the Level fields, [levelsCrossed], the before-session Level
- * fields and [currentStreak]) hold their zero defaults until it is
- * [StudySessionSummaryScoreStatus.Scored], and stay there when it is
- * [StudySessionSummaryScoreStatus.Unavailable]. [headline] starts from route data only and is
- * recomputed once a score lands, since a negative total changes it. [xpLines] never includes a
- * zero-[XpBreakdownLine.amount] entry.
- *
- * [levelCard] is the one state the Level card renders, the same type Home's card renders. Every card
- * waits for the auth user, as Home's does: [FlashcardsLevelCardState.Loading] until [hasAuthUserResolved],
- * which a failed auth read sets too, leaving the card without a name. A
- * [StudySessionSummaryScoreStatus.Scored] Summary then draws the score's own Level position, frozen once
- * it lands: the score is this session's own result, so a later stream value never moves it. Without a score the
- * card follows the live Level stream like Home's: Loading until [liveLevel] has emitted, then content, and
- * [FlashcardsLevelCardState.Unavailable] when [isLiveLevelUnavailable] is set before that. Only a Summary
- * with a settled score status shows the card. [levelCardBefore] is the scored card's starting point.
- *
- * [liveLevel] is the latest value of the live Level stream, the one Home's card reads; `null` until it
- * emits. It keeps its last value if the stream later fails. [isLiveLevelUnavailable] is set when the
- * stream fails or ends before its first value.
- *
- * [photoUrl]/[displayName] are the signed-in User's avatar source for the Level card. Both are null
- * until the auth user arrives ([hasAuthUserResolved] says whether it has), and again whenever there is
- * no signed-in User.
- *
- * [activeDialog] is the dialog on screen, if any. It lives here so a dialog survives rotation.
+ * [levelCard] waits for the auth user, like Home's. Scored, it shows the score's own Level position, which
+ * later [liveLevel] values never move; otherwise it follows [liveLevel].
  */
 data class StudySessionSummaryScreenState(
     val mode: StudyMode = StudyMode.Rated,
@@ -80,10 +52,7 @@ data class StudySessionSummaryScreenState(
             else -> LevelCardLoading
         }
 
-    /**
-     * The card a scored Summary shows before its pour: the score's Level position before the session.
-     * Without a score there is no pour, so this is [levelCard].
-     */
+    /** The scored card before its pour; without a score there is no pour, so [levelCard]. */
     val levelCardBefore: FlashcardsLevelCardState
         get() = when (scoreStatus) {
             StudySessionSummaryScoreStatus.Scored -> when {

@@ -7,10 +7,7 @@ import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionNotSavedException
-import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
-import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
-import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
@@ -26,7 +23,6 @@ import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.PerfectRun
-import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Loading
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Scored
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Unavailable
 import com.rossomak.flashcards.feature.study.toSessionResult
@@ -51,19 +47,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 /**
- * Reads the terminated session's result straight from the route arguments — the only load path this
- * route ever carries (fresh-session egress only, never a past session) — and
- * submits it once, on arrival (ADR-0014, superseded for the write path by the server-authoritative session commit).
- *
- * The submission fires from `init`, which Hilt/Compose Navigation only run once per back-stack entry:
- * this ViewModel survives configuration change, so there is no separate "have I already submitted"
- * flag to maintain. There is likewise no branch to skip a past-session load: [StudySessionSummaryRoute]
- * has no sessionId-only shape today, only ever a complete [SessionResult][com.rossomak.flashcards.core.domain.model.SessionResult] —
- * a future past-session detail view is a separate screen and route (ADR-0014), not a branch of this one.
- *
- * A resolved score is saved in [savedStateHandle], so a ViewModel restored after process death shows
- * the same award without submitting again. Only a death before the score resolved submits again; the
- * use case's baseline then leaves this session out, so the preview never builds on the session itself.
+ * Submits the session from the route once, from `init`. The resolved score is saved in [savedStateHandle],
+ * so a restore after process death shows it without submitting again.
  */
 @HiltViewModel
 class StudySessionSummaryViewModel @Inject constructor(
@@ -89,15 +74,7 @@ class StudySessionSummaryViewModel @Inject constructor(
     private var studyAgainSent = false
 
     init {
-        // Written directly in init, not inside submitSession()'s coroutine: this must land before
-        // the ViewModel instance is handed back to hiltViewModel(), so the very first state Compose
-        // ever observes already carries the real mode and counts, never the
-        // StudySessionSummaryScreenState default. They all sit on `route` already, with no
-        // I/O dependency, so there is no reason to make them wait behind submitSession()'s async read.
-        //
-        // masteredCount is 0 for a Fast result, which has no Terminal States (see
-        // StudySessionSummaryScreenState's own KDoc): the screen chooses its layout off `mode`, never
-        // off this being zero.
+        // Synchronous, so the first observed state already has the route's mode and counts.
         val masteredCount = when (route.mode) {
             StudyMode.Rated -> route.cardStates.count { it == FlashcardStudyProgressState.Mastered }
             StudyMode.Fast -> 0
@@ -118,13 +95,7 @@ class StudySessionSummaryViewModel @Inject constructor(
         observeLevelCard()
     }
 
-    /**
-     * Mirrors the signed-in User's photo and name into [state] for the Level card's avatar. Runs in
-     * its own coroutine so it neither delays nor reorders the synchronous `init` writes or the
-     * submission; a `null` emission (no signed-in User) clears both fields, and the first emission of
-     * either kind marks the auth user resolved. A failed read resolves it too, with no photo or name: the
-     * Level card then shows its figures without a name, as Home's does.
-     */
+    /** A failed read still resolves the auth user, so the Level card shows without a name, like Home's. */
     private fun observeAvatarSource() {
         viewModelScope.launch {
             observeAuthUser()
@@ -141,11 +112,8 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 
     /**
-     * Mirrors the live Level stream into [StudySessionSummaryScreenState.liveLevel], in its own coroutine
-     * so the Summary's sequence never waits for it. Collected whatever the score does; only a Summary without a score
-     * draws its card from it. A failure or a normal completion before the first emission sets
-     * [StudySessionSummaryScreenState.isLiveLevelUnavailable]; after a value the last one stays.
-     * The use case is called inside the flow so a failure to build it is caught the same way.
+     * Only an unscored Summary draws its card from this. Unavailable only if the stream fails or ends before
+     * its first value. The use case is called inside `flow` so a failure building it is caught too.
      */
     private fun observeLevelCard() {
         viewModelScope.launch {
@@ -173,27 +141,8 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 
     /**
-     * Reconstructs the terminated session's [SessionResult] from the route arguments — the only load
-     * path this route ever carries (fresh-session egress only, never a past
-     * session) — and submits it once, on arrival (ADR-0014, superseded for the write path by the server-authoritative session commit).
-     * `init` only runs once per back-stack entry (this ViewModel survives configuration change), so
-     * there is no separate "have I already submitted" flag to maintain.
-     *
-     * [studyDate] and [studyDateUtcOffsetMinutes] are [toSessionResult]'s own concern now — both
-     * derived purely from the route (the offset was captured at session start, not here). Only
-     * [dailyGoalMinutes] is captured **here**, once, right before [toSessionResult]: a fresh local
-     * preferences read, not re-read at eventual delivery time if the session sits in the offline queue
-     * (ADR-0048), baked into the immutable [SessionResult] from this point on.
-     *
-     * [state] keeps [Loading] until [SubmitStudySessionUseCase] returns, which it does exactly once:
-     * with the server's score ([ServerScored]) when it arrives in time, otherwise with the local preview
-     * ([LocalPreview]). A failure makes it [Unavailable] and leaves [state]'s XP fields at their zero
-     * defaults: a session that could not be queued ([SessionNotSavedException]) surfaces
-     * [StudySessionSummaryMessage.SaveFailed], while a failed local read behind the preview, of this
-     * account's prior card progress or scoring state, surfaces [StudySessionSummaryMessage.XpUnavailable]
-     * since the session itself is queued. A resolved score is saved for a restore; a failure is not, so a
-     * restore tries again. [state]'s non-XP fields (mode, duration, counts, …)
-     * are already set synchronously in `init`, above, and are not touched again here.
+     * The Daily Goal is read once here and baked into the result, never re-read at delivery (ADR-0048).
+     * A failure is not saved, so a restore submits again.
      */
     private fun submitSession() {
         viewModelScope.launch {
@@ -209,11 +158,6 @@ class StudySessionSummaryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Every line's count, rate and amount, and the Level position before and after the session, come
-     * from [score], whether the server or the local preview scored it: no client-side value is mixed
-     * into the server's lines.
-     */
     private fun applyScore(score: SessionScore) {
         _state.update {
             it.copy(
@@ -242,10 +186,7 @@ class StudySessionSummaryViewModel @Inject constructor(
         _messages.tryEmit(message)
     }
 
-    /**
-     * Opens Preview for this session's scope, Study Mode and delivery, exactly as its Recent would. Only
-     * the first click navigates: the channel is buffered, so a double tap would otherwise send twice.
-     */
+    /** Only the first click navigates: the buffered channel would otherwise send a double tap twice. */
     fun onStudyAgainClick() {
         if (studyAgainSent) return
         studyAgainSent = true
@@ -262,7 +203,6 @@ class StudySessionSummaryViewModel @Inject constructor(
         viewModelScope.launch { eventChannel.send(StudySessionSummaryDestination.StudyAgain(replay)) }
     }
 
-    /** Single entry point for every dialog on this screen. */
     fun onDialogEvent(event: StudySessionSummaryDialogEvent) {
         when (event) {
             // The breakdown only exists once there is a score to itemise.
@@ -274,18 +214,13 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 
     private companion object {
-        /** The resolved [SessionScore] as JSON, so a restored ViewModel shows it without submitting again. */
         const val KEY_SAVED_SCORE = "savedScore"
     }
 }
 
 private const val SECONDS_PER_MINUTE = 60
 
-/**
- * Abandoned sessions and sessions that lost XP read as [NiceEffort], whatever else is true; a Rated
- * session with every studied card Mastered (defended cards included) is a [PerfectRun]. A negative
- * total can only be known once the score exists, so [scoredXpTotal] is `null` before then.
- */
+/** [scoredXpTotal] is `null` until the score exists. */
 private fun resolveHeadline(
     mode: StudyMode,
     abandoned: Boolean,
@@ -298,13 +233,7 @@ private fun resolveHeadline(
     else -> GreatWork
 }
 
-/**
- * The itemised breakdown: one [XpBreakdownLine] per source [score] actually awarded XP for, in the
- * order the breakdown dialog shows them, zero-[XpBreakdownLine.amount] sources dropped entirely.
- * [score]'s counts and rates supply each multiplied line's [XpBreakdownLine.count] and
- * [XpBreakdownLine.rate], and its already-multiplied totals supply the amounts: nothing here
- * recomputes an amount. A Fast session never has the Rated-only lines.
- */
+/** Amounts are [score]'s own totals, never recomputed; zero amounts are dropped. */
 private fun buildXpBreakdownLines(route: StudySessionSummaryRoute, score: SessionScore): List<XpBreakdownLine> {
     val minutesStudied = route.durationSeconds / SECONDS_PER_MINUTE
     val lines = mutableListOf<XpBreakdownLine>()

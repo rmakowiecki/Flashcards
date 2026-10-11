@@ -174,9 +174,3 @@ private fun SequencePhasePreview(state: StudySessionSummaryScreenState, phase: S
 private fun StudySessionSummaryMidItemizationPreview() {
     SequencePhasePreview(state = LevelUpState, phase = SummaryPhase.Counting, visibleLineCount = MID_ITEMIZATION_LINES)
 }
-
-@PreviewLightDark
-@Composable
-private fun StudySessionSummaryBeforePourPreview() {
-    SequencePhasePreview(state = LevelUpState, phase = SummaryPhase.Revealing, visibleLineCount = LevelUpState.xpLines.size)
-}

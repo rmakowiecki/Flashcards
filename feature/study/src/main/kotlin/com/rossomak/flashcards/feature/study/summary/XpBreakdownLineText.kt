@@ -28,7 +28,6 @@ import com.rossomak.flashcards.feature.study.summary.XpAwardSource.Streak
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.TimeStudied
 import java.util.Locale
 
-/** The name of the rule behind [source], e.g. "Mastery Defended". */
 @Composable
 internal fun xpSourceLabel(source: XpAwardSource): String = stringResource(
     when (source) {
@@ -56,10 +55,7 @@ internal fun xpSourceIcon(source: XpAwardSource): ImageVector = when (source) {
     DailyGoal -> Icons.Filled.EmojiEvents
 }
 
-/**
- * What [line]'s amount is made of, without the amount: "3 cards × 20", "2 min × 10", "8-day streak"
- * or a caption such as "Session completed" for an award that is not a product.
- */
+/** E.g. "3 cards × 20", "8-day streak" or "Session completed". */
 @Composable
 internal fun xpLineFormula(line: XpBreakdownLine, locale: Locale): String {
     val count = line.count ?: 0
@@ -74,7 +70,7 @@ internal fun xpLineFormula(line: XpBreakdownLine, locale: Locale): String {
     }
 }
 
-/** [xpLineFormula] and the signed amount it adds up to: "3 cards × 20 = +60 XP". */
+/** E.g. "3 cards × 20 = +60 XP". */
 @Composable
 internal fun xpLineValue(line: XpBreakdownLine, locale: Locale): String =
     stringResource(R.string.study_session_summary_xp_row_value_label, xpLineFormula(line, locale), formatSignedXp(line.amount, locale))

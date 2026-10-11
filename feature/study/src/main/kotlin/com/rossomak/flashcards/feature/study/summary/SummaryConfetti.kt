@@ -54,7 +54,7 @@ private const val START_SCALE = 0.4f
 private const val FADE_IN_END = 0.12f
 private const val FADE_OUT_START = 0.7f
 
-/** Decorative and theme-independent, like the brand gradient: a burst looks the same in light and dark. */
+/** Theme-independent, like the brand gradient. */
 private val ConfettiColors = listOf(
     Color(0xFFFFD54F),
     Color(0xFFFF8A65),
@@ -67,7 +67,7 @@ private val ConfettiColors = listOf(
 
 private val ConfettiEasing = CubicBezierEasing(0.15f, 0.6f, 0.4f, 1f)
 
-/** One deterministic particle: where it ends up (dp from the origin), how it spins and when it flies. */
+/** [travel] is in dp from the origin. */
 private class ConfettiParticle(
     val travel: Offset,
     val rotationDegrees: Float,
@@ -93,15 +93,9 @@ private val Particles = List(PARTICLE_COUNT) { index ->
     )
 }
 
-/** From the burst until the last particle has finished. */
 private val BurstDuration: Duration = Particles.maxOf { it.delay + it.duration }
 
-/**
- * One burst of confetti from [origin] (window coordinates), drawn on a single canvas over the screen.
- * It draws nothing while [origin] is `null` and plays once when it becomes non-null. The canvas only
- * draws, so it consumes no touches, and every particle runs its full duration: the burst is owned by
- * this composable, not by the sequence that started it.
- */
+/** One burst from [origin] (window coordinates) when it becomes non-null; a skip never cuts it short. */
 @Composable
 internal fun SummaryConfetti(origin: Offset?, modifier: Modifier = Modifier) {
     var canvasOrigin by remember { mutableStateOf(Offset.Zero) }
