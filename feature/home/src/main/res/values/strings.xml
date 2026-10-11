@@ -3,6 +3,8 @@
     <string name="home_empty_title">Ready to start learning?</string>
     <string name="home_empty_message">Pick a category and run your first study session — your recents and favorites will appear here.</string>
     <string name="home_empty_start_button">Start your first session</string>
+    <string name="home_error_title">Couldn\'t load Home</string>
+    <string name="home_error_message">Check your connection and try again.</string>
 
     <string name="favorites_section_title">Favorites</string>
 

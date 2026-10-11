@@ -3,6 +3,8 @@ package com.rossomak.flashcards.feature.home
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
+import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult
+import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Resolved
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
 import com.rossomak.flashcards.core.domain.model.RecentSession
@@ -20,16 +22,25 @@ import com.rossomak.flashcards.core.domain.repository.FakeUserFavoritesRepositor
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
+import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
+import com.rossomak.flashcards.feature.home.HomeBody.LoadError
+import com.rossomak.flashcards.feature.home.HomeBody.Resolving
+import com.rossomak.flashcards.feature.home.HomeBody.Sections
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Hidden
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
+import com.rossomak.flashcards.feature.home.HomeFavoritesState.Failed
 import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsContent
-import com.rossomak.flashcards.feature.home.HomeRecentsState.Hidden as RecentsHidden
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
+import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
+import com.rossomak.flashcards.feature.home.HomeViewModel.Companion.REVEAL_CEILING
 import com.rossomak.flashcards.testutil.MainDispatcherRule
+import com.rossomak.flashcards.testutil.assertValue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
@@ -38,7 +49,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -114,6 +127,18 @@ class HomeViewModelTest {
         flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(parentCategory))
     }
 
+    private fun composeFavorite() = FavoriteSubcategory(subcategory(COMPOSE_ID), parentCategory, favoritedAt = Instant.EPOCH)
+
+    private fun recentItem() = RecentItem(recentSession(OLDER_SESSION_ID, Quick, listOf(COMPOSE_ID)), parentCategory)
+
+    private fun favoriteItemsReturning(results: Flow<FavoriteItemsResult>): ObserveFavoriteItemsUseCase = mockk {
+        coEvery { this@mockk() } returns results
+    }
+
+    private fun recentSessionsReturning(results: Flow<List<RecentItem>>): ObserveRecentSessionsUseCase = mockk {
+        coEvery { this@mockk() } returns results
+    }
+
     private fun HomeFavoritesState.subcategoryIds(): Set<String> =
         shouldBeInstanceOf<Content>().items.filterIsInstance<FavoriteSubcategory>().map { it.subcategory.id }.toSet()
 
@@ -163,7 +188,7 @@ class HomeViewModelTest {
     private fun HomeViewModel.favoritesStates(): Flow<HomeFavoritesState> = state.map { it.favorites }.distinctUntilChanged()
 
     @Test
-    fun `favorites start Loading and become Content without passing through Hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites start Loading and become Content without passing through Empty`() = runTest(mainDispatcherRule.testDispatcher) {
         favorite(COMPOSE_ID)
         val viewModel = createViewModel()
 
@@ -176,18 +201,18 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `favorites become Hidden when the User has none`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites become Empty when the User has none`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Hidden
+        viewModel.state.value.favorites shouldBe Empty
     }
 
     @Test
-    fun `favorites move from Hidden to Content when the first Favorite is added`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites move from Empty to Content when the first Favorite is added`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.state.value.favorites shouldBe Hidden
+        viewModel.state.value.favorites shouldBe Empty
 
         favorite(COMPOSE_ID)
         advanceUntilIdle()
@@ -229,7 +254,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `favorites move from Content to Hidden when the last Favorite is removed`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `favorites move from Content to Empty when the last Favorite is removed`() = runTest(mainDispatcherRule.testDispatcher) {
         favorite(COMPOSE_ID)
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -237,7 +262,7 @@ class HomeViewModelTest {
         unfavorite(COMPOSE_ID)
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Hidden
+        viewModel.state.value.favorites shouldBe Empty
     }
 
     @Test
@@ -297,21 +322,21 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `a failing favorites flow turns Loading into Hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failing favorites flow turns Loading into Failed`() = runTest(mainDispatcherRule.testDispatcher) {
         userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
 
         val viewModel = createViewModel()
         viewModel.state.value.favorites shouldBe Loading
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Hidden
+        viewModel.state.value.favorites shouldBe Failed
     }
 
     @Test
     fun `a favorites failure after the first emission leaves the Content alone`() = runTest(mainDispatcherRule.testDispatcher) {
         val favoriteItems = mockk<ObserveFavoriteItemsUseCase>()
         coEvery { favoriteItems() } returns flow {
-            emit(listOf(FavoriteSubcategory(subcategory(COMPOSE_ID), parentCategory, favoritedAt = Instant.EPOCH)))
+            emit(Resolved(listOf(composeFavorite())))
             error("favorites listener failed")
         }
 
@@ -472,11 +497,11 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `recents become Hidden when the User has no sessions`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `recents become Empty when the User has no sessions`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.recents shouldBe RecentsHidden
+        viewModel.state.value.recents shouldBe RecentsEmpty
     }
 
     @Test
@@ -564,7 +589,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `recents move from Content to Hidden when the last session goes`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `recents move from Content to Empty when the last session goes`() = runTest(mainDispatcherRule.testDispatcher) {
         stubCategoryFetch()
         recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
         val viewModel = createViewModel()
@@ -573,7 +598,7 @@ class HomeViewModelTest {
         recentSessionsRepository.setRecentSessions(emptyList())
         advanceUntilIdle()
 
-        viewModel.state.value.recents shouldBe RecentsHidden
+        viewModel.state.value.recents shouldBe RecentsEmpty
     }
 
     @Test
@@ -602,14 +627,14 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `a failing Recents flow turns Loading into Hidden and leaves the Favorites alone`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failing Recents flow turns Loading into Failed and leaves the Favorites alone`() = runTest(mainDispatcherRule.testDispatcher) {
         recentSessionsRepository.recentSessionsReadFailure = IllegalStateException("recents listener failed")
         favorite(COMPOSE_ID)
 
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.recents shouldBe RecentsHidden
+        viewModel.state.value.recents shouldBe RecentsFailed
         viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
     }
 
@@ -637,7 +662,339 @@ class HomeViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.favorites shouldBe Hidden
+        viewModel.state.value.favorites shouldBe Failed
         viewModel.state.value.recents.sessionIds() shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `a favorites flow that completes before its first emission turns Loading into Failed`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesEmissionLimit = 0
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites shouldBe Failed
+    }
+
+    @Test
+    fun `a Recents flow that completes before its first emission turns Loading into Failed`() = runTest(mainDispatcherRule.testDispatcher) {
+        recentSessionsRepository.recentSessionsEmissionLimit = 0
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents shouldBe RecentsFailed
+    }
+
+    @Test
+    fun `a favorites flow that completes after the first emission leaves the Content alone`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+        userFavoritesRepository.favoritesEmissionLimit = 1
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
+    }
+
+    @Test
+    fun `a Recents flow that completes after the first emission leaves the Content alone`() = runTest(mainDispatcherRule.testDispatcher) {
+        recentSessionsRepository.setRecentSessions(listOf(recentItem().session))
+        flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(parentCategory))
+        recentSessionsRepository.recentSessionsEmissionLimit = 1
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.recents.items() shouldBe listOf(recentItem())
+    }
+
+    @Test
+    fun `a favorites use case that fails to build its flow turns Loading into Failed`() = runTest(mainDispatcherRule.testDispatcher) {
+        val favoriteItems = mockk<ObserveFavoriteItemsUseCase>()
+        coEvery { favoriteItems() } throws IllegalStateException("favorites use case failed")
+
+        val viewModel = createViewModel(observeFavoriteItems = favoriteItems)
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites shouldBe Failed
+    }
+
+    @Test
+    fun `Favorites that cannot be fully fetched before the first emission are Failed, not Empty`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            favorite(COMPOSE_ID)
+            flashcardRepository.subcategoriesByIdsToReturn = Result.failure(IllegalStateException("subcategories fetch failed"))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                favorites shouldBe Failed
+                body shouldBe LoadError
+            }
+        }
+
+    @Test
+    fun `Favorites that cannot be fully fetched after the first emission leave the Content alone`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            favorite(COMPOSE_ID)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            flashcardRepository.subcategoriesByIdsToReturn = Result.failure(IllegalStateException("subcategories fetch failed"))
+            userFavoritesRepository.setSubcategoryFavorite(NAVIGATION_ID, isFavorite = true)
+            advanceUntilIdle()
+
+            viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
+        }
+
+    @Test
+    fun `a Resolved emission after an Unresolved one recovers Failed Favorites`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+        flashcardRepository.subcategoriesByIdsToReturn = Result.failure(IllegalStateException("subcategories fetch failed"))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.favorites shouldBe Failed
+
+        favorite(NAVIGATION_ID)
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID, NAVIGATION_ID)
+    }
+
+    @Test
+    fun `the body is Resolving while both sections load and the ceiling has not elapsed`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.value.body shouldBe Resolving
+    }
+
+    @Test
+    fun `the body stays Resolving while one section loads, until the ceiling elapses`() = runTest(mainDispatcherRule.testDispatcher) {
+        recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        runCurrent()
+        viewModel.state.assertValue {
+            favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
+            body shouldBe Resolving
+        }
+
+        advanceTimeBy(REVEAL_CEILING)
+        runCurrent()
+
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().favoriteItems.size shouldBe 1
+    }
+
+    @Test
+    fun `a section that arrives after the ceiling joins the Sections in place`() = runTest(mainDispatcherRule.testDispatcher) {
+        val recentsGate = CompletableDeferred<Unit>()
+        recentSessionsRepository.recentSessionsReadGate = recentsGate
+        stubCategoryFetch()
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
+        favorite(COMPOSE_ID)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.body.shouldBeInstanceOf<Sections>().recentItems shouldBe emptyList()
+
+        recentsGate.complete(Unit)
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.favoriteItems.size shouldBe 1
+        sections.recentItems.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `both sections Empty give the first-session body`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body shouldBe FirstSession
+    }
+
+    @Test
+    fun `both sections Failed give the error body`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        recentSessionsRepository.recentSessionsReadFailure = IllegalStateException("recents listener failed")
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body shouldBe LoadError
+    }
+
+    @Test
+    fun `Failed Favorites next to Empty Recents give the error body, never the first-session one`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                recents shouldBe RecentsEmpty
+                body shouldBe LoadError
+            }
+        }
+
+    @Test
+    fun `a Failed section next to one still loading after the ceiling gives the error body`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            recents shouldBe RecentsLoading
+            body shouldBe LoadError
+        }
+    }
+
+    @Test
+    fun `Failed Favorites next to Recents Content show the Recents only`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        stubCategoryFetch()
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.favoriteItems shouldBe emptyList()
+        sections.recentItems.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `Favorites Content next to Failed Recents show the Favorites only`() = runTest(mainDispatcherRule.testDispatcher) {
+        recentSessionsRepository.recentSessionsReadFailure = IllegalStateException("recents listener failed")
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.favoriteItems.size shouldBe 1
+        sections.recentItems shouldBe emptyList()
+    }
+
+    @Test
+    fun `Favorites and Recents Content show both`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+        recentSessionsRepository.setRecentSessions(listOf(recentSession(OLDER_SESSION_ID, SingleSubcategory, listOf(COMPOSE_ID))))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.favoriteItems.size shouldBe 1
+        sections.recentItems.map { it.session.id } shouldBe listOf(OLDER_SESSION_ID)
+    }
+
+    @Test
+    fun `Empty Favorites next to Recents still loading after the ceiling give an empty Sections body`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                favorites shouldBe Empty
+                body shouldBe Sections(favoriteItems = emptyList(), recentItems = emptyList())
+            }
+        }
+
+    @Test
+    fun `both sections still loading after the ceiling give an empty Sections body`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.body shouldBe Sections(favoriteItems = emptyList(), recentItems = emptyList())
+    }
+
+    @Test
+    fun `Retry relaunches only the Failed sections, setting them back to Loading`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        val recentSessions = recentSessionsReturning(flow { emit(emptyList()) })
+        val viewModel = createViewModel(observeRecentSessions = recentSessions)
+        advanceUntilIdle()
+        viewModel.state.value.body shouldBe LoadError
+
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        viewModel.onRetry()
+
+        viewModel.state.assertValue {
+            favorites shouldBe Loading
+            recents shouldBe RecentsEmpty
+        }
+        advanceUntilIdle()
+        coVerify(exactly = 1) { recentSessions() }
+    }
+
+    @Test
+    fun `a second Retry tap while the first is loading relaunches nothing`() = runTest(mainDispatcherRule.testDispatcher) {
+        val favoriteItems = favoriteItemsReturning(flow { error("favorites listener failed") })
+        val viewModel = createViewModel(observeFavoriteItems = favoriteItems)
+        advanceUntilIdle()
+
+        viewModel.onRetry()
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { favoriteItems() }
+    }
+
+    @Test
+    fun `a section recovered by Retry replaces Failed`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        favorite(COMPOSE_ID)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.favorites shouldBe Failed
+
+        userFavoritesRepository.favoritesReadFailure = null
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        viewModel.state.value.favorites.subcategoryIds() shouldBe setOf(COMPOSE_ID)
+    }
+
+    @Test
+    fun `Retry restarts the reveal ceiling`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.hasRevealCeilingElapsed shouldBe true
+
+        userFavoritesRepository.favoritesReadFailure = null
+        userFavoritesRepository.favoritesReadGate = CompletableDeferred()
+        viewModel.onRetry()
+        runCurrent()
+        viewModel.state.value.body shouldBe Resolving
+
+        advanceTimeBy(REVEAL_CEILING)
+        runCurrent()
+        viewModel.state.value.hasRevealCeilingElapsed shouldBe true
+    }
+
+    @Test
+    fun `Retry does nothing when no section Failed`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onRetry()
+
+        viewModel.state.value.body shouldBe FirstSession
     }
 }
