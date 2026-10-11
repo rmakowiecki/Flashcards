@@ -39,7 +39,9 @@ the client needs no query of the day's sessions.
   `PERMISSION_DENIED`) and entries that no longer parse move to a dead-letter file and the run
   continues. The dead-letter file is write-only diagnostics: nothing replays or projects it.
 - After each delivery, the worker re-reads the scoring state and the touched Card Progress documents
-  from the server, ignoring failures, and only then removes the entry. The cache then already holds
+  from the server, and only then removes the entry. (Amended by
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md): a failed read keeps the entry
+  queued.) The cache then already holds
   the delivered session when the projection stops replaying it.
 
 ### The Session Summary shows the server's score, and falls back to a local preview
@@ -66,7 +68,9 @@ screens show the server's numbers the next time they read.
 - **Firestore's offline write queue plus a trigger function.** Rejected: the client would write the
   session document itself, which ADR-0049's rules forbid, and the Summary could not learn the score.
 - **A revision field that gates the handover** from projected to server state. Rejected: the refresh
-  before removal closes most of the gap, and the rest is brief and self-correcting.
+  before removal closes most of the gap, and the rest is brief and self-correcting. **Superseded by
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md)**, which gates it with the
+  applied session ids on `user-stats`.
 - **Versioned XP configurations**, so a Pending Session is scored with the configuration of its
   start. Rejected: the server scores with its current configuration, so a versioned preview would
   disagree with the server.
@@ -81,7 +85,8 @@ screens show the server's numbers the next time they read.
 
 ## Consequences
 
-Accepted transient inaccuracies, all corrected by the next successful server read:
+Accepted transient inaccuracies, all corrected by the next successful server read. The first three are
+resolved by [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md):
 
 - **Under-count after delivery.** Between removal and a cache update (the refresh failed), a
   delivered session is in neither the queue nor the cache. A fallback preview in that window also
@@ -112,8 +117,8 @@ Accepted transient inaccuracies, all corrected by the next successful server rea
 Pending Sessions into Home's Recents, so a session finished offline shows at once. Through
 `PendingSessionProjector` it scores each Pending Session's preview `xpTotal` oldest first with the
 cached XP configuration, so later
-Streak and Daily Goal awards build on earlier ones, and it drops Pending Sessions with no Flashcard
-Results, which the server rejects. See [ADR-0057](0057-recents-state-projection.md).
+Streak and Daily Goal awards build on earlier ones. A session with no Studied Flashcards is never
+queued, so it never reaches the projection. See [ADR-0057](0057-recents-state-projection.md).
 
 **2026-10-10 — The Level is followed live, one listener per collecting screen.**
 `DefaultLevelProgressRepository` serves `LevelProgress` (Level, XP into it, XP that completes it) as a
@@ -125,14 +130,13 @@ second screen costs only its own replay. A shared hot flow was rejected: an upst
 application scope has no collector to reach, its collectors never see completion, and a resubscription
 inside a sharing grace window never restarts a completed upstream.
 
-- **Deliverable sessions only.** Both scoring paths, the live flow and the one-shot read behind the
-  Summary's fallback preview, replay only Pending Sessions with at least one Flashcard Result, as
-  Recents already did. The server rejects the others, so counting their XP would show a Level the User
-  never reaches.
+- **Applied sessions add nothing.** The live replay reads `appliedSessionIds` off the same snapshot it
+  replays over, so a delivered session still in the queue counts once, as in the one-shot read. See
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).
 - **Stale replays are dropped.** The live replay reads the Card Progress baselines, then checks the
   queue against the snapshot it replays; a changed queue (a delivery, or a User switch) drops the result
   and the change re-emits. The one-shot read keeps its own uid check and has no stale check, so a
-  delivery during the fallback preview's read never fails the save.
+  delivery during the Summary's fallback preview read never fails the save.
 - **No false starting state offline.** A cache miss for a missing document is not read as a brand-new
   account: the listener runs with metadata changes, drops a from-cache non-existent snapshot, and emits
   nothing until the server answers. A consumer shows its loading state rather than Level 1.
@@ -142,13 +146,15 @@ inside a sharing grace window never restarts a completed upstream.
 - **Sign-out ends the flow.** Permission denied completes the listener, and the flow completes with no
   further value, cancelling a replay still in flight.
 
-Further accepted inaccuracy, alongside the double counts listed under Consequences:
+Further accepted inaccuracy:
 
-- **Double count after a lost response.** When the server records a session but its response never
-  reaches the device, the entry stays queued until a later drain succeeds. A live listener sees the new
-  server state at once and replays the session over it, so the Level counts it twice until that drain
-  removes it.
 - **One repeated value before sign-out completes.** Between sign-out and the permission-denied
   teardown, a queue change can re-emit the same User's last value once. The screen is already leaving.
 - **Two screens can briefly disagree.** Each collector has its own listener and replays the same
   snapshots, so two open screens (Home under the Summary) differ only while one is mid-replay.
+
+**2026-10-10 — Delivered sessions are applied once.** `user-stats` lists the sessions applied to it,
+an applied Pending Session adds to no aggregate, the worker removes an entry only after every refresh
+read succeeds, and the Summary's baseline excludes its own session. This resolves the under-count after
+delivery, the double count after a crash and the double count between refresh and removal. See
+[ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).

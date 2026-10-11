@@ -11,6 +11,9 @@ import com.rossomak.flashcards.feature.auth.LoginFailureReason.Unknown
 internal fun Throwable.isGoogleSignInCancellation(): Boolean = this is GetCredentialCancellationException
 
 /**
+ * Classifies only the Credential Manager stage, the account picker. The Firebase exchange's failures
+ * arrive already classified as a `SignInFailureReason`.
+ *
  * Offline wins over everything: Credential Manager throws the same [NoCredentialException] for "no
  * network" as for "no Google account", and the connection is the more actionable problem anyway. A
  * connection failure in the cause chain still reads as [NoConnection] when the check said online,

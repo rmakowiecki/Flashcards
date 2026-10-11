@@ -201,19 +201,6 @@ class DefaultRecentSessionsRepositoryTest {
     }
 
     @Test
-    fun `a pending session with no Flashcard Results is dropped`() = runTest {
-        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START))
-        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID))
-
-        createRepository().observeRecentSessions().test {
-            awaitItem().map(RecentSession::id) shouldBe listOf(SESSION_TWO_ID)
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        verifyReads(projections = 1)
-    }
-
-    @Test
     fun `server and pending rows sort by start descending, ties by id descending`() = runTest {
         queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID))
         remoteRecents.value = RecentsStateDto(
