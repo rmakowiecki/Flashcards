@@ -2,13 +2,16 @@ package com.rossomak.flashcards.feature.study.summary
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,9 +25,11 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -39,6 +44,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -57,6 +63,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onPlaced
@@ -112,19 +120,22 @@ import kotlinx.coroutines.launch
 
 private const val SECONDS_PER_MINUTE = 60
 
-/** The spacers around the middle group while the sequence counts: a weight must be positive, so almost nothing. */
+/** A weight must be positive, so this stands in for a collapsed spacer. */
 private const val COLLAPSED_SPACER_WEIGHT = 0.001f
 
-/** How the Level card, headline and pills come in at the reveal. */
-private val RevealEnter = fadeIn() + expandVertically()
+private val COUNTING_TOTAL_DROP = 32.dp
 
-/**
- * A Rated or Fast Study Session's mandatory egress, natural end or premature exit alike. Both modes
- * end on the same screen: the account's Level card, a headline, the XP total with its breakdown, the session's stat pills
- * and a sheet with a tip, the way home and a way to study the same thing again. [onNavigateBack] is how the screen
- * ends, from the close icon and the sheet's button alike, and system back does the same thing, since
- * `NavGraph.kt` already replaced everything between here and the tab the user started from.
- */
+private val COUNTING_TILES_GAP = 64.dp
+
+/** Roughly the Level card's bottom edge below the total; fixed, since the card is not laid out at the burst. */
+private val CONFETTI_DROP = 48.dp
+
+/** Unclipped, so an element moves in whole rather than being uncovered edge first. */
+private val RevealEnter = fadeIn() + expandVertically(expandFrom = Alignment.Top, clip = false) + slideInVertically { height -> -height / 4 }
+
+/** Explicit no-op: the default shrink exit makes [AnimatedVisibility] clip during the enter too. */
+private val RevealExit = ExitTransition.None
+
 @Composable
 fun StudySessionSummaryScreen(
     modifier: Modifier = Modifier,
@@ -183,15 +194,8 @@ fun StudySessionSummaryScreen(
 }
 
 /**
- * The Summary: its animation sequence, and the settled state every other path lands on.
- *
- * While the score loads, only a spinner shows on the gradient: no app bar, and nothing to tap. When it
- * resolves during this composition and animations are on, the sequence plays once (see [SummarySequence]).
- * A restored or rotated screen, an [Unavailable] score and a system with animations off all show the
- * settled state directly. Settled, the app bar, a scrolling stack (the Level card, headline, XP total
- * and pills) and the bottom sheet are all in place. An [Unavailable] score shows the same screen without
- * the total or its breakdown button, and its Level card follows the live Level stream like Home's card,
- * with the same skeleton while it loads or when it is unavailable.
+ * Plays the sequence once when the score resolves during this composition with animations on. A restore,
+ * a rotation, an [Unavailable] score or disabled animations show the settled state directly.
  */
 @Composable
 fun StudySessionSummaryContent(
@@ -203,13 +207,13 @@ fun StudySessionSummaryContent(
     onDialogEvent: (StudySessionSummaryDialogEvent) -> Unit,
 ) {
     val animationsEnabled = rememberAnimationsEnabled()
-    // Saved, so a rotation or a restore mid-sequence settles instead of replaying it.
+    // Saved, so a rotation mid-sequence settles instead of replaying.
     var sequenceStarted by rememberSaveable { mutableStateOf(false) }
-    // A score already there when the screen first composes was restored, not awaited: it never plays.
+    // A score present on first composition was restored: it never plays.
     val scoredOnEntry = remember { state.scoreStatus == Scored }
     val isScored = state.scoreStatus == Scored
     val sequence = remember(isScored) {
-        val shouldPlay = isScored && !scoredOnEntry && !sequenceStarted && animationsEnabled
+        val shouldPlay = isScored && animationsEnabled && !scoredOnEntry && !sequenceStarted
         if (shouldPlay) state.toSequence(settled = false) else state.toSequence(settled = true)
     }
 
@@ -237,12 +241,7 @@ private fun StudySessionSummaryScreenState.toSequence(settled: Boolean): Summary
     return build(xpLines, xpTotal)
 }
 
-/**
- * [StudySessionSummaryContent] with the sequence handed in, so a preview can draw any step of it.
- *
- * The sheet is a sibling of the Scaffold rather than part of its content, so the scrolling stack and
- * the snackbar both pad themselves by the sheet's measured height to stay clear of it.
- */
+/** Takes the sequence so previews can draw any step. The stack and snackbar pad by the sheet's measured height. */
 @Composable
 internal fun SummaryLayout(
     modifier: Modifier = Modifier,
@@ -262,8 +261,6 @@ internal fun SummaryLayout(
 
     var sheetHeightPx by remember { mutableIntStateOf(0) }
     val sheetHeight = with(LocalDensity.current) { sheetHeightPx.toDp() }
-    // Off screen by its own height until the sequence settles, then it rises. Read in draw only.
-    val sheetOffset = animateFloatAsState(if (sequence.isSettled) 0f else 1f, tween(SHEET_RISE.toMillisInt()), label = "sheetOffset")
     val isLoading = state.scoreStatus == Loading
 
     Box(
@@ -301,6 +298,8 @@ internal fun SummaryLayout(
             }
         }
         if (!isLoading) {
+            // Created only once scored, so it starts from the unplayed sequence, not the loading screen's settled one.
+            val sheetOffset = animateFloatAsState(if (sequence.isSettled) 0f else 1f, tween(SHEET_RISE.toMillisInt()), label = "sheetOffset")
             // A plain, unaligned sibling of Scaffold, never Modifier.align(Alignment.BottomCenter):
             // see FlashcardsBottomSheet's own doc for why that double-offsets the sheet (ADR-0043).
             SummarySheet(
@@ -317,18 +316,15 @@ internal fun SummaryLayout(
                     },
             )
         }
-        SummaryConfetti(origin = sequence.confettiOrigin)
+        val confettiDropPx = with(LocalDensity.current) { CONFETTI_DROP.toPx() }
+        SummaryConfetti(origin = sequence.confettiOrigin?.let { origin -> origin + Offset(0f, confettiDropPx) })
         if (state.scoreStatus == Scored) {
             SummaryAnnouncement(sequence = sequence, levelsCrossed = state.levelsCrossed)
         }
     }
 }
 
-/**
- * Once the Summary has settled, announces the total and, if a Level was crossed, the new Level. A
- * polite live region on its own node, so the counting total never announces itself. Zero-sized and
- * out of the way: it exists only to be spoken, and the actions are reached by ordinary traversal.
- */
+/** Announces the total and any new Level once settled, from its own node so the counting total stays silent. */
 @Composable
 private fun SummaryAnnouncement(sequence: SummarySequence, levelsCrossed: List<Int>) {
     val locale = currentLocale()
@@ -351,14 +347,9 @@ private fun SummaryAnnouncement(sequence: SummarySequence, levelsCrossed: List<I
     )
 }
 
-/**
- * The app bar is always laid out, so the screen never jumps when it is revealed, but until the sequence
- * settles only Skip is there: the title is invisible and the close button is not even composed, so
- * neither can be focused or tapped.
- */
+/** Always laid out, so its reveal never shifts the screen; only Skip is interactive until settled. */
 @Composable
 private fun SummaryTopBar(sequence: SummarySequence, onNavigateBack: () -> Unit) {
-    // Read in draw only, so the fade never recomposes the bar.
     val alpha = animateFloatAsState(if (sequence.isSettled) 1f else 0f, tween(SHEET_RISE.toMillisInt()), label = "appBarAlpha")
     FlashcardsGradientTopBar(
         title = stringResource(R.string.study_session_summary_title_label),
@@ -387,11 +378,8 @@ private fun SummaryTopBar(sequence: SummarySequence, onNavigateBack: () -> Unit)
 }
 
 /**
- * The stack: the Level card at the top, then the headline, total and pills midway between the card and
- * the sheet, scrolling when they do not fit. While the sequence counts, only the total is in, at the top,
- * with the tiles growing under it. The reveal brings the card and headline in, which pushes the total
- * down, and grows the two spacers around the middle group from nothing, which glides it to the middle.
- * Nothing is measured but the sheet.
+ * Two weighted spacers centre the headline, total and pills between the Level card and the sheet. While
+ * counting, the top spacer is collapsed and the tiles sit on their own layer, so their exit never moves the total.
  */
 @Composable
 private fun SummaryBody(
@@ -405,11 +393,18 @@ private fun SummaryBody(
     val spacing = MaterialTheme.spacing
     val isScored = state.scoreStatus == Scored
     val isRevealed = sequence.phase >= SummaryPhase.Revealing
-    val spacerWeight by animateFloatAsState(if (isRevealed) 1f else COLLAPSED_SPACER_WEIGHT, label = "spacerWeight")
+    val topSpacerWeight by animateFloatAsState(if (isRevealed) 1f else COLLAPSED_SPACER_WEIGHT, label = "topSpacerWeight")
+    val totalDrop by animateDpAsState(if (isRevealed) 0.dp else COUNTING_TOTAL_DROP, label = "totalDrop")
     val topPadding = spacing.small
-    // The sheet draws under the navigation bar, so its measured height already covers that inset: it
-    // replaces the Scaffold's own bottom padding rather than adding to it.
+    // The sheet's measured height already covers the navigation bar, so it replaces the Scaffold's bottom padding.
     val bottomPadding = sheetHeight + spacing.normal
+    val scrollState = rememberScrollState()
+    // A scroll clips to its viewport and would cut the Level card's slide-in, so it starts once settled.
+    val stackScroll = if (sequence.isSettled) {
+        Modifier.verticalScroll(scrollState)
+    } else {
+        Modifier.wrapContentHeight(align = Alignment.Top, unbounded = true)
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -423,7 +418,7 @@ private fun SummaryBody(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState(), enabled = sequence.isSettled)
+                .then(stackScroll)
                 .padding(horizontal = spacing.normal)
                 .padding(top = topPadding, bottom = bottomPadding)
                 // At least the visible height, so the spacers have room to share; taller content scrolls.
@@ -431,7 +426,7 @@ private fun SummaryBody(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (isScored) {
-                AnimatedVisibility(visible = isRevealed, enter = RevealEnter) {
+                AnimatedVisibility(visible = isRevealed, enter = RevealEnter, exit = RevealExit) {
                     SummaryLevelCard(sequence = sequence, state = state, modifier = Modifier.padding(bottom = spacing.medium))
                 }
             }
@@ -444,31 +439,39 @@ private fun SummaryBody(
                     style = FlashcardsComponentStyle.OnGradient,
                 )
             }
-            Spacer(Modifier.weight(spacerWeight))
-            AnimatedVisibility(visible = isRevealed, enter = RevealEnter) {
+            Spacer(Modifier.height(totalDrop))
+            Spacer(Modifier.weight(topSpacerWeight))
+            AnimatedVisibility(visible = isRevealed, enter = RevealEnter, exit = RevealExit) {
                 SummaryHeadline(headline = state.headline, modifier = Modifier.padding(bottom = spacing.medium))
             }
             if (isScored) {
                 SummaryXpTotal(sequence = sequence, onShowBreakdown = { onDialogEvent(Open(XpBreakdown)) })
-                AnimatedVisibility(
-                    visible = sequence.phase == SummaryPhase.Counting,
-                    // Takes what the column has left, and scrolls itself inside it.
-                    modifier = Modifier.weight(1f, fill = false),
-                    exit = fadeOut() + shrinkVertically(),
+            }
+            AnimatedVisibility(visible = isRevealed, enter = RevealEnter, exit = RevealExit) {
+                SummaryPills(state = state, modifier = Modifier.padding(top = spacing.medium))
+            }
+            Spacer(Modifier.weight(1f))
+        }
+        if (isScored) {
+            AnimatedVisibility(visible = sequence.phase == SummaryPhase.Counting, enter = EnterTransition.None, exit = fadeOut()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = spacing.normal)
+                        .padding(top = topPadding + COUNTING_TOTAL_DROP, bottom = contentPadding.calculateBottomPadding() + spacing.normal),
                 ) {
+                    // An invisible copy of the total's row, so the tiles start under the total without measuring it.
+                    SummaryXpTotalSlot(text = "", modifier = Modifier.alpha(0f).clearAndSetSemantics {})
                     SummaryXpTiles(
                         lines = sequence.lines,
                         visibleCount = sequence.visibleLineCount,
                         modifier = Modifier
+                            .weight(1f, fill = false)
                             .fillMaxWidth()
-                            .padding(top = spacing.medium),
+                            .padding(top = COUNTING_TILES_GAP),
                     )
                 }
             }
-            AnimatedVisibility(visible = isRevealed, enter = RevealEnter) {
-                SummaryPills(state = state, modifier = Modifier.padding(top = spacing.medium))
-            }
-            Spacer(Modifier.weight(spacerWeight))
         }
     }
 }
@@ -490,10 +493,6 @@ private fun SummaryHeadline(headline: StudySessionSummaryHeadline, modifier: Mod
     )
 }
 
-/**
- * Duration always, then the cards studied, then (Rated only) how many ended Mastered. TalkBack reads
- * the row as one sentence rather than a pill at a time.
- */
 @Composable
 private fun SummaryPills(state: StudySessionSummaryScreenState, modifier: Modifier = Modifier) {
     val durationLabel = if (state.durationSeconds < SECONDS_PER_MINUTE) {
@@ -519,11 +518,8 @@ private fun SummaryPills(state: StudySessionSummaryScreenState, modifier: Modifi
 }
 
 /**
- * The session's XP total, counting while the tiles reveal, with the button that opens its breakdown once
- * the Summary has settled. The button's slot is always laid out, and an empty slot of the same width
- * mirrors it, so the total sits on the screen's centreline whether or not the button is there. The total
- * text is a single node, read as one figure, and deliberately not a live region: it changes every frame
- * while counting. The settled figure is announced by [SummaryAnnouncement] instead.
+ * A mirrored empty slot keeps the total centred whether or not the info button shows. Not a live region,
+ * since it changes every frame while counting; [SummaryAnnouncement] speaks the final figure.
  */
 @Composable
 private fun SummaryXpTotal(
@@ -539,13 +535,9 @@ private fun SummaryXpTotal(
     )
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.minimumInteractiveComponentSize())
-        Text(
+        SummaryXpTotalSlot(
             text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(shownTotal, locale)),
-            // Only the coordinates object is kept; the confetti reads its position when it bursts.
             modifier = Modifier.onPlaced { coordinates -> sequence.totalTextCoordinates = coordinates },
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.brandColors.onGradientContent,
         )
         Box(modifier = Modifier.minimumInteractiveComponentSize()) {
             if (sequence.isSettled) {
@@ -563,14 +555,22 @@ private fun SummaryXpTotal(
     }
 }
 
-/**
- * The account's Level card on a scored Summary: the position before the session until the sequence
- * pours, then the position after, which the card pours on its own. The card stays out of
- * accessibility until the sequence settles, so it is read out once, with its final figures.
- */
+/** As tall as the row's touch targets, so the tiles layer's invisible copy lines up with the real total. */
+@Composable
+private fun SummaryXpTotalSlot(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier.heightIn(min = LocalMinimumInteractiveComponentSize.current),
+        style = MaterialTheme.typography.displaySmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.brandColors.onGradientContent,
+    )
+}
+
+/** Hidden from accessibility until settled, so it is read once, with final figures. */
 @Composable
 private fun SummaryLevelCard(sequence: SummarySequence, state: StudySessionSummaryScreenState, modifier: Modifier = Modifier) {
-    // A skip gives the card a new identity, whose first composition shows the after position without a pour.
+    // A skip gives the card a new identity, so it shows the after position without a pour.
     key(sequence.wasSkipped) {
         FlashcardsLevelCard(
             state = if (sequence.showsLevelAfter) state.levelCard else state.levelCardBefore,
