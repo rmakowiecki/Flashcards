@@ -1,5 +1,9 @@
 package com.rossomak.flashcards.core.ui.composables.level
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +45,9 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Loading
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable
 import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsLinearProgressBar
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
@@ -83,13 +91,13 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  *   that gives it an edge.
  *
  * The top row is `[name ……… LVL N]` on one shared baseline. Only the name gives way: it is one
- * line, ellipsized, while the "LVL N" pair keeps its size. The name is [displayName] trimmed
+ * line, ellipsized, while the "LVL N" pair keeps its size. The name is the display name trimmed
  * ([levelCardName]); a null or blank name leaves its slot empty, with no fallback label — the
- * avatar's person icon already signals a nameless User. The avatar receives the raw [displayName]
+ * avatar's person icon already signals a nameless User. The avatar receives the raw display name
  * (initials, or the person icon for a null or blank one) and is decorative.
  *
- * The whole card is one accessibility node described as "name, level, xp of xp" (without the name
- * when there is none), built from the final values passed in, so a progress animation never
+ * The figures are one accessibility node described as "name, level, xp of xp" (without the name
+ * when there is none), built from the final values in [Content], so a progress animation never
  * changes the announcement.
  *
  * The mock's frosted-glass `OnGradient` surface (`rgba(255,255,255,0.11)` + backdrop blur) is
@@ -97,24 +105,48 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  * silently no-ops below it (this project's `minSdk = 26`). Real blur-as-a-design-token is tracked
  * separately.
  *
- * [progress] is not computed here — [xpIntoCurrentLevel]/[xpForNextLevel] are passed through only
- * for the readout text; the caller drives the fill via [progress] so it can animate the bar
- * (0 → final) independently of when the readout text itself should update. The parameters are
- * primitives on purpose: the card does not know the domain level model.
+ * What the card draws follows [state]:
+ * - [Loading]: a same-height skeleton whose blocks shimmer, standing where each piece of text sits.
+ * - [Content]: the figures. The bar's fill is derived from the two XP values ([levelCardProgress]). The bar
+ *   animates changes to its fill but not its first composition, so a screen does not replay a sweep from 0
+ *   on every launch. The figures are keyed on the Level, so a Level change starts the bar at its new fill
+ *   instead of sweeping backwards; the same snap softens the short false level-up a double-counted delivery
+ *   can cause.
+ * - [Unavailable]: the same skeleton blocks without the shimmer. It has no UI of its own yet.
  *
- * Use [FlashcardsLevelCardSkeleton] while the figures are still loading.
+ * The skeleton and the figures have the same height, so the fade between them moves nothing. A change
+ * inside [Content] (a progress or name update) is not a transition: it recomposes in place, as does a
+ * change between [Loading] and [Unavailable].
  */
 @Composable
 fun FlashcardsLevelCard(
-    level: Int,
-    xpIntoCurrentLevel: Long,
-    xpForNextLevel: Long,
-    progress: Float,
-    photoUrl: String?,
-    displayName: String?,
+    state: FlashcardsLevelCardState,
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
 ) {
+    AnimatedContent(
+        targetState = state,
+        modifier = modifier,
+        contentKey = { it is Content },
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "FlashcardsLevelCard",
+    ) { shownState ->
+        when (shownState) {
+            Loading -> LevelCardSkeleton(isShimmering = true, style = style)
+
+            Unavailable -> LevelCardSkeleton(isShimmering = false, style = style)
+
+            is Content -> key(shownState.level) { LevelCardFigures(content = shownState, style = style) }
+        }
+    }
+}
+
+@Composable
+private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) {
+    val level = content.level
+    val xpIntoCurrentLevel = content.xpIntoCurrentLevel
+    val xpForNextLevel = content.xpForNextLevel
+    val displayName = content.displayName
     val mutedContentColor = MaterialTheme.brandColors.onGradientContent.copy(alpha = LEVEL_CARD_MUTED_TEXT_ALPHA)
     val name = remember(displayName) { levelCardName(displayName) }
     val description = when (name) {
@@ -123,11 +155,11 @@ fun FlashcardsLevelCard(
     }
 
     LevelCardFrame(
-        modifier = modifier.clearAndSetSemantics { contentDescription = description },
+        modifier = Modifier.clearAndSetSemantics { contentDescription = description },
         style = style,
         avatar = {
             FlashcardsAvatar(
-                photoUrl = photoUrl,
+                photoUrl = content.photoUrl,
                 displayName = displayName,
                 size = FlashcardsAvatarSize.Medium,
                 contentDescription = null,
@@ -172,7 +204,7 @@ fun FlashcardsLevelCard(
                 )
             }
         }
-        FlashcardsLinearProgressBar(progress = progress, style = OnGradient)
+        FlashcardsLinearProgressBar(progress = levelCardProgress(xpIntoCurrentLevel, xpForNextLevel), style = OnGradient)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
@@ -194,19 +226,16 @@ fun FlashcardsLevelCard(
 }
 
 /**
- * Stand-in for [FlashcardsLevelCard] while the figures are still loading: the same container,
- * shape, paddings and avatar size, with a block where each piece of text sits (name, "LVL N", bar
- * track, XP readout) at that text's line height, so both have the same height. Both are built on
+ * Stand-in for the figures while they are loading or unavailable: the same container, shape,
+ * paddings and avatar size, with a block where each piece of text sits (name, "LVL N", bar track,
+ * XP readout) at that text's line height, so both have the same height. Both are built on
  * [LevelCardFrame], so the two cannot drift apart when the card changes.
  *
- * The blocks shimmer through the `compose-shimmer` library, with its theme provided only here.
- * The skeleton never shows data, so it has no accessibility semantics.
+ * The blocks shimmer through the `compose-shimmer` library while [isShimmering], with its theme
+ * provided only here. The skeleton never shows data, so it has no accessibility semantics.
  */
 @Composable
-fun FlashcardsLevelCardSkeleton(
-    modifier: Modifier = Modifier,
-    style: FlashcardsComponentStyle = OnSurface,
-) {
+private fun LevelCardSkeleton(isShimmering: Boolean, style: FlashcardsComponentStyle) {
     val blockColor = MaterialTheme.brandColors.onGradientContent.copy(alpha = LEVEL_CARD_SKELETON_BLOCK_ALPHA)
     val blockShape = RoundedCornerShape(MaterialTheme.cornerRadius.small)
     val density = LocalDensity.current
@@ -217,9 +246,9 @@ fun FlashcardsLevelCardSkeleton(
 
     CompositionLocalProvider(LocalShimmerTheme provides shimmerTheme) {
         LevelCardFrame(
-            modifier = modifier.clearAndSetSemantics {},
+            modifier = Modifier.clearAndSetSemantics {},
             style = style,
-            contentModifier = Modifier.shimmer(),
+            contentModifier = if (isShimmering) Modifier.shimmer() else Modifier,
             avatar = {
                 Box(
                     modifier = Modifier
@@ -246,7 +275,7 @@ private fun SkeletonBlock(sizeModifier: Modifier, color: Color, shape: Shape) {
 }
 
 /**
- * The container shared by [FlashcardsLevelCard] and [FlashcardsLevelCardSkeleton]: the style's
+ * The container shared by [LevelCardFigures] and [LevelCardSkeleton]: the style's
  * surface, the padded row with the [avatar] slot, and the weighted [content] column.
  * [contentModifier] goes on the padded row, before its paddings.
  */
@@ -298,6 +327,10 @@ private fun LevelCardFrame(
 /** The name the card shows: [displayName] trimmed, or null for a null or blank one. */
 internal fun levelCardName(displayName: String?): String? = displayName?.trim()?.takeIf { it.isNotEmpty() }
 
+/** The bar's fill, from 0 to 1: 0 when [xpForNextLevel] is not positive, and never above 1. */
+internal fun levelCardProgress(xpIntoCurrentLevel: Long, xpForNextLevel: Long): Float =
+    if (xpForNextLevel <= 0L) 0f else (xpIntoCurrentLevel.toFloat() / xpForNextLevel.toFloat()).coerceIn(0f, 1f)
+
 @ShowkaseComposable(name = "Level card", group = "Level")
 @Preview
 @Composable
@@ -305,12 +338,13 @@ fun FlashcardsLevelCardShowcase() {
     FlashcardsTheme {
         Surface {
             FlashcardsLevelCard(
-                level = 7,
-                xpIntoCurrentLevel = 2_300L,
-                xpForNextLevel = 6_000L,
-                progress = 2_300f / 6_000f,
-                photoUrl = null,
-                displayName = "Jane Doe",
+                state = Content(
+                    level = 7,
+                    xpIntoCurrentLevel = 2_300L,
+                    xpForNextLevel = 6_000L,
+                    photoUrl = null,
+                    displayName = "Jane Doe",
+                ),
                 modifier = Modifier.padding(MaterialTheme.spacing.normal),
             )
         }
@@ -328,12 +362,13 @@ fun FlashcardsLevelCardOnGradientShowcase() {
                 .padding(MaterialTheme.spacing.normal),
         ) {
             FlashcardsLevelCard(
-                level = 12,
-                xpIntoCurrentLevel = 2_840L,
-                xpForNextLevel = 5_000L,
-                progress = 2_840f / 5_000f,
-                photoUrl = null,
-                displayName = "Jane Doe",
+                state = Content(
+                    level = 12,
+                    xpIntoCurrentLevel = 2_840L,
+                    xpForNextLevel = 5_000L,
+                    photoUrl = null,
+                    displayName = "Jane Doe",
+                ),
                 style = OnGradient,
             )
         }
@@ -350,13 +385,14 @@ fun FlashcardsLevelCardSkeletonShowcase() {
                 modifier = Modifier.padding(MaterialTheme.spacing.normal),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             ) {
-                FlashcardsLevelCardSkeleton()
+                FlashcardsLevelCard(state = Loading)
+                FlashcardsLevelCard(state = Unavailable)
                 Box(
                     modifier = Modifier
                         .background(MaterialTheme.brandColors.screenGradient)
                         .padding(MaterialTheme.spacing.normal),
                 ) {
-                    FlashcardsLevelCardSkeleton(style = OnGradient)
+                    FlashcardsLevelCard(state = Loading, style = OnGradient)
                 }
             }
         }
@@ -378,19 +414,21 @@ private fun LevelCardPreviewMatrix(style: FlashcardsComponentStyle) {
         PreviewCard(level = 7, xpIntoCurrentLevel = 2_300L, xpForNextLevel = 6_000L, displayName = null, style = style)
         PreviewCard(level = 7, xpIntoCurrentLevel = 2_300L, xpForNextLevel = 6_000L, displayName = "   ", style = style)
         PreviewCard(level = 128, xpIntoCurrentLevel = 91_300L, xpForNextLevel = 96_000L, displayName = "Jane Doe", style = style)
-        FlashcardsLevelCardSkeleton(style = style)
+        FlashcardsLevelCard(state = Loading, style = style)
+        FlashcardsLevelCard(state = Unavailable, style = style)
     }
 }
 
 @Composable
 private fun PreviewCard(level: Int, xpIntoCurrentLevel: Long, xpForNextLevel: Long, displayName: String?, style: FlashcardsComponentStyle) {
     FlashcardsLevelCard(
-        level = level,
-        xpIntoCurrentLevel = xpIntoCurrentLevel,
-        xpForNextLevel = xpForNextLevel,
-        progress = xpIntoCurrentLevel.toFloat() / xpForNextLevel,
-        photoUrl = null,
-        displayName = displayName,
+        state = Content(
+            level = level,
+            xpIntoCurrentLevel = xpIntoCurrentLevel,
+            xpForNextLevel = xpForNextLevel,
+            photoUrl = null,
+            displayName = displayName,
+        ),
         style = style,
     )
 }

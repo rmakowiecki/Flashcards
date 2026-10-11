@@ -35,6 +35,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
@@ -191,7 +192,16 @@ internal fun HomeContent(
                 .verticalScroll(scrollState)
                 .heightIn(min = maxHeight),
         ) {
-            HomeLevelCard(state = state.levelCard)
+            // The gutter and the space above belong to the card; the space below is the next section's overline
+            // label's own top padding.
+            FlashcardsLevelCard(
+                state = state.levelCard,
+                modifier = Modifier.padding(
+                    start = MaterialTheme.spacing.normal,
+                    top = MaterialTheme.spacing.normal,
+                    end = MaterialTheme.spacing.normal,
+                ),
+            )
             when (val body = state.body) {
                 Resolving -> Unit
 
