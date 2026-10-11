@@ -9,8 +9,8 @@ import kotlinx.serialization.Serializable
  * from the client's own [com.rossomak.flashcards.core.domain.scoring.scoreSession] for the Session
  * Summary's fallback preview; both use the same rules, so the Summary renders either the same way.
  *
- * The Level position ([level], [xpIntoCurrentLevel], [xpForNextLevel]) is not what the Summary's Level
- * card draws: that card reads the live [LevelProgress] stream, so it always agrees with Home.
+ * The Summary's Level card draws the Level position ([level], [xpIntoCurrentLevel], [xpForNextLevel]).
+ * Only a Summary with no score falls back to the live [LevelProgress] stream that Home's card reads.
  *
  * @param breakdown every award line, [XpBreakdown.dailyGoalBonus] and [XpBreakdown.streakBonus] included.
  * @param level the account's Level after this session.

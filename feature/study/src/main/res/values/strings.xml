@@ -78,6 +78,7 @@
     <string name="study_session_summary_back_button">Back to Home</string>
     <string name="study_session_summary_study_again_button">Study Again</string>
     <string name="study_session_summary_xp_unavailable_message">Couldn\'t calculate your XP right now. Your session is saved.</string>
+    <string name="study_session_summary_save_failed_message">Couldn\'t save this session.</string>
     <string name="study_session_summary_xp_breakdown_title">XP breakdown</string>
     <string name="study_session_summary_xp_breakdown_cd">Show XP breakdown</string>
     <string name="study_session_summary_xp_breakdown_total_label">Total</string>

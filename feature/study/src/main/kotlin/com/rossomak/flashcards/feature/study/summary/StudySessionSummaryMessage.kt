@@ -14,4 +14,10 @@ sealed interface StudySessionSummaryMessage {
      * figures are missing, so the screen shows no numbers for them.
      */
     data object XpUnavailable : StudySessionSummaryMessage
+
+    /**
+     * The session could not be queued for delivery (no signed-in User, a failed local write), so it is
+     * not saved and earns no XP; the screen shows no numbers for them.
+     */
+    data object SaveFailed : StudySessionSummaryMessage
 }

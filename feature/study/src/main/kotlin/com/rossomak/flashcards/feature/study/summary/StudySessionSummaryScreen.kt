@@ -1,10 +1,6 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -86,7 +82,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
-import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardSkeleton
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.currentLocale
@@ -100,6 +96,7 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.X
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.NiceEffort
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.PerfectRun
+import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryMessage.SaveFailed
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryMessage.XpUnavailable
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Loading
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreStatus.Scored
@@ -137,10 +134,12 @@ fun StudySessionSummaryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val xpUnavailableMessage = stringResource(R.string.study_session_summary_xp_unavailable_message)
+    val saveFailedMessage = stringResource(R.string.study_session_summary_save_failed_message)
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         val text = when (message) {
             XpUnavailable -> xpUnavailableMessage
+            SaveFailed -> saveFailedMessage
         }
         snackbarScope.launch { snackbarHostState.showSnackbar(text) }
     }
@@ -180,7 +179,8 @@ fun StudySessionSummaryScreen(
  * A restored or rotated screen, an [Unavailable] score and a system with animations off all show the
  * settled state directly. Settled, the app bar, a scrolling stack (the Level card, headline, XP total
  * and pills) and the bottom sheet are all in place. An [Unavailable] score shows the same screen without
- * the total or its breakdown button, and its Level card follows the live Level stream instead of the score.
+ * the total or its breakdown button, and its Level card follows the live Level stream like Home's card,
+ * with the same skeleton while it loads or when it is unavailable.
  */
 @Composable
 fun StudySessionSummaryContent(
@@ -249,6 +249,8 @@ internal fun SummaryLayout(
         onDialogEvent = onDialogEvent,
     )
 
+    // The sheet is a sibling of the Scaffold rather than part of its content, so the scrolling
+    // stack and the snackbar both pad themselves by the sheet's measured height to stay clear of it.
     var sheetHeightPx by remember { mutableIntStateOf(0) }
     val sheetHeight = with(LocalDensity.current) { sheetHeightPx.toDp() }
     val isLoading = state.scoreStatus == Loading
@@ -439,7 +441,7 @@ private fun SummaryBody(
                 )
             }
             if (state.scoreStatus == Unavailable) {
-                SummaryLiveLevelCard(state = state.levelCard, photoUrl = state.photoUrl, displayName = state.displayName)
+                FlashcardsLevelCard(state = state.levelCard, modifier = Modifier.fillMaxWidth(), style = FlashcardsComponentStyle.OnGradient)
             }
             SummaryHeadline(
                 headline = state.headline,
@@ -598,60 +600,18 @@ private fun SummaryLevelCard(
 ) {
     val xpIntoLevel by remember(payoff) { derivedStateOf { payoff.pourXpIntoLevel.value.roundToLong() } }
     FlashcardsLevelCard(
-        level = payoff.pourLevel,
-        xpIntoCurrentLevel = { xpIntoLevel },
-        xpForNextLevel = payoff.pourXpForNextLevel,
-        progress = { payoff.pourFraction.value },
-        photoUrl = state.photoUrl,
-        displayName = state.displayName,
+        state = LevelCardContent(
+            level = payoff.pourLevel,
+            xpIntoCurrentLevel = xpIntoLevel,
+            xpForNextLevel = payoff.pourXpForNextLevel,
+            photoUrl = state.photoUrl,
+            displayName = state.displayName,
+        ),
         modifier = modifier
             .fillMaxWidth()
             .then(if (payoff.isSettled) Modifier else Modifier.clearAndSetSemantics {}),
         style = FlashcardsComponentStyle.OnGradient,
-        showXpCount = payoff.showsXpCount,
-        levelScale = { payoff.levelPulse.value },
     )
-}
-
-/**
- * The Level card of a Summary with no score, which has no before and after positions to pour between:
- * Home's live Level stream instead, static. The on-gradient skeleton shows until the stream has emitted,
- * with a fade to the card, and a stream that fails or ends first leaves the slot empty.
- */
-@Composable
-private fun SummaryLiveLevelCard(
-    state: StudySessionSummaryLevelCardState,
-    photoUrl: String?,
-    displayName: String?,
-    modifier: Modifier = Modifier,
-) {
-    AnimatedContent(
-        targetState = state,
-        modifier = modifier,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        contentKey = { it::class },
-        label = "SummaryLiveLevelCard",
-    ) { shownState ->
-        when (shownState) {
-            StudySessionSummaryLevelCardState.Loading -> FlashcardsLevelCardSkeleton(
-                modifier = Modifier.fillMaxWidth(),
-                style = FlashcardsComponentStyle.OnGradient,
-            )
-            is StudySessionSummaryLevelCardState.Content -> with(shownState.levelProgress) {
-                FlashcardsLevelCard(
-                    level = level,
-                    xpIntoCurrentLevel = xpIntoCurrentLevel,
-                    xpForNextLevel = xpForNextLevel,
-                    progress = progress,
-                    photoUrl = photoUrl,
-                    displayName = displayName,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = FlashcardsComponentStyle.OnGradient,
-                )
-            }
-            StudySessionSummaryLevelCardState.Unavailable -> Unit
-        }
-    }
 }
 
 @Composable

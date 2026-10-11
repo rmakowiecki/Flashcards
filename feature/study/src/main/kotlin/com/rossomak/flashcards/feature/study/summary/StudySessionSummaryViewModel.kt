@@ -120,23 +120,30 @@ class StudySessionSummaryViewModel @Inject constructor(
     /**
      * Mirrors the signed-in User's photo and name into [state] for the Level card's avatar. Runs in
      * its own coroutine so it neither delays nor reorders the synchronous `init` writes or the
-     * submission; a `null` emission (no signed-in User) clears both fields. A failed read just
-     * leaves the avatar on its fallback.
+     * submission; a `null` emission (no signed-in User) clears both fields, and the first emission of
+     * either kind marks the auth user resolved. A failed read leaves the avatar on its fallback and,
+     * like Home, makes a live Level card that has not reached content unavailable.
      */
     private fun observeAvatarSource() {
         viewModelScope.launch {
             observeAuthUser()
-                .catch { exception -> logw(exception) { "Failed to observe the auth user for the Level card avatar" } }
+                .catch { exception ->
+                    logw(exception) { "Failed to observe the auth user for the Level card avatar" }
+                    _state.update { it.copy(isLiveLevelUnavailable = true) }
+                }
                 .collect { authUser ->
-                    _state.update { it.copy(photoUrl = authUser?.photoUrl, displayName = authUser?.displayName) }
+                    _state.update {
+                        it.copy(hasAuthUserResolved = true, photoUrl = authUser?.photoUrl, displayName = authUser?.displayName)
+                    }
                 }
         }
     }
 
     /**
-     * Mirrors the live Level stream into [StudySessionSummaryScreenState.levelCard], in its own coroutine
-     * so the payoff never waits for it. Collected whatever the score does; only an unavailable score shows it. A failure or a normal completion before the first
-     * emission gives [StudySessionSummaryLevelCardState.Unavailable]; after content the last value stays.
+     * Mirrors the live Level stream into [StudySessionSummaryScreenState.liveLevel], in its own coroutine
+     * so the payoff never waits for it. Collected whatever the score does; only a Summary without a score
+     * draws its card from it. A failure or a normal completion before the first emission sets
+     * [StudySessionSummaryScreenState.isLiveLevelUnavailable]; after a value the last one stays.
      * The use case is called inside the flow so a failure to build it is caught the same way.
      */
     private fun observeLevelCard() {
@@ -147,21 +154,21 @@ class StudySessionSummaryViewModel @Inject constructor(
                 .onCompletion { cause ->
                     if (cause == null && !hasLevelEmitted) {
                         loge { "Observing the Level for the Summary's Level card completed before its first emission" }
-                        setLevelCardUnavailable()
+                        setLiveLevelUnavailable()
                     }
                 }
                 .catch { exception ->
                     loge(exception) { "Observing the Level for the Summary's Level card failed" }
-                    if (!hasLevelEmitted) setLevelCardUnavailable()
+                    if (!hasLevelEmitted) setLiveLevelUnavailable()
                 }
                 .collect { levelProgress ->
-                    _state.update { it.copy(levelCard = StudySessionSummaryLevelCardState.Content(levelProgress)) }
+                    _state.update { it.copy(liveLevel = levelProgress) }
                 }
         }
     }
 
-    private fun setLevelCardUnavailable() {
-        _state.update { it.copy(levelCard = StudySessionSummaryLevelCardState.Unavailable) }
+    private fun setLiveLevelUnavailable() {
+        _state.update { it.copy(isLiveLevelUnavailable = true) }
     }
 
     /**
