@@ -341,20 +341,6 @@ class PendingSessionProjectorTest {
     }
 
     @Test
-    fun `projectSessionXpTotals is not stale because of a zero-card pending session left out of its argument`() = runTest {
-        coEvery { scoringStateRemoteDataSource.getScoringState() } returns null
-        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
-        queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START))
-        queue(fastSession(SESSION_TWO_ID, SESSION_TWO_START, CARD_ID))
-        val projector = createProjector()
-        val deliverable = projector.observeDeliverablePendingSessions().first()
-
-        projector.projectSessionXpTotals(deliverable) shouldBe mapOf(SESSION_TWO_ID to 540)
-        coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
-        coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
-    }
-
-    @Test
     fun `three sessions queued offline chain their scoring states, the last projecting the XP of applying all three`() = runTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))

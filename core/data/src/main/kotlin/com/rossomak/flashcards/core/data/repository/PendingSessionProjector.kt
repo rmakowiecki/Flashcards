@@ -73,14 +73,6 @@ class PendingSessionProjector @Inject constructor(
         .distinctUntilChanged()
 
     /**
-     * [observePendingSessions] without the sessions that have no Flashcard Result: the server rejects
-     * those, so they never become a recorded session and are never shown as one.
-     */
-    fun observeDeliverablePendingSessions(): Flow<List<SessionResult>> = observePendingSessions()
-        .map { sessions -> sessions.filter { session -> session.cardResults.isNotEmpty() } }
-        .distinctUntilChanged()
-
-    /**
      * The Card Progress of [subcategoryId] with the Pending Sessions that touch it replayed on top.
      *
      * With no such session, this is the plain remote read, failure included. Otherwise a failed remote
@@ -161,7 +153,7 @@ class PendingSessionProjector @Inject constructor(
     }
 
     /**
-     * The preview `xpTotal` of each of [pendingSessions] (a snapshot of [observeDeliverablePendingSessions]),
+     * The preview `xpTotal` of each of [pendingSessions] (a snapshot of [observePendingSessions]),
      * keyed by session id. Replayed oldest first, so later Streak and Daily Goal awards build on earlier ones.
      * `null` when the queue changed meanwhile; that change re-emits. An unreadable scoring state replays
      * from [ScoringState]'s defaults: the values are approximate until the server's replace them.
@@ -180,7 +172,7 @@ class PendingSessionProjector @Inject constructor(
             .onFailure { exception -> logw(exception) { "Scoring state unreadable, replaying pending session XP from defaults" } }
             .getOrNull()
         val xpConfig = config.await()
-        if (observeDeliverablePendingSessions().first() != pendingSessions) return@coroutineScope null
+        if (observePendingSessions().first() != pendingSessions) return@coroutineScope null
         val scoringState = scoringStateDto?.toDomain() ?: ScoringState()
         replay(baselines, pendingSessions, scoringState, xpConfig, scoringStateDto.appliedSessionIds()).xpTotalBySessionId
     }
