@@ -21,6 +21,7 @@ import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSourc
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import io.kotest.matchers.shouldBe
@@ -481,8 +482,20 @@ class SessionSubmissionDeliveryWorkerTest {
             xpIntoCurrentLevel = 110,
             xpForNextLevel = 1000,
             levelsCrossed = emptyList(),
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 0,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 1,
             counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
-            rates = null,
+            rates = SessionScoreRates(
+                newCardStudied = 10,
+                cardMastered = 100,
+                cardPartial = 25,
+                masteryDefended = 50,
+                cardDemastered = -80,
+                minuteStudied = 10,
+                sessionCompleted = 500,
+            ),
         )
     }
 }

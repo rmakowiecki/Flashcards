@@ -10,13 +10,15 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
  * always zero for a Fast result — Fast never produces those outcomes — and the content chooses the
  * reduced Fast variant off [mode] rather than inferring it from the counts being zero.
  *
- * [xpLines]/[xpTotal]/[level]/[xpIntoCurrentLevel]/[xpForNextLevel]/[levelsCrossed] all stay at
- * their zero defaults until the session's submission resolves — the state is populated from the route
- * synchronously, before that I/O-dependent calculation can possibly have run. [xpLines] never
+ * [xpLines]/[xpTotal]/[level]/[xpIntoCurrentLevel]/[xpForNextLevel]/[levelsCrossed] and the
+ * before-session Level fields all stay at their zero defaults until the session's submission
+ * resolves — the state is populated from the route synchronously, before that I/O-dependent
+ * calculation can possibly have run. [xpLines] never
  * includes a zero-[XpBreakdownLine.amount] entry; a future redesign replaces this plain
  * list with the animated pour, against content this makes real for the first time.
  *
- * [levelsCrossed] is carried for a Level-up celebration and not rendered yet.
+ * [levelsCrossed], [levelBefore], [xpIntoCurrentLevelBefore], [xpForNextLevelBefore] and
+ * [currentStreak] are carried for the animated Level pour and the Streak line, and not rendered yet.
  *
  * [photoUrl]/[displayName] are the signed-in User's avatar source for the Level card. Both are null
  * until the auth user arrives, and again whenever there is no signed-in User.
@@ -36,6 +38,10 @@ data class StudySessionSummaryScreenState(
     val xpIntoCurrentLevel: Long = 0,
     val xpForNextLevel: Long = 0,
     val levelsCrossed: List<Int> = emptyList(),
+    val levelBefore: Int = ScoringState.STARTING_LEVEL,
+    val xpIntoCurrentLevelBefore: Long = 0,
+    val xpForNextLevelBefore: Long = 0,
+    val currentStreak: Int = 0,
     val photoUrl: String? = null,
     val displayName: String? = null,
 )

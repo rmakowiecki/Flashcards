@@ -145,9 +145,9 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 
     /**
-     * Every line's count, rate and amount come from [score], whether the server or the local preview
-     * scored it. A server answer missing its counts or its rates shows each line's amount only: no
-     * client-side value is mixed into the server's lines.
+     * Every line's count, rate and amount, and the Level position before and after the session, come
+     * from [score], whether the server or the local preview scored it: no client-side value is mixed
+     * into the server's lines.
      */
     private fun applyScore(result: SessionResult, score: SessionScore) {
         _state.update {
@@ -159,6 +159,10 @@ class StudySessionSummaryViewModel @Inject constructor(
                 xpIntoCurrentLevel = score.xpIntoCurrentLevel,
                 xpForNextLevel = score.xpForNextLevel,
                 levelsCrossed = score.levelsCrossed,
+                levelBefore = score.levelBefore,
+                xpIntoCurrentLevelBefore = score.xpIntoCurrentLevelBefore,
+                xpForNextLevelBefore = score.xpForNextLevelBefore,
+                currentStreak = score.currentStreak,
             )
         }
     }
@@ -176,24 +180,14 @@ private const val SECONDS_PER_MINUTE = 60
  * in the same order as [XpBreakdown]'s fields, zero-[XpBreakdownLine.amount] sources dropped entirely.
  * [counts] and [rates] supply each multiplied line's [XpBreakdownLine.count] and
  * [XpBreakdownLine.rate]; [breakdown]'s already-multiplied totals supply the amounts — nothing here
- * recomputes an amount. When [counts] or [rates] is `null`, every multiplied line carries its amount
- * only. The Daily Goal and Streak lines are not multiplied per item, so they always carry their amount
- * only.
+ * recomputes an amount. The Daily Goal and Streak lines are not multiplied per item, so they carry
+ * their amount only.
  */
-private fun buildXpBreakdownLines(
-    result: SessionResult,
-    breakdown: XpBreakdown,
-    counts: SessionScoreCounts?,
-    rates: SessionScoreRates?,
-): List<XpBreakdownLine> {
+private fun buildXpBreakdownLines(result: SessionResult, breakdown: XpBreakdown, counts: SessionScoreCounts, rates: SessionScoreRates): List<XpBreakdownLine> {
     val minutesStudied = result.durationSeconds / SECONDS_PER_MINUTE
     val lines = mutableListOf<XpBreakdownLine>()
     fun addMultiplied(source: XpAwardSource, amount: Int, count: (SessionScoreCounts) -> Int?, rate: (SessionScoreRates) -> Int) {
-        lines += if (counts == null || rates == null) {
-            XpBreakdownLine(source, count = null, rate = null, amount = amount)
-        } else {
-            XpBreakdownLine(source, count = count(counts) ?: 0, rate = rate(rates), amount = amount)
-        }
+        lines += XpBreakdownLine(source, count = count(counts) ?: 0, rate = rate(rates), amount = amount)
     }
     addMultiplied(XpAwardSource.NewCards, breakdown.newCards, { it.newCardsStudied }, { it.newCardStudied })
     if (result is Rated) {

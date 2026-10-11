@@ -26,8 +26,8 @@ class SessionScoringTest {
 
         scoring.score.breakdown.masteryDefenseBonus shouldBe CONFIG.masteryDefended
         scoring.score.breakdown.mastered shouldBe 0
-        scoring.score.counts?.defended shouldBe 1
-        scoring.score.counts?.newlyMastered shouldBe 0
+        scoring.score.counts.defended shouldBe 1
+        scoring.score.counts.newlyMastered shouldBe 0
     }
 
     @Test
@@ -38,8 +38,8 @@ class SessionScoringTest {
 
         scoring.score.breakdown.mastered shouldBe CONFIG.cardMastered
         scoring.score.breakdown.masteryDefenseBonus shouldBe 0
-        scoring.score.counts?.newlyMastered shouldBe 1
-        scoring.score.counts?.defended shouldBe 0
+        scoring.score.counts.newlyMastered shouldBe 1
+        scoring.score.counts.defended shouldBe 0
     }
 
     @Test
@@ -49,7 +49,7 @@ class SessionScoringTest {
         val scoring = scoreSession(priorStates(CARD_ID to Mastered), ScoringState(), session, CONFIG)
 
         scoring.score.breakdown.demastered shouldBe CONFIG.cardDemastered
-        scoring.score.counts?.demastered shouldBe 1
+        scoring.score.counts.demastered shouldBe 1
     }
 
     @Test
@@ -63,8 +63,8 @@ class SessionScoringTest {
         val prior = priorStates(DEFENDED_CARD_ID to Mastered, DEMASTERED_CARD_ID to Mastered)
 
         val score = scoreSession(prior, ScoringState(), session, CONFIG).score
-        val counts = requireNotNull(score.counts)
-        val rates = requireNotNull(score.rates)
+        val counts = score.counts
+        val rates = score.rates
 
         counts shouldBe SessionScoreCounts(newCardsStudied = 2, newlyMastered = 1, partial = 1, defended = 1, demastered = 1)
         score.breakdown.newCards shouldBe counts.newCardsStudied * rates.newCardStudied
@@ -76,7 +76,7 @@ class SessionScoringTest {
 
     @Test
     fun `the rates come from the config`() {
-        val rates = requireNotNull(scoreSession(emptyMap(), ScoringState(), ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG).score.rates)
+        val rates = scoreSession(emptyMap(), ScoringState(), ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG).score.rates
 
         rates.newCardStudied shouldBe CONFIG.newCardStudied
         rates.cardMastered shouldBe CONFIG.cardMastered
@@ -112,6 +112,48 @@ class SessionScoringTest {
         scoring.score.level shouldBe 2
         scoring.score.xpIntoCurrentLevel shouldBe STARTING_XP + xpTotal - CONFIG.levelThreshold(1)
         scoring.score.xpForNextLevel shouldBe CONFIG.levelThreshold(2)
+    }
+
+    @Test
+    fun `the Level position before the session comes from the given scoring state`() {
+        val priorState = ScoringState(xp = STARTING_XP, level = 2, xpIntoCurrentLevel = PRIOR_XP_INTO_LEVEL)
+
+        val score = scoreSession(emptyMap(), priorState, ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG).score
+
+        score.levelBefore shouldBe 2
+        score.xpIntoCurrentLevelBefore shouldBe PRIOR_XP_INTO_LEVEL
+        score.xpForNextLevelBefore shouldBe CONFIG.levelThreshold(2)
+    }
+
+    @Test
+    fun `a new account's first session starts from the starting Level with no points and that Level's threshold`() {
+        val score = scoreSession(emptyMap(), ScoringState(), ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG).score
+
+        score.levelBefore shouldBe ScoringState.STARTING_LEVEL
+        score.xpIntoCurrentLevelBefore shouldBe 0L
+        score.xpForNextLevelBefore shouldBe CONFIG.levelThreshold(ScoringState.STARTING_LEVEL)
+    }
+
+    @Test
+    fun `the current Streak comes from the new scoring state`() {
+        val priorState = ScoringState(currentStreak = 7, bestStreak = 7, lastStudyDate = PREVIOUS_STUDY_DATE)
+
+        val scoring = scoreSession(emptyMap(), priorState, ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG)
+
+        scoring.score.currentStreak shouldBe 8
+        scoring.score.currentStreak shouldBe scoring.newScoringState.currentStreak
+    }
+
+    @Test
+    fun `a session scored on the previous session's new state starts where the previous session ended`() {
+        val firstBaseline = ScoringState(xp = STARTING_XP, level = 1, xpIntoCurrentLevel = STARTING_XP)
+        val first = scoreSession(emptyMap(), firstBaseline, ratedSession(RatedCard(CARD_ID, Mastered)), CONFIG)
+
+        val second = scoreSession(emptyMap(), first.newScoringState, ratedSession(RatedCard(OTHER_CARD_ID, Mastered)), CONFIG).score
+
+        second.levelBefore shouldBe first.score.level
+        second.xpIntoCurrentLevelBefore shouldBe first.score.xpIntoCurrentLevel
+        second.xpForNextLevelBefore shouldBe first.score.xpForNextLevel
     }
 
     @Test
@@ -235,6 +277,7 @@ class SessionScoringTest {
         const val STUDY_DATE = "2026-09-06"
         const val PREVIOUS_STUDY_DATE = "2026-09-05"
         const val STARTING_XP = 600L
+        const val PRIOR_XP_INTO_LEVEL = 250L
         val STARTED_AT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct rates, so a line scored with the wrong rate cannot pass by coincidence, and a flat
