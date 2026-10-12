@@ -118,3 +118,14 @@ this codebase's flat, role-based taxonomy).
   those screens are reached — not designed speculatively here.
 - Exact `progressBarTrackOnSurface`/`OnGradient` alpha values may be revisited once a concrete
   screen renders these on a real background (mirrors the same caveat in ADR-0033).
+
+## Amendment: one ring, the list-row ring
+
+`FlashcardsCircularProgressRing` never gained a production caller, while the list-row
+`FlashcardsProgressRing` (Browse search and Category Details Topic rows) shipped with its own look:
+3dp stroke, `colorScheme.primary` fill over a 16% `primary` track, butt ends, no animation, and a
+built-in percentage plus a nullable unknown state. Two rings with different looks was one too many,
+so the unused generic ring, its metrics and the `progressRingDiameterNormal/Small` tokens are
+removed and `FlashcardsProgressRing` is the only ring. The progress family above is now linear and
+segmented; a future ring use (the "Continue learning" card, the daily-goal ring) extends
+`FlashcardsProgressRing` against its real design rather than reviving the generic one.

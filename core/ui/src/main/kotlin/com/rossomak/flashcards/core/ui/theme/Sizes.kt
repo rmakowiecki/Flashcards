@@ -83,12 +83,6 @@ object AppSizes {
     /** Progress-bar thickness at [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Small]. */
     val progressBarThicknessSmall: Dp = 4.dp
 
-    /** Diameter of [com.rossomak.flashcards.core.ui.composables.progress.FlashcardsCircularProgressRing] at `Normal` ("Continue learning" card). */
-    val progressRingDiameterNormal: Dp = 56.dp
-
-    /** Diameter of [com.rossomak.flashcards.core.ui.composables.progress.FlashcardsCircularProgressRing] at `Small` (list rows). */
-    val progressRingDiameterSmall: Dp = 40.dp
-
     /** Larger border width of any component drawn on a brand gradient. */
     val onGradientBorder: Dp = 1.5.dp
 
