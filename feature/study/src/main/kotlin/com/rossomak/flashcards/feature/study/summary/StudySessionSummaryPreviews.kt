@@ -1,6 +1,8 @@
 package com.rossomak.flashcards.feature.study.summary
 
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -37,6 +39,7 @@ private val ScoredState = StudySessionSummaryScreenState(
     level = 7,
     xpIntoCurrentLevel = 2_300,
     xpForNextLevel = 6_000,
+    hasAuthUserResolved = true,
     displayName = "Jane Doe",
 )
 
@@ -131,4 +134,43 @@ private fun StudySessionSummaryXpBreakdownDialogPreview() {
             activeDialog = XpBreakdown,
         ),
     )
+}
+
+private val LevelUpState = ScoredState.copy(
+    durationSeconds = 720,
+    studiedCount = 14,
+    masteredCount = 8,
+    xpLines = EveryLine,
+    xpTotal = EveryLine.sumOf { it.amount },
+    level = 8,
+    xpIntoCurrentLevel = 1_100,
+    xpForNextLevel = 7_000,
+    levelsCrossed = listOf(8),
+    levelBefore = 7,
+    xpIntoCurrentLevelBefore = 5_200,
+    xpForNextLevelBefore = 6_000,
+)
+
+private const val MID_ITEMIZATION_LINES = 5
+
+/** A step of the sequence held still, drawn through the same layout the live sequence uses. */
+@Composable
+private fun SequencePhasePreview(state: StudySessionSummaryScreenState, phase: SummaryPhase, visibleLineCount: Int) {
+    val sequence = remember { SummarySequence(state.xpLines, state.xpTotal, phase, visibleLineCount) }
+    FlashcardsTheme {
+        SummaryLayout(
+            state = state,
+            sequence = sequence,
+            snackbarHostState = remember { SnackbarHostState() },
+            onNavigateBack = {},
+            onStudyAgainClick = {},
+            onDialogEvent = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun StudySessionSummaryMidItemizationPreview() {
+    SequencePhasePreview(state = LevelUpState, phase = SummaryPhase.Counting, visibleLineCount = MID_ITEMIZATION_LINES)
 }

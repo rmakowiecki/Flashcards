@@ -33,7 +33,11 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     override fun userPreferences(): Flow<UserPreferences> = flow {
         userPreferencesReadGate?.await()
         userPreferencesReadFailure?.let { throw it }
-        emitAll(userPreferencesEmissionLimit?.let(preferences::take) ?: preferences)
+        when (val limit = userPreferencesEmissionLimit) {
+            null -> emitAll(preferences)
+            0 -> Unit
+            else -> emitAll(preferences.take(limit))
+        }
     }
 
     override suspend fun save(preference: UserPreference) {

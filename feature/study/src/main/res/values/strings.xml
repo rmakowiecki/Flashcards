@@ -61,6 +61,8 @@
 
     <string name="study_session_summary_title_label">Session complete</string>
     <string name="study_session_summary_close_cd">Close</string>
+    <string name="study_session_summary_skip_button">Skip</string>
+    <string name="study_session_summary_level_up_announcement">Level up! Level %1$d</string>
     <string name="study_session_summary_headline_label">Great work!</string>
     <string name="study_session_summary_headline_perfect_label">Perfect run! 🎉</string>
     <string name="study_session_summary_headline_effort_label">Nice effort!</string>

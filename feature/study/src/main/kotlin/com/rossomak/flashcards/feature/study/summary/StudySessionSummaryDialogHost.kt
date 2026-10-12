@@ -25,10 +25,6 @@ import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown
 import java.util.Locale
 
-/**
- * Renders [activeDialog], if any. The XP breakdown only reads state, so Done is a [Confirm] and an
- * outside tap or back press a [Dismiss], and both just close it.
- */
 @Composable
 internal fun StudySessionSummaryDialogHost(
     activeDialog: StudySessionSummaryDialog?,
@@ -47,7 +43,6 @@ internal fun StudySessionSummaryDialogHost(
     }
 }
 
-/** One row per line, a divider, then the total. The dialog scaffold scrolls the rows when they do not fit. */
 @Composable
 private fun XpBreakdownDialog(
     xpLines: List<XpBreakdownLine>,
@@ -67,11 +62,10 @@ private fun XpBreakdownDialog(
     }
 }
 
-/** Icon, the rule's name, and its arithmetic. A loss is drawn in the error colour. */
 @Composable
 private fun XpBreakdownDialogRow(line: XpBreakdownLine, locale: Locale, modifier: Modifier = Modifier) {
     val labelColor = if (line.isLoss) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-    val valueColor = if (line.isLoss) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val valueColor = if (line.isLoss) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -113,6 +107,7 @@ private fun XpBreakdownTotalRow(xpTotal: Int, locale: Locale, modifier: Modifier
         Text(
             text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(xpTotal, locale)),
             style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }
