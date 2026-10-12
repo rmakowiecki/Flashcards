@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.data.source.AuthRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.model.SignInResult.SignedIn
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -34,13 +35,23 @@ class DefaultAuthRepositoryTest {
     fun `signInWithGoogleIdToken delegates to the remote data source`() = runTest {
         val idToken = "id-token"
         val user = AuthUser(uid = "uid-1", email = "user@example.com", displayName = "Alex", photoUrl = null)
-        coEvery { remoteDataSource.signInWithGoogleIdToken(idToken) } returns Result.success(user)
+        coEvery { remoteDataSource.signInWithGoogleIdToken(idToken) } returns SignedIn(user)
 
         val result = createRepository().signInWithGoogleIdToken(idToken)
 
-        result.isSuccess shouldBe true
-        result.getOrThrow() shouldBe user
+        result shouldBe SignedIn(user)
         coVerify(exactly = 1) { remoteDataSource.signInWithGoogleIdToken(idToken) }
+    }
+
+    @Test
+    fun `signInWithGitHub delegates to the remote data source`() = runTest {
+        val user = AuthUser(uid = "uid-1", email = "user@example.com", displayName = "Alex", photoUrl = null)
+        coEvery { remoteDataSource.signInWithGitHub() } returns SignedIn(user)
+
+        val result = createRepository().signInWithGitHub()
+
+        result shouldBe SignedIn(user)
+        coVerify(exactly = 1) { remoteDataSource.signInWithGitHub() }
     }
 
     @Test

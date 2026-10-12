@@ -20,8 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.spacing
@@ -29,9 +27,6 @@ import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingHierarchyConnector
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
-
-/** Letter spacing of a card's all-caps kind label. */
-private val KindLabelLetterSpacing = 1.0.sp
 
 /**
  * Teaches the Category → Topic → Flashcard hierarchy with three stacked example cards.
@@ -93,14 +88,12 @@ private fun StructureExampleCard(
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.none)) {
                 Text(
                     text = kindLabel.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = KindLabelLetterSpacing,
                 )
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
                 )
                 Text(
                     text = message,

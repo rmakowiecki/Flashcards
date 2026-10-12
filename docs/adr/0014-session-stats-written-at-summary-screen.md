@@ -316,3 +316,11 @@ unchanged; only this piece of the reasoning for it was corrected.)*
   same arguments rather than losing the result. Nothing sensitive rides in that payload: no transcript
   is ever part of the result, so `SavedStateHandle`'s disk-backed persistence carries only card ids,
   states and counts.
+
+## Amendments
+
+**2026-10-03 — Home's Recents no longer query `sessions`.** They read the server-written
+`users/{uid}/recents/state` document instead ([ADR-0057](0057-recents-state-projection.md)). The
+denormalized names on the session document stay, and Recents carry the same names: each `recents/state`
+entry stores its Category and Subcategory names, so a row shows and replays without a taxonomy read.
+`cardResults` stays embedded on its own merit, since no reader needs a session without its cards.

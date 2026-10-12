@@ -61,7 +61,7 @@ v1 is deliberately simplistic: the clock runs unconditional of backgrounding or 
 
 ### Session Result: `users/{uid}/sessions/{sessionId}`
 
-**One session is one document.** Aggregates, denormalized names, and the per-card results embedded as a `cardResults` map. Home's Recents carousel is this collection's highest-traffic reader, and reads it with `orderBy(startTimestamp, DESCENDING).limit(n)`, whose cost is the limit rather than the collection size.
+**One session is one document.** Aggregates, denormalized names, and the per-card results embedded as a `cardResults` map. Home does not query this collection: its Recents read the server-written `recents/state` projection ([ADR-0057](../adr/0057-recents-state-projection.md)).
 
 **The document is sealed by its own `studyMode`.** Rated has Ratings, Attempts and Terminal States; Fast has none of that, only `Seen`. Rather than a Fast document carrying zeroed mastery counters, the four Rated-only fields below are **absent** on a Fast document — not written as 0. A reader decides which fields to expect from `studyMode` alone.
 

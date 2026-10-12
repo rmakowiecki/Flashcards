@@ -43,39 +43,42 @@ A Flashcard created by a user. Follows a submission lifecycle: `private → subm
 _Avoid_: User card, Custom card
 
 **Favorite**:
-A Category or a Subcategory explicitly bookmarked by a User; the two kinds are independent, so favoriting a Category does not favorite its Subcategories. Displayed on the Home screen as one snapping carousel of cards, most recently favorited first. A Category card shows the Category's name; its body opens Category Details and its Quick session button starts a Quick Session in that Category. A Subcategory card shows the Subcategory and parent Category names plus the User's **Studied** progress in it; its body opens Subcategory Details and its play button starts a single-subcategory session. As everywhere, the body browses and the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
+A Category or a Subcategory explicitly bookmarked by a User; the two kinds are independent, so favoriting a Category does not favorite its Subcategories. Displayed on the Home screen as one snapping carousel of cards, most recently favorited first. A Category card shows the Category's name; its body opens Category Details and its Quick session button starts a Quick Session in that Category. A Subcategory card shows the Subcategory and parent Category names plus the User's **Studied** progress in it; its body opens Subcategory Details and its play button starts a single-subcategory session. The body browses and the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
 _Avoid_: Starred, Saved, Liked
 
 **Recent**:
-A past Study Session surfaced on the Home screen as a carousel card. Renders as one of two variants: a **single-subcategory Recent** (session had one Subcategory — shows Subcategory + Category name, taps into Subcategory Details) or a **composite Recent** (session spanned multiple Subcategories — shows Category name only, taps into Category Details).
+One row of Home's **Recently studied** list: one past Study Session of either Study Mode, completed or abandoned. Newest first, at most 15; every session gets its own row, repeats included. A session with no Studied Flashcards is never a Recent. A **Pending Session** is a Recent as soon as it is queued. The row shows the Category, a title (the Subcategory for a single-subcategory session, otherwise "Quick session · N topics" or "Custom session · N topics"), card count, minutes, XP, the Study Mode, any hands-free delivery, and when the session happened. Tapping it opens the Preview Study Session Screen to study the same thing again (see **Study Creation** → Replay): the one row that opens Preview instead of browsing ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md) amendment). Each Recent keeps the Category and Subcategory names it was studied under, so it shows and replays offline too. Stored as `recents/state` ([ADR-0057](docs/adr/0057-recents-state-projection.md)).
 _Avoid_: History, Last session
 
 **Guest**:
 A transient, pre-link Firebase Anonymous Auth session — never a standing alternate identity, never a
 permanent or optional mode. Started only at the moment onboarding's final step is committed, and only
 if the user picked at least one Favorite, so a uid exists to write that pick under before real sign-in.
-Always resolves into a real **User** via `linkWithCredential` at Login, which keeps the same uid and
-everything written under it (e.g. the Favorite); on a linking collision (the credential is already
-tied to a different existing User — a returning user on a new device) the session and anything written
-under it are discarded outright, not merged. Sign-in stays mandatory: nothing reachable past onboarding
-treats a Guest as authenticated.
+Always resolves into a real **User** by linking the sign-in provider they pick at Login (Google or
+GitHub), which keeps the same uid and everything written under it (e.g. the Favorite). When that
+sign-in already belongs to a different existing User (a returning user on a new device), the session
+and anything written under it are discarded outright, not merged. When the provider's email already
+belongs to a User who signs in with the other provider, nothing is linked: the Guest stays a Guest and
+is told to use that provider. Sign-in stays mandatory: nothing reachable past onboarding treats a Guest
+as authenticated.
 _Avoid_: Anonymous user, Temp user
 
 **User**:
-An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl`.
+An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl` and the sign-in `provider` (Google or GitHub; none for a Guest).
 _Avoid_: Account, Player, Learner
 
 **Study Session**:
 A focused learning instance scoped to one or more Subcategories within a single Category. Has exactly one **Study Mode**. Every Study Session records **Card Progress** for the eligible (non-Private) Flashcards it actually puts in front of the User; only a Rated Study Session records Ratings, Attempts and Terminal States. A session with exactly one Subcategory is a **single-subcategory session**; a session spanning multiple Subcategories is a **composite session** — the umbrella term, true of a Quick Session and a Custom Session alike. Composite is not itself an entry point: every Composite session is either Quick (system-selected) or Custom (user-selected) — see **Study Creation**.
+Every Study Session also records its **source type**: the Study Creation entry point that started it, single-subcategory, Quick or Custom. It records how the session was started, not how many Subcategories it ended with: a Quick Session that sampled one Subcategory is still Quick, and a Custom selection of one is single-subcategory.
 _Avoid_: Quiz, Session alone (ambiguous with auth session)
 
 **Session Result**:
-The domain type describing what happened in one Study Session, of either Study Mode: session identity, Study Mode, start timestamp, duration, whether the session was abandoned before the deck was finished, denormalized Category/Subcategory ids and names, the shared `newCardsStudied` count, its local calendar `studyDate` and the Daily Goal value in effect when it ended ([ADR-0048](docs/adr/0048-streak-and-daily-goal-ride-the-session-payload.md)), and the per-Flashcard `cardResults` map (see **Flashcard Result**). A Rated Session Result additionally carries the Mastered/Partial/Defended/De-mastered counts — a Fast one has no Terminal States to tally, so those fields are absent, not zero. Sealed once, at session termination — it carries no XP *totals*, only the context needed to compute them.
+The domain type describing what happened in one Study Session, of either Study Mode: session identity, Study Mode, start timestamp, duration, whether the session was abandoned before the deck was finished, denormalized Category/Subcategory ids and names, the session's source type, its delivery (whether Voice Answering was on for a Rated session, or read-aloud for a Fast one; each absent on the other mode, not false), the shared `newCardsStudied` count, its local calendar `studyDate` and the Daily Goal value in effect when it ended ([ADR-0048](docs/adr/0048-streak-and-daily-goal-ride-the-session-payload.md)), and the per-Flashcard `cardResults` map (see **Flashcard Result**). A Rated Session Result additionally carries the Mastered/Partial/Defended/De-mastered counts — a Fast one has no Terminal States to tally, so those fields are absent, not zero. Sealed once, at session termination — it carries no XP *totals*, only the context needed to compute them.
 **The persisted document is a distinct, larger shape**, not this type verbatim: the server-authoritative `submitStudySession` Cloud Function ([ADR-0014](docs/adr/0014-session-stats-written-at-summary-screen.md)) builds it from the submitted Session Result plus the computed `xpBreakdown`/`xpTotal` and streak/daily-goal awards ([ADR-0047](docs/adr/0047-xp-values-behind-a-config-repository.md), [ADR-0048](docs/adr/0048-streak-and-daily-goal-ride-the-session-payload.md)), and that document is what's written once, inside one Firestore transaction — nothing is written while a session runs, and the client no longer writes any of it directly. Stored at `users/{uid}/sessions/{sessionId}`, with `studyMode` as the one field a reader needs to know which shape the rest of the document is in.
 _Avoid_: Ledger (retired name), Outcome, Session outcome, Session record
 
 **Pending Session**:
-A finished Study Session, of either Study Mode and completed or abandoned, that is queued on the device for delivery to the server and not yet confirmed. It belongs to exactly one User, and counts toward that User's Card Progress, progress summary, XP, Level, Streak and Daily Goal as soon as it is queued, on that device. It stops being Pending once the server records it or rejects it.
+A finished Study Session, of either Study Mode and completed or abandoned, that is queued on the device for delivery to the server and not yet confirmed. It belongs to exactly one User, and counts toward that User's Card Progress, progress summary, XP, Level, Streak and Daily Goal as soon as it is queued, on that device. It stops being Pending once the server records it or rejects it. A Study Session with no Studied Flashcards is never queued and never becomes a Pending Session: leaving it returns to the Preview Study Session Screen with nothing recorded.
 _Avoid_: Offline session, Unsynced session, Queued submission
 
 **Flashcard Result**:
@@ -129,6 +132,10 @@ _Avoid_: Flag, Flag Action, Curation Flag
 A specific fix directive attached to a Curation Request. Values: `DifficultyTooEasy` (raise difficulty), `DifficultyTooHard` (lower difficulty), `WrongTags` (tags don't fit the card), `NeedsCodeExample` (answer needs a code block), `BacktickRedo` (inline-code formatting is wrong), `FullRedo` (factually wrong or structurally broken), `Delete` (card is duplicate or worthless). `DifficultyTooEasy` and `DifficultyTooHard` are mutually exclusive; all other actions can coexist. Every value gets a row in the Report a Problem dialog — enforced at compile-by-check time against `CurationAction.entries`, so a new action cannot be added without a row. Presented to the user as: "Raise the difficulty," "Lower the difficulty," "Wrong tags," "Needs a code example," "Formatting looks broken," "Needs a full rewrite," "Duplicate or low quality."
 _Avoid_: Flag Action, Curation Type, Curation Flag Action
 
+**Bug Report**:
+A User's free-text description of a problem with the app, a severity they pick (Blocker, Minor or Cosmetic), and automatic installation details (app version, device model, Android version). Sent through the `submitBugReport` server function and stored top-level for triage ([ADR-0058](docs/adr/0058-bug-reports-written-only-by-a-callable.md)).
+_Avoid_: Feedback, Ticket, Issue
+
 ### Activities
 
 **Study Creation**:
@@ -136,6 +143,7 @@ The flow a user goes through to start a Study Session. All entry points route th
 - **Single-subcategory**: tap a Subcategory's **play button** on Category Details (or "Start session" in the bottom toolbar of Subcategory Details, or the play button on a Favorite Subcategory card on Home) → Preview Study Session Screen → session begins. Tapping the Subcategory row itself opens **Subcategory Details** and starts nothing — the row browses, the play button studies ([ADR-0041](docs/adr/0041-topic-row-tap-browses-play-button-studies.md)).
 - **Quick Session**: tap "Quick Session" on Category Details, or the Quick session button on a Favorite Category card on Home → system samples a random count of Subcategories — bounded by the user's `subcategoryCountRange` preference — then randomly selects that many Subcategories and draws Flashcards from them → Preview Study Session Screen → session begins. Re-randomize re-rolls the Subcategory sample itself, not just the card draw. Category Details hands Preview the Category's Subcategory list to sample from; Home sends only the Category, and Preview fetches that list itself ([ADR-0056](docs/adr/0056-preview-resolves-quick-session-candidate-pool.md)).
 - **Custom**: enter **Selection Mode** on Category Details (bottom-toolbar toggle, or long-press any Subcategory row) → user manually chooses every Subcategory that enters the session → taps "Custom session" → Preview Study Session Screen → session begins. A Composite session when multiple Subcategories are selected (see **Study Session**) — a single selection makes it a single-subcategory session instead. Not every Composite session is Custom — Quick is the other way in.
+- **Replay**: tap a **Recent** on Home, or **Study Again** on a Session Summary (which acts as that session's own Recent) → Preview Study Session Screen → session begins. A single-subcategory Recent opens with the same Subcategory; a Quick Recent sends only the Category, so Preview samples the whole Category afresh; a Custom Recent sends its stored Subcategories. Preview starts with the past session's Study Mode and Voice Answering or read-aloud choice, without saving them as defaults. Everything else comes from the saved defaults, and Flashcards are drawn fresh.
 _Avoid_: Composite Session (retired name for this entry point; Composite itself survives as the broader structural term)
 _Avoid_: "Start Custom Session" (retired label — never built; the entry point is the Selection Mode toggle, and the CTA it reveals reads "Custom session")
 _Avoid_: Session setup, Session wizard
@@ -180,6 +188,10 @@ _Avoid_: Study target, Quota
 Count of Study Sessions in which the User reached deck end (last card completed). Abandoned sessions (exited before deck end) do not count. Tracked as a lifetime aggregate stat on the Progress screen.
 _Avoid_: Sessions finished, Sessions done
 
+**Account Deletion**:
+The irreversible removal of a User and everything written for them. It runs server-side first: the `deleteAccount` Cloud Function deletes the User's Bug Reports and every document under `users/{uid}`, revokes their sessions, sweeps anything a racing submission wrote back, and deletes their Firebase Auth user ([ADR-0059](docs/adr/0059-account-deletion-runs-server-side.md)). Only then does the device drop that User's Pending Sessions, sign out and open Login ([ADR-0060](docs/adr/0060-account-deletion-completes-on-the-device.md)). Signing in again afterwards, even with the same Google account, starts a fresh User with no history.
+_Avoid_: Account removal, Deactivation
+
 
 ## Relationships
 
@@ -188,7 +200,7 @@ _Avoid_: Sessions finished, Sessions done
 - A **Flashcard** carries one or more **Tags** (all global, all user-facing) and a **Private flag**; the same Tag may appear on Flashcards across different Subcategories
 - A finished **Study Session** is a **Pending Session** until the server records it; a Pending Session belongs to exactly one **User**
 - A **Study Session** draws **Flashcards** from one or more **Subcategories** within a single **Category**
-- A **Recent** is a past **Study Session** — single-subcategory if one Subcategory, composite if multiple
+- A **Recent** is one past **Study Session**, shown on Home; tapping it replays the session through the Preview Study Session Screen
 - A **Favorite** is a bookmarked **Category** or **Subcategory**
 - An **Attempt** produces exactly one **Rating** *(Rated sessions only)*
 - **Voice Answering** is chosen up front for a **Rated** Study Session and fixed for its duration; its automatic grade produces a **Rating** the same way a manual tap does
@@ -201,4 +213,5 @@ _Avoid_: Sessions finished, Sessions done
 - A **User** accumulates **XP** through study activity; XP determines **Level**
 - A **Streak** belongs to a **User** and increments once per calendar day a Study Session reaches the Session Summary screen
 - A **Daily Goal** belongs to a **User** and is compared against today's total studied minutes
+- A **Bug Report** is written by one **User**; **Account Deletion** removes the User's Bug Reports
 

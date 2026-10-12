@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
@@ -37,14 +38,12 @@ import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsDraftState
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ReportCurrentCardProblem
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.SessionVoiceSettings as VoiceSettingsDialog
 import com.rossomak.flashcards.testutil.MainDispatcherRule
-import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -102,6 +101,7 @@ class FastStudySessionViewModelTest {
         cardIds = listOf("card-1", "card-2", "card-3"),
         categoryName = "Android",
         subcategoryNames = listOf("Compose"),
+        sourceType = SingleSubcategory,
     )
 
     @Before
@@ -205,14 +205,27 @@ class FastStudySessionViewModelTest {
     }
 
     @Test
-    fun `loadFlashcards surfaces error when any subcategory fetch fails`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failed card load returns to Preview`() = runTest(mainDispatcherRule.testDispatcher) {
         flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
-
         val viewModel = createViewModel()
-        advanceUntilIdle()
 
-        viewModel.state.value.error shouldBe R.string.study_session_load_error_message
-        viewModel.state.value.isLoading shouldBe false
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionDestination.Back
+        }
+    }
+
+    @Test
+    fun `a load that finds none of the routed cards returns to Preview`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.success(emptyList())
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            awaitItem() shouldBe FastStudySessionDestination.Back
+        }
     }
 
     @Test
@@ -249,7 +262,6 @@ class FastStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.state.value.error shouldBe null
             viewModel.state.value.isLoading shouldBe false
         }
 
@@ -334,6 +346,7 @@ class FastStudySessionViewModelTest {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
+            viewModel.onShowAnswer()
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -360,17 +373,18 @@ class FastStudySessionViewModelTest {
 
     @Test
     fun `a card skipped during its question is absent from cardResults`() = runTest(mainDispatcherRule.testDispatcher) {
-        loadThreeCards()
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+        val viewModel = createReadAloudViewModel()
         // card-1's question is skipped past without its answer ever being shown.
+        playbackGateway.emitExternal(TransportCommand.JumpTo(1))
+        advanceUntilIdle()
+        readQuestionThrough()
         viewModel.onDialogEvent(Open(ExitSession))
 
         viewModel.events.test {
             viewModel.onDialogEvent(Confirm)
             val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
 
-            destination.route.cardIds shouldNotContain "card-1"
+            destination.route.cardIds shouldBe listOf("card-2")
         }
     }
 
@@ -495,12 +509,28 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
+    fun `confirming the exit dialog before any answer is revealed navigates back, not to the summary`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            loadThreeCards()
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onDialogEvent(Open(ExitSession))
+
+            viewModel.events.test {
+                viewModel.onDialogEvent(Confirm)
+
+                awaitItem() shouldBe FastStudySessionDestination.Back
+            }
+        }
+
+    @Test
     fun `duration is measured from first card shown, not from route entry`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
+            viewModel.onShowAnswer()
             clock.instant = FIXED_INSTANT.plusSeconds(17)
             viewModel.onDialogEvent(Open(ExitSession))
 
@@ -513,25 +543,6 @@ class FastStudySessionViewModelTest {
         }
 
     @Test
-    fun `a session whose card load fails and is then abandoned reports zero duration and empty cardResults`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            flashcardRepository.flashcardsBySubcategory[subcategoryId] = Result.failure(IllegalStateException("boom"))
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            clock.instant = FIXED_INSTANT.plusSeconds(999)
-            viewModel.onDialogEvent(Open(ExitSession))
-
-            viewModel.events.test {
-                viewModel.onDialogEvent(Confirm)
-                val destination = awaitItem().shouldBeInstanceOf<FastStudySessionDestination.Summary>()
-
-                destination.route.durationSeconds shouldBe 0
-                destination.route.cardIds.shouldBeEmpty()
-            }
-        }
-
-    @Test
     fun `a long real-world gap between first card shown and termination is counted in full — v1 never pauses the clock`() =
         runTest(mainDispatcherRule.testDispatcher) {
             loadThreeCards()
@@ -540,6 +551,7 @@ class FastStudySessionViewModelTest {
 
             // Simulates a long backgrounded gap (a phone call, switching apps) with no lifecycle
             // hook to react to it — v1 is deliberately simplistic: wall time only, no pausing.
+            viewModel.onShowAnswer()
             clock.instant = FIXED_INSTANT.plusSeconds(1_200)
             viewModel.onDialogEvent(Open(ExitSession))
 

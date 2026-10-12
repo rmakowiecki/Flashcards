@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.ui.navigation
 
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
@@ -12,11 +13,22 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.rossomak.flashcards.R
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
+import com.rossomak.flashcards.feature.account.AccountRoute
+import com.rossomak.flashcards.feature.account.AccountScreen
+import com.rossomak.flashcards.feature.account.OpenSourceLicensesRoute
+import com.rossomak.flashcards.feature.account.OpenSourceLicensesScreen
+import com.rossomak.flashcards.feature.account.ReportBugRoute
+import com.rossomak.flashcards.feature.account.ReportBugScreen
 import com.rossomak.flashcards.feature.auth.AuthRoute
 import com.rossomak.flashcards.feature.auth.LoginScreen
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
@@ -92,6 +104,7 @@ private fun NavHostController.navigateToPreviewStudySession(
             categoryName = categoryName,
             subcategoryIds = listOf(subcategoryId),
             subcategoryNames = listOf(subcategoryName),
+            sourceType = SingleSubcategory,
         )
     )
 }
@@ -107,9 +120,44 @@ private fun NavHostController.navigateToPreviewQuickSession(categoryId: String, 
             categoryName = categoryName,
             subcategoryIds = emptyList(),
             subcategoryNames = emptyList(),
-            isQuickSession = true,
+            sourceType = Quick,
         )
     )
+}
+
+/**
+ * Studying a finished session's thing again, from its Recent on Home or from its Session Summary: Preview
+ * opens with the past Study Mode and delivery as starting values. It carries no filters or sort, so Preview
+ * uses the saved defaults (ADR-0038).
+ *
+ * `popUpTo(Main)` is a no-op from Home, where [Main] is already on top, and from the Summary it removes the
+ * Summary, so back from Preview returns to the tab the user started from.
+ */
+@Suppress("LongParameterList") // one primitive per route field: feature modules never build each other's routes.
+private fun NavHostController.navigateToPreviewReplay(
+    categoryId: String,
+    categoryName: String,
+    sourceType: SessionSourceType,
+    subcategoryIds: List<String>,
+    subcategoryNames: List<String>,
+    studyMode: StudyMode,
+    voiceAnsweringEnabled: Boolean?,
+    readAloudEnabled: Boolean?,
+) {
+    navigate(
+        PreviewStudySessionRoute(
+            categoryId = categoryId,
+            categoryName = categoryName,
+            subcategoryIds = subcategoryIds,
+            subcategoryNames = subcategoryNames,
+            sourceType = sourceType,
+            studyMode = studyMode,
+            voiceAnsweringEnabled = voiceAnsweringEnabled,
+            readAloudEnabled = readAloudEnabled,
+        )
+    ) {
+        popUpTo(Main) { inclusive = false }
+    }
 }
 
 /**
@@ -136,6 +184,7 @@ private fun NavHostController.navigateToPreviewStudySessionWithSelection(
             difficultyMin = difficultyRange.first,
             difficultyMax = difficultyRange.last,
             sortOrder = sortOrder,
+            sourceType = SingleSubcategory,
         )
     )
 }
@@ -145,10 +194,10 @@ private fun NavHostController.navigateToPreviewStudySessionWithSelection(
  * Subcategory list as the *candidate pool*, and the Preview screen samples a bounded subset from it
  * (ADR-0040) rather than starting a session across all of them. A caller without the list can
  * leave the ids empty and let the Preview screen fetch the pool itself (ADR-0056). **Custom** hands
- * over exactly the Subcategories the user selected, and [isQuickSession] is `false`, so the Preview
- * screen honours them literally rather than sampling. Either way — unlike [navigateToPreviewStudySession] — the
- * subcategories pass through as the lists the route already models rather than wrapping a single
- * one.
+ * over exactly the Subcategories the user selected, as [sourceType] Custom (or SingleSubcategory
+ * for a one-Subcategory selection), so the Preview screen honours them literally rather than
+ * sampling. Either way — unlike [navigateToPreviewStudySession] — the subcategories pass through as
+ * the lists the route already models rather than wrapping a single one.
  *
  * It also passes no sort order: there is no browsed card list behind either entry point, so the
  * route carries null and the Preview screen falls back to the user's saved default (ADR-0038).
@@ -158,7 +207,7 @@ private fun NavHostController.navigateToPreviewStudySessionForCategory(
     categoryName: String,
     subcategoryIds: List<String>,
     subcategoryNames: List<String>,
-    isQuickSession: Boolean,
+    sourceType: SessionSourceType,
 ) {
     navigate(
         PreviewStudySessionRoute(
@@ -166,7 +215,7 @@ private fun NavHostController.navigateToPreviewStudySessionForCategory(
             categoryName = categoryName,
             subcategoryIds = subcategoryIds,
             subcategoryNames = subcategoryNames,
-            isQuickSession = isQuickSession,
+            sourceType = sourceType,
         )
     )
 }
@@ -203,9 +252,9 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
             fadeOut(animationSpec = tween(durationMillis = 1, delayMillis = SHARED_ELEMENT_DURATION_MS))
         },
     ) {
-        // Splash and Onboarding hand the brand mark between them as a shared element, so both
+        // Splash hands the brand mark to Onboarding or Login as a shared element, so all three
         // publish their AnimatedVisibilityScope for the element to animate against.
-        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+        ProvideNavAnimatedVisibilityScope {
             SplashScreen(
                 onNavigateToMain = {
                     navController.navigate(Main) {
@@ -240,21 +289,23 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
         }
     }
     composable<AuthRoute>(enterTransition = { EnterTransition.None }) {
-        LoginScreen(
-            onNavigateToMain = {
-                navController.navigate(Main) {
-                    popUpTo(AuthRoute) { inclusive = true }
-                }
-            },
-            onNavigateToOnboarding = {
-                navController.navigate(OnboardingRoute) {
-                    popUpTo(AuthRoute) { inclusive = true }
-                }
-            },
-        )
+        ProvideNavAnimatedVisibilityScope {
+            LoginScreen(
+                onNavigateToMain = {
+                    navController.navigate(Main) {
+                        popUpTo(AuthRoute) { inclusive = true }
+                    }
+                },
+                onNavigateToOnboarding = {
+                    navController.navigate(OnboardingRoute) {
+                        popUpTo(AuthRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
     }
     composable<OnboardingRoute>(enterTransition = { EnterTransition.None }) {
-        CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+        ProvideNavAnimatedVisibilityScope {
             OnboardingScreen(
                 onNavigateToMain = {
                     navController.navigate(Main) {
@@ -268,6 +319,37 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
                 },
             )
         }
+    }
+}
+
+private fun NavGraphBuilder.accountDestination(navController: NavHostController) {
+    composable<AccountRoute> {
+        AccountScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToReportBug = { navController.navigate(ReportBugRoute) },
+            onNavigateToOpenSourceLicenses = {
+                navController.navigate(OpenSourceLicensesRoute) { launchSingleTop = true }
+            },
+            onNavigateToLogin = {
+                navController.navigate(AuthRoute) {
+                    popUpTo(Main) { inclusive = true }
+                    // A second Login event during the exit transition must not stack another AuthRoute.
+                    launchSingleTop = true
+                }
+            },
+        )
+    }
+    composable<ReportBugRoute> {
+        ReportBugScreen(onNavigateBack = { navController.popBackStack() })
+    }
+}
+
+private fun NavGraphBuilder.openSourceLicensesDestination(navController: NavHostController) {
+    composable<OpenSourceLicensesRoute> {
+        OpenSourceLicensesScreen(
+            librariesResId = R.raw.aboutlibraries,
+            onNavigateBack = { navController.popBackStack() },
+        )
     }
 }
 
@@ -293,10 +375,8 @@ fun FlashcardsNavGraph(
                 // opaquely — see the comment on Splash.
                 composable<Main>(enterTransition = { EnterTransition.None }) {
                     MainScreen(
-                        onNavigateToLogin = {
-                            navController.navigate(AuthRoute) {
-                                popUpTo(Main) { inclusive = true }
-                            }
+                        onNavigateToAccount = {
+                            navController.navigate(AccountRoute) { launchSingleTop = true }
                         },
                         onNavigateToOnboarding = {
                             navController.navigate(OnboardingRoute) {
@@ -309,11 +389,14 @@ fun FlashcardsNavGraph(
                         onNavigateToSubcategoryDetails = navController::navigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = navController::navigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = navController::navigateToPreviewQuickSession,
+                        onNavigateToPreviewRecentSession = navController::navigateToPreviewReplay,
                         onNavigateToDebugTool = { route -> navController.navigate(route) },
                     )
                 }
                 // Debug tools that need the whole screen, without the bottom bar; empty in release.
                 debugFullScreenDestinations(navController)
+                accountDestination(navController)
+                openSourceLicensesDestination(navController)
                 composable<CategoryDetailsRoute> {
                     CategoryDetailsScreen(
                         onNavigateBack = { navController.popBackStack() },
@@ -337,20 +420,29 @@ fun FlashcardsNavGraph(
                 }
                 composable<FastStudySessionRoute> {
                     FastStudySessionScreen(
-                        onNavigateToSummary = navController::navigateToStudySessionSummary
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSummary = navController::navigateToStudySessionSummary,
                     )
                 }
                 composable<RatedStudySessionRoute> {
                     RatedStudySessionScreen(
-                        onNavigateToSummary = navController::navigateToStudySessionSummary
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSummary = navController::navigateToStudySessionSummary,
                     )
                 }
                 composable<StudySessionSummaryRoute> {
                     StudySessionSummaryScreen(
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPreviewStudySession = navController::navigateToPreviewReplay,
                     )
                 }
             }
         }
     }
+}
+
+/** Publishes this destination's scope, so a shared element inside it has an end to animate against. */
+@Composable
+private fun AnimatedVisibilityScope.ProvideNavAnimatedVisibilityScope(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this, content = content)
 }

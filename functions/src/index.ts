@@ -4,13 +4,10 @@ import { defineSecret } from "firebase-functions/params";
 import { isPremiumUser } from "./lib/entitlement";
 import { transcribeWithElevenLabsScribe } from "./lib/elevenlabs";
 import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
+import { handleDeleteAccountCall } from "./lib/deleteAccount";
 import { RequestDeadline } from "./lib/requestDeadline";
-import {
-  SubmitStudySessionResult,
-  requireOwnerMatchesCaller,
-  submitStudySession as runSubmitStudySession,
-  validateSubmitStudySessionRequest,
-} from "./lib/submitStudySession";
+import { handleSubmitBugReportCall } from "./lib/submitBugReport";
+import { SubmitStudySessionResult, handleSubmitStudySessionCall } from "./lib/submitStudySession";
 
 admin.initializeApp();
 
@@ -18,7 +15,9 @@ const elevenLabsApiKey = defineSecret("ELEVENLABS_API_KEY");
 
 const RUNTIME_OPTIONS = {
   region: "us-central1",
-  timeoutSeconds: 120,
+  // Below the Android SDK's default callable timeout (70 s), so a callable that keeps the default
+  // never sees the SDK give up while the function still runs.
+  timeoutSeconds: 60,
   memory: "512MiB" as const,
 };
 
@@ -159,15 +158,30 @@ export const transcribeAndGradeSpokenAnswer = onCall<
  * (`CommitStudySessionUseCase` / `StudySessionRemoteDataSource`): the client submits what happened
  * during a session, and this function is the sole place that computes and writes its XP, level and
  * progress. Named "submit", not "report" — this codebase's curation feature already owns "report" for
- * a flagged-content signal, so a finished session is submitted, never reported. Auth check and payload
- * validation stay here, thin, in `index.ts`; the transaction and scoring logic live in
- * `lib/submitStudySession.ts` and `lib/xpScoring.ts` where they can be tested directly, without going
- * through this `onCall` wrapper.
+ * a flagged-content signal, so a finished session is submitted, never reported. The wrapper stays thin:
+ * the revoked-token guard, payload validation, transaction and scoring logic live in
+ * `lib/authGuard.ts`, `lib/submitStudySession.ts` and `lib/xpScoring.ts`, where they can be tested
+ * directly without going through this `onCall` wrapper.
  */
-export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResult>>(RUNTIME_OPTIONS, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Missing Firebase ID token");
-  const validated = validateSubmitStudySessionRequest(request.data);
-  requireOwnerMatchesCaller(uid, validated);
-  return runSubmitStudySession(uid, validated);
-});
+export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResult>>(RUNTIME_OPTIONS, (request) =>
+  handleSubmitStudySessionCall(admin.auth(), admin.firestore(), request),
+);
+
+/**
+ * The sole writer of Bug Reports (ADR-0058): no client can read or write `bugReports` directly. The
+ * wrapper stays thin: the revoked-token guard, validation, the per-User rate limit and the write live
+ * in `lib/submitBugReport.ts`, where they are tested against the emulators. Returns nothing on success.
+ */
+export const submitBugReport = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
+  handleSubmitBugReportCall(admin.auth(), admin.firestore(), request),
+);
+
+/**
+ * Account Deletion (ADR-0059): erases the caller's Bug Reports, everything under `users/{uid}` and
+ * their Auth user. Takes no payload and returns nothing. The wrapper stays thin: the revoked-token
+ * guard and the ordered, retryable deletion steps live in `lib/deleteAccount.ts`, where they are tested
+ * against the emulators.
+ */
+export const deleteAccount = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
+  handleDeleteAccountCall(admin.auth(), admin.firestore(), request),
+);

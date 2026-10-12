@@ -25,13 +25,17 @@ callable runtime, or the call is rejected `unauthenticated` before any code runs
 ```
 functions/
   package.json / tsconfig.json      — Node 22, TypeScript, strict
-  src/index.ts                      — the 3 exported onCall functions
+  src/index.ts                      — the 5 exported onCall functions
   src/lib/entitlement.ts            — Firestore entitlement read (isPremiumUser)
   src/lib/elevenlabs.ts             — ElevenLabs Scribe STT call
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
   src/lib/httpError.ts              — HttpError(statusCode, message) thrown by elevenlabs/grading libs
   src/lib/xpScoring.ts              — pure XP/level calculation, mirrored by the client's SessionXpCalculation.kt
+  src/lib/authGuard.ts              — requireActiveSession: revoked/deleted-caller guard for writing callables (ADR-0057)
   src/lib/submitStudySession.ts     — validation + the session-commit transaction
+  src/lib/submitBugReport.ts        — Bug Report validation, per-User rate limit and write (ADR-0058)
+  src/lib/deleteAccount.ts          — Account Deletion: Bug Reports, users/{uid} and the Auth user, in a retryable order (ADR-0059)
+  src/lib/requestValidation.ts      — shared field checks for the callables' request validators
   src/lib/*.test.ts                 — emulator-backed tests for the above (see "Local iteration" below)
 ```
 
@@ -80,14 +84,18 @@ Server-authoritative session commit. Replaces the client-side write path
 the client submits what happened during a session, and this function alone computes and writes its
 XP, level and progress. Named "submit", not "report" — this codebase's curation feature already owns
 "report" for a flagged-content signal, so a finished session is submitted, never reported. `index.ts`
-only checks auth and delegates; the real logic lives in `src/lib/submitStudySession.ts` (the
-transaction) and `src/lib/xpScoring.ts` (the pure XP/level calculation, mirrored by the
+only delegates; the real logic lives in `src/lib/submitStudySession.ts` (the revoked-token guard
+from `src/lib/authGuard.ts`, then validation and the transaction) and `src/lib/xpScoring.ts` (the pure XP/level calculation, mirrored by the
 client's `calculateSessionXp` in `SessionXpCalculation.kt`).
 
 Everything happens in one Firestore transaction, keyed for idempotency on the client-generated
 `sessionId`: if `sessions/{sessionId}` already exists, the call is a no-op that returns the same
 result again — safe for the client's own at-least-once retry queue to call
 freely. See `submitStudySession`'s own doc comment in that file for the full read/write shape.
+
+Before anything else it rejects, with `unauthenticated`, a caller whose tokens were revoked or whose
+Auth user was deleted or disabled (ADR-0057). The client's delivery worker treats that code as
+transient and keeps the session queued.
 
 ## One-time setup (from a clean checkout)
 
@@ -141,10 +149,14 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
    npx firebase-tools functions:artifacts:setpolicy
    ```
 
-8. **Firestore rules.** `firestore.rules` at the repo root is deployed via:
+8. **Firestore rules and indexes.** `firestore.rules` and `firestore.indexes.json` at the repo root
+   are deployed via:
    ```
-   npx firebase-tools deploy --only firestore:rules
+   npx firebase-tools deploy --only firestore:rules,firestore:indexes
    ```
+   Index builds are asynchronous: wait until every index shows `Enabled` in the Firebase console
+   (Firestore → Indexes) before sending traffic to `submitBugReport`, whose rate-limit `count()`
+   query fails with `FAILED_PRECONDITION` until its composite index is ready.
    **Read `docs/adr/0024`'s Consequences section before touching this file.** Any new collection
    needs its own explicit `match` block or it default-denies. Confirm real Firestore paths by
    grepping `core/data/.../source/*.kt` for `.collection(...)` before writing a rule.
@@ -175,6 +187,26 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
     debug-only 🛠️ Voice Debug tab, and test in order: entitlement (no third-party cost) →
     transcribe + sanitize → a real study-session voice answer for the full streaming path.
 
+### `submitBugReport`
+
+The only writer of the top-level `bugReports` collection; security rules deny every client access
+(ADR-0058). `index.ts` only delegates to `src/lib/submitBugReport.ts`, which runs the revoked-token
+guard, validates the request, allows at most 10 reports per uid in a rolling 24 hours
+(`resource-exhausted` past that), then adds the report with the server-set `uid`, `createdAt` and
+`status: "new"`. Returns nothing on success. The rate limit's `count()` query needs the
+`bugReports` (`uid`, `createdAt`) composite index in `../firestore.indexes.json`. That file also lists the
+`subcategories` (`categoryId`, `order`) index already live in production, so it mirrors every deployed
+composite index and an indexes deploy never finds one it doesn't know.
+
+### `deleteAccount`
+
+Account Deletion (ADR-0059). Takes no payload and returns nothing. `index.ts` only delegates to
+`src/lib/deleteAccount.ts`, which runs the revoked-token guard, then in order: deletes the caller's Bug
+Reports and recursively deletes `users/{uid}`, revokes their refresh tokens, repeats both deletes to
+sweep anything a submission that passed the guard just before revocation wrote, and deletes the Auth
+user. Every step is idempotent. Errors: `unauthenticated` from the guard, otherwise `internal`, logged
+with the uid and the failed step.
+
 ## Local iteration
 
 - `npm run build:watch` inside `functions/` for a standing `tsc --watch`.
@@ -182,15 +214,15 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
   ADR-0029) — every test against them goes through the real deployed callables via the debug screen.
   The in-app fake/real toggles are gone — the fake now only exists as a unit-test double
   (`core/data/src/test`).
-- `submitStudySession` is the first function with a real local test suite: `npm test`
-  starts a Firestore emulator (`firebase emulators:exec`, reusing `../firebase.json`) and runs every
-  `src/lib/*.test.ts` file against it with Node's built-in test runner. It calls
-  `submitStudySession`/`validateSubmitStudySessionRequest` directly rather than going through a
-  running Functions emulator or an `onCall` HTTP round trip — no Auth emulator or token minting
-  needed, since the `onCall` wrapper's own auth check is a single trivial guard in `index.ts`.
-  `npm run test:unit` runs the same suite against whatever Firestore emulator is already listening
-  on port 8080 (handy for repeated runs while iterating, instead of paying emulator startup cost
-  every time).
+- `submitStudySession` and `submitBugReport` have real local test suites: `npm test`
+  starts the Firestore and Auth emulators (`firebase emulators:exec`, reusing `../firebase.json`)
+  and runs every `src/lib/*.test.ts` file against them with Node's built-in test runner. Tests call
+  the lib functions directly rather than going through a running Functions emulator or an `onCall`
+  HTTP round trip. The revoked-token guard reads real user records from the Auth emulator, but the
+  tests build the decoded-token request `onCall` would pass, so no token minting is needed.
+  `npm run test:unit` runs the same suite against whatever emulators are already listening on ports
+  8080 (Firestore) and 9099 (Auth), handy for repeated runs while iterating, instead of paying
+  emulator startup cost every time.
 
 ## Redeploying after a code change
 

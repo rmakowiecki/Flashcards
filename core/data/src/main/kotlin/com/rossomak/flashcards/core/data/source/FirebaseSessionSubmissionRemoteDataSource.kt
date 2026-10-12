@@ -23,11 +23,10 @@ import kotlinx.coroutines.withContext
  * `ValidatedSubmitStudySessionRequest` shape 1:1 — this is the one seam where these contracts must agree
  * across languages with no compiler to enforce it.
  *
- * The response is read into a [SessionScore]. `counts` and `rates` are read leniently: when either is
- * missing, as from a function deployed before it returned them, the score carries `null` for it instead
- * of failing. Any other missing or malformed field makes the whole response unreadable: that is logged
- * and returned as success with a `null` score. The call itself succeeded, so the server has recorded the
- * session, and retrying would only replay the same unreadable answer and block every later queue entry.
+ * The response is read into a [SessionScore]. Any missing or malformed field (the Rated-only counts
+ * excepted) makes the whole response unreadable: that is logged and returned as success with a `null`
+ * score. The call itself succeeded, so the server has recorded the session, and retrying would only
+ * replay the same unreadable answer and block every later queue entry.
  *
  * A field added to [SessionResult] needs updating here (`toPayload()`, this class's own network-wire
  * subset) **and independently** in [com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto]
@@ -60,22 +59,27 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         }
     }
 
-    private fun SessionResult.toPayload(ownerUid: String): Map<String, Any> = mapOf(
-        FIELD_OWNER_UID to ownerUid,
-        FIELD_SESSION_ID to id,
-        FIELD_STUDY_MODE to mode.name,
-        FIELD_STARTED_AT_EPOCH_MILLIS to startedAt.toEpochMilli(),
-        FIELD_DURATION_SECONDS to durationSeconds,
-        FIELD_ABANDONED to abandoned,
-        FIELD_CATEGORY_ID to categoryId,
-        FIELD_CATEGORY_NAME to categoryName,
-        FIELD_SUBCATEGORY_IDS to subcategoryIds,
-        FIELD_SUBCATEGORY_NAMES to subcategoryNames,
-        FIELD_CARD_RESULTS to cardResults.map { entry -> entry.toPayload() },
-        FIELD_STUDY_DATE to studyDate,
-        FIELD_STUDY_DATE_UTC_OFFSET_MINUTES to studyDateUtcOffsetMinutes,
-        FIELD_DAILY_GOAL_MINUTES to dailyGoalMinutes,
-    )
+    private fun SessionResult.toPayload(ownerUid: String): Map<String, Any> = buildMap {
+        put(FIELD_OWNER_UID, ownerUid)
+        put(FIELD_SESSION_ID, id)
+        put(FIELD_STUDY_MODE, mode.name)
+        put(FIELD_STARTED_AT_EPOCH_MILLIS, startedAt.toEpochMilli())
+        put(FIELD_DURATION_SECONDS, durationSeconds)
+        put(FIELD_ABANDONED, abandoned)
+        put(FIELD_CATEGORY_ID, categoryId)
+        put(FIELD_CATEGORY_NAME, categoryName)
+        put(FIELD_SUBCATEGORY_IDS, subcategoryIds)
+        put(FIELD_SUBCATEGORY_NAMES, subcategoryNames)
+        put(FIELD_SOURCE_TYPE, sourceType.name)
+        put(FIELD_CARD_RESULTS, cardResults.map { entry -> entry.toPayload() })
+        put(FIELD_STUDY_DATE, studyDate)
+        put(FIELD_STUDY_DATE_UTC_OFFSET_MINUTES, studyDateUtcOffsetMinutes)
+        put(FIELD_DAILY_GOAL_MINUTES, dailyGoalMinutes)
+        when (this@toPayload) {
+            is SessionResult.Rated -> put(FIELD_VOICE_ANSWERING, voiceAnsweringEnabled)
+            is SessionResult.Fast -> put(FIELD_READ_ALOUD, readAloudEnabled)
+        }
+    }
 
     private fun FlashcardResult.toPayload(): Map<String, Any> = buildMap {
         put(FIELD_CARD_ID, cardId)
@@ -98,8 +102,12 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
             levelsCrossed = requireList(response[FIELD_LEVELS_CROSSED], FIELD_LEVELS_CROSSED).map { level ->
                 requireNotNull((level as? Number)?.toInt()) { "Non-numeric entry in $FIELD_LEVELS_CROSSED" }
             },
-            counts = (response[FIELD_COUNTS] as? Map<*, *>)?.let(::parseCounts),
-            rates = (response[FIELD_RATES] as? Map<*, *>)?.let(::parseRates),
+            levelBefore = requireInt(response, FIELD_LEVEL_BEFORE),
+            xpIntoCurrentLevelBefore = requireLong(response, FIELD_XP_INTO_CURRENT_LEVEL_BEFORE),
+            xpForNextLevelBefore = requireLong(response, FIELD_XP_FOR_NEXT_LEVEL_BEFORE),
+            currentStreak = requireInt(response, FIELD_CURRENT_STREAK),
+            counts = parseCounts(requireMap(response[FIELD_COUNTS], FIELD_COUNTS)),
+            rates = parseRates(requireMap(response[FIELD_RATES], FIELD_RATES)),
         )
     }
 
@@ -153,6 +161,10 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val FIELD_XP_INTO_CURRENT_LEVEL = "xpIntoCurrentLevel"
         const val FIELD_XP_FOR_NEXT_LEVEL = "xpForNextLevel"
         const val FIELD_LEVELS_CROSSED = "levelsCrossed"
+        const val FIELD_LEVEL_BEFORE = "levelBefore"
+        const val FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore"
+        const val FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore"
+        const val FIELD_CURRENT_STREAK = "currentStreak"
         const val FIELD_COUNTS = "counts"
         const val FIELD_RATES = "rates"
         const val FIELD_NEW_CARDS = "newCards"
@@ -186,6 +198,9 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val FIELD_CATEGORY_NAME = "categoryName"
         const val FIELD_SUBCATEGORY_IDS = "subcategoryIds"
         const val FIELD_SUBCATEGORY_NAMES = "subcategoryNames"
+        const val FIELD_SOURCE_TYPE = "sourceType"
+        const val FIELD_VOICE_ANSWERING = "voiceAnswering"
+        const val FIELD_READ_ALOUD = "readAloud"
         const val FIELD_CARD_RESULTS = "cardResults"
         const val FIELD_CARD_ID = "cardId"
         const val FIELD_CARD_SUBCATEGORY_ID = "subcategoryId"

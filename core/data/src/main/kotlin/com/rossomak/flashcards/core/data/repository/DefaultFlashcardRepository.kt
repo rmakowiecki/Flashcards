@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.data.repository
 
 import com.rossomak.flashcards.core.common.logd
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.FlashcardDto
 import com.rossomak.flashcards.core.data.source.FlashcardReadSource
@@ -167,15 +168,40 @@ class DefaultFlashcardRepository @Inject constructor(
      * the server, just not new enough to trust as "current" for the *next* read — but the
      * Subcategory is left un-stamped, so that next read goes to the server again instead of
      * treating this stale response as belonging to the new generation.
+     *
+     * A failed server read, most often offline, falls back to the cache: cards from an earlier
+     * process or generation beat an error. They are returned without a stamp, so the next read
+     * tries the server again. An empty cache rethrows the server's failure.
      */
     private suspend fun readFromServer(subcategoryId: String): List<FlashcardDto> {
         val startGeneration = cacheGeneration.get()
-        val fromServer = remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server)
+        val fromServer = try {
+            remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Server)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            return readCacheAfterServerFailure(subcategoryId, serverFailure = exception)
+        }
         cacheMutex.withLock {
             if (cacheGeneration.get() == startGeneration) {
                 serverReadGenerations[subcategoryId] = startGeneration
             }
         }
         return fromServer
+    }
+
+    /** The caller sees [serverFailure], not a cache error, when the cache has nothing to offer. */
+    private suspend fun readCacheAfterServerFailure(subcategoryId: String, serverFailure: Exception): List<FlashcardDto> {
+        val cached = try {
+            remoteDataSource.getFlashcardsBySubcategoryId(subcategoryId, FlashcardReadSource.Cache)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            serverFailure.addSuppressed(exception)
+            emptyList()
+        }
+        if (cached.isEmpty()) throw serverFailure
+        logw(serverFailure) { "Server read of Subcategory $subcategoryId failed, serving ${cached.size} cached Flashcards" }
+        return cached
     }
 }

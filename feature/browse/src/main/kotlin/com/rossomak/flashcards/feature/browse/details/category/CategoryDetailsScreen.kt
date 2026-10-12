@@ -18,8 +18,8 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Deselect
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SelectAll
@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Resolved
@@ -100,7 +101,7 @@ fun CategoryDetailsScreen(
         categoryName: String,
         subcategoryIds: List<String>,
         subcategoryNames: List<String>,
-        isQuickSession: Boolean,
+        sourceType: SessionSourceType,
     ) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -127,7 +128,7 @@ fun CategoryDetailsScreen(
                 destination.categoryName,
                 destination.subcategoryIds,
                 destination.subcategoryNames,
-                destination.isQuickSession,
+                destination.sourceType,
             )
         }
     }
@@ -242,7 +243,7 @@ fun CategoryDetailsContent(
                 )
 
                 is Error -> FlashcardsEmptyState(
-                    icon = Icons.Filled.ErrorOutline,
+                    icon = Icons.Filled.CloudOff,
                     title = stringResource(CoreUiR.string.common_load_error_title),
                     supportingText = stringResource(content.messageRes),
                     tone = FlashcardsEmptyStateTone.Error,
@@ -288,6 +289,7 @@ private fun CategoryDetailsTopBar(
             selectedCardCount,
             selectedCardCount,
         )
+
         else -> stringResource(R.string.category_details_selection_subtitle_label)
     }
     Column {
@@ -477,7 +479,7 @@ private fun SubcategoryList(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.normal)
+            .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState)
     ) {

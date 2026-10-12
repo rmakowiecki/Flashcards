@@ -53,7 +53,7 @@ fun FlashcardsFilledButton(
         Modifier.background(
             brush = MaterialTheme.brandColors.ctaButtonGradient,
             shape = shape,
-            alpha = if (enabled) 1f else DISABLED_GRADIENT_ALPHA,
+            alpha = if (enabled) 1f else DISABLED_BUTTON_ALPHA,
         )
     }
 

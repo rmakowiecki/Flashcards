@@ -16,6 +16,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -25,6 +26,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconBu
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 import com.rossomak.flashcards.core.ui.theme.spacing
 import kotlin.math.roundToInt
 
@@ -69,22 +71,19 @@ internal fun Subcategory.searchResultCardsStudiedText(progress: SubcategoryProgr
 }
 
 /**
- * `"[glyph] · <cards> · <studied>"`, forced to one line, ellipsized on overflow — never a marquee;
- * that's the title's job, same reasoning as [CategoryDetailsRowSubtitle]. The glyph stands in for
- * the parent category name entirely (no "in Category" text, no separate label) — that's the whole
- * point of the glyph, reclaiming the line's space for [text]; [categoryName] only reaches a screen
- * reader via [FlashcardsInlineCategoryGlyph]'s contentDescription, never rendered visibly.
+ * `"[glyph] <cards> · <studied>"` on one line. The parent's glyph, in its color, stands in for its
+ * name, which only a screen reader hears.
  */
 @Composable
-private fun SearchResultSubtitle(iconSvg: String?, categoryName: String, text: AnnotatedString) {
+private fun SearchResultSubtitle(parentCategory: Category, text: AnnotatedString) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FlashcardsInlineCategoryGlyph(
-            iconSvg = iconSvg,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            contentDescription = categoryName,
+            iconSvg = parentCategory.iconSvg,
+            tint = rememberCategoryColor(hex = parentCategory.color, fallback = MaterialTheme.colorScheme.onSurfaceVariant),
+            contentDescription = parentCategory.name,
         )
         Text(
             text = text,
@@ -96,17 +95,13 @@ private fun SearchResultSubtitle(iconSvg: String?, categoryName: String, text: A
     }
 }
 
-/**
- * One matched Subcategory in the search results: progress ring, name, `[glyph] · <cards> · <studied>`
- * subtitle, a play button that starts a session, and a chevron. [modifier] is the pre-shaped row
- * modifier handed out by `FlashcardsListGroup`'s builder.
- */
+/** One matched Subcategory: progress ring, name, [SearchResultSubtitle], play button and chevron. */
 @Composable
 internal fun SubcategorySearchResultRow(
     modifier: Modifier,
     subcategory: Subcategory,
+    parentCategory: Category,
     progress: SubcategoryProgressState,
-    iconSvg: String?,
     isFavorited: Boolean,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
@@ -122,7 +117,7 @@ internal fun SubcategorySearchResultRow(
         modifier = modifier,
         title = subcategory.name,
         secondaryContent = {
-            SearchResultSubtitle(iconSvg = iconSvg, categoryName = subcategory.categoryName, text = cardsStudiedText)
+            SearchResultSubtitle(parentCategory = parentCategory, text = cardsStudiedText)
         },
         onClick = { onSubcategoryClick(subcategory) },
         isFavorited = isFavorited,

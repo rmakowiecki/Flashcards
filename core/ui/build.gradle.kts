@@ -23,10 +23,12 @@ dependencies {
     api(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.syntaxmp)
     implementation(libs.androidsvg)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.compose.shimmer)
     // Annotation only on the main compile classpath so components can carry
     // @ShowkaseComposable; SOURCE-retained, so no release-runtime cost. The processor and
     // browser UI stay debug-only.

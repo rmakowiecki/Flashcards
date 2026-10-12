@@ -8,6 +8,7 @@ package com.rossomak.flashcards.core.ui.composables.lists
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
@@ -45,7 +46,8 @@ import kotlinx.collections.immutable.persistentListOf
 /**
  * The closed set of row kinds the sealed-model [FlashcardsListGroup] and [flashcardsListGroupItems]
  * overloads can render — one variant per dedicated row composable ([FlashcardsListRow],
- * [FlashcardsDetailedListRow], [FlashcardsSelectableListRow], [FlashcardsExpandableListRow]).
+ * [FlashcardsDetailedListRow], [FlashcardsSelectableListRow], [FlashcardsExpandableListRow],
+ * [FlashcardsListContentRow]).
  *
  * **Short static lists only** (settings sections, debug menus, showcases). Items are data classes
  * holding lambdas, and call sites build them outside a composable scope, where the Compose compiler
@@ -104,6 +106,18 @@ sealed interface FlashcardsListGroupItem {
         override val key: Any? = null,
     ) : FlashcardsListGroupItem
 
+    /**
+     * Renders as [FlashcardsListContentRow]: the shared row frame around whatever [content] the
+     * caller composes, for a row whose look no other variant covers. A `null` [onClick] makes it
+     * inert.
+     */
+    data class Custom(
+        val onClick: (() -> Unit)?,
+        val content: @Composable RowScope.() -> Unit,
+        val enabled: Boolean = true,
+        override val key: Any? = null,
+    ) : FlashcardsListGroupItem
+
     /** Renders as [FlashcardsSelectableListRow]. */
     data class Selectable(
         val title: String,
@@ -150,6 +164,12 @@ private fun FlashcardsListGroupRow(item: FlashcardsListGroupItem, modifier: Modi
             isFavorited = item.isFavorited,
             leading = item.leading,
             trailing = item.trailing,
+        )
+        is FlashcardsListGroupItem.Custom -> FlashcardsListContentRow(
+            modifier = modifier,
+            onClick = item.onClick,
+            enabled = item.enabled,
+            content = item.content,
         )
         is FlashcardsListGroupItem.DetailedRow -> FlashcardsDetailedListRow(
             modifier = modifier,

@@ -26,7 +26,6 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -249,8 +248,7 @@ private fun MockScreenContent(modifier: Modifier = Modifier) {
     Column(modifier = modifier.padding(MaterialTheme.spacing.normal)) {
         Text(
             text = "Android · Compose",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
         )
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
         repeat(MOCK_SCREEN_CONTENT_ROW_COUNT) { index ->

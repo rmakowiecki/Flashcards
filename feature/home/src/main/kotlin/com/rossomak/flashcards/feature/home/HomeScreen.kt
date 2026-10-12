@@ -1,66 +1,65 @@
 package com.rossomak.flashcards.feature.home
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.rossomak.flashcards.core.domain.model.Category
-import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteCategory
-import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
+import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
-import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
-import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
+import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
+import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
+import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
-import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
+import com.rossomak.flashcards.feature.home.HomeBody.LoadError
+import com.rossomak.flashcards.feature.home.HomeBody.Resolving
+import com.rossomak.flashcards.feature.home.HomeBody.Sections
 import com.rossomak.flashcards.feature.home.HomeDestination.CategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.QuickSessionPreviewStudySession
+import com.rossomak.flashcards.feature.home.HomeDestination.RecentPreviewStudySession
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryDetails
 import com.rossomak.flashcards.feature.home.HomeDestination.SubcategoryPreviewStudySession
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Content
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Empty
-import com.rossomak.flashcards.feature.home.HomeFavoritesState.Loading
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Carousel
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Hint
+import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Omitted as FavoritesOmitted
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
+import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
 import java.time.Instant
+import java.time.ZoneId
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -80,8 +79,30 @@ fun HomeScreen(
         subcategoryName: String,
     ) -> Unit,
     onNavigateToPreviewQuickSession: (categoryId: String, categoryName: String) -> Unit,
+    onNavigateToPreviewRecentSession: (
+        categoryId: String,
+        categoryName: String,
+        sourceType: SessionSourceType,
+        subcategoryIds: List<String>,
+        subcategoryNames: List<String>,
+        studyMode: StudyMode,
+        voiceAnsweringEnabled: Boolean?,
+        readAloudEnabled: Boolean?,
+    ) -> Unit,
+    onNavigateToBrowse: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // Ticks only while Home is STARTED and refreshes at once on every start. Held as State, not read with `by`, so
+    // only the Recent rows that read it recompose per tick.
+    val nowState = produceState(initialValue = Instant.now(), lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = Instant.now()
+                delay(1.minutes)
+            }
+        }
+    }
 
     observeAsEvents(viewModel.events) { destination ->
         with(destination) {
@@ -109,6 +130,17 @@ fun HomeScreen(
                     categoryId,
                     categoryName,
                 )
+
+                is RecentPreviewStudySession -> onNavigateToPreviewRecentSession(
+                    categoryId,
+                    categoryName,
+                    sourceType,
+                    subcategoryIds,
+                    subcategoryNames,
+                    studyMode,
+                    voiceAnsweringEnabled,
+                    readAloudEnabled,
+                )
             }
         }
     }
@@ -116,283 +148,173 @@ fun HomeScreen(
     HomeContent(
         modifier = modifier,
         state = state,
+        now = { nowState.value },
         onCategoryClick = viewModel::onFavoriteCategorySelect,
         onCategoryQuickSessionClick = viewModel::onFavoriteCategoryQuickSessionStart,
         onSubcategoryClick = viewModel::onFavoriteSubcategorySelect,
         onSubcategoryPlayClick = viewModel::onFavoriteSubcategorySessionStart,
+        onRecentClick = viewModel::onRecentSelect,
+        onFavoritesHintHide = viewModel::onFavoritesHintHide,
+        onBrowseClick = onNavigateToBrowse,
+        onRetry = viewModel::onRetry,
     )
 }
 
+/**
+ * Renders the Level card, then [HomeScreenState.body], in one scrolling column, so what shows below the card is
+ * decided in one place.
+ *
+ * @param now provider of what Recents' start times are worded against, read only where a Recent's start time is
+ * worded so a tick recomposes just those rows.
+ */
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
-private fun HomeContent(
+internal fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeScreenState,
+    now: () -> Instant,
+    zoneId: ZoneId = ZoneId.systemDefault(),
     onCategoryClick: (Category) -> Unit,
     onCategoryQuickSessionClick: (Category) -> Unit,
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategoryPlayClick: (Subcategory) -> Unit,
+    onRecentClick: (RecentItem) -> Unit,
+    onFavoritesHintHide: () -> Unit,
+    onBrowseClick: () -> Unit,
+    onRetry: () -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        HomeTopBar()
-        UserGreetingSection(userName = "Ross")
-        when (val favorites = state.favorites) {
-            Loading -> Unit
-            Empty -> HomeEmptyState(modifier = Modifier.weight(1f))
-            is Content -> FavoritesCarousel(
+    // No top app bar: MainScreen leaves each tab root to pad for the status bar itself.
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+    ) {
+        val scrollState = rememberScrollState()
+        // verticalScroll gives its content an unbounded max height, so the column takes the viewport as its
+        // minimum height instead: with no max to fill, a Column hands its weighted children the space up to its
+        // minimum, so a weight(1f) area fills what the card leaves and grows (and the screen scrolls) when its
+        // content is taller.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .flashcardsScrollFade(scrollState)
+                .verticalScroll(scrollState)
+                .heightIn(min = maxHeight),
+        ) {
+            // The gutter and the space above belong to the card; the space below is the next section's overline
+            // label's own top padding.
+            FlashcardsLevelCard(
+                state = state.levelCard,
+                modifier = Modifier.padding(
+                    start = MaterialTheme.spacing.normal,
+                    top = MaterialTheme.spacing.normal,
+                    end = MaterialTheme.spacing.normal,
+                ),
+            )
+            when (val body = state.body) {
+                Resolving -> Unit
+
+                FirstSession -> CenteredBelowCard {
+                    FlashcardsEmptyState(
+                        icon = Icons.AutoMirrored.Filled.MenuBook,
+                        title = stringResource(R.string.home_empty_title),
+                        supportingText = stringResource(R.string.home_empty_message),
+                        button = {
+                            FlashcardsFilledButton(text = stringResource(R.string.home_empty_start_button), onClick = onBrowseClick)
+                        },
+                    )
+                }
+
+                LoadError -> CenteredBelowCard {
+                    FlashcardsEmptyState(
+                        icon = Icons.Filled.CloudOff,
+                        title = stringResource(R.string.home_error_title),
+                        supportingText = stringResource(R.string.home_error_message),
+                        tone = FlashcardsEmptyStateTone.Error,
+                        button = {
+                            FlashcardsFilledButton(
+                                text = stringResource(CoreUiR.string.common_retry_button),
+                                onClick = onRetry,
+                                icon = Icons.Filled.Refresh,
+                            )
+                        },
+                    )
+                }
+
+                is Sections -> HomeSections(
+                    sections = body,
+                    progressSummary = state.progressSummary,
+                    isProgressResolved = state.isProgressResolved,
+                    now = now,
+                    zoneId = zoneId,
+                    onCategoryClick = onCategoryClick,
+                    onCategoryQuickSessionClick = onCategoryQuickSessionClick,
+                    onSubcategoryClick = onSubcategoryClick,
+                    onSubcategoryPlayClick = onSubcategoryPlayClick,
+                    onRecentClick = onRecentClick,
+                    onFavoritesHintHide = onFavoritesHintHide,
+                )
+            }
+        }
+    }
+}
+
+/** Centers [content] in the viewport space the Level card leaves; see [HomeContent] for why a weight fills it. */
+@Composable
+private fun ColumnScope.CenteredBelowCard(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+@Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
+@Composable
+private fun HomeSections(
+    sections: Sections,
+    progressSummary: ProgressSummary?,
+    isProgressResolved: Boolean,
+    now: () -> Instant,
+    zoneId: ZoneId,
+    onCategoryClick: (Category) -> Unit,
+    onCategoryQuickSessionClick: (Category) -> Unit,
+    onSubcategoryClick: (Subcategory) -> Unit,
+    onSubcategoryPlayClick: (Subcategory) -> Unit,
+    onRecentClick: (RecentItem) -> Unit,
+    onFavoritesHintHide: () -> Unit,
+) {
+    Column {
+        when (val favorites = sections.favorites) {
+            is Carousel -> FavoritesCarousel(
                 items = favorites.items,
-                progressSummary = state.progressSummary,
-                isProgressResolved = state.isProgressResolved,
+                progressSummary = progressSummary,
+                isProgressResolved = isProgressResolved,
                 onCategoryClick = onCategoryClick,
                 onCategoryQuickSessionClick = onCategoryQuickSessionClick,
                 onSubcategoryClick = onSubcategoryClick,
                 onSubcategoryPlayClick = onSubcategoryPlayClick,
             )
+
+            Hint -> FavoritesHint(onHide = onFavoritesHintHide)
+
+            FavoritesOmitted -> Unit
+        }
+        when (val recents = sections.recents) {
+            is Rows -> RecentSessionsSection(
+                items = recents.items,
+                now = now,
+                zoneId = zoneId,
+                onRecentClick = onRecentClick,
+                modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal),
+            )
+
+            Placeholder -> RecentsPlaceholder(modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal))
+
+            RecentsOmitted -> Unit
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeTopBar() {
-    Box(modifier = Modifier.fillMaxWidth().background(MaterialTheme.brandColors.topBarGradient)) {
-        CenterAlignedTopAppBar(
-            title = {
-                Icon(
-                    painter = painterResource(R.drawable.flashcards_white),
-                    contentDescription = "Flashcards",
-                    tint = Color.Unspecified,
-                    modifier = Modifier.height(64.dp),
-                )
-            },
-            actions = {
-                BadgedBox(
-                    badge = {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(MaterialTheme.colorScheme.tertiary, CircleShape),
-                        )
-                    },
-                ) {
-                    IconButton(onClick = {}) {
-                        Icon(
-                            imageVector = Icons.Filled.Notifications,
-                            contentDescription = "Notifications",
-                            modifier = Modifier.size(26.dp),
-                        )
-                    }
-                }
-            },
-            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                containerColor = Color.Transparent,
-                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun UserGreetingSection(userName: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                .padding(12.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = userName.first().uppercase(),
-                style = MaterialTheme.typography.titleLarge.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-        }
-        Column {
-            Text(
-                text = "Good morning,",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
-            Text(
-                text = "$userName 👋",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeEmptyState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        EmptyStateIllustration()
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = "Ready to start learning?",
-            style = MaterialTheme.typography.titleLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-            ),
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Pick a category and run your first study session — your recents and favorites will appear here.",
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = {},
-            shape = RoundedCornerShape(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                contentDescription = null,
-                modifier = Modifier
-                    .padding(end = 8.dp)
-                    .size(20.dp),
-            )
-            Text(
-                text = "Start your first session",
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyStateIllustration() {
-    Box(
-        modifier = Modifier
-            .size(160.dp)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                shape = RoundedCornerShape(80.dp),
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 90.dp, height = 72.dp)
-                .offset(x = (-18).dp, y = 10.dp)
-                .rotate(-15f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary),
-        )
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .offset(x = 12.dp, y = (-6).dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(36.dp),
-            )
-        }
-    }
-}
-
-private val previewCategory = Category(
-    id = "android",
-    name = "Android",
-    order = 0,
-    subcategoryCount = 14,
-    iconSvg = null,
-    color = "#2B6AA5",
-    featuredSubcategoryNames = emptyList(),
-)
-private val previewSubcategory = Subcategory(
-    id = "compose",
-    name = "Compose",
-    categoryId = previewCategory.id,
-    categoryName = previewCategory.name,
-    order = 0,
-    cardCount = 30,
-)
-
-@Composable
-private fun HomeContentPreviewHost(state: HomeScreenState) {
-    FlashcardsTheme {
-        HomeContent(
-            state = state,
-            onCategoryClick = {},
-            onCategoryQuickSessionClick = {},
-            onSubcategoryClick = {},
-            onSubcategoryPlayClick = {},
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentLoadingPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = Loading))
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentEmptyPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = Empty))
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentFavoritesPreview() {
-    val favoritedAt = Instant.parse("2026-05-05T10:00:00Z")
-    HomeContentPreviewHost(
-        state = HomeScreenState(
-            favorites = Content(
-                listOf(
-                    FavoriteSubcategory(previewSubcategory, previewCategory, favoritedAt),
-                    FavoriteCategory(previewCategory, favoritedAt),
-                ),
-            ),
-            progressSummary = ProgressSummary(
-                subcategories = mapOf(previewSubcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
-            ),
-            isProgressResolved = true,
-        ),
-    )
 }

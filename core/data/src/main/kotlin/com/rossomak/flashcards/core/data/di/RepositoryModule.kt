@@ -1,13 +1,14 @@
 package com.rossomak.flashcards.core.data.di
 
-import com.rossomak.flashcards.core.data.network.DefaultNetworkAvailability
-import com.rossomak.flashcards.core.data.network.NetworkAvailability
+import com.rossomak.flashcards.core.data.network.DefaultNetworkAvailabilityGateway
 import com.rossomak.flashcards.core.data.repository.DefaultAppShortcutsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCurationRepository
 import com.rossomak.flashcards.core.data.repository.DefaultFlashcardRepository
+import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultOnboardingSubcategoriesRepository
+import com.rossomak.flashcards.core.data.repository.DefaultRecentSessionsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultScoringStateRepository
 import com.rossomak.flashcards.core.data.repository.DefaultSessionSubmissionRepository
 import com.rossomak.flashcards.core.data.repository.DefaultUserFavoritesRepository
@@ -20,8 +21,10 @@ import com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLoca
 import com.rossomak.flashcards.core.data.source.FirebaseAuthRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirestoreCurationRemoteDataSource
+import com.rossomak.flashcards.core.data.source.FirestoreRecentsRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirestoreUserFavoritesRemoteDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.data.source.RecentsRemoteDataSource
 import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource
 import com.rossomak.flashcards.core.data.source.UserFavoritesRemoteDataSource
 import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
@@ -29,7 +32,10 @@ import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.LevelProgressRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.OnboardingSubcategoriesRepository
+import com.rossomak.flashcards.core.domain.repository.RecentSessionsRepository
 import com.rossomak.flashcards.core.domain.repository.ScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository
 import com.rossomak.flashcards.core.domain.repository.UserFavoritesRepository
@@ -42,6 +48,7 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
+@Suppress("TooManyFunctions") // one binding per repository and data source.
 abstract class RepositoryModule {
 
     @Binds
@@ -78,6 +85,14 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
+    abstract fun bindRecentSessionsRepository(defaultRecentSessionsRepository: DefaultRecentSessionsRepository): RecentSessionsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecentsRemoteDataSource(impl: FirestoreRecentsRemoteDataSource): RecentsRemoteDataSource
+
+    @Binds
+    @Singleton
     abstract fun bindSessionSubmissionRepository(defaultSessionSubmissionRepository: DefaultSessionSubmissionRepository): SessionSubmissionRepository
 
     @Binds
@@ -85,7 +100,7 @@ abstract class RepositoryModule {
     abstract fun bindSessionSubmissionRemoteDataSource(firebaseSessionSubmissionRemoteDataSource: FirebaseSessionSubmissionRemoteDataSource): SessionSubmissionRemoteDataSource
 
     @Binds
-    abstract fun bindNetworkAvailability(defaultNetworkAvailability: DefaultNetworkAvailability): NetworkAvailability
+    abstract fun bindNetworkAvailabilityGateway(defaultNetworkAvailabilityGateway: DefaultNetworkAvailabilityGateway): NetworkAvailabilityGateway
 
     @Binds
     @Singleton
@@ -110,6 +125,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindScoringStateRepository(defaultScoringStateRepository: DefaultScoringStateRepository): ScoringStateRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindLevelProgressRepository(defaultLevelProgressRepository: DefaultLevelProgressRepository): LevelProgressRepository
 
     @Binds
     @Singleton

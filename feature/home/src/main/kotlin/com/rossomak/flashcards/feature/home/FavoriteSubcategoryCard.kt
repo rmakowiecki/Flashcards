@@ -15,14 +15,12 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.Category
@@ -34,9 +32,9 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconB
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsLinearProgressBar
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.ui.theme.toCategoryColorOrNull
 import kotlin.math.roundToInt
 
 private const val PERCENT_SCALE = 100
@@ -58,8 +56,7 @@ internal fun FavoriteSubcategoryCard(
     onPlayClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val parentColor = remember(parentCategory.color) { parentCategory.color.toCategoryColorOrNull() }
-        ?: MaterialTheme.colorScheme.primary
+    val parentColor = rememberCategoryColor(hex = parentCategory.color, fallback = MaterialTheme.colorScheme.primary)
     val playButtonSize = MaterialTheme.sizes.buttonHeightSmall
 
     FavoriteCardContainer(modifier = modifier) {
@@ -80,15 +77,13 @@ internal fun FavoriteSubcategoryCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = subcategory.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmallEmphasized,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = parentCategory.name,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMediumEmphasized,
                         color = parentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

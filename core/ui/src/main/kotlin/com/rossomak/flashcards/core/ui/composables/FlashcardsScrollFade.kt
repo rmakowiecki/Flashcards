@@ -160,15 +160,21 @@ fun Modifier.flashcardsListScrollFade(
  * own content column, which scrolls internally when a card's question/answer text overflows its max
  * height. Same solid-color paint-over technique as [flashcardsListScrollFade]: pass the color the
  * scrollable content actually sits on (its own container's background), not the screen background.
+ *
+ * [fadeTop]/[fadeBottom] switch an edge off entirely — e.g. a column whose own top bar scrolls with
+ * the content, where a top fade would paint a strip of [backgroundColor] over that bar before it
+ * has scrolled away.
  */
 @Composable
 fun Modifier.flashcardsScrollFade(
     scrollState: ScrollState,
     fadeHeight: Dp = FlashcardsScrollFadeHeight,
     backgroundColor: Color = MaterialTheme.colorScheme.background,
+    fadeTop: Boolean = true,
+    fadeBottom: Boolean = true,
 ): Modifier {
-    val canFadeTop by remember(scrollState) { derivedStateOf { scrollState.canScrollBackward } }
-    val canFadeBottom by remember(scrollState) { derivedStateOf { scrollState.canScrollForward } }
+    val canFadeTop by remember(scrollState, fadeTop) { derivedStateOf { fadeTop && scrollState.canScrollBackward } }
+    val canFadeBottom by remember(scrollState, fadeBottom) { derivedStateOf { fadeBottom && scrollState.canScrollForward } }
     return edgeScrollFade(
         fadeHeight = fadeHeight,
         reveal = FlashcardsFadeReveal.Solid(backgroundColor),

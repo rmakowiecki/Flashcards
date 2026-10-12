@@ -7,7 +7,6 @@ import com.rossomak.flashcards.core.data.mapper.toDto
 import com.rossomak.flashcards.core.data.model.DeliveredSessionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
-import com.rossomak.flashcards.core.data.network.NetworkAvailability
 import com.rossomak.flashcards.core.data.source.FakePendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
 import com.rossomak.flashcards.core.data.worker.SessionDeliveryReport
@@ -16,12 +15,17 @@ import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
+import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -49,7 +53,7 @@ class DefaultSessionSubmissionRepositoryTest {
     private fun createRepository(
         pendingLocalDataSource: PendingSessionSubmissionLocalDataSource = localDataSource,
     ): DefaultSessionSubmissionRepository =
-        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, NetworkAvailability { internetAvailable })
+        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, NetworkAvailabilityGateway { internetAvailable })
 
     @Before
     fun setUp() {
@@ -66,6 +70,7 @@ class DefaultSessionSubmissionRepositoryTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = listOf(
             FlashcardResult.Rated(
                 cardId = "card-1",
@@ -78,6 +83,7 @@ class DefaultSessionSubmissionRepositoryTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     @Test
@@ -139,21 +145,21 @@ class DefaultSessionSubmissionRepositoryTest {
     }
 
     @Test
-    fun `with nobody signed in submitSession emits NotDelivered without queuing or scheduling`() = runTest {
+    fun `with nobody signed in submitSession emits NotQueued without queuing or scheduling`() = runTest {
         authRepository.userToReturn = null
 
         val statuses = createRepository().submitSession(sessionResult()).toList()
 
-        statuses shouldBe listOf(NotDelivered)
+        statuses shouldBe listOf(NotQueued)
         localDataSource.listAll() shouldBe emptyList()
         verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
     @Test
-    fun `a local append failure is logged and emits NotDelivered, never thrown`() = runTest {
+    fun `a local append failure is logged and emits NotQueued, never thrown`() = runTest {
         val statuses = createRepository(ThrowingPendingSessionSubmissionLocalDataSource()).submitSession(sessionResult()).toList()
 
-        statuses shouldBe listOf(NotDelivered)
+        statuses shouldBe listOf(NotQueued)
         verify(exactly = 0) { drainScheduler.scheduleDrainForFinishedSession() }
     }
 
@@ -185,8 +191,20 @@ class DefaultSessionSubmissionRepositoryTest {
             xpIntoCurrentLevel = 360,
             xpForNextLevel = 1000,
             levelsCrossed = emptyList(),
-            counts = null,
-            rates = null,
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 0,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 1,
+            counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
+            rates = SessionScoreRates(
+                newCardStudied = 10,
+                cardMastered = 100,
+                cardPartial = 25,
+                masteryDefended = 50,
+                cardDemastered = -80,
+                minuteStudied = 10,
+                sessionCompleted = 500,
+            ),
         )
 
         fun workInfo(
@@ -213,6 +231,8 @@ private class ThrowingPendingSessionSubmissionLocalDataSource : PendingSessionSu
 
     override suspend fun remove(sessionId: String) = Unit
 
+    override suspend fun removeAllForUser(uid: String) = Unit
+
     override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flowOf(emptyList())
 }
 
@@ -224,6 +244,8 @@ private class CancellingPendingSessionSubmissionLocalDataSource : PendingSession
     override suspend fun listAll(): List<PendingSessionSubmissionDto> = emptyList()
 
     override suspend fun remove(sessionId: String) = Unit
+
+    override suspend fun removeAllForUser(uid: String) = Unit
 
     override fun observeAll(): Flow<List<PendingSessionSubmissionDto>> = flowOf(emptyList())
 }

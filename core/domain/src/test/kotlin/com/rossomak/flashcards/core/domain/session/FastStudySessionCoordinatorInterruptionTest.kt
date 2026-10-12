@@ -10,6 +10,7 @@ import com.rossomak.flashcards.core.domain.model.FastSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FocusChange
 import com.rossomak.flashcards.core.domain.model.InterruptionEpisode
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
@@ -59,6 +60,7 @@ class FastStudySessionCoordinatorInterruptionTest {
         sessionTitle = "Compose",
         voiceSettings = VoiceSettings(speechRate = 1f),
         readAloudEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private fun flashcard(id: String): Flashcard = Flashcard(

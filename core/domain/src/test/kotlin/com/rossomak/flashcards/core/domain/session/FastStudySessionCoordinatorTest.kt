@@ -7,6 +7,8 @@ import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
@@ -21,6 +23,7 @@ import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressDetailsUseCase
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
@@ -57,6 +60,7 @@ class FastStudySessionCoordinatorTest {
         sessionTitle = "Compose",
         voiceSettings = VoiceSettings(speechRate = SPEECH_RATE),
         readAloudEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private val events = mutableListOf<FastSessionEvent>()
@@ -595,16 +599,96 @@ class FastStudySessionCoordinatorTest {
     }
 
     @Test
-    fun `leaving before the cards load seals an empty abandoned result with zero duration`() = runTest {
+    fun `a card load that fails after leaving reports no load failure`() = runTest {
+        flashcardRepository.flashcardsBySubcategory[SUBCATEGORY_ID] = Result.failure(IllegalStateException("offline"))
         val coordinator = startCoordinator(runsLoad = false)
 
         coordinator.end(abandoned = true)
         runCurrent()
 
-        val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result
-        result.abandoned shouldBe true
-        result.cardResults shouldBe emptyList()
-        result.durationSeconds shouldBe 0
+        coordinator.sessionState.value shouldBe FastSessionStateSnapshot.Loading
+    }
+
+    @Test
+    fun `leaving after a failed card load sends no event, since the screen is already returning to Preview`() = runTest {
+        flashcardRepository.flashcardsBySubcategory[SUBCATEGORY_ID] = Result.failure(IllegalStateException("offline"))
+        val coordinator = startCoordinator()
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe FastSessionStateSnapshot.LoadFailed
+        events.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a card load that finishes after leaving does not start the session`() = runTest {
+        val coordinator = startCoordinator(runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe FastSessionStateSnapshot.Loading
+    }
+
+    @Test
+    fun `leaving before the cards load discards the session`() = runTest {
+        val coordinator = startCoordinator(runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.SessionDiscarded>().shouldHaveSize(1)
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `leaving before any answer is revealed discards the session exactly once`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.end(abandoned = true)
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.SessionDiscarded>().shouldHaveSize(1)
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+        playbackGateway.stopCount shouldBe 1
+    }
+
+    @Test
+    fun `a completed session with no answer revealed is discarded`() = runTest {
+        val coordinator = startCoordinator()
+
+        coordinator.end(abandoned = false)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.SessionDiscarded>().shouldHaveSize(1)
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `leaving after one answer is revealed ends the session, not discards it`() = runTest {
+        val coordinator = startCoordinator()
+        reachAnswer()
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.cardResults.map { it.cardId } shouldBe listOf("card-1")
+        events.filterIsInstance<FastSessionEvent.SessionDiscarded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `the ended result carries the setup's source type and read-aloud setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Quick))
+        reachAnswer()
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<FastSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Fast>()
+        result.sourceType shouldBe Quick
+        result.readAloudEnabled shouldBe true
     }
 
     @Test

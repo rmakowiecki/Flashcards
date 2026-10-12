@@ -6,11 +6,15 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotDelivered
+import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Rejected
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
+import com.rossomak.flashcards.core.domain.model.SessionNotSavedException
 import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
+import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
 import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
@@ -61,10 +65,12 @@ class SubmitStudySessionUseCaseTest {
         categoryName = "Category",
         subcategoryIds = listOf(subcategoryId),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardResults,
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        voiceAnsweringEnabled = false,
     )
 
     private fun fastSessionResult(
@@ -79,10 +85,12 @@ class SubmitStudySessionUseCaseTest {
         categoryName = "Category",
         subcategoryIds = listOf(subcategoryId),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = SingleSubcategory,
         cardResults = cardResults,
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = 0,
+        readAloudEnabled = false,
     )
 
     private fun ratedEntry(
@@ -135,6 +143,17 @@ class SubmitStudySessionUseCaseTest {
         val result = createUseCase().invoke(session)
 
         result.getOrThrow().shouldBeInstanceOf<LocalPreview>()
+        currentTime shouldBe 0L
+    }
+
+    @Test
+    fun `NotQueued fails with SessionNotSavedException instead of a local preview`() = runTest {
+        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(NotQueued)
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        result.exceptionOrNull().shouldBeInstanceOf<SessionNotSavedException>()
         currentTime shouldBe 0L
     }
 
@@ -195,6 +214,36 @@ class SubmitStudySessionUseCaseTest {
     }
 
     @Test
+    fun `a re-submission whose session is already queued previews the same score as the first submission`() = runTest {
+        scoringStateRepository.resultToReturn = Result.success(ScoringState(xp = 40, xpIntoCurrentLevel = 40))
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+        val first = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+        scoringStateRepository.resultsIncludingQueuedSession = mapOf(
+            session.id to Result.success(ScoringState(xp = 40L + first.breakdown.xpTotal, xpIntoCurrentLevel = 40L + first.breakdown.xpTotal)),
+        )
+        cardProgressRepository.progressIncludingQueuedSession = mapOf(
+            session.id to SubcategoryProgressDetails(subcategoryId = "sub-1", categoryId = "cat-1", cards = mapOf("card-1" to priorEntry(FlashcardStudyProgressState.Mastered))),
+        )
+
+        val resubmitted = createUseCase().invokeAndCapturePreview(session).getOrThrow()
+
+        resubmitted shouldBe first
+        scoringStateRepository.excludedSessionIds shouldBe listOf(session.id, session.id)
+        cardProgressRepository.excludedSessionIds shouldBe listOf(session.id, session.id)
+    }
+
+    @Test
+    fun `a session already applied in the cached scoring state with no server score fails the preview`() = runTest {
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+        scoringStateRepository.appliedSessionIds = setOf(session.id)
+
+        val result = createUseCase().invoke(session)
+
+        result.isFailure shouldBe true
+        sessionSubmissionRepository.submittedSessionResults shouldBe listOf(session)
+    }
+
+    @Test
     fun `a failed baseline read does not fail a server-scored result`() = runTest {
         scoringStateRepository.resultToReturn = Result.failure(IllegalStateException("firestore down"))
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
@@ -219,7 +268,7 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session)
 
-        preview.getOrThrow().counts?.newCardsStudied shouldBe 1
+        preview.getOrThrow().counts.newCardsStudied shouldBe 1
     }
 
     @Test
@@ -233,6 +282,7 @@ class SubmitStudySessionUseCaseTest {
             categoryName = "Category",
             subcategoryIds = listOf("sub-1", "sub-2"),
             subcategoryNames = listOf("Subcategory 1", "Subcategory 2"),
+            sourceType = SingleSubcategory,
             cardResults = listOf(
                 ratedEntry(cardId = "card-1", subcategoryId = "sub-1", state = FlashcardStudyProgressState.Mastered),
                 ratedEntry(cardId = "card-2", subcategoryId = "sub-2", state = FlashcardStudyProgressState.Failed),
@@ -240,11 +290,12 @@ class SubmitStudySessionUseCaseTest {
             studyDate = "2026-09-08",
             dailyGoalMinutes = 20,
             studyDateUtcOffsetMinutes = 0,
+            voiceAnsweringEnabled = false,
         )
 
         val preview = createUseCase().invokeAndCapturePreview(session)
 
-        preview.getOrThrow().counts?.newCardsStudied shouldBe 2
+        preview.getOrThrow().counts.newCardsStudied shouldBe 2
     }
 
     @Test
@@ -253,7 +304,7 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session)
 
-        preview.getOrThrow().counts?.newCardsStudied shouldBe 1
+        preview.getOrThrow().counts.newCardsStudied shouldBe 1
     }
 
     @Test
@@ -312,7 +363,7 @@ class SubmitStudySessionUseCaseTest {
         val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
 
         preview.breakdown.mastered shouldBe CUSTOM_CONFIG.cardMastered
-        preview.rates?.cardMastered shouldBe CUSTOM_CONFIG.cardMastered
+        preview.rates.cardMastered shouldBe CUSTOM_CONFIG.cardMastered
     }
 
     @Test
@@ -334,8 +385,8 @@ class SubmitStudySessionUseCaseTest {
 
         val preview = createUseCase().invokeAndCapturePreview(session).getOrThrow()
 
-        preview.counts?.defended shouldBe 1
-        preview.counts?.newlyMastered shouldBe 0
+        preview.counts.defended shouldBe 1
+        preview.counts.newlyMastered shouldBe 0
         preview.breakdown.masteryDefenseBonus shouldBe XpConfig().masteryDefended
     }
 
@@ -356,8 +407,20 @@ class SubmitStudySessionUseCaseTest {
             xpIntoCurrentLevel = 40,
             xpForNextLevel = 6000,
             levelsCrossed = listOf(2),
+            levelBefore = 1,
+            xpIntoCurrentLevelBefore = 900,
+            xpForNextLevelBefore = 1000,
+            currentStreak = 1,
             counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
-            rates = null,
+            rates = SessionScoreRates(
+                newCardStudied = 10,
+                cardMastered = 100,
+                cardPartial = 25,
+                masteryDefended = 50,
+                cardDemastered = -80,
+                minuteStudied = 10,
+                sessionCompleted = 500,
+            ),
         )
     }
 }

@@ -57,16 +57,16 @@ import kotlinx.serialization.json.Json
  * appends anyway, so a queue with an unreadable *backlog* still accepts new sessions (at worst as a
  * duplicate, which delivery handles idempotently); only draining/reading the backlog is affected.
  * [remove] has to drop one line out of the middle, so it still reads every entry, filters, and rewrites
- * the whole file. [writeAll] (used by [remove], and by nothing else) writes to a sibling temp file
+ * the whole file. [writeAll] (used by [remove] and [removeAllForUser]) writes to a sibling temp file
  * first, then atomically renames it over [file]: a process death mid-write leaves either the old
  * complete file or the new complete file on disk, never a half-written one. A process death mid-[append]
  * can leave a torn trailing line — [readAll]'s per-line skip handles that the same way it handles any
  * other corrupted line.
  *
  * **Observing**: [observeAll] serves [entries], an in-memory copy of the queue loaded from [file] once,
- * on the first [observeAll] collection, and replaced inside [mutex] by every [append], [listAll] and
- * [remove], so observers see each change without polling the file. A load that fails is not kept:
- * that collection sees an empty queue, and the next collection reads the file again.
+ * on the first [observeAll] collection, and replaced inside [mutex] by every [append], [listAll],
+ * [remove] and [removeAllForUser], so observers see each change without polling the file. A load that
+ * fails is not kept: that collection sees an empty queue, and the next collection reads the file again.
  *
  * **App-start recovery**: this class has no init-time logic of its own.
  * [com.rossomak.flashcards.core.data.SignedInWorkRunner] re-enqueues the drain worker whenever a User
@@ -165,6 +165,19 @@ class FilePendingSessionSubmissionLocalDataSource @Inject constructor(
             if (entries.value != null) entries.value = updated
             logd { "Removed session $sessionId from queue file, ${updated.size} entries remain" }
             Unit
+        }
+    }
+
+    /** Like [remove], a whole-file [IOException] propagates and leaves [file] untouched. */
+    override suspend fun removeAllForUser(uid: String) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val queued = readAll()
+            val remaining = queued.filterNot { it.uid == uid }
+            if (remaining.size != queued.size) {
+                writeAll(remaining)
+                if (entries.value != null) entries.value = remaining
+                logd { "Removed ${queued.size - remaining.size} queued sessions of a deleted account, ${remaining.size} entries remain" }
+            }
         }
     }
 

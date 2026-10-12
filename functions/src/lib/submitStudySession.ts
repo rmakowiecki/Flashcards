@@ -1,7 +1,17 @@
-import * as admin from "firebase-admin";
+import { Auth } from "firebase-admin/auth";
+import { FieldValue, Firestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
-import { HttpsError } from "firebase-functions/v2/https";
+import { CallableRequest, HttpsError } from "firebase-functions/v2/https";
+import { requireActiveSession } from "./authGuard";
 import { CardProgressUpdate, CardState, StudyMode, mergeSessionIntoCardProgress } from "./cardProgressMerge";
+import {
+  fail,
+  requireBoolean,
+  requireFiniteNumber,
+  requireFiniteNumberInRange,
+  requireNonEmptyString,
+  requireStringArray,
+} from "./requestValidation";
 import { loadXpConfig } from "./xpConfig";
 import {
   DEFAULT_SCORING_STATE,
@@ -14,7 +24,7 @@ import {
 } from "./xpScoring";
 
 /**
- * The sole writer of a session's XP, level and progress. Everything this function decides
+ * The sole writer of a session's XP, level, progress and Recents entry. Everything this function decides
  * lands in one Firestore transaction, keyed for idempotency on the client-generated `sessionId`: a
  * retry of an already-processed session is a no-op that returns the same result again, never a
  * second award. See `submitStudySession`'s own doc comment for the transaction's shape.
@@ -37,6 +47,9 @@ const PROGRESS_DETAILS_DOCUMENT = "details";
 const PROGRESS_SUBCATEGORIES_COLLECTION = "subcategories";
 const PROGRESS_SUMMARY_DOCUMENT = "summary";
 const PROGRESS_USER_STATS_DOCUMENT = "user-stats";
+// `recents/state` has no Kotlin writer to mirror: this function is its only writer from the start.
+const RECENTS_COLLECTION = "recents";
+const RECENTS_STATE_DOCUMENT = "state";
 
 // `sessions/{sessionId}` document fields — mirrors StudySessionRemoteDataSource.kt's own FIELD_* names.
 const FIELD_SESSION_ID = "sessionId";
@@ -58,6 +71,10 @@ const FIELD_CARDS_DEMASTERED = "cardsDemastered";
 const FIELD_CARD_SUBCATEGORY_ID = "subcategoryId";
 const FIELD_ATTEMPTS_USED = "attemptsUsed";
 const FIELD_WAS_PREVIOUSLY_MASTERED = "wasPreviouslyMastered";
+const FIELD_SOURCE_TYPE = "sourceType";
+// Rated-only and Fast-only respectively: each is absent from the other mode's session document.
+const FIELD_VOICE_ANSWERING = "voiceAnswering";
+const FIELD_READ_ALOUD = "readAloud";
 
 // A `sessions/{sessionId}` document field only, no longer a trusted request-body field: the
 // "today's total minutes" query below filters the session collection on this same name, but the
@@ -71,8 +88,15 @@ const FIELD_LEVELS_CROSSED = "levelsCrossed";
 const FIELD_LEVEL_AFTER = "levelAfter";
 const FIELD_XP_INTO_CURRENT_LEVEL_AFTER = "xpIntoCurrentLevelAfter";
 const FIELD_XP_FOR_NEXT_LEVEL_AFTER = "xpForNextLevelAfter";
+// The account's Level position right before this session, so the Summary can fill the Level bar from
+// where the User stood and animate any Level-up.
+const FIELD_LEVEL_BEFORE = "levelBefore";
+const FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore";
+const FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore";
+// The account's Streak right after this session.
+const FIELD_CURRENT_STREAK_AFTER = "currentStreakAfter";
 // The per-line XP rates this session was scored with, so a retried call answers with the same rates
-// even after the admin-edited XP configuration has changed. Absent on documents written before it.
+// even after the admin-edited XP configuration has changed.
 const FIELD_XP_RATES = "xpRates";
 
 // Shared between a card's stored result fields and a card's stored progress fields.
@@ -97,6 +121,12 @@ const FIELD_BEST_STREAK = "bestStreak";
 const FIELD_LAST_STUDY_DATE = "lastStudyDate";
 const FIELD_GOAL_MET_DATE = "goalMetDate";
 const FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE = "studiedSecondsOnLastStudyDate";
+// The ids of the latest sessions applied to `user-stats`, oldest first. Kept out of ScoringState: the
+// device reads it only to tell which of its Pending Sessions this document already includes.
+const FIELD_APPLIED_SESSION_IDS = "appliedSessionIds";
+
+// How many applied session ids `user-stats` keeps. Only sessions still queued on some device matter.
+export const MAX_APPLIED_SESSION_IDS = 20;
 
 // The itemised XP breakdown's own fields — mirrors StudySessionRemoteDataSource.kt's FIELD_XP_* names.
 const FIELD_XP_NEW_CARDS = "newCards";
@@ -109,6 +139,23 @@ const FIELD_XP_SESSION_COMPLETION_BONUS = "sessionCompletionBonus";
 const FIELD_XP_DAILY_GOAL_BONUS = "dailyGoalBonus";
 const FIELD_XP_STREAK_BONUS = "streakBonus";
 const FIELD_XP_TOTAL = "xpTotal";
+
+// `recents/state` document fields. Each entry reuses the session document's FIELD_* names above.
+const FIELD_ENTRIES = "entries";
+
+// How many sessions `recents/state` keeps: Home shows a User's latest sessions, never the full history.
+export const MAX_RECENT_ENTRIES = 15;
+
+const VALID_SOURCE_TYPES = ["SingleSubcategory", "Quick", "Custom"] as const;
+
+/** The Study Creation entry point a session came from, as the client's `SessionSourceType.name`. */
+export type SessionSourceType = (typeof VALID_SOURCE_TYPES)[number];
+
+/**
+ * How the session was delivered, chosen on Preview: Voice Answering for a Rated session, read-aloud for
+ * a Fast one. Holds only the session's own mode's flag, so writing it never stores the other's.
+ */
+export type SessionDelivery = { [FIELD_VOICE_ANSWERING]: boolean } | { [FIELD_READ_ALOUD]: boolean };
 
 export interface SubmitStudySessionCardResult {
   cardId: string;
@@ -135,6 +182,8 @@ export interface ValidatedSubmitStudySessionRequest {
   categoryName: string;
   subcategoryIds: string[];
   subcategoryNames: string[];
+  sourceType: SessionSourceType;
+  delivery: SessionDelivery;
   cardResults: SubmitStudySessionCardResult[];
   /**
    * Minutes east of UTC for the device's timezone offset at `startedAtEpochMillis` — the
@@ -172,21 +221,40 @@ export interface SubmitStudySessionResult {
   xpIntoCurrentLevel: number;
   xpForNextLevel: number;
   levelsCrossed: number[];
+  /** The account's Level right before this session. */
+  levelBefore: number;
+  /** Points into [levelBefore] right before this session. */
+  xpIntoCurrentLevelBefore: number;
+  /** Points [levelBefore] needs in total before the next Level. */
+  xpForNextLevelBefore: number;
+  /** The account's Streak right after this session. */
+  currentStreak: number;
   /** The session's wall-clock duration, as submitted and stored. */
   durationSeconds: number;
   counts: SubmitStudySessionCounts;
-  /** Absent only when answering from a session document stored before rates were recorded. */
-  rates?: XpRates;
+  rates: XpRates;
 }
 
-function fail(message: string): never {
-  throw new HttpsError("invalid-argument", message);
-}
-
-function requireNonEmptyString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.length === 0) fail(`${field} must be a non-empty string`);
-  return value as string;
-}
+/**
+ * One session's entry in `recents/state`, keyed there by its `sessionId`, with the same field names and
+ * values as its session document. Holds only what Home needs to show and replay a Recent, names
+ * included so a row never needs a taxonomy read, and no abandoned flag, settings, card ids or XP breakdown.
+ * `startTimestamp` is the session document's own `Timestamp`, and `xpTotal` is signed: a session that
+ * de-mastered cards can lose XP overall.
+ */
+export type RecentEntry = {
+  [FIELD_SESSION_ID]: string;
+  [FIELD_START_TIMESTAMP]: FirebaseFirestore.Timestamp;
+  [FIELD_DURATION_SECONDS]: number;
+  [FIELD_STUDY_MODE]: StudyMode;
+  [FIELD_SOURCE_TYPE]: SessionSourceType;
+  [FIELD_CATEGORY_ID]: string;
+  [FIELD_CATEGORY_NAME]: string;
+  [FIELD_SUBCATEGORY_IDS]: string[];
+  [FIELD_SUBCATEGORY_NAMES]: string[];
+  [FIELD_CARD_COUNT]: number;
+  [FIELD_XP_TOTAL]: number;
+} & SessionDelivery;
 
 // Firestore's own reserved-name rule for both document ids and nested map-field-path segments:
 // a value matching `__.*__` can never be written (Firestore itself throws INVALID_ARGUMENT). Any id
@@ -232,36 +300,10 @@ function deriveLocalStudyDate(startedAtEpochMillis: number, utcOffsetMinutes: nu
   return `${year}-${month}-${day}`;
 }
 
-function requireFiniteNumberInRange(value: unknown, field: string, minimum: number, maximum: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
-    fail(`${field} must be a number between ${minimum} and ${maximum}`);
-  }
-  return value as number;
-}
-
 function requireFirestoreSafeId(value: unknown, field: string): string {
   const id = requireNonEmptyString(value, field);
   if (RESERVED_FIRESTORE_NAME.test(id) || id.includes("/")) fail(`${field} is not a valid Firestore id: "${id}"`);
   return id;
-}
-
-function requireStringArray(value: unknown, field: string): string[] {
-  if (!Array.isArray(value) || value.length === 0 || !value.every((v) => typeof v === "string" && v.length > 0)) {
-    fail(`${field} must be a non-empty array of non-empty strings`);
-  }
-  return value as string[];
-}
-
-function requireFiniteNumber(value: unknown, field: string, minimum = 0): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum) {
-    fail(`${field} must be a number >= ${minimum}`);
-  }
-  return value as number;
-}
-
-function requireBoolean(value: unknown, field: string): boolean {
-  if (typeof value !== "boolean") fail(`${field} must be a boolean`);
-  return value as boolean;
 }
 
 const VALID_STATES: readonly CardState[] = ["Mastered", "Partial", "Failed", "Seen"];
@@ -288,6 +330,18 @@ function validateCardResult(raw: unknown, studyMode: StudyMode, index: number): 
   return { cardId, subcategoryId, state: state as CardState, attemptsUsed, wasPreviouslyMastered };
 }
 
+/** Requires the session's own mode's delivery flag and rejects the other mode's, even as `false`. */
+function validateDelivery(body: Record<string, unknown>, studyMode: StudyMode): SessionDelivery {
+  if (studyMode === "Rated") {
+    if (typeof body.voiceAnswering !== "boolean") fail("voiceAnswering must be a boolean for a Rated session");
+    if (body.readAloud !== undefined) fail("readAloud must not be present on a Rated session");
+    return { [FIELD_VOICE_ANSWERING]: body.voiceAnswering as boolean };
+  }
+  if (typeof body.readAloud !== "boolean") fail("readAloud must be a boolean for a Fast session");
+  if (body.voiceAnswering !== undefined) fail("voiceAnswering must not be present on a Fast session");
+  return { [FIELD_READ_ALOUD]: body.readAloud as boolean };
+}
+
 /** Rejects a structurally invalid payload before any transaction opens. */
 export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmitStudySessionRequest {
   if (typeof data !== "object" || data === null) fail("request body must be an object");
@@ -306,6 +360,11 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
   const subcategoryNames = requireStringArray(body.subcategoryNames, "subcategoryNames");
   if (subcategoryIds.length !== subcategoryNames.length) fail("subcategoryIds and subcategoryNames must be the same length");
   subcategoryIds.forEach((id, index) => requireFirestoreSafeId(id, `subcategoryIds[${index}]`));
+  const sourceType = body.sourceType;
+  if (typeof sourceType !== "string" || !VALID_SOURCE_TYPES.includes(sourceType as SessionSourceType)) {
+    fail("sourceType must be SingleSubcategory, Quick or Custom");
+  }
+  const delivery = validateDelivery(body, studyMode);
 
   if (!Array.isArray(body.cardResults) || body.cardResults.length === 0) fail("cardResults must be a non-empty array");
   if (body.cardResults.length > MAX_CARD_RESULTS) fail(`cardResults must not exceed ${MAX_CARD_RESULTS} entries`);
@@ -343,6 +402,8 @@ export function validateSubmitStudySessionRequest(data: unknown): ValidatedSubmi
     categoryName,
     subcategoryIds,
     subcategoryNames,
+    sourceType: sourceType as SessionSourceType,
+    delivery,
     cardResults,
     studyDateUtcOffsetMinutes,
     dailyGoalMinutes,
@@ -384,6 +445,37 @@ function scoringStateDocRef(db: FirebaseFirestore.Firestore, uid: string): Fireb
   return usersDoc(db, uid).collection(PROGRESS_COLLECTION).doc(PROGRESS_USER_STATS_DOCUMENT);
 }
 
+function recentsStateDocRef(db: FirebaseFirestore.Firestore, uid: string): FirebaseFirestore.DocumentReference {
+  return usersDoc(db, uid).collection(RECENTS_COLLECTION).doc(RECENTS_STATE_DOCUMENT);
+}
+
+// An entry whose startTimestamp is missing or malformed sorts as the oldest, so it is evicted first.
+function startMillisOf(entry: RecentEntry | undefined): number {
+  const startTimestamp = entry?.[FIELD_START_TIMESTAMP];
+  return startTimestamp instanceof Timestamp ? startTimestamp.toMillis() : Number.NEGATIVE_INFINITY;
+}
+
+/**
+ * The `recents/state` entries after adding [entry]: at most [max] of them, keeping the newest by
+ * `startTimestamp`, with equal timestamps evicting the lower `sessionId` first. Ordering never depends
+ * on submission order, so a late-delivered session lands where it started. Returns `null` when the
+ * document must stay untouched: [entry]'s session is already present, or it is older than every kept
+ * entry and would be evicted straight away.
+ */
+export function nextRecentEntries(existing: Record<string, RecentEntry>, entry: RecentEntry, max: number): Record<string, RecentEntry> | null {
+  const sessionId = entry[FIELD_SESSION_ID];
+  if (Object.hasOwn(existing, sessionId)) return null;
+  const oldestFirst = [...Object.entries(existing), [sessionId, entry] as const].sort(([idA, entryA], [idB, entryB]) => {
+    const millisA = startMillisOf(entryA);
+    const millisB = startMillisOf(entryB);
+    if (millisA !== millisB) return millisA < millisB ? -1 : 1;
+    return idA < idB ? -1 : idA > idB ? 1 : 0;
+  });
+  const kept = oldestFirst.slice(Math.max(0, oldestFirst.length - max));
+  if (!kept.some(([keptSessionId]) => keptSessionId === sessionId)) return null;
+  return Object.fromEntries(kept);
+}
+
 function scoringStateFields(state: ScoringState): Record<string, unknown> {
   return {
     [FIELD_XP]: state.xp,
@@ -395,6 +487,15 @@ function scoringStateFields(state: ScoringState): Record<string, unknown> {
     [FIELD_GOAL_MET_DATE]: state.goalMetDate,
     [FIELD_STUDIED_SECONDS_ON_LAST_STUDY_DATE]: state.studiedSecondsOnLastStudyDate,
   };
+}
+
+function readAppliedSessionIds(snapshot: FirebaseFirestore.DocumentSnapshot): string[] {
+  return (snapshot.data()?.[FIELD_APPLIED_SESSION_IDS] as string[] | undefined) ?? [];
+}
+
+/** [prior] with [sessionId] moved to the end, keeping the latest [MAX_APPLIED_SESSION_IDS]. */
+function nextAppliedSessionIds(prior: string[], sessionId: string): string[] {
+  return [...prior.filter((appliedSessionId) => appliedSessionId !== sessionId), sessionId].slice(-MAX_APPLIED_SESSION_IDS);
 }
 
 function readScoringState(snapshot: FirebaseFirestore.DocumentSnapshot): ScoringState {
@@ -474,16 +575,19 @@ function readSessionCounts(data: FirebaseFirestore.DocumentData): SubmitStudySes
  * same session both answer through here, so their responses are identical field for field.
  */
 function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): SubmitStudySessionResult {
-  const rates = data[FIELD_XP_RATES] as XpRates | undefined;
   return {
     breakdown: readXpBreakdownFields(data),
     level: data[FIELD_LEVEL_AFTER],
     xpIntoCurrentLevel: data[FIELD_XP_INTO_CURRENT_LEVEL_AFTER],
     xpForNextLevel: data[FIELD_XP_FOR_NEXT_LEVEL_AFTER],
     levelsCrossed: (data[FIELD_LEVELS_CROSSED] as number[]) ?? [],
+    levelBefore: data[FIELD_LEVEL_BEFORE],
+    xpIntoCurrentLevelBefore: data[FIELD_XP_INTO_CURRENT_LEVEL_BEFORE],
+    xpForNextLevelBefore: data[FIELD_XP_FOR_NEXT_LEVEL_BEFORE],
+    currentStreak: data[FIELD_CURRENT_STREAK_AFTER],
     durationSeconds: data[FIELD_DURATION_SECONDS] ?? 0,
     counts: readSessionCounts(data),
-    ...(rates !== undefined ? { rates } : {}),
+    rates: data[FIELD_XP_RATES] as XpRates,
   };
 }
 
@@ -493,21 +597,24 @@ function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): Submit
  * 1. Reads `sessions/{sessionId}` first. If it already exists, every other document this function
  *    would otherwise touch was necessarily already written alongside it in that earlier, successful
  *    transaction — so this is a pure cache hit: the session document's own stored fields (its XP
- *    breakdown, rates, line counts, duration and the level/xp-into-level/xp-for-next-level/levels-crossed
- *    *as they stood right after that original commit*) are returned unchanged, with no further reads
+ *    breakdown, rates, line counts, duration, the Level position before the session and the
+ *    level/xp-into-level/xp-for-next-level/levels-crossed/streak *as they stood right after that
+ *    original commit*) are returned unchanged, with no further reads
  *    or writes at all.
  *    Returning the account's *current* scoring state here instead would break idempotency — other
  *    sessions committed since would have moved it on.
- * 2. Otherwise, reads every touched Subcategory's prior progress and the account's prior
- *    [ScoringState], computes the new progress writes, the [XpBreakdown] and the new [ScoringState]
- *    (mirrored by the client's `scoreSession`) with the server-owned XP
- *    configuration (`config/xp`, see `xpConfig.ts`), and writes all four
- *    documents — the session document, every touched Subcategory's progress, the progress summary's
- *    increments, and the full scoring-state overwrite — before answering from the session document
- *    it just built, through the same [resultFromSessionDocument] a retry uses.
+ * 2. Otherwise, reads every touched Subcategory's prior progress, the account's prior
+ *    [ScoringState] and `recents/state`, computes the new progress writes, the [XpBreakdown] and the
+ *    new [ScoringState] (mirrored by the client's `scoreSession`) with the server-owned XP
+ *    configuration (`config/xp`, see `xpConfig.ts`), and writes the session document, every touched
+ *    Subcategory's progress, the progress summary's increments, the full scoring-state overwrite (with
+ *    this session's id appended to its applied session ids) and,
+ *    unless [nextRecentEntries] leaves it unchanged, the full `recents/state` overwrite — before
+ *    answering from the session document it just built, through the same [resultFromSessionDocument]
+ *    a retry uses. `recents/state` is read in this same transaction, so overwriting it whole loses no
+ *    concurrent update.
  */
-export async function submitStudySession(uid: string, request: ValidatedSubmitStudySessionRequest): Promise<SubmitStudySessionResult> {
-  const db = admin.firestore();
+export async function submitStudySession(db: Firestore, uid: string, request: ValidatedSubmitStudySessionRequest): Promise<SubmitStudySessionResult> {
   const sessionRef = sessionDocRef(db, uid, request.sessionId);
 
   // A plain read outside the transaction: the configuration is admin-edited, not part of this
@@ -528,6 +635,8 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
     const subcategorySnapshots = await Promise.all(touchedSubcategoryIds.map((id) => transaction.get(subcategoryProgressDocRef(db, uid, id))));
     const scoringRef = scoringStateDocRef(db, uid);
     const scoringSnapshot = await transaction.get(scoringRef);
+    const recentsRef = recentsStateDocRef(db, uid);
+    const recentsSnapshot = await transaction.get(recentsRef);
     const todaySessionsSnapshot = await transaction.get(
       usersDoc(db, uid).collection(SESSIONS_COLLECTION).where(FIELD_STUDY_DATE, "==", derivedStudyDate),
     );
@@ -578,9 +687,10 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
     );
     const xpForNextLevel = levelThreshold(config, newScoringState.level);
 
+    const startTimestamp = Timestamp.fromMillis(request.startedAtEpochMillis);
     const sessionFields: Record<string, unknown> = {
       [FIELD_SESSION_ID]: request.sessionId,
-      [FIELD_START_TIMESTAMP]: admin.firestore.Timestamp.fromMillis(request.startedAtEpochMillis),
+      [FIELD_START_TIMESTAMP]: startTimestamp,
       [FIELD_DURATION_SECONDS]: request.durationSeconds,
       [FIELD_STUDY_MODE]: request.studyMode,
       [FIELD_IS_ABANDONED]: request.abandoned,
@@ -588,6 +698,8 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
       [FIELD_CATEGORY_NAME]: request.categoryName,
       [FIELD_SUBCATEGORY_IDS]: request.subcategoryIds,
       [FIELD_SUBCATEGORY_NAMES]: request.subcategoryNames,
+      [FIELD_SOURCE_TYPE]: request.sourceType,
+      ...request.delivery,
       [FIELD_STUDY_DATE]: derivedStudyDate,
       [FIELD_CARD_COUNT]: request.cardResults.length,
       [FIELD_NEW_CARDS_STUDIED]: newCardsStudied,
@@ -606,6 +718,10 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
       [FIELD_LEVEL_AFTER]: newScoringState.level,
       [FIELD_XP_INTO_CURRENT_LEVEL_AFTER]: newScoringState.xpIntoCurrentLevel,
       [FIELD_XP_FOR_NEXT_LEVEL_AFTER]: xpForNextLevel,
+      [FIELD_LEVEL_BEFORE]: currentScoringState.level,
+      [FIELD_XP_INTO_CURRENT_LEVEL_BEFORE]: currentScoringState.xpIntoCurrentLevel,
+      [FIELD_XP_FOR_NEXT_LEVEL_BEFORE]: levelThreshold(config, currentScoringState.level),
+      [FIELD_CURRENT_STREAK_AFTER]: newScoringState.currentStreak,
       [FIELD_XP_RATES]: xpRatesFields(config),
       ...xpBreakdownFields(breakdown),
     };
@@ -625,8 +741,8 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
         [FIELD_CARDS]: Object.fromEntries(
           [...cardUpdates].map(([cardId, update]) => {
             const entryFields: Record<string, unknown> = { [FIELD_STATE]: update.state };
-            if (update.stampFirstStudied) entryFields[FIELD_FIRST_STUDIED_AT] = admin.firestore.FieldValue.serverTimestamp();
-            if (update.stampMastered) entryFields[FIELD_MASTERED_AT] = admin.firestore.FieldValue.serverTimestamp();
+            if (update.stampFirstStudied) entryFields[FIELD_FIRST_STUDIED_AT] = FieldValue.serverTimestamp();
+            if (update.stampMastered) entryFields[FIELD_MASTERED_AT] = FieldValue.serverTimestamp();
             return [cardId, entryFields];
           }),
         ),
@@ -639,16 +755,50 @@ export async function submitStudySession(uid: string, request: ValidatedSubmitSt
         [...summaryDeltas].map(([subcategoryId, delta]) => [
           subcategoryId,
           {
-            [FIELD_MASTERED_COUNT]: admin.firestore.FieldValue.increment(delta.masteredDelta),
-            [FIELD_STUDIED_COUNT]: admin.firestore.FieldValue.increment(delta.studiedDelta),
+            [FIELD_MASTERED_COUNT]: FieldValue.increment(delta.masteredDelta),
+            [FIELD_STUDIED_COUNT]: FieldValue.increment(delta.studiedDelta),
           },
         ]),
       );
       transaction.set(progressSummaryDocRef(db, uid), { [FIELD_SUBCATEGORIES]: subcategories }, { merge: true });
     }
 
-    transaction.set(scoringRef, scoringStateFields(newScoringState));
+    transaction.set(scoringRef, {
+      ...scoringStateFields(newScoringState),
+      [FIELD_APPLIED_SESSION_IDS]: nextAppliedSessionIds(readAppliedSessionIds(scoringSnapshot), request.sessionId),
+    });
+
+    const recentEntry: RecentEntry = {
+      [FIELD_SESSION_ID]: request.sessionId,
+      [FIELD_START_TIMESTAMP]: startTimestamp,
+      [FIELD_DURATION_SECONDS]: request.durationSeconds,
+      [FIELD_STUDY_MODE]: request.studyMode,
+      ...request.delivery,
+      [FIELD_SOURCE_TYPE]: request.sourceType,
+      [FIELD_CATEGORY_ID]: request.categoryId,
+      [FIELD_CATEGORY_NAME]: request.categoryName,
+      [FIELD_SUBCATEGORY_IDS]: request.subcategoryIds,
+      [FIELD_SUBCATEGORY_NAMES]: request.subcategoryNames,
+      [FIELD_CARD_COUNT]: request.cardResults.length,
+      [FIELD_XP_TOTAL]: breakdown.xpTotal,
+    };
+    const existingRecentEntries = (recentsSnapshot.data()?.[FIELD_ENTRIES] as Record<string, RecentEntry> | undefined) ?? {};
+    const nextEntries = nextRecentEntries(existingRecentEntries, recentEntry, MAX_RECENT_ENTRIES);
+    if (nextEntries !== null) transaction.set(recentsRef, { [FIELD_ENTRIES]: nextEntries });
 
     return resultFromSessionDocument(sessionFields);
   });
+}
+
+/**
+ * The whole `submitStudySession` callable, minus the `onCall` wrapper: rejects an inactive caller
+ * ([requireActiveSession]) before anything else, then validates the payload, checks its owner and
+ * commits it. Lives here rather than in `index.ts` so the guard's place in front of every write is
+ * tested, not just assumed.
+ */
+export async function handleSubmitStudySessionCall(auth: Auth, db: Firestore, request: Pick<CallableRequest<unknown>, "auth" | "data">): Promise<SubmitStudySessionResult> {
+  const uid = await requireActiveSession(auth, request);
+  const validated = validateSubmitStudySessionRequest(request.data);
+  requireOwnerMatchesCaller(uid, validated);
+  return submitStudySession(db, uid, validated);
 }

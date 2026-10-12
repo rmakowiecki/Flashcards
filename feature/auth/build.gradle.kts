@@ -38,11 +38,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth.ktx)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.play.services)
 }

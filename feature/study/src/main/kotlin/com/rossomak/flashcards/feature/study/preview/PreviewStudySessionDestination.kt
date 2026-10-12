@@ -34,6 +34,7 @@ internal fun PreviewStudySessionScreenState.toSessionDestination(categoryId: Str
                 voiceVariantIndex = config.voiceSettings.voiceLabel?.variantIndex,
                 categoryName = categoryName,
                 subcategoryNames = subcategoryNames,
+                sourceType = sourceType,
             )
         )
     } else {
@@ -52,6 +53,7 @@ internal fun PreviewStudySessionScreenState.toSessionDestination(categoryId: Str
                 voiceVariantIndex = config.voiceSettings.voiceLabel?.variantIndex,
                 categoryName = categoryName,
                 subcategoryNames = subcategoryNames,
+                sourceType = sourceType,
             )
         )
     }

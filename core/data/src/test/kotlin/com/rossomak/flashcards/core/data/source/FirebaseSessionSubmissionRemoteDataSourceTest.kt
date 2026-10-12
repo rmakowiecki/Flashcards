@@ -12,9 +12,13 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.XpBreakdown
+import io.kotest.assertions.withClue
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
@@ -53,6 +57,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = Quick,
         cardResults = listOf(
             FlashcardResult.Rated(
                 cardId = "card-1",
@@ -65,6 +70,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = -300,
+        voiceAnsweringEnabled = true,
     )
 
     private fun fastSessionResult(): SessionResult.Fast = SessionResult.Fast(
@@ -76,10 +82,12 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         categoryName = "Category",
         subcategoryIds = listOf("sub-1"),
         subcategoryNames = listOf("Subcategory"),
+        sourceType = Custom,
         cardResults = listOf(FlashcardResult.Fast(cardId = "card-1", subcategoryId = "sub-1", state = FlashcardStudyProgressState.Seen)),
         studyDate = "2026-09-08",
         dailyGoalMinutes = 20,
         studyDateUtcOffsetMinutes = -300,
+        readAloudEnabled = true,
     )
 
     @Test
@@ -102,6 +110,9 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         payload["categoryName"] shouldBe session.categoryName
         payload["subcategoryIds"] shouldBe session.subcategoryIds
         payload["subcategoryNames"] shouldBe session.subcategoryNames
+        payload["sourceType"] shouldBe session.sourceType.name
+        payload["voiceAnswering"] shouldBe session.voiceAnsweringEnabled
+        payload.containsKey("readAloud") shouldBe false
         payload["studyDate"] shouldBe session.studyDate
         payload["studyDateUtcOffsetMinutes"] shouldBe session.studyDateUtcOffsetMinutes
         payload["dailyGoalMinutes"] shouldBe session.dailyGoalMinutes
@@ -132,6 +143,20 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     }
 
     @Test
+    fun `submitSession sends a Fast session's source type and read-aloud setting without voiceAnswering`() = runTest {
+        val session = fastSessionResult()
+        val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
+
+        createApi().submitSession(OWNER_UID, session)
+
+        @Suppress("UNCHECKED_CAST")
+        val payload = payloadSlot.captured as Map<String, Any>
+        payload["sourceType"] shouldBe session.sourceType.name
+        payload["readAloud"] shouldBe session.readAloudEnabled
+        payload.containsKey("voiceAnswering") shouldBe false
+    }
+
+    @Test
     fun `submitSession wraps a callable failure in a failure result`() = runTest {
         val error: FirebaseFunctionsException = mockk()
         stubCallable(Tasks.forException(error))
@@ -139,7 +164,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
         result.isFailure shouldBe true
-        result.exceptionOrNull() shouldBe error
+        result.exceptionOrNull() shouldBeSameInstanceAs error
         verify(exactly = 1) { callableReference.call(any()) }
     }
 
@@ -166,6 +191,10 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
                 xpIntoCurrentLevel = 870L,
                 xpForNextLevel = 6000L,
                 levelsCrossed = listOf(2),
+                levelBefore = 1,
+                xpIntoCurrentLevelBefore = 0L,
+                xpForNextLevelBefore = 1000L,
+                currentStreak = 1,
                 counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
                 rates = SessionScoreRates(
                     newCardStudied = 10,
@@ -190,13 +219,14 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     }
 
     @Test
-    fun `submitSession reads a response without counts or rates, leaving both null`() = runTest {
-        stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE - FIELD_COUNTS - FIELD_RATES)))
+    fun `submitSession succeeds without a score on a response missing any newly required field`() = runTest {
+        listOf(FIELD_LEVEL_BEFORE, FIELD_XP_INTO_CURRENT_LEVEL_BEFORE, FIELD_XP_FOR_NEXT_LEVEL_BEFORE, FIELD_CURRENT_STREAK, FIELD_COUNTS, FIELD_RATES).forEach { field ->
+            stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE - field)))
 
-        val score = createApi().submitSession(OWNER_UID, ratedSessionResult()).getOrThrow().shouldNotBeNull()
+            val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
-        score.counts shouldBe null
-        score.rates shouldBe null
+            withClue(field) { result shouldBe Result.success(null) }
+        }
     }
 
     @Test
@@ -222,6 +252,10 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
         const val OWNER_UID = "uid-1"
         const val FIELD_COUNTS = "counts"
         const val FIELD_RATES = "rates"
+        const val FIELD_LEVEL_BEFORE = "levelBefore"
+        const val FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore"
+        const val FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore"
+        const val FIELD_CURRENT_STREAK = "currentStreak"
 
         // Shaped as the Functions SDK decodes JSON: small numbers as Int, lists and objects as List and Map.
         val RATED_RESPONSE: Map<String, Any> = mapOf(
@@ -241,6 +275,10 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
             "xpIntoCurrentLevel" to 870,
             "xpForNextLevel" to 6000,
             "levelsCrossed" to listOf(2),
+            FIELD_LEVEL_BEFORE to 1,
+            FIELD_XP_INTO_CURRENT_LEVEL_BEFORE to 0,
+            FIELD_XP_FOR_NEXT_LEVEL_BEFORE to 1000,
+            FIELD_CURRENT_STREAK to 1,
             "durationSeconds" to 60,
             FIELD_COUNTS to mapOf("newCardsStudied" to 1, "newlyMastered" to 1, "partial" to 0, "defended" to 0, "demastered" to 0),
             FIELD_RATES to mapOf(

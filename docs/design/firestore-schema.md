@@ -94,7 +94,10 @@ users/{uid}/favorites/state                           → { categories: { "<cate
 // → SessionSubmissionRemoteDataSource). Shape follows studyMode: RATED carries the four counters and full
 // cardResults entries below; FAST has none of the RATED-only fields at all — not zeroed, genuinely absent.
 users/{uid}/sessions/{sessionId}                      → { sessionId, startTimestamp, durationSeconds,
-                                                          studyMode: "rated"|"fast", isAbandoned,
+                                                          studyMode: "Rated"|"Fast", isAbandoned,
+                                                          sourceType: "SingleSubcategory"|"Quick"|"Custom",
+                                                          voiceAnswering,  // RATED only
+                                                          readAloud,       // FAST only
                                                           categoryId, categoryName,
                                                           subcategoryIds[], subcategoryNames[],
                                                           cardCount, newCardsStudied,
@@ -105,6 +108,8 @@ users/{uid}/sessions/{sessionId}                      → { sessionId, startTime
                                                           newCards … streakBonus, xpTotal,
                                                           levelAfter, xpIntoCurrentLevelAfter,
                                                           xpForNextLevelAfter, levelsCrossed[],
+                                                          levelBefore, xpIntoCurrentLevelBefore,
+                                                          xpForNextLevelBefore, currentStreakAfter,
                                                           xpRates: { newCardStudied, cardMastered,
                                                             cardPartial, masteryDefended, cardDemastered,
                                                             minuteStudied, sessionCompleted } }
@@ -114,7 +119,33 @@ users/{uid}/sessions/{sessionId}                      → { sessionId, startTime
                                                           } }  // no transcript, ever
 ```
 
-- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. Home's Recents carousel renders from one `orderBy(startTimestamp).limit(n)` query with no joins. `cardResults` is embedded rather than split into a subcollection because Firestore bills per document read — splitting saved Recents no reads while costing a write per card. The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md). The scoring fields let a retried submission answer from this document alone: `xpRates` records the per-line rates the session was scored with (absent on documents written before it was added), and the function's response derives each XP line's count from the stored counters (newly Mastered = `cardsMastered − cardsDefended`).
+- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. `cardResults` is embedded rather than split into a subcollection because no reader needs a session without its cards, so a subcollection would only add a write per card. Home does not query this collection: it reads [`recents/state`](#recents). The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md). `sourceType` is the Study Creation entry point that started the session, not its Subcategory count. Delivery is sealed the same way: `voiceAnswering` exists only on a Rated document and `readAloud` only on a Fast one. The scoring fields let a retried submission answer from this document alone: `xpRates` records the per-line rates the session was scored with, `levelBefore`/`xpIntoCurrentLevelBefore`/`xpForNextLevelBefore` record the account's Level position right before the session (the prior `user-stats` and its Level's threshold), and `currentStreakAfter` the account's Streak right after it. The function's response returns `breakdown`, `level`, `xpIntoCurrentLevel`, `xpForNextLevel`, `levelsCrossed`, `levelBefore`, `xpIntoCurrentLevelBefore`, `xpForNextLevelBefore`, `currentStreak`, `durationSeconds`, `counts` and `rates`, all read from this document, and derives each XP line's count from the stored counters (newly Mastered = `cardsMastered − cardsDefended`).
+
+## Recents
+
+```
+// Written only by the submitStudySession Cloud Function, inside the session's own transaction.
+users/{uid}/recents/state                             → { entries: { "<sessionId>": {
+                                                            sessionId: string,
+                                                            startTimestamp: Timestamp,
+                                                            durationSeconds: number,
+                                                            studyMode: "Rated"|"Fast",
+                                                            voiceAnswering: boolean,  // RATED only
+                                                            readAloud: boolean,       // FAST only
+                                                            sourceType: "SingleSubcategory"|"Quick"|"Custom",
+                                                            categoryId: string,
+                                                            categoryName: string,
+                                                            subcategoryIds: string[],
+                                                            subcategoryNames: string[],  // parallel to subcategoryIds
+                                                            cardCount: number,
+                                                            xpTotal: number  // signed
+                                                          }, ... } }
+```
+
+- **One document per User holding their latest 15 sessions**, so Home's Recently studied list costs one read on attach and one per change instead of a query over `sessions`. See [ADR-0057](../adr/0057-recents-state-projection.md).
+- Each entry repeats its session document's field names and values, **names included**: names never change, so a row shows and replays without any taxonomy read. The client looks up the Category only for its color and icon, and an entry missing its names, or whose `subcategoryIds` and `subcategoryNames` differ in length, is skipped.
+- Keyed by `sessionId`, so a retried submission is idempotent: an id already present leaves the document untouched. A new entry is added, then the map is trimmed to the 15 newest by `startTimestamp`, ties evicting the lower `sessionId` first. A late-delivered old session therefore never pushes out a newer one; one older than every kept entry is not written at all.
+- **Client-read-only**: the owner may read it; only the function (Admin SDK) writes it. See `firestore.rules`.
 
 ## Per-subcategory progress detail
 
@@ -145,11 +176,13 @@ users/{uid}/progress/summary                          → { subcategories: { <su
 users/{uid}/progress/user-stats                       → { xp, level, xpIntoCurrentLevel,
                                                           currentStreak, bestStreak,
                                                           lastStudyDate, goalMetDate,
-                                                          studiedSecondsOnLastStudyDate }
+                                                          studiedSecondsOnLastStudyDate,
+                                                          appliedSessionIds: string[] }  // latest 20, oldest first
 ```
 
 - **`progress` holds the User's singleton documents** — the progress summary (`summary`) and the scoring state (`user-stats`) — alongside the fixed `details` anchor document that hosts the packed per-Subcategory documents one hop deeper. Firestore paths alternate collection and document, so each per-User singleton needs a fixed document id inside a collection; one security rule covers them all.
 - **`user-stats` is the scoring state**, written only by the `submitStudySession` Cloud Function. `lastStudyDate` and `goalMetDate` only move forward ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). `studiedSecondsOnLastStudyDate` is the seconds of every recorded session on `lastStudyDate`: a submission sets it to that day's total when its `studyDate` is not earlier than `lastStudyDate`, and leaves it unchanged otherwise. A missing field reads as `0`. The client reads it as the day's baseline when it previews the Daily Goal for a Pending Session ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
+- **`appliedSessionIds`** lists the latest 20 sessions applied to `user-stats`, oldest first. Only the function writes it, appending the session's id in the commit transaction in the same write as the scoring fields; a retry leaves it untouched. A missing field reads as empty. It is not part of the scoring state: the device's projection reads it to skip the Pending Sessions this document already includes ([ADR-0061](../adr/0061-delivered-sessions-applied-once-in-the-projection.md)).
 
 ## XP configuration
 
@@ -186,6 +219,21 @@ users/{uid}/curationRequests/{cardId}                       → { subcategoryId:
 ```
 
 - **`curationRequests/{cardId}` is a flat collection** keyed by globally-unique cardId. Stores structured content-fix directives raised by any user via the in-session "Report a problem" dialog, consumed by admin sync scripts — not surfaced back to users anywhere in the app. Actions are a map of `CurationAction` string → `{ flaggedAt }`. Doc is deleted when all actions are removed. See [ADR-0017](../adr/0017-curation-report-system.md).
+
+## Bug Reports
+
+```
+bugReports/{reportId}                                 → { uid, description, severity,
+                                                          appVersionName, appVersionCode,
+                                                          deviceModel, androidVersion,
+                                                          createdAt, status }
+// severity: blocker | minor | cosmetic
+// status:   new | triaged | fixed
+```
+
+- **`bugReports` is top-level**, with an auto id and the reporter's `uid` as a field, so every report can be browsed and queried in one place. `androidVersion` is the SDK int.
+- **Written only by the `submitBugReport` Cloud Function**, which validates the report, allows at most 10 per uid in a rolling 24 hours, and sets `uid`, `createdAt` (server timestamp) and `status: "new"` itself ([ADR-0058](../adr/0058-bug-reports-written-only-by-a-callable.md)). The rate limit counts on a composite index over `uid` and `createdAt`.
+- **No client access at all**: security rules deny every read and write, the reporter's own included. The developer, or an investigation agent, moves `status` to `triaged` or `fixed` with the Admin SDK.
 
 ## Offline persistence
 

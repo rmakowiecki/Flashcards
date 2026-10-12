@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -36,6 +35,7 @@ import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.code
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
 import kotlinx.coroutines.delay
@@ -139,7 +139,7 @@ fun SplashContent(
         )
         Text(
             text = stringResource(R.string.splash_tagline).uppercase(),
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = MaterialTheme.typography.code,
             color = Color.White.copy(alpha = 0.5f),
             modifier = Modifier
                 .offset(y = LogoHeight / 2)
@@ -167,7 +167,7 @@ private fun SplashContentPreview() {
         )
         Text(
             text = stringResource(R.string.splash_tagline).uppercase(),
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = MaterialTheme.typography.code,
             color = Color.White.copy(alpha = 0.5f),
             modifier = Modifier.offset(y = LogoHeight / 2)
         )

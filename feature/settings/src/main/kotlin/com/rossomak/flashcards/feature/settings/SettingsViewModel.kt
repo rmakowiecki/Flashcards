@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.DefaultStudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.PartialRatingCardRequeueingEnabled
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference.RatedAttempts
@@ -15,11 +16,11 @@ import com.rossomak.flashcards.core.domain.model.UserPreference.DailyGoalMinutes
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.model.voiceLabel
+import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveStudySessionPreferenceUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
-import com.rossomak.flashcards.core.domain.usecase.SignOutUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
@@ -35,38 +36,32 @@ import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardCount
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionMode
 import com.rossomak.flashcards.feature.settings.SettingsDialog.SessionVoiceSettings
-import com.rossomak.flashcards.feature.settings.SettingsDialog.SignOut
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    private val observeAuthUser: ObserveAuthUserUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
     private val observeStudySessionPreferences: ObserveStudySessionPreferencesUseCase,
     private val saveUserPreference: SaveUserPreferenceUseCase,
     private val saveStudySessionPreference: SaveStudySessionPreferenceUseCase,
-    private val signOutUseCase: SignOutUseCase,
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsScreenState())
     val state: StateFlow<SettingsScreenState> = _state.asStateFlow()
-
-    private val eventChannel = Channel<SettingsDestination>(Channel.BUFFERED)
-    val events = eventChannel.receiveAsFlow()
 
     private val _messages = MutableSharedFlow<SettingsMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<SettingsMessage> = _messages.asSharedFlow()
@@ -74,6 +69,11 @@ class SettingsViewModel @Inject constructor(
     private var healRequestedVoiceId: String? = null
 
     init {
+        viewModelScope.launch {
+            // A null emission only comes while the session is ending, so the last user
+            // stays rather than blanking the avatar during the exit transition.
+            observeAuthUser().filterNotNull().collect(::applyUser)
+        }
         viewModelScope.launch {
             observeUserPreferences()
                 .onEach { preferences -> _state.update { it.copy(dailyGoalMinutes = preferences.dailyGoalMinutes) } }
@@ -100,6 +100,15 @@ class SettingsViewModel @Inject constructor(
                     healVoiceLabel(preferences.voiceSettings)
                 }
                 .launchIn(this)
+        }
+    }
+
+    private fun applyUser(user: AuthUser) {
+        _state.update {
+            it.copy(
+                avatarPhotoUrl = user.photoUrl,
+                avatarDisplayName = user.displayName,
+            )
         }
     }
 
@@ -201,26 +210,17 @@ class SettingsViewModel @Inject constructor(
      * The only commit path. Every dialog writes the sealed preference it edited and closes; the
      * row itself updates once the write lands back through [observeUserPreferences] /
      * [observeStudySessionPreferences] — no `copy()` into state here, so a row can never disagree
-     * with disk. Sign-out is the one case with no draft, answering with an action instead
-     * (ADR-0036).
+     * with disk.
      */
     private fun onDialogConfirm() {
         val dialog = _state.value.activeDialog ?: return
 
-        // The two cases whose commit is an action rather than a field. Kept out of the write
-        // below because `update` re-runs its lambda under contention, which would fire them twice.
-        when (dialog) {
-            is SignOut -> {
-                _state.update { it.copy(activeDialog = null) }
-                signOut()
-                return
-            }
-            is SessionVoiceSettings -> {
-                voiceSettingsController.save(viewModelScope, dialog.draftState)
-                _state.update { it.copy(activeDialog = null) }
-                return
-            }
-            else -> Unit
+        // The one case whose commit is an action rather than a field. Kept out of the write below
+        // because `update` re-runs its lambda under contention, which would fire it twice.
+        if (dialog is SessionVoiceSettings) {
+            voiceSettingsController.save(viewModelScope, dialog.draftState)
+            _state.update { it.copy(activeDialog = null) }
+            return
         }
 
         viewModelScope.launch {
@@ -234,8 +234,8 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Lifted out of [onDialogConfirm] purely to keep that function under detekt's
-     * `CyclomaticComplexMethod` threshold — [SignOut] and [SessionVoiceSettings] never reach here, both
-     * having already returned above.
+     * `CyclomaticComplexMethod` threshold — [SessionVoiceSettings] never reaches here, having already
+     * returned above.
      */
     private suspend fun saveDialogPreference(dialog: SettingsDialog): Result<Unit> = when (dialog) {
         is SessionCardCount -> saveStudySessionPreference(SessionLength(dialog.draftState))
@@ -248,28 +248,7 @@ class SettingsViewModel @Inject constructor(
         is RatedSessionVoiceAnswering -> saveStudySessionPreference(VoiceAnsweringEnabled(dialog.draftState))
         is FastSessionReadAloud -> saveStudySessionPreference(ReadAloudEnabled(dialog.draftState))
         is DailyStudyGoal -> saveUserPreference(DailyGoalMinutes(dialog.draftState))
-        // Both returned above; repeated only because the `when` is exhaustive.
-        is SessionVoiceSettings, SignOut -> Result.success(Unit)
-    }
-
-    private fun signOut() {
-        if (_state.value.isSigningOut) {
-            return
-        }
-
-        _state.update { it.copy(isSigningOut = true) }
-
-        viewModelScope.launch {
-            try {
-                signOutUseCase()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // Intentionally navigate to login even if remote sign-out fails.
-            } finally {
-                _state.update { it.copy(isSigningOut = false) }
-                eventChannel.send(SettingsDestination.Login)
-            }
-        }
+        // Returned above; repeated only because the `when` is exhaustive.
+        is SessionVoiceSettings -> Result.success(Unit)
     }
 }

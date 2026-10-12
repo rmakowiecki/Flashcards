@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.domain.scoring
 
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 import org.junit.Test
@@ -44,6 +45,7 @@ class CardProgressMergeTest(
                 categoryName = CATEGORY_NAME,
                 subcategoryIds = subcategoryIds,
                 subcategoryNames = subcategoryIds,
+                sourceType = SingleSubcategory,
                 cardResults = cardResults.map { cardResult ->
                     FlashcardResult.Rated(
                         cardId = cardResult.cardId,
@@ -56,6 +58,7 @@ class CardProgressMergeTest(
                 studyDate = STUDY_DATE,
                 studyDateUtcOffsetMinutes = 0,
                 dailyGoalMinutes = DAILY_GOAL_MINUTES,
+                voiceAnsweringEnabled = false,
             )
             FAST_MODE -> SessionResult.Fast(
                 id = SESSION_ID,
@@ -66,12 +69,14 @@ class CardProgressMergeTest(
                 categoryName = CATEGORY_NAME,
                 subcategoryIds = subcategoryIds,
                 subcategoryNames = subcategoryIds,
+                sourceType = SingleSubcategory,
                 cardResults = cardResults.map { cardResult ->
                     FlashcardResult.Fast(cardId = cardResult.cardId, subcategoryId = cardResult.subcategoryId, state = cardResult.state)
                 },
                 studyDate = STUDY_DATE,
                 studyDateUtcOffsetMinutes = 0,
                 dailyGoalMinutes = DAILY_GOAL_MINUTES,
+                readAloudEnabled = false,
             )
             else -> error("unknown study mode \"$studyMode\"")
         }

@@ -11,11 +11,7 @@ import com.google.firebase.firestore.SetOptions
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.data.model.UserFavoritesDto
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
@@ -40,26 +36,14 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
      * instead of registering a listener — mirrors the PERMISSION_DENIED-during-sign-out teardown
      * path, rather than crashing on the [uid] getter's `requireNotNull`. Captured once here rather
      * than reread later, so a sign-out racing the flow's launch can't throw the `requireNotNull`
-     * out of the `callbackFlow` builder.
+     * out of the [snapshotFlow] builder.
      */
     override fun observeFavorites(): Flow<UserFavoritesDto> = flow {
         val uid = firebaseAuth.currentUser?.uid ?: return@flow
         emitAll(observeAuthenticatedFavorites(uid))
     }
 
-    private fun observeAuthenticatedFavorites(uid: String): Flow<UserFavoritesDto> = callbackFlow {
-        // Delivered off the main thread so the snapshot-to-DTO mapping never costs a UI frame, one
-        // snapshot at a time: Firestore submits every snapshot to the executor separately, so a
-        // parallel one could finish mapping an older snapshot last and leave it as the latest value.
-        val registration = document(uid).addSnapshotListener(Dispatchers.Default.limitedParallelism(1).asExecutor()) { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
-            trySend(snapshot.toFavoritesDto())
-        }
-        awaitClose { registration.remove() }
-    }
+    private fun observeAuthenticatedFavorites(uid: String): Flow<UserFavoritesDto> = document(uid).snapshotFlow { snapshot -> snapshot.toFavoritesDto() }
 
     override suspend fun setCategoryFavorite(categoryId: String, isFavorite: Boolean) {
         writeEntries(FIELD_CATEGORIES, setOf(categoryId), isFavorite)

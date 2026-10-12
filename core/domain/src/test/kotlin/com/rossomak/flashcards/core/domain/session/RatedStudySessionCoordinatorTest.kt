@@ -12,6 +12,8 @@ import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SessionResult
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
@@ -33,8 +35,10 @@ import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoryProgressDetailsUseCase
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainInOrder
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -83,6 +87,7 @@ class RatedStudySessionCoordinatorTest {
         voiceAnsweringEnabled = true,
         attemptsLimit = 3,
         partialRatingCardRequeueingEnabled = true,
+        sourceType = SingleSubcategory,
     )
 
     private val events = mutableListOf<RatedSessionEvent>()
@@ -141,6 +146,13 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
     }
 
+    /** Reveals the first card's answer and rates it Correct, so the session has one Studied card. */
+    private fun TestScope.rateFirstCard(coordinator: RatedStudySessionCoordinator) {
+        coordinator.revealAnswer()
+        coordinator.rate(FlashcardAttemptRating.Correct)
+        runCurrent()
+    }
+
     private fun TestScope.finishNotice() {
         playbackGateway.finishNotice()
         runCurrent()
@@ -186,16 +198,33 @@ class RatedStudySessionCoordinatorTest {
 
     @Test
     fun `a revoked microphone ends the session as abandoned once the user had time to read why`() = runTest {
+        val coordinator = startCoordinator()
+        rateFirstCard(coordinator)
+        playbackGateway.emit(PlaybackEvent.EngineUnavailable)
+        runCurrent()
         permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
-        startCoordinator()
+        coordinator.play()
+        runCurrent()
 
         advanceTimeBy(MIC_REVOKED_END_DELAY - 1.milliseconds)
         runCurrent()
-        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().shouldBeEmpty()
 
         advanceTimeBy(1.milliseconds)
         runCurrent()
         events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.abandoned shouldBe true
+    }
+
+    @Test
+    fun `a microphone revoked before any rating discards the session`() = runTest {
+        permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
+        startCoordinator()
+
+        advanceTimeBy(MIC_REVOKED_END_DELAY)
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionDiscarded>().shouldHaveSize(1)
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().shouldBeEmpty()
     }
 
     @Test
@@ -207,7 +236,7 @@ class RatedStudySessionCoordinatorTest {
         advanceTimeBy(MIC_REVOKED_END_DELAY)
         runCurrent()
 
-        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().shouldBeEmpty()
     }
 
     // Timers
@@ -676,7 +705,7 @@ class RatedStudySessionCoordinatorTest {
         val coordinator = startCoordinator(setup.copy(cardIds = listOf("card-1")))
         coordinator.holdAdvance()
         gradeAndReachAdvancePoint()
-        events.filterIsInstance<RatedSessionEvent.SessionEnded>() shouldBe emptyList()
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().shouldBeEmpty()
 
         coordinator.releaseAdvance()
         advanceTimeBy(RELEASE_LINGER)
@@ -1072,24 +1101,103 @@ class RatedStudySessionCoordinatorTest {
     // Result
 
     @Test
-    fun `leaving before the cards load seals an empty abandoned result with zero duration`() = runTest {
+    fun `a card load that fails after leaving reports no load failure`() = runTest {
+        flashcardRepository.flashcardsBySubcategory[SUBCATEGORY_ID] = Result.failure(IllegalStateException("offline"))
+        val coordinator = startCoordinator(runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe RatedSessionStateSnapshot.Loading
+    }
+
+    @Test
+    fun `leaving after a failed card load sends no event, since the screen is already returning to Preview`() = runTest {
+        flashcardRepository.flashcardsBySubcategory[SUBCATEGORY_ID] = Result.failure(IllegalStateException("offline"))
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe RatedSessionStateSnapshot.LoadFailed
+        events.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a card load that finishes after leaving does not start the session`() = runTest {
+        val coordinator = startCoordinator(runsLoad = false)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        coordinator.sessionState.value shouldBe RatedSessionStateSnapshot.Loading
+    }
+
+    @Test
+    fun `leaving before the cards load discards the session exactly once`() = runTest {
         val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false), runsLoad = false)
 
         coordinator.end(abandoned = true)
         coordinator.end(abandoned = false)
         runCurrent()
 
-        val ended = events.single().shouldBeInstanceOf<RatedSessionEvent.SessionEnded>()
-        val result = ended.result.shouldBeInstanceOf<SessionResult.Rated>()
-        result.abandoned shouldBe true
-        result.cardResults shouldBe emptyList()
-        result.durationSeconds shouldBe 0
+        events.single() shouldBe RatedSessionEvent.SessionDiscarded
+    }
+
+    @Test
+    fun `leaving before any rating discards the session`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+        coordinator.revealAnswer()
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionDiscarded>().shouldHaveSize(1)
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `leaving after one rating ends the session, not discards it`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+        rateFirstCard(coordinator)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.cardResults.map { it.cardId } shouldBe listOf("card-1")
+        events.filterIsInstance<RatedSessionEvent.SessionDiscarded>().shouldBeEmpty()
+    }
+
+    @Test
+    fun `the ended result carries the setup's source type and voice answering setting`() = runTest {
+        val coordinator = startCoordinator(setup.copy(sourceType = Quick))
+        rateFirstCard(coordinator)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
+        result.sourceType shouldBe Quick
+        result.voiceAnsweringEnabled shouldBe true
+    }
+
+    @Test
+    fun `a manual session's ended result records voice answering as off`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+        rateFirstCard(coordinator)
+
+        coordinator.end(abandoned = true)
+        runCurrent()
+
+        val result = events.filterIsInstance<RatedSessionEvent.SessionEnded>().single().result.shouldBeInstanceOf<SessionResult.Rated>()
+        result.voiceAnsweringEnabled shouldBe false
     }
 
     @Test
     fun `the duration runs from the first card shown to the end`() = runTest {
         val clock = MutableClock(START_INSTANT)
         val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false), clock)
+        rateFirstCard(coordinator)
         clock.instant = START_INSTANT.plusSeconds(ELAPSED_SECONDS)
 
         coordinator.end(abandoned = true)

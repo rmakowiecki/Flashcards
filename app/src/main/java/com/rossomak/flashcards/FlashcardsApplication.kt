@@ -3,7 +3,9 @@ package com.rossomak.flashcards
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.rossomak.flashcards.core.data.InterruptedAccountDeletionCompleter
 import com.rossomak.flashcards.core.data.SignedInWorkRunner
+import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import timber.log.Timber
@@ -22,6 +24,13 @@ import timber.log.Timber
  * pending sessions) whenever a user becomes signed in, the session Firebase restores at app start
  * included. That drain is also the recovery path for a session a previous process queued locally but
  * never got to deliver, so no separate app-start drain is needed.
+ *
+ * [InterruptedAccountDeletionCompleter.complete] runs first, so a User whose deletion a process death
+ * interrupted is signed out before that drain is scheduled and before the start screen is chosen.
+ *
+ * [CurrentActivityHolder] is registered here, before anything else can start an Activity, because
+ * GitHub sign-in runs inside the data layer and needs the resumed Activity to open its Custom Tab.
+ * Registering it from the Application means it sees every Activity of the process from the first.
  */
 @HiltAndroidApp
 class FlashcardsApplication : Application(), Configuration.Provider {
@@ -30,7 +39,13 @@ class FlashcardsApplication : Application(), Configuration.Provider {
     lateinit var hiltWorkerFactory: HiltWorkerFactory
 
     @Inject
+    lateinit var interruptedAccountDeletionCompleter: InterruptedAccountDeletionCompleter
+
+    @Inject
     lateinit var signedInWorkRunner: SignedInWorkRunner
+
+    @Inject
+    lateinit var currentActivityHolder: CurrentActivityHolder
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(hiltWorkerFactory).build()
@@ -40,6 +55,8 @@ class FlashcardsApplication : Application(), Configuration.Provider {
         if (BuildConfig.LOGGING_ENABLED) {
             Timber.plant(Timber.DebugTree())
         }
+        registerActivityLifecycleCallbacks(currentActivityHolder)
+        interruptedAccountDeletionCompleter.complete()
         signedInWorkRunner.start()
     }
 }

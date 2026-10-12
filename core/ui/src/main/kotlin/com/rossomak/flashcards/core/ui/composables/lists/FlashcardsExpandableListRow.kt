@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsDifficultyBadge
@@ -94,7 +93,6 @@ fun FlashcardsExpandableListRow(
                 Text(
                     text = title.withInlineCode(),
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (tags.isNotEmpty()) {

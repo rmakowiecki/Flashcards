@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.domain.session
 
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
 
 /**
@@ -20,6 +21,7 @@ data class RatedSessionSetup(
     val voiceAnsweringEnabled: Boolean,
     val attemptsLimit: Int,
     val partialRatingCardRequeueingEnabled: Boolean,
+    val sourceType: SessionSourceType,
 )
 
 /** Everything a Fast Study Session is started with, fixed once the session starts. */
@@ -32,4 +34,5 @@ data class FastSessionSetup(
     val sessionTitle: String,
     val voiceSettings: VoiceSettings,
     val readAloudEnabled: Boolean,
+    val sourceType: SessionSourceType,
 )

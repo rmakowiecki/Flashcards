@@ -5,7 +5,7 @@
 ## Project Overview
 - **Package Name**: `com.rossomak.flashcards`
 - **Architecture**: Clean Architecture with MVVM
-- **Minimum SDK**: 24 (Android 7.0)
+- **Minimum SDK**: 26 (Android 8.0)
 - **Target SDK**: 36
 - **Release status**: unreleased, no production users. Breaking changes to persisted or wire formats (local queue files, DataStore, Firestore documents, Cloud Function payloads) are fine: no migrations, legacy fallbacks or decoding defaults for old data. Remove this line once the app ships.
 
@@ -163,6 +163,7 @@ Best practices:
 - `contentDescription` on icon buttons and images
 - `remember` for expensive calculations; `derivedStateOf` for computed state
 - `LazyColumn` for lists; `key()` for stable item identity
+- Typography: style text only with a `MaterialTheme.typography` slot, its `*Emphasized` twin, or a theme constant (`typography.code`, `InlineCodeSpanStyle`, `EmphasizedSpanStyle`). Never set `fontWeight`, `fontSize`, `fontFamily`, `letterSpacing` or `lineHeight` at a call site. Konsist enforces it. See [ADR-0061](./docs/adr/0061-typography-is-the-stock-m3-scale-over-bundled-roboto.md).
 
 ## Dependency Injection (Hilt)
 
@@ -187,7 +188,7 @@ Dispatchers:
 
 StateFlow / SharedFlow rules:
 - `StateFlow` for UI state in ViewModels (single source of truth per screen)
-- **A one-shot snackbar/toast message is never screen state — not even as a nullable field nulled out after showing.** It's a transient event, same category as navigation. Shape: ViewModel owns `private val _messages = MutableSharedFlow<XxxMessage>(extraBufferCapacity = 1)` exposed as `val messages: SharedFlow<XxxMessage> = _messages.asSharedFlow()`, sent via `_messages.tryEmit(...)`; a sealed `XxxMessage` interface in its own file, doc'd "one-shot snackbar messages... never screen state"; the Composable consumes it with the same `observeAsEvents` helper navigation uses (`core:ui/navigation/ObserveAsEventsKt.kt` — it's generic over any `Flow<T>`, not nav-only) and calls `snackbarHostState.showSnackbar(...)` inside. See `CategoryDetailsViewModel`/`CategoryDetailsMessage` for the reference implementation.
+- **A one-shot snackbar/toast message is never screen state — not even as a nullable field nulled out after showing.** It's a transient event, same category as navigation. Shape: ViewModel owns `private val _messages = MutableSharedFlow<XxxMessage>(extraBufferCapacity = 1)` exposed as `val messages: SharedFlow<XxxMessage> = _messages.asSharedFlow()`, sent via `_messages.tryEmit(...)`; a sealed `XxxMessage` interface in its own file, doc'd "one-shot snackbar messages... never screen state"; the Composable consumes it with the same `observeAsEvents` helper navigation uses (`core:ui/navigation/ObserveAsEventsKt.kt` — it's generic over any `Flow<T>`, not nav-only) and calls `snackbarHostState.showSnackbar(...)` inside. See `CategoryDetailsViewModel`/`CategoryDetailsMessage` for the reference implementation. A message emitted while no collector is active (app backgrounded, Activity recreating) is dropped by design: messages are informational, never required, so don't move them to a `Channel`. Navigation stays on a `Channel` because it can't be dropped.
 - **Navigation is a one-time event, not state**: dispatch it through a `Channel<XxxDestination>(Channel.BUFFERED)` exposed via `receiveAsFlow()` and collect it once in the UI with `ObserveAsEvents(viewModel.events) { … }` (`core:ui`). Destinations stay type-safe sealed interfaces implementing `NavigationEvent` (no route strings). Never put navigation in persistent screen state; there is no `onNavigationHandled()` reset. See [docs/navigation-pattern.md](./docs/navigation-pattern.md) and [ADR-0019](./docs/adr/0019-navigation-as-one-time-events.md).
 - Handle errors with `.catch()` operator on upstream flows
 - Delays use `Duration`, not raw `Long` ms: `delay(NO_SPEECH_TIMEOUT_MS.milliseconds)`, never bare millis.

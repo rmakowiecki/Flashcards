@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Icon
@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -177,8 +176,7 @@ fun FlashcardsEmptyState(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
                 )
@@ -247,7 +245,7 @@ private fun FlashcardsEmptyStateErrorShowcase() {
         Surface {
             Box(modifier = Modifier.padding(MaterialTheme.spacing.normal)) {
                 FlashcardsEmptyState(
-                    icon = Icons.Filled.ErrorOutline,
+                    icon = Icons.Filled.CloudOff,
                     title = "Something went wrong",
                     supportingText = "Couldn't load your categories. Check your connection and try again.",
                     tone = Error,
@@ -297,7 +295,7 @@ private fun FlashcardsEmptyStateOnGradientErrorShowcase() {
                     .padding(MaterialTheme.spacing.normal),
             ) {
                 FlashcardsEmptyState(
-                    icon = Icons.Filled.ErrorOutline,
+                    icon = Icons.Filled.CloudOff,
                     title = "Something went wrong",
                     supportingText = "Couldn't load your categories. Check your connection and try again.",
                     tone = Error,

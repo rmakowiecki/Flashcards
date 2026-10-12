@@ -91,13 +91,14 @@ internal fun disabledButtonContentColorFor(style: FlashcardsComponentStyle): Col
 }
 
 /**
- * Container fill alpha for [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient]
- * when disabled, shared by every gradient-filled `Flashcards*Button`
- * ([FlashcardsFilledButton], [FlashcardsFilledIconButton]). M3's `disabledContainerColor` only
- * takes a flat [Color], so the gradient itself keeps painting (via a background modifier behind a
- * transparent container) and is dimmed with this alpha instead of being swapped out for a solid fill.
+ * Container fill alpha for a disabled filled `Flashcards*Button`: the
+ * [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient] of [FlashcardsFilledButton]
+ * and [FlashcardsFilledIconButton], and the solid error fill of [FlashcardsDestructiveButton]. M3's
+ * `disabledContainerColor` only takes a flat [Color], so the gradient itself keeps painting (via a
+ * background modifier behind a transparent container) and is dimmed with this alpha instead of being
+ * swapped out for a solid fill.
  */
-internal const val DISABLED_GRADIENT_ALPHA = 0.38f
+internal const val DISABLED_BUTTON_ALPHA = 0.38f
 
 /**
  * Resolved colors for a gradient-filled `Flashcards*Button` ([FlashcardsFilledButton],

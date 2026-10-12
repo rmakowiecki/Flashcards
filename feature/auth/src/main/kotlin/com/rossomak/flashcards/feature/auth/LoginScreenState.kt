@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.auth
 
+import com.rossomak.flashcards.feature.auth.LoginPhase.Idle
+
 data class LoginScreenState(
-    val isSigningIn: Boolean = false,
-    val failureReason: LoginFailureReason? = null,
+    val phase: LoginPhase = Idle,
 )

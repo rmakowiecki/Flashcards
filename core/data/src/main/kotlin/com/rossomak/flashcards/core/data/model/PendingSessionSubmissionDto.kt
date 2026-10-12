@@ -13,7 +13,11 @@ import kotlinx.serialization.Serializable
  * [mode] and [startedAtEpochMillis] use the same string/epoch-millis encoding as the network payload
  * (`StudyMode.name`, `Instant.toEpochMilli()`) rather than relying on kotlinx.serialization's default
  * enum/`Instant` handling, for the same reason: no contextual serializer to wire up, and one
- * unsurprising encoding this whole data layer already uses elsewhere.
+ * unsurprising encoding this whole data layer already uses elsewhere. [sourceType] likewise holds
+ * `SessionSourceType.name`, and has no default: a line without it fails to decode.
+ *
+ * [voiceAnsweringEnabled] is present only for a `Rated` entry and [readAloudEnabled] only for a `Fast`
+ * one, each `null` for the other mode, the same split as [PendingFlashcardResultDto.attemptsUsed].
  *
  * [uid] is the User who finished the session, stamped at append time. It is queue metadata, not part
  * of the domain [com.rossomak.flashcards.core.domain.model.SessionResult]:
@@ -44,10 +48,13 @@ data class PendingSessionSubmissionDto(
     val categoryName: String,
     val subcategoryIds: List<String>,
     val subcategoryNames: List<String>,
+    val sourceType: String,
     val cardResults: List<PendingFlashcardResultDto>,
     val studyDate: String,
     val dailyGoalMinutes: Int,
     val studyDateUtcOffsetMinutes: Int,
+    val voiceAnsweringEnabled: Boolean? = null,
+    val readAloudEnabled: Boolean? = null,
 )
 
 /**

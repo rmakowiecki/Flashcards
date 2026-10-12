@@ -39,7 +39,9 @@ the client needs no query of the day's sessions.
   `PERMISSION_DENIED`) and entries that no longer parse move to a dead-letter file and the run
   continues. The dead-letter file is write-only diagnostics: nothing replays or projects it.
 - After each delivery, the worker re-reads the scoring state and the touched Card Progress documents
-  from the server, ignoring failures, and only then removes the entry. The cache then already holds
+  from the server, and only then removes the entry. (Amended by
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md): a failed read keeps the entry
+  queued.) The cache then already holds
   the delivered session when the projection stops replaying it.
 
 ### The Session Summary shows the server's score, and falls back to a local preview
@@ -53,10 +55,13 @@ that report and returns one of two results:
 - **`LocalPreview`**: a `SessionScore` computed by `scoreSession` over the projected reads. The use case
   reads that baseline *before* it queues the session, so the preview never counts the session twice.
   The fallback comes at the earliest of:
-  1. no internet when the Summary opens, or the session could not be queued;
+  1. no internet when the Summary opens;
   2. `SERVER_RESULT_BUDGET` (6 seconds) passing;
   3. the server rejecting the session;
   4. the drain run ending, or going back into retry, without this session's score.
+
+A session that could not be queued at all (no signed-in User, a failed local write) gets no preview:
+the use case fails with `SessionNotSavedException` and the Summary says the session was not saved.
 
 The use case returns once. A server score arriving after the fallback does not replace it; other
 screens show the server's numbers the next time they read.
@@ -66,7 +71,9 @@ screens show the server's numbers the next time they read.
 - **Firestore's offline write queue plus a trigger function.** Rejected: the client would write the
   session document itself, which ADR-0049's rules forbid, and the Summary could not learn the score.
 - **A revision field that gates the handover** from projected to server state. Rejected: the refresh
-  before removal closes most of the gap, and the rest is brief and self-correcting.
+  before removal closes most of the gap, and the rest is brief and self-correcting. **Superseded by
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md)**, which gates it with the
+  applied session ids on `user-stats`.
 - **Versioned XP configurations**, so a Pending Session is scored with the configuration of its
   start. Rejected: the server scores with its current configuration, so a versioned preview would
   disagree with the server.
@@ -75,13 +82,14 @@ screens show the server's numbers the next time they read.
 - **Delivering in-process from the Summary** instead of through the worker. Rejected: two delivery
   paths for one queue, and the Summary dies with its process.
 - **An app-lifetime snapshot listener on the scoring state**, to keep it cached. Deferred until a
-  screen needs a live scoring state.
+  screen needs a live scoring state; resolved as a listener per collecting screen (see Amendments).
 - **A client query of the day's sessions** for the Daily Goal. Rejected: nothing keeps session
   documents cached, so the query is empty offline, exactly when it is needed.
 
 ## Consequences
 
-Accepted transient inaccuracies, all corrected by the next successful server read:
+Accepted transient inaccuracies, all corrected by the next successful server read. The first three are
+resolved by [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md):
 
 - **Under-count after delivery.** Between removal and a cache update (the refresh failed), a
   delivered session is in neither the queue nor the cache. A fallback preview in that window also
@@ -105,3 +113,57 @@ Accepted transient inaccuracies, all corrected by the next successful server rea
 - **Empty Card Progress baseline.** Offline, a Subcategory never read on this device has no cached
   document, so a Pending Session's cards replay over no record: they count as new, and a Mastery
   Defense card counts as newly Mastered.
+
+## Amendments
+
+**2026-10-03 — Recents consume the projection.** `DefaultRecentSessionsRepository` merges the User's
+Pending Sessions into Home's Recents, so a session finished offline shows at once. Through
+`PendingSessionProjector` it scores each Pending Session's preview `xpTotal` oldest first with the
+cached XP configuration, so later
+Streak and Daily Goal awards build on earlier ones. A session with no Studied Flashcards is never
+queued, so it never reaches the projection. See [ADR-0057](0057-recents-state-projection.md).
+
+**2026-10-10 — The Level is followed live, one listener per collecting screen.**
+`DefaultLevelProgressRepository` serves `LevelProgress` (Level, XP into it, XP that completes it) as a
+flow: a snapshot listener on `progress/user-stats` with the User's Pending Sessions replayed on top
+through `PendingSessionProjector`. This resolves the deferred app-lifetime listener option without an
+always-on listener and without a shared replay: every collecting screen gets its own cold flow and
+listener. The Firestore client serves duplicate listeners on one document from a single watch, so a
+second screen costs only its own replay. A shared hot flow was rejected: an upstream failure in an
+application scope has no collector to reach, its collectors never see completion, and a resubscription
+inside a sharing grace window never restarts a completed upstream.
+
+- **Applied sessions add nothing.** The live replay reads `appliedSessionIds` off the same snapshot it
+  replays over, so a delivered session still in the queue counts once, as in the one-shot read. See
+  [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).
+- **Stale replays are dropped.** The live replay reads the Card Progress baselines, then checks the
+  queue against the snapshot it replays; a changed queue (a delivery, or a User switch) drops the result
+  and the change re-emits. The one-shot read keeps its own uid check and has no stale check, so a
+  delivery during the Summary's fallback preview read never fails the save.
+- **No false starting state offline.** A cache miss for a missing document is not read as a brand-new
+  account: the listener runs with metadata changes, drops a from-cache non-existent snapshot, and emits
+  nothing until the server answers. A consumer shows its loading state rather than Level 1.
+- **One configuration per value.** Each emission reads the cached XP configuration once and uses it for
+  both the replay and the Level threshold. A configuration refreshed while a screen is open applies
+  from the next emission.
+- **Sign-out ends the flow.** Permission denied completes the listener, and the flow completes with no
+  further value, cancelling a replay still in flight.
+
+Further accepted inaccuracy:
+
+- **One repeated value before sign-out completes.** Between sign-out and the permission-denied
+  teardown, a queue change can re-emit the same User's last value once. The screen is already leaving.
+- **Two screens can briefly disagree.** Each collector has its own listener and replays the same
+  snapshots, so two open screens (Home under the Summary) differ only while one is mid-replay.
+
+**2026-10-10 — Delivered sessions are applied once.** `user-stats` lists the sessions applied to it,
+an applied Pending Session adds to no aggregate, the worker removes an entry only after every refresh
+read succeeds, and the Summary's baseline excludes its own session. This resolves the under-count after
+delivery, the double count after a crash and the double count between refresh and removal. See
+[ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md).
+
+**2026-10-11 — The Summary's Level card follows its score.** A scored Summary draws its Level card
+from the session's score; only a Summary with no score follows the live Level stream. Accepted: a
+scored card can differ from Home's when the server scored with a newer XP configuration than the
+device's cached one, or when the Summary shows a local preview that the server later scores
+differently. The Summary never replaces a score it has shown.

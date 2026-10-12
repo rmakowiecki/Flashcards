@@ -8,22 +8,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.feature.study.R
 
 /**
  * The non-sheet body shared by every Study Session screen
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)):
- * the loading spinner, the load-error text, the empty-deck message, and — once cards exist —
- * [FlashcardCard] for the current card.
+ * the loading spinner and, once cards exist, [FlashcardCard] for the current card. A session that
+ * loads no cards never shows here: its ViewModel returns to Preview instead.
  *
  * Takes the current card plus the values needed to pick it, not the screen state that owns them —
  * the two Study Modes are diverging into two different state types and this body must not force
@@ -34,7 +31,6 @@ import com.rossomak.flashcards.feature.study.R
 fun StudySessionBody(
     modifier: Modifier = Modifier,
     isLoading: Boolean,
-    error: String?,
     flashcards: List<Flashcard>,
     currentCardIndex: Int,
     isAnswerRevealed: Boolean,
@@ -44,14 +40,10 @@ fun StudySessionBody(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            isLoading -> CenteredBox(innerPadding) {
+            // No cards only before the first Running snapshot, or while a failed load returns to Preview.
+            isLoading || flashcards.isEmpty() -> CenteredBox(innerPadding) {
                 CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
             }
-            error != null -> CenteredBox(innerPadding) { Text(text = error) }
-            flashcards.isEmpty() -> CenteredBox(innerPadding) {
-                Text(text = stringResource(R.string.study_session_no_cards_message))
-            }
-
             else -> BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()

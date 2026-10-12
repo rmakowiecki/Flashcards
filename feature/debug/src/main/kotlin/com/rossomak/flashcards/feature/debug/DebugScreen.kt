@@ -22,6 +22,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.TwoRowsTopAppBar
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -31,6 +32,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.domain.model.AppVersion
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
@@ -53,13 +56,14 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 fun DebugScreen(
     modifier: Modifier = Modifier,
     viewModel: DebugViewModel = hiltViewModel(),
-    buildInfo: BuildInfo,
+    gitShortSha: String,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
     onNavigateToVoiceIndicatorDebug: () -> Unit,
     onNavigateToNetworkGraphPrototype: () -> Unit,
 ) {
     val context = LocalContext.current
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     observeAsEvents(viewModel.events) { destination ->
         when (destination) {
@@ -71,7 +75,8 @@ fun DebugScreen(
 
     DebugContent(
         modifier = modifier,
-        buildInfo = buildInfo,
+        state = state,
+        gitShortSha = gitShortSha,
         showcaseIntent = showcaseIntent,
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
@@ -84,7 +89,8 @@ fun DebugScreen(
 @Composable
 private fun DebugContent(
     modifier: Modifier = Modifier,
-    buildInfo: BuildInfo,
+    state: DebugScreenState,
+    gitShortSha: String,
     showcaseIntent: Intent?,
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
@@ -97,7 +103,11 @@ private fun DebugContent(
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            DebugTopAppBar(buildInfo = buildInfo, scrollBehavior = scrollBehavior)
+            DebugTopAppBar(
+                appVersion = state.appVersion,
+                gitShortSha = gitShortSha,
+                scrollBehavior = scrollBehavior,
+            )
         },
     ) { innerPadding ->
         Column(
@@ -190,17 +200,17 @@ private fun debugToolRow(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DebugTopAppBar(buildInfo: BuildInfo, scrollBehavior: TopAppBarScrollBehavior) {
+private fun DebugTopAppBar(appVersion: AppVersion?, gitShortSha: String, scrollBehavior: TopAppBarScrollBehavior) {
     TwoRowsTopAppBar(
         title = { Text(text = stringResource(R.string.debug_title)) },
         subtitle = { expanded ->
-            if (expanded) {
+            if (expanded && appVersion != null) {
                 Text(
                     text = stringResource(
                         R.string.debug_build_info_label,
-                        buildInfo.versionName,
-                        buildInfo.versionCode,
-                        buildInfo.gitShortSha,
+                        appVersion.name,
+                        appVersion.code,
+                        gitShortSha,
                     ),
                     modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal),
                     maxLines = 1,
@@ -217,11 +227,8 @@ private fun DebugTopAppBar(buildInfo: BuildInfo, scrollBehavior: TopAppBarScroll
 private fun DebugContentPreview() {
     FlashcardsTheme {
         DebugContent(
-            buildInfo = BuildInfo(
-                versionName = "0.1.1234-profiling",
-                versionCode = 1234,
-                gitShortSha = "7f57c64",
-            ),
+            state = DebugScreenState(appVersion = AppVersion(name = "0.1.1234-profiling", code = 1234)),
+            gitShortSha = "7f57c64",
             showcaseIntent = null,
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},

@@ -13,8 +13,9 @@ import kotlinx.coroutines.flow.Flow
  * [com.rossomak.flashcards.core.data.repository.DefaultSessionSubmissionRepository] is the only
  * [append] caller; [com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker] is the
  * only [listAll]/[remove] caller. [com.rossomak.flashcards.core.data.repository.PendingSessionProjector]
- * is the only [observeAll] caller. See [FilePendingSessionSubmissionLocalDataSource] for the concrete
- * storage shape and its concurrency guarantee across those callers.
+ * is the only [observeAll] caller. Account Deletion is the only [removeAllForUser] caller. See
+ * [FilePendingSessionSubmissionLocalDataSource] for the concrete storage shape and its concurrency
+ * guarantee across those callers.
  */
 interface PendingSessionSubmissionLocalDataSource {
 
@@ -29,10 +30,13 @@ interface PendingSessionSubmissionLocalDataSource {
 
     suspend fun remove(sessionId: String)
 
+    /** Drops every entry owned by [uid], leaving other Users' entries queued. */
+    suspend fun removeAllForUser(uid: String)
+
     /**
-     * Every User's queued entries, re-emitted after each [append] and [remove]. Unlike [listAll], never
-     * fails: a queue file that cannot be read emits an empty list, since an observer only projects the
-     * queue and has nothing to retry.
+     * Every User's queued entries, re-emitted after each [append], [remove] and [removeAllForUser].
+     * Unlike [listAll], never fails: a queue file that cannot be read emits an empty list, since an
+     * observer only projects the queue and has nothing to retry.
      */
     fun observeAll(): Flow<List<PendingSessionSubmissionDto>>
 }

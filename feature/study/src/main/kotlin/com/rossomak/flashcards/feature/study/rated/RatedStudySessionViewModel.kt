@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
-import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.LoadFailed
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.Loading
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.Running
@@ -17,6 +16,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEvent
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.ExternalTransportCommand
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.MicPermissionRevoked
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.PlayIgnoredDuringCall
+import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.SessionDiscarded
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.SessionEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerCaptureUnavailable
 import com.rossomak.flashcards.core.domain.session.RatedSessionEvent.VoiceAnswerGradingFailed
@@ -36,7 +36,6 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
-import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -127,6 +126,7 @@ class RatedStudySessionViewModel @Inject constructor(
                 voiceAnsweringEnabled = route.voiceAnsweringEnabled,
                 attemptsLimit = route.ratedAttempts,
                 partialRatingCardRequeueingEnabled = route.partialRatingCardRequeueingEnabled,
+                sourceType = route.sourceType,
             ),
         )
     }
@@ -134,7 +134,12 @@ class RatedStudySessionViewModel @Inject constructor(
     private fun observeSnapshot() {
         viewModelScope.launch {
             coordinator.sessionState.collect { snapshot ->
-                _state.update { it.fromSnapshot(snapshot) }
+                when (snapshot) {
+                    Loading -> _state.update { it.copy(isLoading = true) }
+                    // No session started: return to Preview, which can load the cards again.
+                    LoadFailed -> eventChannel.send(RatedStudySessionDestination.Back)
+                    is Running -> _state.update { it.fromRunningSnapshot(snapshot) }
+                }
             }
         }
     }
@@ -160,6 +165,7 @@ class RatedStudySessionViewModel @Inject constructor(
             is SessionEnded -> viewModelScope.launch {
                 eventChannel.send(RatedStudySessionDestination.Summary(event.result.toSummaryRoute()))
             }
+            SessionDiscarded -> viewModelScope.launch { eventChannel.send(RatedStudySessionDestination.Back) }
         }
     }
 
@@ -168,7 +174,9 @@ class RatedStudySessionViewModel @Inject constructor(
      * the snapshot collector to run, keeps the screen in step with the tap that caused it.
      */
     private fun showSessionNow() {
-        _state.update { it.fromSnapshot(coordinator.sessionState.value) }
+        // Commands only reach a running session.
+        val snapshot = coordinator.sessionState.value as? Running ?: return
+        _state.update { it.fromRunningSnapshot(snapshot) }
     }
 
     private fun GradingFailureReason.toMessage(): RatedStudySessionMessage = when (this) {
@@ -176,15 +184,8 @@ class RatedStudySessionViewModel @Inject constructor(
         GradingFailureReason.ServiceError -> RatedStudySessionMessage.VoiceAnswerGradingServiceError
     }
 
-    private fun RatedStudySessionScreenState.fromSnapshot(snapshot: RatedSessionStateSnapshot) = when (snapshot) {
-        Loading -> copy(isLoading = true, error = null)
-        LoadFailed -> copy(isLoading = false, error = R.string.study_session_load_error_message)
-        is Running -> fromRunningSnapshot(snapshot)
-    }
-
     private fun RatedStudySessionScreenState.fromRunningSnapshot(snapshot: Running) = copy(
         isLoading = false,
-        error = null,
         flashcards = snapshot.cards,
         isAnswerRevealed = snapshot.isAnswerRevealed,
         isVoiceActive = snapshot.playback.isActive,

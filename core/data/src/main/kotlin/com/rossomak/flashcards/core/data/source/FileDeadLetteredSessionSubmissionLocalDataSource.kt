@@ -20,8 +20,9 @@ import kotlinx.serialization.json.Json
  * [DeadLetteredSessionSubmissionDto] JSON-encoded per line, the same layout as
  * [FilePendingSessionSubmissionLocalDataSource].
  *
- * [append] rewrites the whole file through a sibling temp file and an atomic rename, so a process death
- * mid-write leaves either the old complete file or the new complete file on disk. Dead-lettering is
+ * [append] and [removeAllForUser] rewrite the whole file through a sibling temp file and an atomic
+ * rename, so a process death mid-write leaves either the old complete file or the new complete file on
+ * disk. Dead-lettering is
  * rare, so the cost of a full rewrite does not matter. A line that fails to decode is logged and
  * skipped, and dropped from disk by the next [append]. A whole-file [IOException] propagates, so an
  * unreadable file is never silently replaced with a shorter one.
@@ -39,6 +40,14 @@ class FileDeadLetteredSessionSubmissionLocalDataSource @Inject constructor(
 
     override suspend fun listAll(): List<DeadLetteredSessionSubmissionDto> = withContext(Dispatchers.IO) {
         mutex.withLock { readAll() }
+    }
+
+    override suspend fun removeAllForUser(uid: String) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val recorded = readAll()
+            val remaining = recorded.filterNot { it.entry.uid == uid }
+            if (remaining.size != recorded.size) writeAll(remaining)
+        }
     }
 
     /** Must only be called while holding [mutex]. */

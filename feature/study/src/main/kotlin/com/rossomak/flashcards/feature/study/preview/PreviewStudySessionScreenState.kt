@@ -1,16 +1,18 @@
 package com.rossomak.flashcards.feature.study.preview
 
-import androidx.annotation.StringRes
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
+import com.rossomak.flashcards.core.domain.model.SessionSourceType
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
+import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 
 data class PreviewStudySessionScreenState(
     val categoryName: String = "",
     val subcategoryNames: List<String> = emptyList(),
-    val isQuickSession: Boolean = false,
+    val sourceType: SessionSourceType = SingleSubcategory,
     val isLoading: Boolean = true,
-    @param:StringRes val error: Int? = null,
+    val isLoadFailed: Boolean = false, // A read failed, most often offline; Retry can recover.
     val config: StudySessionConfig = StudySessionConfig(subcategoryIds = emptyList()),
     val selectedCardCount: Int = 0,
     val estimatedMinutes: Int = 0,
@@ -31,6 +33,7 @@ data class PreviewStudySessionScreenState(
 ) {
     val isSingleSubcategory: Boolean get() = subcategoryNames.size == 1
     val subcategoryCount: Int get() = subcategoryNames.size
+    val isQuickSession: Boolean get() = sourceType == Quick
 
     // Quick only: its subcategories were auto-sampled, so a fresh draw is meaningful. Custom's are
     // hand-picked by the user — nothing to reshuffle, so Custom never offers it, single-subcategory
@@ -47,5 +50,5 @@ data class PreviewStudySessionScreenState(
      */
     val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
 
-    val canStart: Boolean get() = !isLoading && error == null && selectedCardCount > 0
+    val canStart: Boolean get() = !isLoading && !isLoadFailed && selectedCardCount > 0
 }

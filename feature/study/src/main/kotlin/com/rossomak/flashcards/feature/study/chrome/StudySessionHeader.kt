@@ -20,7 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
@@ -86,7 +85,7 @@ fun StudySessionHeader(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     // alignByBaseline, not Alignment.Bottom: labelMedium and titleLarge have
                     // different descent, so box-bottom alignment leaves their glyphs visibly
-                    // offset — see the LEVEL/level-number pair in FlashcardsLevelCard.
+                    // offset — see the LVL/level-number pair in FlashcardsLevelCard.
                     Text(
                         text = progress.label,
                         modifier = Modifier.alignByBaseline(),
@@ -97,9 +96,8 @@ fun StudySessionHeader(
                     Text(
                         text = progress.completedCount.toString(),
                         modifier = Modifier.alignByBaseline(),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLargeEmphasized,
                         color = MaterialTheme.brandColors.onGradientContent,
-                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = stringResource(R.string.study_session_progress_total_label, progress.totalCount),

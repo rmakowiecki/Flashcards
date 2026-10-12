@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,9 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -70,6 +69,7 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
+import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
@@ -82,6 +82,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.EmphasizedSpanStyle
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
@@ -92,6 +93,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
+import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.MicPermissionStillDenied
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -124,7 +126,7 @@ fun PreviewStudySessionScreen(
     val snackbarScope = rememberCoroutineScope()
     observeAsEvents(viewModel.messages) { message ->
         when (message) {
-            PreviewStudySessionMessage.MicPermissionStillDenied -> snackbarScope.launch {
+            MicPermissionStillDenied -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(message = micPermissionStillDeniedText, duration = SnackbarDuration.Short)
             }
         }
@@ -280,11 +282,10 @@ fun PreviewStudySessionContent(
                     CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
                 }
 
-                state.error != null -> ErrorContent(
+                state.isLoadFailed -> LoadFailureContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    error = stringResource(state.error),
                     onRetry = onRetry,
                 )
 
@@ -305,7 +306,7 @@ fun PreviewStudySessionContent(
                 )
             }
         }
-        // Gated to error only, deliberately NOT to state.isLoading: a settings edit re-triggers
+        // Gated to a load failure only, deliberately NOT to state.isLoading: a settings edit re-triggers
         // selectCards(), which flips isLoading true for the reselect and false again once it lands
         // (see PreviewStudySessionViewModel.selectCards's own doc) — a sheet already open at that
         // point must ride through untouched, or it unmounts and remounts on every edit, snapping
@@ -315,7 +316,7 @@ fun PreviewStudySessionContent(
         // before the first load lands, so nothing here is meaningless during that window either —
         // and the sheet cannot be open yet at that point regardless, since ReadyContent's own
         // settings toggle is what's absent until the first load lands.
-        if (state.error == null) {
+        if (!state.isLoadFailed) {
             SessionSettingsSheet(
                 state = state,
                 sheetState = settingsSheetState,
@@ -327,27 +328,25 @@ fun PreviewStudySessionContent(
 }
 
 @Composable
-private fun ErrorContent(
+private fun LoadFailureContent(
     modifier: Modifier = Modifier,
-    error: String,
     onRetry: () -> Unit,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = error,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.brandColors.onGradientContent,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
-        FlashcardsOutlinedButton(
-            text = stringResource(CoreUiR.string.common_retry_button),
-            onClick = onRetry,
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        FlashcardsEmptyState(
+            icon = Icons.Default.CloudOff,
+            title = stringResource(CoreUiR.string.common_load_error_title),
+            supportingText = stringResource(CoreUiR.string.common_flashcards_load_error_message),
+            tone = FlashcardsEmptyStateTone.Error,
             style = OnGradient,
+            button = {
+                FlashcardsFilledButton(
+                    text = stringResource(CoreUiR.string.common_retry_button),
+                    onClick = onRetry,
+                    icon = Icons.Default.Refresh,
+                    style = OnGradient,
+                )
+            },
         )
     }
 }
@@ -430,8 +429,7 @@ private fun HeroTop(modifier: Modifier = Modifier) {
             // this hero is that empty state's populated counterpart in the very same layout slot
             // (see ReadyContent), so the two should read as the same weight of "state title".
             text = stringResource(R.string.preview_session_ready_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.brandColors.onGradientContent,
         )
     }
@@ -771,17 +769,17 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
     val listTwoItemConjunction = stringResource(CoreUiR.string.common_list_two_item_conjunction)
     val listFinalConjunction = stringResource(CoreUiR.string.common_list_final_conjunction)
     return buildAnnotatedString {
-        fun appendBold(text: String) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text) }
+        fun appendEmphasized(text: String) {
+            withStyle(EmphasizedSpanStyle) { append(text) }
         }
 
         when {
             state.isQuickSession -> {
-                appendBold(cardsText)
+                appendEmphasized(cardsText)
                 append(stringResource(R.string.preview_session_scope_quick_session_message))
                 appendSubcategoryList(
                     state.subcategoryNames,
-                    ::appendBold,
+                    ::appendEmphasized,
                     otherSubcategoriesText,
                     listSeparator,
                     listTwoItemConjunction,
@@ -790,18 +788,18 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
             }
 
             state.isSingleSubcategory -> {
-                appendBold(cardsText)
+                appendEmphasized(cardsText)
                 append(stringResource(R.string.preview_session_scope_single_subcategory_prefix_message))
-                appendBold(state.subcategoryNames.first())
+                appendEmphasized(state.subcategoryNames.first())
                 append(stringResource(R.string.preview_session_scope_single_subcategory_suffix_message))
             }
 
             else -> {
-                appendBold(cardsText)
+                appendEmphasized(cardsText)
                 append(stringResource(R.string.preview_session_scope_multi_subcategory_message))
                 appendSubcategoryList(
                     state.subcategoryNames,
-                    ::appendBold,
+                    ::appendEmphasized,
                     otherSubcategoriesText,
                     listSeparator,
                     listTwoItemConjunction,
@@ -828,19 +826,19 @@ private const val SUBCATEGORY_LIST_VISIBLE_COUNT = 3
  */
 private fun AnnotatedString.Builder.appendSubcategoryList(
     names: List<String>,
-    appendBold: (String) -> Unit,
+    appendEmphasized: (String) -> Unit,
     otherSubcategoriesText: String?,
     listSeparator: String,
     listTwoItemConjunction: String,
     listFinalConjunction: String,
 ) {
     if (otherSubcategoriesText == null) {
-        appendOxfordList(names, appendBold, listSeparator, listTwoItemConjunction, listFinalConjunction)
+        appendOxfordList(names, appendEmphasized, listSeparator, listTwoItemConjunction, listFinalConjunction)
         return
     }
     names.take(SUBCATEGORY_LIST_VISIBLE_COUNT).forEachIndexed { index, name ->
         if (index > 0) append(listSeparator)
-        appendBold(name)
+        appendEmphasized(name)
     }
     append(otherSubcategoriesText)
 }
@@ -848,7 +846,7 @@ private fun AnnotatedString.Builder.appendSubcategoryList(
 // Joins names as "A and B" (2 items) or "A, B, and C" (3+ items), bolding each name.
 private fun AnnotatedString.Builder.appendOxfordList(
     names: List<String>,
-    appendBold: (String) -> Unit,
+    appendEmphasized: (String) -> Unit,
     listSeparator: String,
     listTwoItemConjunction: String,
     listFinalConjunction: String,
@@ -859,6 +857,6 @@ private fun AnnotatedString.Builder.appendOxfordList(
             names.lastIndex -> append(if (names.size > 2) listFinalConjunction else listTwoItemConjunction)
             else -> append(listSeparator)
         }
-        appendBold(name)
+        appendEmphasized(name)
     }
 }

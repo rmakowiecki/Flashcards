@@ -4,6 +4,7 @@ import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.CategorySearchResults
 import com.rossomak.flashcards.core.domain.model.CategoryWithSubcategorySummary
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import com.rossomak.flashcards.core.domain.model.SubcategoryWithParentCategory
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.base.UseCase
 import javax.inject.Inject
@@ -62,7 +63,7 @@ class SearchCategoriesUseCase @Inject constructor(
      * name. Both branches are load-bearing: the first is what surfaces "Android" for a search of
      * "compose", the second is what surfaces it for a search of "and" when no Subcategory matches
      * at all. A parent id with no entry in [categories] — a stale or partial category list — is
-     * dropped rather than faked into a row.
+     * dropped rather than faked into a row, in both sections.
      */
     private fun buildResults(
         normalizedQuery: String,
@@ -85,7 +86,12 @@ class SearchCategoriesUseCase @Inject constructor(
                 )
             }
 
-        return CategorySearchResults(subcategories = subcategories, categories = matchedCategories)
+        val categoriesById = categories.associateBy(Category::id)
+        val subcategoriesWithParent = subcategories.mapNotNull { subcategory ->
+            val parentCategory = categoriesById[subcategory.categoryId] ?: return@mapNotNull null
+            SubcategoryWithParentCategory(subcategory = subcategory, parentCategory = parentCategory)
+        }
+        return CategorySearchResults(subcategories = subcategoriesWithParent, categories = matchedCategories)
     }
 
     /**

@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
@@ -106,8 +105,7 @@ private fun MasteryQuestionCard(modifier: Modifier = Modifier) {
         }
         Text(
             text = stringResource(R.string.mastery_example_question_title),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmallEmphasized,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
         )
@@ -145,8 +143,7 @@ private fun MasteryResultCard(modifier: Modifier = Modifier) {
             )
             Text(
                 text = stringResource(R.string.mastery_xp_reward_label, CARD_MASTERY_XP),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMediumEmphasized,
                 color = MaterialTheme.colorScheme.primary,
             )
         }

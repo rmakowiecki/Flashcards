@@ -22,12 +22,6 @@ object AppSizes {
     /** 1px hairline used for card borders and dividers. */
     val hairline: Dp = 1.dp
 
-    /** An inline progress spinner sized to sit in a text button's place in an app bar. */
-    val inlineProgress: Dp = 20.dp
-
-    /** Stroke of an [inlineProgress] spinner — heavier than the M3 default at this diameter. */
-    val inlineProgressStroke: Dp = 2.dp
-
     /** Height of the checkable tag chip (M3 filter chip, one size only). */
     val tagChipHeight: Dp = 40.dp
 
@@ -119,8 +113,18 @@ object AppSizes {
     /** Glyph size inside [emptyStateIconCircle]. */
     val emptyStateIcon: Dp = 40.dp
 
-    /** Diameter of the striped placeholder avatar on [com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard]. */
-    val levelCardAvatar: Dp = 56.dp
+    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small] avatar (Settings' top app bar). */
+    val avatarSmall: Dp = 32.dp
+
+    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Medium] avatar (level card). */
+    val avatarMedium: Dp = 56.dp
+
+    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large] avatar (Account header). */
+    val avatarLarge: Dp = 88.dp
+
+    val actionProgressStroke: Dp = 2.dp
+
+    val bulletDot: Dp = 4.dp
 
     /** Glyph inlined at the end of a favorited row's title text (see `FlashcardsRowTitleText`). */
     val favoriteInlineIcon: Dp = 16.dp
