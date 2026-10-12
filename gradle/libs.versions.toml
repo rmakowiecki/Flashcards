@@ -47,6 +47,10 @@ detekt = "1.23.8"
 konsist = "0.17.3"
 # Compose Multiplatform for the KMP lib modules; keep it on the androidx Compose UI version the BOM resolves.
 composeMultiplatform = "1.12.1"
+# CMP material3 ships on its own release train; this one wraps androidx material3 1.5.0-alpha22.
+composeMultiplatformMaterial3 = "1.12.0-alpha03"
+# The CMP material icons were frozen at this release.
+composeMultiplatformMaterialIcons = "1.7.3"
 timber = "5.0.1"
 
 [libraries]
@@ -140,6 +144,10 @@ jetbrains-compose-runtime = { group = "org.jetbrains.compose.runtime", name = "r
 jetbrains-compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
 jetbrains-compose-ui-util = { group = "org.jetbrains.compose.ui", name = "ui-util", version.ref = "composeMultiplatform" }
 jetbrains-compose-animation-core = { group = "org.jetbrains.compose.animation", name = "animation-core", version.ref = "composeMultiplatform" }
+jetbrains-compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
+jetbrains-compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMultiplatformMaterial3" }
+jetbrains-compose-material-icons-core = { group = "org.jetbrains.compose.material", name = "material-icons-core", version.ref = "composeMultiplatformMaterialIcons" }
+jetbrains-compose-material-icons-extended = { group = "org.jetbrains.compose.material", name = "material-icons-extended", version.ref = "composeMultiplatformMaterialIcons" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -153,6 +161,7 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 aboutlibraries-android = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutLibraries" }

@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.debugtools.networkgraph
+package com.rossomak.networkgraph.tuner
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,29 +33,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.networkgraph.EdgeRule
 import com.rossomak.networkgraph.MAX_SHAPE_PRIMITIVES
 import com.rossomak.networkgraph.NetworkGraphLayerSpec
+import com.rossomak.networkgraph.NetworkGraphPresets
 import com.rossomak.networkgraph.NetworkGraphSpec
 import com.rossomak.networkgraph.ShapePrimitive
 import com.rossomak.networkgraph.ShapePrimitive.Bloom
 import com.rossomak.networkgraph.ShapePrimitive.Ribbon
 import com.rossomak.networkgraph.ShapePrimitive.Uniform
-import java.util.Locale
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * Live editor for one [NetworkGraphSpec]: a layer picker (with add-back-layer / remove), the layer's
  * edge rule as a segmented row, its shape as one collapsible card per [ShapePrimitive] (add, remove,
- * up to [MAX_SHAPE_PRIMITIVES]), then the curated sliders. Edits are in-memory only; "copy spec" on the
- * screen is how they survive.
+ * up to [MAX_SHAPE_PRIMITIVES]), then the curated sliders. Edits are in-memory only; [toKotlinSource]
+ * is how they survive.
  * [header] goes above everything else, inside the same scroll. [showViolations] is screen-wide,
  * not part of the spec: it rings any node breaking the two-edge rule.
  */
 @Composable
-fun NetworkGraphTuningSheetContent(
+public fun NetworkGraphTuningSheetContent(
     modifier: Modifier = Modifier,
     spec: NetworkGraphSpec,
     showViolations: Boolean,
@@ -74,9 +71,9 @@ fun NetworkGraphTuningSheetContent(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = MaterialTheme.spacing.normal)
-            .padding(bottom = MaterialTheme.spacing.large),
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+            .padding(horizontal = SpacingNormal)
+            .padding(bottom = SpacingLarge),
+        verticalArrangement = Arrangement.spacedBy(SpacingSmall),
     ) {
         header()
         LayerPicker(
@@ -84,7 +81,7 @@ fun NetworkGraphTuningSheetContent(
             selectedLayer = layerIndex,
             onLayerSelect = { selectedLayer = it },
             onBackLayerAdd = {
-                onSpecChange(spec.copy(layers = listOf(FlashcardsNetworkGraphPresets.defaultBackLayer) + spec.layers))
+                onSpecChange(spec.copy(layers = listOf(NetworkGraphPresets.defaultBackLayer) + spec.layers))
                 selectedLayer = 0
             },
             onLayerRemove = {
@@ -129,7 +126,7 @@ private fun LayerPicker(
     onLayerRemove: () -> Unit,
 ) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SpacingSmall),
         verticalArrangement = Arrangement.Center,
     ) {
         repeat(layerCount) { index ->
@@ -176,7 +173,7 @@ private fun ShapeEditor(shapes: List<ShapePrimitive>, onShapesChange: (List<Shap
         )
     }
     if (shapes.size < MAX_SHAPE_PRIMITIVES) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(SpacingSmall)) {
             newPrimitives.forEach { primitive ->
                 AssistChip(
                     onClick = {
@@ -191,7 +188,7 @@ private fun ShapeEditor(shapes: List<ShapePrimitive>, onShapesChange: (List<Shap
     }
 }
 
-@Suppress("LongParameterList") // Prototype plumbing: one card's state and its three actions.
+@Suppress("LongParameterList") // One card's state and its three actions.
 @Composable
 private fun ShapeCard(
     label: String,
@@ -203,10 +200,10 @@ private fun ShapeCard(
     onRemove: () -> Unit,
 ) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(horizontal = MaterialTheme.spacing.small)) {
+        Column(modifier = Modifier.padding(horizontal = SpacingSmall)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "$label · weight %.2f".format(Locale.US, primitive.weight),
+                    text = "$label · weight ${primitive.weight.toFixed(2)}",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -263,7 +260,7 @@ private fun SliderRow(label: String, value: Float, range: ClosedFloatingPointRan
     Column {
         Row {
             Text(text = label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            Text(text = "%.2f".format(Locale.US, value), style = MaterialTheme.typography.labelMedium)
+            Text(text = value.toFixed(2), style = MaterialTheme.typography.labelMedium)
         }
         Slider(value = value.coerceIn(range), onValueChange = onValueChange, valueRange = range, modifier = Modifier.padding(top = 0.dp))
     }

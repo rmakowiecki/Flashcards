@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.feature.debug.networkgraph
 
 import androidx.compose.ui.graphics.Color
-import com.rossomak.networkgraph.NetworkGraphLayerSpec
 import com.rossomak.networkgraph.NetworkGraphPresets
 import com.rossomak.networkgraph.NetworkGraphSpec
 
@@ -9,7 +8,7 @@ private val BrandIndigo = Color(0xFF2A2E8F)
 
 /**
  * The prototype screen's pages: the lib's [NetworkGraphPresets] with Flashcards' brand applied, plus
- * the fake onboarding decks. New presets come from the tuning sheet's "copy spec" button, pasted here.
+ * the fake onboarding decks. New presets come from the playground's "copy spec" button, pasted here.
  */
 object FlashcardsNetworkGraphPresets {
 
@@ -44,7 +43,4 @@ object FlashcardsNetworkGraphPresets {
         "Corner bloom",
         "Bloom, bottom-start",
     ).map(::morphVariantNamed)
-
-    /** What the tuning sheet inserts as a new back layer. */
-    val defaultBackLayer: NetworkGraphLayerSpec = NetworkGraphPresets.defaultBackLayer
 }

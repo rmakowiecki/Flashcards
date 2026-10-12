@@ -1,18 +1,22 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph.tuner
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.rossomak.networkgraph.NetworkGraphLayerSpec
+import com.rossomak.networkgraph.NetworkGraphPresets
 import com.rossomak.networkgraph.NetworkGraphSpec
 import com.rossomak.networkgraph.ShapePrimitive
-import java.util.Locale
 
 // Each primitive's constructor defaults, read off a default instance so they never drift from the lib.
 private val UniformDefaults = ShapePrimitive.Uniform()
 private val RibbonDefaults = ShapePrimitive.Ribbon()
 private val BloomDefaults = ShapePrimitive.Bloom()
 
-/** The spec as Kotlin source for [NetworkGraphPresets], listing only layer fields that differ from the defaults. */
-fun NetworkGraphSpec.toKotlinSource(): String {
+/**
+ * The spec as Kotlin source in the style of [NetworkGraphPresets], ready to paste into a preset list. Lists
+ * only the layer fields that differ from the defaults.
+ */
+public fun NetworkGraphSpec.toKotlinSource(): String {
     val defaults = NetworkGraphLayerSpec().sourceArguments()
     val layerSources = layers.joinToString(separator = ",\n") { layer ->
         val arguments = layer.sourceArguments().filter { (name, value) -> defaults[name] != value }
@@ -67,7 +71,7 @@ private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linke
     "cometStrength" to cometStrength.toSource(),
     "cometSpark" to cometSpark.toString(),
     "alpha" to alpha.toSource(),
-    "surfaceColor" to (surfaceColor?.let { color -> "Color(0x%08X)".format(Locale.US, color.toArgb()) } ?: "null"),
+    "surfaceColor" to (surfaceColor?.let { color -> "Color(0x${color.toArgbHex()})" } ?: "null"),
 )
 
 /** The primitive as a constructor call, listing only the arguments that differ from its defaults. */
@@ -95,6 +99,14 @@ private fun ShapePrimitive.toSource(): String {
     }
 }
 
-private fun Float.toSource(): String = "%.3f".format(Locale.US, this).trimEnd('0').let { trimmed ->
+/** A Kotlin float literal rounded to three decimals, trailing zeros trimmed: `0.5f`, `2.0f`. */
+internal fun Float.toSource(): String = toFixed(SOURCE_DECIMALS).trimEnd('0').let { trimmed ->
     if (trimmed.endsWith('.')) "${trimmed}0f" else "${trimmed}f"
 }
+
+/** The color's ARGB as eight uppercase hex digits, alpha first: `FF2A2E8F`. */
+internal fun Color.toArgbHex(): String = toArgb().toUInt().toString(HEX_RADIX).uppercase().padStart(ARGB_HEX_DIGITS, '0')
+
+private const val SOURCE_DECIMALS = 3
+private const val HEX_RADIX = 16
+private const val ARGB_HEX_DIGITS = 8

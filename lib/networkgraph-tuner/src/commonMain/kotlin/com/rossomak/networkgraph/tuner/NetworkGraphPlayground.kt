@@ -1,8 +1,7 @@
 @file:OptIn(ExperimentalNetworkGraphApi::class)
 
-package com.rossomak.flashcards.debugtools.networkgraph
+package com.rossomak.networkgraph.tuner
 
-import android.content.ClipData
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,7 +25,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ContentCopy
@@ -36,6 +34,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -62,62 +61,59 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import com.rossomak.flashcards.core.common.logd
-import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
-import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.networkgraph.ExperimentalNetworkGraphApi
 import com.rossomak.networkgraph.NetworkGraphFrameStats
 import com.rossomak.networkgraph.NetworkGraphLayerStats
 import com.rossomak.networkgraph.NetworkGraphMorph
 import com.rossomak.networkgraph.NetworkGraphSpec
 import com.rossomak.networkgraph.morphsSmoothlyInto
-import java.util.Locale
+import com.rossomak.networkgraph.networkGraphBackground
 import kotlin.math.floor
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * PROTOTYPE, throwaway — answers "which animated network-graph background looks best, and on which
- * surfaces". Delete the whole `networkgraph` package and the two routing hooks in
- * [com.rossomak.flashcards.debugtools.DebugScreen] / `MainScreenDebugTabs` once a winner is
- * promoted.
+ * A sample and tuner in one: a full-screen pager for finding which network-graph background looks
+ * best, and on which surfaces.
  *
- * One [FlashcardsNetworkGraphPresets] variant per pager page, each shown on the two aspect ratios a winner has
- * to hold up on: a wide, short top app bar strip and a tall hero. Three more pages follow the presets:
- * a morph page that scrubs or times a morph between two [FlashcardsNetworkGraphPresets.morphFamily] variants,
- * and two fake onboarding pagers whose background morphs with their scroll position and whose surface
- * can shrink and grow: the first between simple shapes, the second through splits, merges and
- * crossings that send comets ([FlashcardsNetworkGraphPresets.onboardingCometPages]). Registered on the app's outer graph, so it runs full-screen without the bottom bar.
+ * One [presets] spec per pager page, each shown on the two aspect ratios a background has to hold up
+ * on: a wide, short top app bar strip and a tall hero. Then a morph page that scrubs or times a morph
+ * between two [morphFamily] specs, and one page per entry of [decks]: a stand-in onboarding pager whose
+ * background morphs with its scroll position and whose surface can shrink and grow.
  *
- * The bottom overlay, laid out under the pages rather than over them, reseeds the page's layout,
- * flips the [FlashcardsComponentStyle] for every page, copies the page's current spec as Kotlin
- * (clipboard + logcat), and opens the tuning sheet, which edits that spec live: the morph's "to" side
- * on the morph page, the settled step on the onboarding page. Edits live in memory for this screen's
- * lifetime only.
+ * The bottom overlay, laid out under the pages rather than over them, reseeds the page's layout, steps
+ * every page through [styles], copies the page's current spec as Kotlin to the clipboard and
+ * [onSpecExport], and opens the tuning sheet, which edits that spec live: the morph's "to" side on the
+ * morph page, the settled step on a deck page. Edits live in memory for the playground's lifetime only.
+ *
+ * Renders with the caller's `MaterialTheme`; [styles] and [deckStyle] carry the caller's brand, and
+ * [navigationIcon] goes at the start of every page's app bar.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit) {
-    val specs = remember { FlashcardsNetworkGraphPresets.all.toMutableStateList() }
-    val morphSpecs = remember { FlashcardsNetworkGraphPresets.morphFamily.toMutableStateList() }
-    val onboardingDecks = listOf(
-        rememberOnboardingDeck(FlashcardsNetworkGraphPresets.onboardingPages),
-        rememberOnboardingDeck(FlashcardsNetworkGraphPresets.onboardingCometPages),
-    )
-    val morphSelection = remember { MorphSelection() }
-    var style by remember { mutableStateOf(FlashcardsComponentStyle.entries.first()) }
+public fun NetworkGraphPlayground(
+    modifier: Modifier = Modifier,
+    presets: List<NetworkGraphSpec>,
+    morphFamily: List<NetworkGraphSpec>,
+    decks: List<List<NetworkGraphSpec>>,
+    styles: List<NetworkGraphPlaygroundStyle>,
+    deckStyle: NetworkGraphPlaygroundStyle,
+    onSpecExport: (source: String) -> Unit = {},
+    navigationIcon: @Composable () -> Unit = {},
+) {
+    require(styles.isNotEmpty()) { "The playground needs at least one style" }
+    val specs = remember { presets.toMutableStateList() }
+    val morphSpecs = remember { morphFamily.toMutableStateList() }
+    val deckStates = decks.map { pages -> rememberDeck(pages) }
+    val morphSelection = remember { MorphSelection(defaultToIndex = MORPH_DEFAULT_TO_INDEX.coerceAtMost(morphFamily.lastIndex)) }
+    var styleIndex by remember { mutableIntStateOf(0) }
+    val style = styles[styleIndex.coerceIn(styles.indices)]
     var isTuning by remember { mutableStateOf(false) }
-    val pageCount = specs.size + 1 + onboardingDecks.size
+    val pageCount = specs.size + 1 + deckStates.size
     val pagerState = rememberPagerState(pageCount = { pageCount })
     val stats = remember { NetworkGraphFrameStats() }
     val layerStats = remember { NetworkGraphLayerStats() }
@@ -127,8 +123,8 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
 
     RecordFrameIntervals(stats)
     val currentPage = pagerState.currentPage
-    val onboardingDeck = onboardingDecks.getOrNull(currentPage - specs.size - 1)
-    val slot = specSlotFor(currentPage, specs, morphSpecs, morphSelection, onboardingDeck, coroutineScope)
+    val deck = deckStates.getOrNull(currentPage - specs.size - 1)
+    val slot = specSlotFor(currentPage, specs, morphSpecs, morphSelection, deck, coroutineScope)
 
     // The overlay sits under the pager rather than over it, so it never hides a page's content.
     Column(modifier = modifier.fillMaxSize()) {
@@ -143,7 +139,7 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
                     stats = stats,
                     layerStats = pageLayerStats,
                     showViolations = showViolations,
-                    onNavigateBack = onNavigateBack,
+                    navigationIcon = navigationIcon,
                 )
                 page == specs.size -> MorphPage(
                     specs = morphSpecs,
@@ -152,10 +148,11 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
                     stats = stats,
                     layerStats = pageLayerStats,
                     showViolations = showViolations,
-                    onNavigateBack = onNavigateBack,
+                    navigationIcon = navigationIcon,
                 )
-                else -> OnboardingPage(
-                    deck = onboardingDecks[page - specs.size - 1],
+                else -> DeckPage(
+                    deck = deckStates[page - specs.size - 1],
+                    style = deckStyle,
                     stats = stats,
                     layerStats = pageLayerStats,
                     showViolations = showViolations,
@@ -163,7 +160,7 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
             }
         }
 
-        PresetOverlay(
+        PlaygroundOverlay(
             spec = slot.spec,
             pageLabel = "${currentPage + 1}/$pageCount",
             stats = stats,
@@ -172,12 +169,12 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
             onNext = { coroutineScope.launch { pagerState.animateScrollToPage((currentPage + 1) % pageCount) } },
             onReseed = slot.onReseed,
             onStart = slot.onStart,
-            onStyleToggle = { style = FlashcardsComponentStyle.entries[(style.ordinal + 1) % FlashcardsComponentStyle.entries.size] },
-            onCopy = { coroutineScope.launch { copySpec(slot.spec, clipboard) } },
+            onStyleToggle = { styleIndex = (styleIndex + 1) % styles.size },
+            onCopy = { coroutineScope.launch { copySpec(slot.spec, clipboard, onSpecExport) } },
             onTune = { isTuning = true },
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
-                .padding(MaterialTheme.spacing.normal)
+                .padding(SpacingNormal)
                 .windowInsetsPadding(WindowInsets.navigationBars),
         )
     }
@@ -205,14 +202,14 @@ private fun RecordFrameIntervals(stats: NetworkGraphFrameStats) {
     }
 }
 
-/** One fake onboarding pager: its steps' specs, editable in place, and its own pager. */
-private class OnboardingDeck(val specs: SnapshotStateList<NetworkGraphSpec>, val pagerState: PagerState)
+/** One stand-in onboarding pager: its steps' specs, editable in place, and its own pager. */
+private class Deck(val specs: SnapshotStateList<NetworkGraphSpec>, val pagerState: PagerState)
 
 @Composable
-private fun rememberOnboardingDeck(pages: List<NetworkGraphSpec>): OnboardingDeck {
+private fun rememberDeck(pages: List<NetworkGraphSpec>): Deck {
     val specs = remember { pages.toMutableStateList() }
     val pagerState = rememberPagerState(pageCount = { specs.size })
-    return remember(pagerState) { OnboardingDeck(specs, pagerState) }
+    return remember(pagerState) { Deck(specs, pagerState) }
 }
 
 private fun specSlotFor(
@@ -220,7 +217,7 @@ private fun specSlotFor(
     specs: SnapshotStateList<NetworkGraphSpec>,
     morphSpecs: SnapshotStateList<NetworkGraphSpec>,
     morphSelection: MorphSelection,
-    onboarding: OnboardingDeck?,
+    deck: Deck?,
     coroutineScope: CoroutineScope,
 ): SpecSlot = when {
     page < specs.size -> SpecSlot(
@@ -242,21 +239,21 @@ private fun specSlotFor(
         },
     )
     else -> {
-        val deck = checkNotNull(onboarding) { "Page $page is past the onboarding pages" }
-        val step = deck.pagerState.currentPage
+        val currentDeck = checkNotNull(deck) { "Page $page is past the deck pages" }
+        val step = currentDeck.pagerState.currentPage
         SpecSlot(
-            spec = deck.specs[step],
-            onSpecChange = { deck.specs[step] = it },
-            onReseed = { deck.specs.reseedTogether() },
+            spec = currentDeck.specs[step],
+            onSpecChange = { currentDeck.specs[step] = it },
+            onReseed = { currentDeck.specs.reseedTogether() },
         )
     }
 }
 
-/** Copies [spec] as Kotlin source to the clipboard and logcat, ready to paste into [FlashcardsNetworkGraphPresets]. */
-private suspend fun copySpec(spec: NetworkGraphSpec, clipboard: Clipboard) {
+/** Copies [spec] as Kotlin source to the clipboard and hands it to [onSpecExport], ready to paste into a preset list. */
+private suspend fun copySpec(spec: NetworkGraphSpec, clipboard: Clipboard, onSpecExport: (String) -> Unit) {
     val source = spec.toKotlinSource()
-    logd { "Network graph spec:\n$source" }
-    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("NetworkGraphSpec", source)))
+    onSpecExport(source)
+    clipboard.setClipEntry(plainTextClipEntry(source))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -277,26 +274,26 @@ private fun TuningSheet(slot: SpecSlot, showViolations: Boolean, onShowViolation
     }
 }
 
-/** The morph page starts on uniform field → corner bloom. */
+/** With the lib's morph family, the morph page starts on uniform field → corner bloom. */
 private const val MORPH_DEFAULT_TO_INDEX = 3
 
-/** How far the onboarding page's surface shrinks, as a share of the page's height. */
-private const val ONBOARDING_SHRUNK_HEIGHT = 0.45f
-private const val ONBOARDING_RESIZE_MILLIS = 900
+/** How far a deck page's surface shrinks, as a share of the page's height. */
+private const val DECK_SHRUNK_HEIGHT = 0.45f
+private const val DECK_RESIZE_MILLIS = 900
 
 /** How long Start takes to morph from one end to the other. */
 private const val MORPH_PLAY_MILLIS = 1_200
 private const val MORPH_HALFWAY = 0.5f
 
 /**
- * Which two [FlashcardsNetworkGraphPresets.morphFamily] variants the morph page morphs between, and how far:
- * [progress] runs from 0 (from) to 1 (to), scrubbed by the tuning sheet's slider and played end to
- * end by the overlay's Start button.
+ * Which two morph family specs the morph page morphs between, and how far: [progress] runs from 0
+ * (from) to 1 (to), scrubbed by the tuning sheet's slider and played end to end by the overlay's Start
+ * button.
  */
 @Stable
-private class MorphSelection {
+private class MorphSelection(defaultToIndex: Int) {
     var fromIndex by mutableIntStateOf(0)
-    var toIndex by mutableIntStateOf(MORPH_DEFAULT_TO_INDEX)
+    var toIndex by mutableIntStateOf(defaultToIndex)
     val progress = Animatable(0f)
 
     /** Morphs to whichever end is further away; a scrub stops it. */
@@ -325,44 +322,44 @@ private fun SnapshotStateList<NetworkGraphSpec>.reseedTogether() {
     for (index in indices) this[index] = this[index].copy(seed = seed)
 }
 
-@Suppress("LongParameterList") // Prototype plumbing; the page is a pure function of these.
+@Suppress("LongParameterList") // The page is a pure function of these.
 @Composable
 private fun GraphPage(
     morph: NetworkGraphMorph,
     title: String,
     note: String,
-    style: FlashcardsComponentStyle,
+    style: NetworkGraphPlaygroundStyle,
     stats: NetworkGraphFrameStats,
     layerStats: NetworkGraphLayerStats?,
     showViolations: Boolean,
-    onNavigateBack: () -> Unit,
+    navigationIcon: @Composable () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        NetworkGraphAppBarDemo(
+        PlaygroundAppBar(
             morph = morph,
             title = title,
             style = style,
             stats = stats,
             showViolations = showViolations,
-            onNavigateBack = onNavigateBack,
+            navigationIcon = navigationIcon,
         )
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(MaterialTheme.spacing.normal),
+                .padding(SpacingNormal),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(heroBackgroundFor(style), RoundedCornerShape(HeroCornerRadius))
-                    .flashcardsNetworkGraphBackground(morph, style, stats, layerStats, showViolations),
+                    .background(style.heroBackground, RoundedCornerShape(HeroCornerRadius))
+                    .networkGraphBackground(morph, style.palette, stats, layerStats, showViolations),
             ) {
                 Text(
                     text = note,
-                    color = contentColorFor(style),
+                    color = style.contentColor,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(MaterialTheme.spacing.normal),
+                    modifier = Modifier.padding(SpacingNormal),
                 )
             }
         }
@@ -370,20 +367,20 @@ private fun GraphPage(
 }
 
 /**
- * A morph between two [FlashcardsNetworkGraphPresets.morphFamily] variants at [MorphSelection.progress]. Its
- * controls live in the tuning sheet ([MorphControls]) and the overlay's Start button, so nothing
- * covers the graph while it morphs.
+ * A morph between two morph family specs at [MorphSelection.progress]. Its controls live in the
+ * tuning sheet ([MorphControls]) and the overlay's Start button, so nothing covers the graph while it
+ * morphs.
  */
-@Suppress("LongParameterList") // Prototype plumbing; the page is a pure function of these.
+@Suppress("LongParameterList") // The page is a pure function of these.
 @Composable
 private fun MorphPage(
     specs: List<NetworkGraphSpec>,
     selection: MorphSelection,
-    style: FlashcardsComponentStyle,
+    style: NetworkGraphPlaygroundStyle,
     stats: NetworkGraphFrameStats,
     layerStats: NetworkGraphLayerStats?,
     showViolations: Boolean,
-    onNavigateBack: () -> Unit,
+    navigationIcon: @Composable () -> Unit,
 ) {
     val from = specs[selection.fromIndex]
     val to = specs[selection.toIndex]
@@ -395,18 +392,18 @@ private fun MorphPage(
         stats = stats,
         layerStats = layerStats,
         showViolations = showViolations,
-        onNavigateBack = onNavigateBack,
+        navigationIcon = navigationIcon,
     )
 }
 
-/** The morph page's part of the tuning sheet: both pickers and the scrub slider. The "to" picker offers only variants "from" morphs into smoothly. */
+/** The morph page's part of the tuning sheet: both pickers and the scrub slider. The "to" picker offers only specs "from" morphs into smoothly. */
 @Composable
 private fun MorphControls(specs: List<NetworkGraphSpec>, selection: MorphSelection, onScrub: (Float) -> Unit) {
     val from = specs[selection.fromIndex]
     Column {
         MorphPicker(label = "From", specs = specs, selected = selection.fromIndex, isEnabled = { true }, onSelect = { selection.fromIndex = it })
         MorphPicker(label = "To", specs = specs, selected = selection.toIndex, isEnabled = { from.morphsSmoothlyInto(specs[it]) }, onSelect = { selection.toIndex = it })
-        Text(text = "Morph %.2f".format(Locale.US, selection.progress.value), style = MaterialTheme.typography.bodySmall)
+        Text(text = "Morph ${selection.progress.value.toFixed(2)}", style = MaterialTheme.typography.bodySmall)
         Slider(value = selection.progress.value, onValueChange = onScrub)
         Text(text = "Tuning the \"to\" side", style = MaterialTheme.typography.labelLarge)
     }
@@ -415,7 +412,7 @@ private fun MorphControls(specs: List<NetworkGraphSpec>, selection: MorphSelecti
 @Composable
 private fun MorphPicker(label: String, specs: List<NetworkGraphSpec>, selected: Int, isEnabled: (Int) -> Boolean, onSelect: (Int) -> Unit) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+        horizontalArrangement = Arrangement.spacedBy(SpacingXSmall),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(text = label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.align(Alignment.CenterVertically))
@@ -431,14 +428,15 @@ private fun MorphPicker(label: String, specs: List<NetworkGraphSpec>, selected: 
 }
 
 /**
- * Stands in for onboarding: a full-screen gradient whose background morphs from one step's spec to
- * the next as the pager scrolls, scrubbing back when it scrolls back. The surface button animates the
- * graph's surface between full and [ONBOARDING_SHRUNK_HEIGHT] of the page, to show a resize keeping
- * every node in place while the shape follows the new bounds.
+ * Stands in for onboarding: a full-screen [NetworkGraphPlaygroundStyle.heroBackground] whose graph
+ * morphs from one step's spec to the next as the pager scrolls, scrubbing back when it scrolls back.
+ * The surface button animates the graph's surface between full and [DECK_SHRUNK_HEIGHT] of the page,
+ * to show a resize keeping every node in place while the shape follows the new bounds.
  */
 @Composable
-private fun OnboardingPage(
-    deck: OnboardingDeck,
+private fun DeckPage(
+    deck: Deck,
+    style: NetworkGraphPlaygroundStyle,
     stats: NetworkGraphFrameStats,
     layerStats: NetworkGraphLayerStats?,
     showViolations: Boolean,
@@ -447,37 +445,36 @@ private fun OnboardingPage(
     val pagerState = deck.pagerState
     var isShrunk by remember { mutableStateOf(false) }
     val heightFraction by animateFloatAsState(
-        targetValue = if (isShrunk) ONBOARDING_SHRUNK_HEIGHT else 1f,
-        animationSpec = tween(ONBOARDING_RESIZE_MILLIS),
-        label = "onboardingSurfaceHeight",
+        targetValue = if (isShrunk) DECK_SHRUNK_HEIGHT else 1f,
+        animationSpec = tween(DECK_RESIZE_MILLIS),
+        label = "deckSurfaceHeight",
     )
     val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val lower = floor(position).toInt().coerceIn(0, specs.lastIndex)
     val upper = (lower + 1).coerceAtMost(specs.lastIndex)
     val morph = NetworkGraphMorph(specs[lower], specs[upper], (position - lower).coerceIn(0f, 1f))
-    val contentColor = MaterialTheme.brandColors.onGradientContent
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.brandColors.screenGradient),
+            .background(style.heroBackground),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(heightFraction)
-                .flashcardsNetworkGraphBackground(morph, FlashcardsComponentStyle.OnGradient, stats, layerStats, showViolations),
+                .networkGraphBackground(morph, style.palette, stats, layerStats, showViolations),
         )
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(MaterialTheme.spacing.large),
+                    .padding(SpacingLarge),
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text(text = "Step ${page + 1} of ${specs.size}", color = contentColor, style = MaterialTheme.typography.headlineMedium)
-                Text(text = specs[page].name, color = contentColor, style = MaterialTheme.typography.bodyLarge)
+                Text(text = "Step ${page + 1} of ${specs.size}", color = style.contentColor, style = MaterialTheme.typography.headlineMedium)
+                Text(text = specs[page].name, color = style.contentColor, style = MaterialTheme.typography.bodyLarge)
             }
         }
         FilledTonalButton(
@@ -485,7 +482,7 @@ private fun OnboardingPage(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(MaterialTheme.spacing.normal),
+                .padding(SpacingNormal),
         ) {
             Text(if (isShrunk) "Grow surface" else "Shrink surface")
         }
@@ -494,75 +491,45 @@ private fun OnboardingPage(
 
 private val HeroCornerRadius = 16.dp
 
-/** The app bar's background: [FlashcardsComponentStyle.OnGradient]'s brand top-bar gradient; [FlashcardsComponentStyle.OnSurface]'s plain themed surface. */
-@Composable
-private fun cardBackgroundFor(style: FlashcardsComponentStyle) = when (style) {
-    FlashcardsComponentStyle.OnSurface -> SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)
-    FlashcardsComponentStyle.OnGradient -> MaterialTheme.brandColors.topBarGradient
-}
-
-/** The hero stands in for a full-screen surface, so it gets the full-screen gradient. */
-@Composable
-private fun heroBackgroundFor(style: FlashcardsComponentStyle) = when (style) {
-    FlashcardsComponentStyle.OnSurface -> SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)
-    FlashcardsComponentStyle.OnGradient -> MaterialTheme.brandColors.screenGradient
-}
-
-@Composable
-private fun contentColorFor(style: FlashcardsComponentStyle) = when (style) {
-    FlashcardsComponentStyle.OnSurface -> MaterialTheme.colorScheme.onSurface
-    FlashcardsComponentStyle.OnGradient -> MaterialTheme.brandColors.onGradientContent
-}
-
-private fun styleLabel(style: FlashcardsComponentStyle) = when (style) {
-    FlashcardsComponentStyle.OnSurface -> "On surface"
-    FlashcardsComponentStyle.OnGradient -> "On gradient"
-}
-
 /**
- * Built the same way [com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar] is
- * (`LargeFlexibleTopAppBar` + transparent colors) rather than being that component, whose gradient is
- * hardcoded. The graph modifier lands on the bar's outermost node, before its inset padding, so it
- * bleeds behind the status bar for free.
+ * A `LargeFlexibleTopAppBar` with transparent colors over the style's [NetworkGraphPlaygroundStyle.barBackground].
+ * The graph modifier lands on the bar's outermost node, before its inset padding, so it bleeds behind
+ * the status bar for free.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun NetworkGraphAppBarDemo(
+private fun PlaygroundAppBar(
     morph: NetworkGraphMorph,
     title: String,
-    style: FlashcardsComponentStyle,
+    style: NetworkGraphPlaygroundStyle,
     stats: NetworkGraphFrameStats,
     showViolations: Boolean,
-    onNavigateBack: () -> Unit,
+    navigationIcon: @Composable () -> Unit,
 ) {
-    val contentColor = contentColorFor(style)
     LargeFlexibleTopAppBar(
         modifier = Modifier
-            .background(cardBackgroundFor(style))
-            .flashcardsNetworkGraphBackground(morph, style, stats, showViolations = showViolations),
+            .background(style.barBackground)
+            .networkGraphBackground(morph, style.palette, stats, showViolations = showViolations),
         title = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        subtitle = { Text(text = styleLabel(style), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = contentColor)
-            }
-        },
+        subtitle = { Text(text = style.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        navigationIcon = navigationIcon,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Transparent,
             scrolledContainerColor = Color.Transparent,
-            navigationIconContentColor = contentColor,
-            titleContentColor = contentColor,
-            subtitleContentColor = contentColor,
+            navigationIconContentColor = style.contentColor,
+            titleContentColor = style.contentColor,
+            subtitleContentColor = style.contentColor,
         ),
     )
 }
 
 private val OverlayElevation = 8.dp
 private val OverlayCornerRadius = 24.dp
+private const val OVERLAY_ALPHA = 0.92f
 
-@Suppress("LongParameterList") // One callback per overlay button; a prototype is not worth an event type.
+@Suppress("LongParameterList") // One callback per overlay button.
 @Composable
-private fun PresetOverlay(
+private fun PlaygroundOverlay(
     spec: NetworkGraphSpec,
     pageLabel: String,
     stats: NetworkGraphFrameStats,
@@ -580,12 +547,12 @@ private fun PresetOverlay(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(OverlayCornerRadius),
-        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.92f),
+        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = OVERLAY_ALPHA),
         contentColor = contentColor,
         shadowElevation = OverlayElevation,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.small, vertical = MaterialTheme.spacing.xsmall),
+            modifier = Modifier.padding(horizontal = SpacingSmall, vertical = SpacingXSmall),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -595,7 +562,7 @@ private fun PresetOverlay(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = "$pageLabel · ${spec.name}", style = MaterialTheme.typography.labelLarge)
                     Text(
-                        text = "frame %.1fms · graphs %.2fms · seed %d".format(stats.frameMillis, stats.drawMillis, spec.seed),
+                        text = "frame ${stats.frameMillis.toFixed(1)}ms · graphs ${stats.drawMillis.toFixed(2)}ms · seed ${spec.seed}",
                         style = MaterialTheme.typography.labelSmall,
                     )
                     if (layerSummary.isNotEmpty()) {
@@ -618,16 +585,6 @@ private fun PresetOverlay(
                     }
                 }
             }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun NetworkGraphPrototypeScreenPreview() {
-    FlashcardsTheme {
-        Surface {
-            NetworkGraphPrototypeScreen(onNavigateBack = {})
         }
     }
 }
