@@ -17,7 +17,8 @@ Nothing kept the weights consistent, so the same role was bold on one screen and
 ## Decision
 
 **One bundled family.** The variable `Roboto[wdth,wght].ttf` from google/fonts ships in
-`core/ui/src/main/res/font/roboto.ttf` (about 0.5 MB) and is instanced at Normal, Medium and Bold.
+`core/ui/src/main/res/font/roboto.ttf` (about 0.5 MB) and is instanced at Normal, Medium, Bold and
+ExtraBold.
 Every slot uses it. The serif, the Google Fonts provider, the `ui-text-google-fonts` dependency and
 both `font_certs.xml` copies are gone. `FontFamily.Default` was rejected because several OEMs replace
 the system sans-serif, so it would not guarantee Roboto.
@@ -28,9 +29,9 @@ stock sizes, weights, line heights and tracking for every slot.
 **Emphasis is the M3 `*Emphasized` twin of a slot.** Material3 ships an emphasized version of all 15
 slots (`titleMediumEmphasized` and so on), so text that needs weight uses that instead of a weight
 override. Their weights are Material's: Medium for body, display, headline and `titleLarge`; Bold for
-`titleMedium`, `titleSmall` and the labels. `ExtraBold` and `SemiBold` are not used.
+`titleMedium`, `titleSmall` and the labels. `SemiBold` is not used.
 
-**Three theme constants cover what the slots don't** (`core/ui/.../theme/Type.kt`):
+**Theme constants cover what the slots don't** (`core/ui/.../theme/Type.kt`):
 
 - `Typography.code`: `bodySmall` in the system monospace, for code blocks and raw debug text.
 - `InlineCodeSpanStyle`: monospace at `0.85.em`, a size relative to the text around it. Monospace
@@ -38,6 +39,9 @@ override. Their weights are Material's: Medium for body, display, headline and `
   size keeps the same ratio next to every slot, with no per-slot inline-code constants.
 - `EmphasizedSpanStyle`: Medium weight for emphasis inside running text, matching the body
   `*Emphasized` slots.
+- `Typography.displaySmallExtraBold` and `Typography.titleLargeExtraBold`: ExtraBold hero figures,
+  the Session Summary's XP total and the Level card's Level number. The Medium of their `*Emphasized`
+  twins reads too light for a number that is the point of the screen.
 
 **One sanctioned exception.** `FlashcardsAvatar` sizes its fallback initials as a fraction of the
 avatar's diameter, which no fixed slot can do.
@@ -51,7 +55,7 @@ avatar's diameter, which no fixed slot can do.
 
 - Text looks the same on every device, with no runtime download and no fallback flash.
 - Headings are sans-serif. Emphasis on `headlineSmall`, `headlineMedium`, `displaySmall`, `titleLarge`
-  and `bodyLarge` is Medium where it used to be Bold.
+  and `bodyLarge` is Medium where it used to be Bold, except the two ExtraBold hero figures.
 - A new text style needs a slot, an `*Emphasized` slot or a new theme constant; the Konsist rule
   rejects anything set at the call site.
 - Code blocks are 12sp, down from 13sp. Inline code scales with its sentence instead of a fixed 13sp.

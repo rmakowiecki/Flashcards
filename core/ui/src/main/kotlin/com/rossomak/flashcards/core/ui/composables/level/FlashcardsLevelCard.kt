@@ -57,6 +57,7 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.core.ui.theme.titleLargeExtraBold
 import com.valentinilk.shimmer.LocalShimmerTheme
 import com.valentinilk.shimmer.defaultShimmerTheme
 import com.valentinilk.shimmer.shimmer
@@ -220,7 +221,7 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
                             scaleX = pour.levelScale.value
                             scaleY = pour.levelScale.value
                         },
-                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    style = MaterialTheme.typography.titleLargeExtraBold,
                 )
             }
         }

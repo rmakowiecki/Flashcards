@@ -103,6 +103,7 @@ import com.rossomak.flashcards.core.ui.format.currentLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.displaySmallExtraBold
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDestination.StudyAgain
@@ -566,7 +567,7 @@ private fun SummaryXpTotalSlot(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         modifier = modifier.heightIn(min = LocalMinimumInteractiveComponentSize.current),
-        style = MaterialTheme.typography.displaySmallEmphasized,
+        style = MaterialTheme.typography.displaySmallExtraBold,
         color = MaterialTheme.brandColors.onGradientContent,
     )
 }
