@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,7 +89,7 @@ import kotlinx.coroutines.launch
  * background morphs with its scroll position and whose surface can shrink and grow.
  *
  * The bottom overlay, laid out under the pages rather than over them, reseeds the page's layout, steps
- * every page through [styles], copies the page's current spec as Kotlin to the clipboard and
+ * a deck page through its deck, steps every page through [styles], copies the page's current spec as Kotlin to the clipboard and
  * [onSpecExport], and opens the tuning sheet, which edits that spec live: the morph's "to" side on the
  * morph page, the settled step on a deck page. Edits live in memory for the playground's lifetime only.
  *
@@ -161,14 +163,12 @@ public fun NetworkGraphPlayground(
         }
 
         PlaygroundOverlay(
-            spec = slot.spec,
+            slot = slot,
             pageLabel = "${currentPage + 1}/$pageCount",
             stats = stats,
             layerSummary = layerStats.summary,
             onPrevious = { coroutineScope.launch { pagerState.animateScrollToPage((currentPage - 1 + pageCount) % pageCount) } },
             onNext = { coroutineScope.launch { pagerState.animateScrollToPage((currentPage + 1) % pageCount) } },
-            onReseed = slot.onReseed,
-            onStart = slot.onStart,
             onStyleToggle = { styleIndex = (styleIndex + 1) % styles.size },
             onCopy = { coroutineScope.launch { copySpec(slot.spec, clipboard, onSpecExport) } },
             onTune = { isTuning = true },
@@ -240,11 +240,18 @@ private fun specSlotFor(
     )
     else -> {
         val currentDeck = checkNotNull(deck) { "Page $page is past the deck pages" }
-        val step = currentDeck.pagerState.currentPage
+        val pagerState = currentDeck.pagerState
+        val step = pagerState.currentPage
         SpecSlot(
             spec = currentDeck.specs[step],
             onSpecChange = { currentDeck.specs[step] = it },
             onReseed = { currentDeck.specs.reseedTogether() },
+            deckStep = DeckStep(
+                canGoBack = step > 0,
+                canGoForward = step < pagerState.pageCount - 1,
+                onBack = { coroutineScope.launch { pagerState.animateScrollToPage(step - 1) } },
+                onForward = { coroutineScope.launch { pagerState.animateScrollToPage(step + 1) } },
+            ),
         )
     }
 }
@@ -306,7 +313,8 @@ private class MorphSelection(defaultToIndex: Int) {
 
 /**
  * The spec the overlay and the tuning sheet act on for the current page, plus the morph page's
- * extras: [onStart] for the overlay's Start button and [sheetHeader] above the tuning sliders.
+ * extras: [onStart] for the overlay's Start button and [sheetHeader] above the tuning sliders, and a
+ * deck page's [deckStep] for the overlay's step buttons.
  */
 private class SpecSlot(
     val spec: NetworkGraphSpec,
@@ -314,7 +322,14 @@ private class SpecSlot(
     val onReseed: () -> Unit,
     val onStart: (() -> Unit)? = null,
     val sheetHeader: (@Composable () -> Unit)? = null,
+    val deckStep: DeckStep? = null,
 )
+
+/**
+ * Steps a deck page's own pager one step back or forward, morphing its background on the way. Swiping
+ * does the same, but a desktop mouse can't drag a pager.
+ */
+private class DeckStep(val canGoBack: Boolean, val canGoForward: Boolean, val onBack: () -> Unit, val onForward: () -> Unit)
 
 /** One new seed for every spec in the list, so they stay one morph family. */
 private fun SnapshotStateList<NetworkGraphSpec>.reseedTogether() {
@@ -530,19 +545,20 @@ private const val OVERLAY_ALPHA = 0.92f
 @Suppress("LongParameterList") // One callback per overlay button.
 @Composable
 private fun PlaygroundOverlay(
-    spec: NetworkGraphSpec,
+    slot: SpecSlot,
     pageLabel: String,
     stats: NetworkGraphFrameStats,
     layerSummary: String,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onReseed: () -> Unit,
-    onStart: (() -> Unit)?,
     onStyleToggle: () -> Unit,
     onCopy: () -> Unit,
     onTune: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spec = slot.spec
+    val deckStep = slot.deckStep
+    val onStart = slot.onStart
     val contentColor = MaterialTheme.colorScheme.inverseOnSurface
     Surface(
         modifier = modifier,
@@ -574,10 +590,18 @@ private fun PlaygroundOverlay(
                 }
             }
             Row {
-                IconButton(onClick = onReseed) { Icon(imageVector = Icons.Default.Shuffle, contentDescription = "Reseed layout") }
+                IconButton(onClick = slot.onReseed) { Icon(imageVector = Icons.Default.Shuffle, contentDescription = "Reseed layout") }
                 IconButton(onClick = onStyleToggle) { Icon(imageVector = Icons.Default.Contrast, contentDescription = "Toggle surface style") }
                 IconButton(onClick = onCopy) { Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy spec as Kotlin") }
                 IconButton(onClick = onTune) { Icon(imageVector = Icons.Default.Tune, contentDescription = "Tune preset") }
+                if (deckStep != null) {
+                    IconButton(onClick = deckStep.onBack, enabled = deckStep.canGoBack) {
+                        Icon(imageVector = Icons.Default.SkipPrevious, contentDescription = "Previous step")
+                    }
+                    IconButton(onClick = deckStep.onForward, enabled = deckStep.canGoForward) {
+                        Icon(imageVector = Icons.Default.SkipNext, contentDescription = "Next step")
+                    }
+                }
                 if (onStart != null) {
                     FilledTonalButton(onClick = onStart, contentPadding = ButtonDefaults.TextButtonContentPadding) {
                         Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
