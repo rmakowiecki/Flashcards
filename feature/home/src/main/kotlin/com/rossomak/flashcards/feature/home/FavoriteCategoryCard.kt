@@ -28,8 +28,8 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.ui.theme.toCategoryColorOrNull
 
 private val WatermarkSize = 96.dp
 
@@ -54,8 +54,7 @@ internal fun FavoriteCategoryCard(
     onQuickSessionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val categoryColor = remember(category.color) { category.color.toCategoryColorOrNull() }
-        ?: MaterialTheme.colorScheme.primary
+    val categoryColor = rememberCategoryColor(hex = category.color, fallback = MaterialTheme.colorScheme.primary)
     val watermarkTint = remember(categoryColor) { categoryColor.copy(alpha = WATERMARK_ALPHA) }
     val quickSessionDescription = stringResource(R.string.favorites_category_quick_session_cd, category.name)
 

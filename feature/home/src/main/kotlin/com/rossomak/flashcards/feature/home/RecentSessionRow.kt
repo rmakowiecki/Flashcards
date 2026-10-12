@@ -44,9 +44,9 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSiz
 import com.rossomak.flashcards.core.ui.format.currentLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.ui.theme.toCategoryColorOrNull
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.DaysAgo
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.HoursAgo
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.JustNow
@@ -122,8 +122,7 @@ internal fun RecentSessionRow(
 /** [category] only styles the overline; without it the name shows in the primary color with no glyph. */
 @Composable
 private fun RecentCategoryOverline(categoryName: String, category: Category?) {
-    val categoryColor = remember(category?.color) { category?.color?.toCategoryColorOrNull() }
-        ?: MaterialTheme.colorScheme.primary
+    val categoryColor = rememberCategoryColor(hex = category?.color, fallback = MaterialTheme.colorScheme.primary)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
