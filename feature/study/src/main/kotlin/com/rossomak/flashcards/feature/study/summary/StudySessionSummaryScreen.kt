@@ -79,7 +79,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -104,6 +103,7 @@ import com.rossomak.flashcards.core.ui.format.currentLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.ui.theme.displaySmallExtraBold
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDestination.StudyAgain
@@ -567,8 +567,7 @@ private fun SummaryXpTotalSlot(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         modifier = modifier.heightIn(min = LocalMinimumInteractiveComponentSize.current),
-        style = MaterialTheme.typography.displaySmall,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.displaySmallExtraBold,
         color = MaterialTheme.brandColors.onGradientContent,
     )
 }

@@ -12,13 +12,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Letter spacing of the all-caps eyebrow label. */
-private val EyebrowLetterSpacing = 1.2.sp
 
 /**
  * The vertical rhythm every step shares: one scrollable column, so a step whose content outgrows a
@@ -62,16 +57,14 @@ fun OnboardingStepHeader(
         if (eyebrow != null) {
             Text(
                 text = eyebrow.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = OnboardingContentColors.eyebrow,
-                letterSpacing = EyebrowLetterSpacing,
                 textAlign = TextAlign.Center,
             )
         }
         Text(
             text = headline,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             color = OnboardingContentColors.primary,
             textAlign = TextAlign.Center,
         )

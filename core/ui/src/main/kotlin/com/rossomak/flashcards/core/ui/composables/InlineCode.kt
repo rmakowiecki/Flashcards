@@ -6,8 +6,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.sp
+import com.rossomak.flashcards.core.ui.theme.InlineCodeSpanStyle
+
+/** Pads the code background on each side; a full monospace space makes the span look bulky. */
+private const val THIN_SPACE = ' '
 
 @Composable
 fun String.withInlineCode(): AnnotatedString {
@@ -30,15 +32,8 @@ fun String.withInlineCode(): AnnotatedString {
                     break
                 }
                 val codeText = source.substring(open + 1, close)
-                pushStyle(
-                    SpanStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        background = codeBackground,
-                        color = codeColor,
-                    )
-                )
-                append(" $codeText ")
+                pushStyle(InlineCodeSpanStyle.merge(SpanStyle(background = codeBackground, color = codeColor)))
+                append("$THIN_SPACE$codeText$THIN_SPACE")
                 pop()
                 cursor = close + 1
             }

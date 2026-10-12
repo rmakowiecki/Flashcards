@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
@@ -65,8 +64,7 @@ fun FlashcardsDifficultyRangePill(
     ) {
         Text(
             text = "$lowLevel–$highLevel",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelLargeEmphasized,
             color = MaterialTheme.difficultyColors.onRamp,
         )
     }

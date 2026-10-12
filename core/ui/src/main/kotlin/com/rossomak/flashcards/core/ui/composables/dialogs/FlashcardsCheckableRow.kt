@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
@@ -76,7 +75,6 @@ fun FlashcardsCheckableRow(
                 .weight(1f)
                 .padding(horizontal = MaterialTheme.spacing.small),
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
         )
         Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
     }

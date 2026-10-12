@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
@@ -58,8 +57,7 @@ internal fun AllSetStep(
             } else {
                 stringResource(R.string.all_set_headline_anonymous_title)
             },
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             color = OnboardingContentColors.primary,
             textAlign = TextAlign.Center,
         )

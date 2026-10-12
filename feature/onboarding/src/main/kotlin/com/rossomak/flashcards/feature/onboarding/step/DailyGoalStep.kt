@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import com.rossomak.flashcards.core.ui.composables.FlashcardsStepper
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
@@ -96,8 +95,7 @@ private fun StreakExampleCard(modifier: Modifier = Modifier) {
             )
             Text(
                 text = stringResource(R.string.daily_goal_streak_example_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmallEmphasized,
             )
         }
         Text(

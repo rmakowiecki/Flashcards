@@ -356,6 +356,25 @@ class ArchitectureKonsistTest {
     }
 
     @Test
+    fun `text is styled only through theme typography tokens`() {
+        // Text takes a MaterialTheme.typography slot or its *Emphasized twin, or a theme constant
+        // (Typography.code, InlineCodeSpanStyle, EmphasizedSpanStyle), never an ad hoc weight,
+        // size, family or spacing. Previews are held to it too. FlashcardsAvatar is the one
+        // exception: its initials scale with the avatar's diameter, which no fixed slot can do.
+        val adHocTypography = Regex(
+            """\b(fontWeight|fontSize|fontFamily|letterSpacing|lineHeight)\s*=""" +
+                """|\bTextStyle\(""" +
+                """|\btypography\.\w+\.copy\(""",
+        )
+        projectScope
+            .files
+            .filter { file -> isComposeModuleMainSource(file.path) }
+            .filter { file -> !file.path.contains("/core/ui/theme/") }
+            .filter { file -> !file.path.endsWith("/FlashcardsAvatar.kt") }
+            .assertFalse { file -> adHocTypography.containsMatchIn(file.text) }
+    }
+
+    @Test
     fun `functions do not instantiate Random directly outside constructor defaults`() {
         // Randomizing logic takes an injected kotlin.random.Random defaulting to
         // Random.Default in the constructor signature — never called ad hoc in a function body.

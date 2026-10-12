@@ -163,6 +163,7 @@ Best practices:
 - `contentDescription` on icon buttons and images
 - `remember` for expensive calculations; `derivedStateOf` for computed state
 - `LazyColumn` for lists; `key()` for stable item identity
+- Typography: style text only with a `MaterialTheme.typography` slot, its `*Emphasized` twin, or a theme constant (`typography.code`, `InlineCodeSpanStyle`, `EmphasizedSpanStyle`). Never set `fontWeight`, `fontSize`, `fontFamily`, `letterSpacing` or `lineHeight` at a call site. Konsist enforces it. See [ADR-0061](./docs/adr/0061-typography-is-the-stock-m3-scale-over-bundled-roboto.md).
 
 ## Dependency Injection (Hilt)
 

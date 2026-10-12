@@ -19,7 +19,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -65,8 +64,8 @@ internal fun AccountHeaderBar(
     val hiddenSemantics = if (detailsProgress > 0f) Modifier else Modifier.clearAndSetSemantics {}
     val fadingDetails = Modifier.alpha(detailsProgress).then(hiddenSemantics)
     val nameStyle = lerp(
-        start = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-        stop = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+        start = MaterialTheme.typography.headlineSmallEmphasized,
+        stop = MaterialTheme.typography.titleLargeEmphasized,
         fraction = collapsedFraction,
     )
 
