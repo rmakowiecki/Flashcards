@@ -9,6 +9,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 
 data class PreviewStudySessionScreenState(
     val categoryName: String = "",
+    val categoryIconSvg: String? = null,
     val subcategoryNames: List<String> = emptyList(),
     val sourceType: SessionSourceType = SingleSubcategory,
     val isLoading: Boolean = true,

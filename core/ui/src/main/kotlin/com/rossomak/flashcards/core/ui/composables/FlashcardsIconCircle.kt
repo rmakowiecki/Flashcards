@@ -43,6 +43,16 @@ fun FlashcardsIconCircle(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
+) = FlashcardsIconCircle(modifier = modifier, style = style) {
+    Icon(imageVector = icon, contentDescription = contentDescription)
+}
+
+/** [FlashcardsIconCircle] with any centered [content], drawn in the circle's content color. */
+@Composable
+fun FlashcardsIconCircle(
+    modifier: Modifier = Modifier,
+    style: FlashcardsComponentStyle = OnSurface,
+    content: @Composable () -> Unit,
 ) {
     val brandColors = MaterialTheme.brandColors
     val containerColor = when (style) {
@@ -65,9 +75,7 @@ fun FlashcardsIconCircle(
         contentColor = contentColor,
         border = border,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(imageVector = icon, contentDescription = contentDescription)
-        }
+        Box(contentAlignment = Alignment.Center) { content() }
     }
 }
 

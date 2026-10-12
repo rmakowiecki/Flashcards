@@ -13,6 +13,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
+import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
@@ -51,6 +52,7 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class PreviewStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val getCategory: GetCategoryUseCase,
     private val getSubcategories: GetSubcategoriesUseCase,
     private val selectSessionFlashcards: SelectSessionFlashcardsUseCase,
     private val sampleQuickSessionSubcategories: SampleQuickSessionSubcategoriesUseCase,
@@ -140,6 +142,12 @@ class PreviewStudySessionViewModel @Inject constructor(
      * answering and read-aloud, for this session only.
      */
     init {
+        viewModelScope.launch {
+            // Cosmetic: a failed lookup leaves the hero's fallback glyph and never blocks the session.
+            getCategory(route.categoryId).onSuccess { category ->
+                _state.update { it.copy(categoryIconSvg = category.iconSvg) }
+            }
+        }
         viewModelScope.launch {
             val defaults = observeStudySessionPreferences().first()
             hasSeenVoiceAnsweringInfo = observeUserPreferences().first().hasSeenVoiceAnsweringInfo
