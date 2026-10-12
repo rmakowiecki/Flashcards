@@ -23,7 +23,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Blocker
@@ -85,8 +84,7 @@ internal fun ReportBugSeverityField(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = MaterialTheme.spacing.small),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLargeEmphasized,
                 )
             } else {
                 Text(

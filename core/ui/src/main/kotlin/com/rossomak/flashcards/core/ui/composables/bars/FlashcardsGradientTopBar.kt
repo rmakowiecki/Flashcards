@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
@@ -75,8 +74,7 @@ fun FlashcardsGradientTopBar(
                     .basicMarquee()
                     .graphicsLayer { alpha = titleAlpha() }
                     .then(if (isTitleShown) Modifier else Modifier.clearAndSetSemantics {}),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmallEmphasized,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

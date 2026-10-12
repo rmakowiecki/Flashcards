@@ -59,9 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -87,6 +85,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
+import com.rossomak.flashcards.core.ui.theme.EmphasizedSpanStyle
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
@@ -442,8 +441,7 @@ private fun HeroTop(iconSvg: String?, modifier: Modifier = Modifier) {
             // this hero is that empty state's populated counterpart in the very same layout slot
             // (see ReadyContent), so the two should read as the same weight of "state title".
             text = stringResource(R.string.preview_session_ready_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.brandColors.onGradientContent,
         )
     }
@@ -783,17 +781,17 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
     val listTwoItemConjunction = stringResource(CoreUiR.string.common_list_two_item_conjunction)
     val listFinalConjunction = stringResource(CoreUiR.string.common_list_final_conjunction)
     return buildAnnotatedString {
-        fun appendBold(text: String) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text) }
+        fun appendEmphasized(text: String) {
+            withStyle(EmphasizedSpanStyle) { append(text) }
         }
 
         when {
             state.isQuickSession -> {
-                appendBold(cardsText)
+                appendEmphasized(cardsText)
                 append(stringResource(R.string.preview_session_scope_quick_session_message))
                 appendSubcategoryList(
                     state.subcategoryNames,
-                    ::appendBold,
+                    ::appendEmphasized,
                     otherSubcategoriesText,
                     listSeparator,
                     listTwoItemConjunction,
@@ -802,18 +800,18 @@ private fun scopeDescription(state: PreviewStudySessionScreenState): AnnotatedSt
             }
 
             state.isSingleSubcategory -> {
-                appendBold(cardsText)
+                appendEmphasized(cardsText)
                 append(stringResource(R.string.preview_session_scope_single_subcategory_prefix_message))
-                appendBold(state.subcategoryNames.first())
+                appendEmphasized(state.subcategoryNames.first())
                 append(stringResource(R.string.preview_session_scope_single_subcategory_suffix_message))
             }
 
             else -> {
-                appendBold(cardsText)
+                appendEmphasized(cardsText)
                 append(stringResource(R.string.preview_session_scope_multi_subcategory_message))
                 appendSubcategoryList(
                     state.subcategoryNames,
-                    ::appendBold,
+                    ::appendEmphasized,
                     otherSubcategoriesText,
                     listSeparator,
                     listTwoItemConjunction,
@@ -840,19 +838,19 @@ private const val SUBCATEGORY_LIST_VISIBLE_COUNT = 3
  */
 private fun AnnotatedString.Builder.appendSubcategoryList(
     names: List<String>,
-    appendBold: (String) -> Unit,
+    appendEmphasized: (String) -> Unit,
     otherSubcategoriesText: String?,
     listSeparator: String,
     listTwoItemConjunction: String,
     listFinalConjunction: String,
 ) {
     if (otherSubcategoriesText == null) {
-        appendOxfordList(names, appendBold, listSeparator, listTwoItemConjunction, listFinalConjunction)
+        appendOxfordList(names, appendEmphasized, listSeparator, listTwoItemConjunction, listFinalConjunction)
         return
     }
     names.take(SUBCATEGORY_LIST_VISIBLE_COUNT).forEachIndexed { index, name ->
         if (index > 0) append(listSeparator)
-        appendBold(name)
+        appendEmphasized(name)
     }
     append(otherSubcategoriesText)
 }
@@ -860,7 +858,7 @@ private fun AnnotatedString.Builder.appendSubcategoryList(
 // Joins names as "A and B" (2 items) or "A, B, and C" (3+ items), bolding each name.
 private fun AnnotatedString.Builder.appendOxfordList(
     names: List<String>,
-    appendBold: (String) -> Unit,
+    appendEmphasized: (String) -> Unit,
     listSeparator: String,
     listTwoItemConjunction: String,
     listFinalConjunction: String,
@@ -871,6 +869,6 @@ private fun AnnotatedString.Builder.appendOxfordList(
             names.lastIndex -> append(if (names.size > 2) listFinalConjunction else listTwoItemConjunction)
             else -> append(listSeparator)
         }
-        appendBold(name)
+        appendEmphasized(name)
     }
 }
