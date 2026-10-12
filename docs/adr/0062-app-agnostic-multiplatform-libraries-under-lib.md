@@ -23,6 +23,10 @@ modules apply the `kmp-library` convention plugin:
   Gradle plugin;
 - the usual Spotless, detekt and Lint.
 
+The one exception is `:lib:networkgraph-playground`, a desktop app that hosts the tuner: it is the only
+module that applies the `org.jetbrains.compose` plugin, which it needs to package a desktop application.
+Nothing depends on it.
+
 Diagnostics and tooling hooks sit behind the `@ExperimentalNetworkGraphApi` opt-in, so app modules don't
 come to depend on them by accident.
 

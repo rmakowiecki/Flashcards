@@ -24,7 +24,7 @@ data/           → Repository Implementations, Data Sources (Remote/Local), DTO
 - Data depends on Domain (implements repository interfaces)
 
 ### App-agnostic libraries (`lib/`)
-`lib/*` modules are Kotlin Multiplatform libraries (Android + desktop JVM) built with the `kmp-library` convention plugin: package `com.rossomak.<lib>`, strict explicit API mode, Compose Multiplatform artifacts. They never import `com.rossomak.flashcards..` (Konsist enforces it): branding, theme tokens and logging are applied by the consuming module at its call site. See [ADR-0062](./docs/adr/0062-app-agnostic-multiplatform-libraries-under-lib.md).
+`lib/*` modules are Kotlin Multiplatform libraries (Android + desktop JVM) built with the `kmp-library` convention plugin: package `com.rossomak.<lib>`, strict explicit API mode, Compose Multiplatform artifacts. They never import `com.rossomak.flashcards..` (Konsist enforces it): branding, theme tokens and logging are applied by the consuming module at its call site. `:lib:networkgraph-playground` is the exception: a desktop app hosting the tuner (`./gradlew :lib:networkgraph-playground:run`), and the only module applying the `org.jetbrains.compose` plugin. See [ADR-0062](./docs/adr/0062-app-agnostic-multiplatform-libraries-under-lib.md).
 
 ### MVVM Pattern (Presentation Layer)
 - **ViewModel**: Holds UI state, orchestrates use cases, survives configuration changes
