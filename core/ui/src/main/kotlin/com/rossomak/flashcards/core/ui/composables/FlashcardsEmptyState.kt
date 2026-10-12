@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone.Error
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone.Info
@@ -37,6 +38,9 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.semanticColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val EMPTY_STATE_CIRCLE_SIZE = 80.dp
+private val EMPTY_STATE_ICON_SIZE = 40.dp
 
 /** Container fill alpha for [FlashcardsEmptyStateTone.Error]'s [OnGradient] circle. */
 private const val ON_GRADIENT_ERROR_CONTAINER_ALPHA = 0.33f
@@ -157,7 +161,7 @@ fun FlashcardsEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            modifier = Modifier.size(MaterialTheme.sizes.emptyStateIconCircle),
+            modifier = Modifier.size(EMPTY_STATE_CIRCLE_SIZE),
             shape = CircleShape,
             color = colors.container,
             contentColor = colors.icon,
@@ -168,7 +172,7 @@ fun FlashcardsEmptyState(
                     imageVector = icon,
                     // Decorative: the title below already names the state for a screen reader.
                     contentDescription = null,
-                    modifier = Modifier.size(MaterialTheme.sizes.emptyStateIcon),
+                    modifier = Modifier.size(EMPTY_STATE_ICON_SIZE),
                 )
             }
         }

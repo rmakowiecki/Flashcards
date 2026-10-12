@@ -91,7 +91,7 @@ colors.** Always read a token:
 | Concern            | Token source                                             |
 |--------------------|----------------------------------------------------------|
 | Gaps & padding     | `MaterialTheme.spacing.*` (`AppSpacing`)                 |
-| Component sizes     | `AppSizes.*` (row height, icon-tile, hairline)          |
+| Component sizes    | `AppSizes.*` when shared across components; a size only one component uses is a private `val` at the top of that component's file |
 | Corners            | `MaterialTheme.cornerRadius.*` (`AppCornerRadius`)       |
 | Colors             | `MaterialTheme.colorScheme.*` / `MaterialTheme.brandColors.*` |
 | Typography         | `MaterialTheme.typography.*`                             |

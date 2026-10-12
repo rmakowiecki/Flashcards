@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
@@ -23,6 +24,8 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.sizes
+
+private val ICON_CIRCLE_SIZE = 72.dp
 
 /**
  * Circular, tinted icon badge — the single-glyph marker used at the end or head of a flow (onboarding's
@@ -56,7 +59,7 @@ fun FlashcardsIconCircle(
     }
 
     Surface(
-        modifier = modifier.size(MaterialTheme.sizes.iconCircle),
+        modifier = modifier.size(ICON_CIRCLE_SIZE),
         shape = CircleShape,
         color = containerColor,
         contentColor = contentColor,
@@ -73,7 +76,7 @@ fun FlashcardsIconCircle(
 fun FlashcardsIconCircleOnSurfaceShowcase() {
     FlashcardsTheme {
         Surface {
-            Box(modifier = Modifier.size(MaterialTheme.sizes.iconCircle), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(ICON_CIRCLE_SIZE), contentAlignment = Alignment.Center) {
                 FlashcardsIconCircle(icon = Icons.Default.Celebration, contentDescription = null)
             }
         }
@@ -89,7 +92,7 @@ fun FlashcardsIconCircleOnGradientShowcase() {
             Box(
                 modifier = Modifier
                     .background(MaterialTheme.brandColors.screenGradient)
-                    .size(MaterialTheme.sizes.iconCircle),
+                    .size(ICON_CIRCLE_SIZE),
                 contentAlignment = Alignment.Center,
             ) {
                 FlashcardsIconCircle(
@@ -107,7 +110,7 @@ fun FlashcardsIconCircleOnGradientShowcase() {
 private fun FlashcardsIconCirclePreview() {
     FlashcardsTheme {
         Surface {
-            Box(modifier = Modifier.size(MaterialTheme.sizes.iconCircle), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(ICON_CIRCLE_SIZE), contentAlignment = Alignment.Center) {
                 FlashcardsIconCircle(icon = Icons.Default.Celebration, contentDescription = null)
             }
         }

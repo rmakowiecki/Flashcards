@@ -17,11 +17,15 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import kotlin.math.roundToInt
+
+private val RING_STROKE = 3.dp
+private val RING_SIZE = 40.dp
 
 private const val FULL_CIRCLE_DEGREES = 360f
 private const val ARC_START_DEGREES = -90f
@@ -49,15 +53,15 @@ fun FlashcardsProgressRing(
     val fraction = progress?.coerceIn(0f, 1f)
     val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = TRACK_ALPHA)
     val arcColor = MaterialTheme.colorScheme.primary
-    val strokeWidth = MaterialTheme.sizes.progressRingStroke
+    val strokeWidth = RING_STROKE
 
     Box(
         modifier = modifier
-            .size(MaterialTheme.sizes.progressRing)
+            .size(RING_SIZE)
             .clearAndSetSemantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(MaterialTheme.sizes.progressRing)) {
+        Canvas(modifier = Modifier.size(RING_SIZE)) {
             val stroke = Stroke(width = strokeWidth.toPx())
             // Inset by half the stroke so the ring is drawn inside its bounds rather than clipped.
             val inset = stroke.width / 2

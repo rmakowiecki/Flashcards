@@ -19,14 +19,16 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.DifficultyColors
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.difficultyColors
-import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val RANGE_PILL_HEIGHT = 24.dp
 
 /** Fraction of the pill's width each end color holds flat before the gradient blends. */
 private const val GRADIENT_STOP_FRACTION = 0.38f
@@ -57,7 +59,7 @@ fun FlashcardsDifficultyRangePill(
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.full)
     Row(
         modifier = modifier
-            .height(MaterialTheme.sizes.difficultyRangePillHeight)
+            .height(RANGE_PILL_HEIGHT)
             .background(brush = gradient, shape = shape)
             .clearAndSetSemantics { contentDescription = description }
             .padding(horizontal = MaterialTheme.spacing.small),

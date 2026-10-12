@@ -19,13 +19,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.DifficultyColors
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.difficultyColors
-import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val DIFFICULTY_BADGE_SIZE = 24.dp
 
 /**
  * Circular badge showing a card's [level] (1 easiest – 10 hardest) filled with its
@@ -36,7 +38,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 fun FlashcardsDifficultyBadge(
     level: Int,
     modifier: Modifier = Modifier,
-    size: Dp = MaterialTheme.sizes.difficultyBadge,
+    size: Dp = DIFFICULTY_BADGE_SIZE,
 ) {
     val description = stringResource(R.string.common_difficulty_level_cd, level, DifficultyColors.LEVELS)
     Box(

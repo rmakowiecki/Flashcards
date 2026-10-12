@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState.Correct
@@ -35,6 +36,9 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.semanticColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val ATTEMPT_SLOT_SIZE = 20.dp
+private val ATTEMPT_ICON_SIZE = 12.dp
 
 /**
  * Read-only history of a card's attempts within a session: one small square per attempt, filled
@@ -83,7 +87,7 @@ private fun AttemptSlot(state: FlashcardsAttemptSlotState) {
     val borderWidth = if (state == Current) MaterialTheme.sizes.tagChipBorder else MaterialTheme.sizes.hairline
 
     Surface(
-        modifier = Modifier.size(MaterialTheme.sizes.attemptIndicatorSlot),
+        modifier = Modifier.size(ATTEMPT_SLOT_SIZE),
         shape = shape,
         color = containerColor,
         border = borderColor?.let { BorderStroke(width = borderWidth, color = it) },
@@ -98,7 +102,7 @@ private fun AttemptSlot(state: FlashcardsAttemptSlotState) {
                     tint = contentColor,
                     modifier = Modifier
                         .padding(MaterialTheme.spacing.xxsmall)
-                        .size(MaterialTheme.sizes.attemptIndicatorIcon),
+                        .size(ATTEMPT_ICON_SIZE),
                 )
             }
         }

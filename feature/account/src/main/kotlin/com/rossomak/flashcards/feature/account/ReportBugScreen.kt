@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.BugReport
@@ -59,6 +60,8 @@ import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportNoConnecti
 import com.rossomak.flashcards.feature.account.ReportBugMessage.ReportSent
 import com.rossomak.flashcards.feature.account.ReportBugSubmissionStatus.Sending
 import kotlinx.coroutines.launch
+
+private val ACTION_PROGRESS_STROKE = 2.dp
 
 @Composable
 fun ReportBugScreen(
@@ -207,7 +210,7 @@ private fun SendAction(
                         contentDescription = sendingDescription
                         liveRegion = LiveRegionMode.Polite
                     },
-                strokeWidth = MaterialTheme.sizes.actionProgressStroke,
+                strokeWidth = ACTION_PROGRESS_STROKE,
             )
         }
     } else {

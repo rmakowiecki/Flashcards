@@ -22,32 +22,14 @@ object AppSizes {
     /** 1px hairline used for card borders and dividers. */
     val hairline: Dp = 1.dp
 
-    /** Height of the checkable tag chip (M3 filter chip, one size only). */
-    val tagChipHeight: Dp = 40.dp
-
-    /** Leading check icon inside a selected tag chip. */
-    val tagChipIcon: Dp = 18.dp
-
     /** Outline width of an unselected tag chip — deliberately heavier than [hairline]. */
     val tagChipBorder: Dp = 1.5.dp
-
-    /** Height of the metadata badge — the smaller, non-checkable stats pill. */
-    val metadataBadgeHeight: Dp = 32.dp
 
     /** Leading icon inside a metadata badge. */
     val metadataBadgeIcon: Dp = 16.dp
 
-    /** Height of a [metadataBadgeHeight] badge in its compact variant (flat card-row tags). */
-    val metadataBadgeHeightCompact: Dp = 24.dp
-
     /** Leading icon inside a compact metadata badge. */
     val metadataBadgeIconCompact: Dp = 14.dp
-
-    /** Diameter of the circular difficulty badge (leading element of flashcard rows). */
-    val difficultyBadge: Dp = 24.dp
-
-    /** Height of the difficulty range pill (filters, Study Creation summaries). */
-    val difficultyRangePillHeight: Dp = 24.dp
 
     /** Height of a [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Normal] button. */
     val buttonHeightNormal: Dp = 56.dp
@@ -61,12 +43,6 @@ object AppSizes {
 
     /** Diameter of the circular self-rating button (Failed / Partial / Correct). */
     val ratingButton: Dp = 56.dp
-
-    /** Diameter of the circular mastery progress ring used as a leading element of subcategory rows. */
-    val progressRing: Dp = 40.dp
-
-    /** Stroke width of the [progressRing] track and its filled arc. */
-    val progressRingStroke: Dp = 3.dp
 
     // Button icon size isn't a design-system token: it's androidx.compose.material3.ButtonDefaults.IconSize
     // (18dp), referenced directly in FlashcardsButtonMetrics.kt. Both size tiers share that one M3
@@ -86,42 +62,8 @@ object AppSizes {
     /** Larger border width of any component drawn on a brand gradient. */
     val onGradientBorder: Dp = 1.5.dp
 
-    /** Leading icon inside a [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner]. */
-    val infoBannerIcon: Dp = 16.dp
-
     /** Leading icon inside a [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]. */
     val xpBreakdownRowIcon: Dp = 20.dp
-
-    /** Side of one slot in a [com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator]. */
-    val attemptIndicatorSlot: Dp = 20.dp
-
-    /** Rating icon inside a graded [attemptIndicatorSlot]. */
-    val attemptIndicatorIcon: Dp = 12.dp
-
-    /** Diameter of the tinted circle behind a [com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState]'s icon. */
-    val emptyStateIconCircle: Dp = 80.dp
-
-    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle]. */
-    val iconCircle: Dp = 72.dp
-
-    /** Glyph size inside [emptyStateIconCircle]. */
-    val emptyStateIcon: Dp = 40.dp
-
-    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small] avatar (Settings' top app bar). */
-    val avatarSmall: Dp = 32.dp
-
-    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Medium] avatar (level card). */
-    val avatarMedium: Dp = 56.dp
-
-    /** Diameter of a [com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large] avatar (Account header). */
-    val avatarLarge: Dp = 88.dp
-
-    val actionProgressStroke: Dp = 2.dp
-
-    val bulletDot: Dp = 4.dp
-
-    /** Glyph inlined at the end of a favorited row's title text (see `FlashcardsRowTitleText`). */
-    val favoriteInlineIcon: Dp = 16.dp
 }
 
 val MaterialTheme.sizes: AppSizes
