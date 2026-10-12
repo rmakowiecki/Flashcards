@@ -1,6 +1,6 @@
 @file:Suppress("MagicNumber")
 
-package com.rossomak.flashcards.debugtools.networkgraph
+package com.rossomak.flashcards.feature.debug.networkgraph
 
 import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
 import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon

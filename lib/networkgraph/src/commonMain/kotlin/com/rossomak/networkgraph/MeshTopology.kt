@@ -1,6 +1,6 @@
 @file:Suppress("LoopWithTooManyJumpStatements", "TooManyFunctions")
 
-package com.rossomak.flashcards.debugtools.networkgraph
+package com.rossomak.flashcards.feature.debug.networkgraph
 
 import kotlin.math.max
 import kotlin.math.min

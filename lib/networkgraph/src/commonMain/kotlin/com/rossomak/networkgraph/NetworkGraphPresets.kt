@@ -1,6 +1,6 @@
 @file:Suppress("MagicNumber")
 
-package com.rossomak.flashcards.debugtools.networkgraph
+package com.rossomak.flashcards.feature.debug.networkgraph
 
 import androidx.compose.ui.graphics.Color
 import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom

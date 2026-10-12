@@ -76,6 +76,14 @@ pluginManager.withPlugin("com.android.application") {
     }
 }
 
+// Standalone Lint (multiplatform lib modules) writes a missing baseline and fails, so only wire one that
+// exists: these modules start with no frozen findings.
+pluginManager.withPlugin("com.android.lint") {
+    file("lint-baseline.xml").takeIf { it.exists() }?.let { lintBaseline ->
+        extensions.configure<com.android.build.api.dsl.Lint>("lint") { baseline = lintBaseline }
+    }
+}
+
 // Per-module entry point, e.g. `./gradlew :feature:study:staticAnalysis` — faster than the root
 // aggregate when only one module changed. Konsist stays whole-repo (its cross-module layer rules
 // can't be scoped to one module), and it reruns whenever any module's Kotlin sources change; the
@@ -88,3 +96,4 @@ val moduleStaticAnalysis = tasks.register("staticAnalysis") {
 // Lint only exists on Android modules — pure-Kotlin modules (android-core-kotlin) have no such task.
 pluginManager.withPlugin("com.android.library") { moduleStaticAnalysis.configure { dependsOn("lint") } }
 pluginManager.withPlugin("com.android.application") { moduleStaticAnalysis.configure { dependsOn("lint") } }
+pluginManager.withPlugin("com.android.lint") { moduleStaticAnalysis.configure { dependsOn("lint") } }
