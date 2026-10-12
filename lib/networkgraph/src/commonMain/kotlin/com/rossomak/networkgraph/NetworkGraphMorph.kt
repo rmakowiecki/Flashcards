@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,8 +28,6 @@ private const val SNAP_FRACTION = 0.5f
 private const val MAX_MORPH_NESTING = 4
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * A background part way between two specs: what [networkGraphBackground]'s morph overload draws.
  * [fraction] runs from 0 ([from]) to 1 ([to]) and can stop, scrub and reverse anywhere in between.
  *
@@ -38,7 +36,7 @@ private const val MAX_MORPH_NESTING = 4
  * morph starts exactly from what was on screen. [from] is that frozen morph's specs interpolated.
  */
 @Immutable
-data class NetworkGraphMorph(
+public data class NetworkGraphMorph(
     val from: NetworkGraphSpec,
     val to: NetworkGraphSpec,
     val fraction: Float,
@@ -50,7 +48,7 @@ data class NetworkGraphMorph(
  * is to the new target over [durationMillis], including from part way through an earlier morph.
  */
 @Composable
-fun animateNetworkGraphMorph(target: NetworkGraphSpec, durationMillis: Int = DEFAULT_MORPH_MILLIS): NetworkGraphMorph {
+public fun animateNetworkGraphMorph(target: NetworkGraphSpec, durationMillis: Int = DEFAULT_MORPH_MILLIS): NetworkGraphMorph {
     var from by remember { mutableStateOf(target) }
     var to by remember { mutableStateOf(target) }
     var origin by remember { mutableStateOf<NetworkGraphMorph?>(null) }
@@ -76,17 +74,20 @@ private fun NetworkGraphMorph.withNestingAtMost(levels: Int): NetworkGraphMorph?
 
 /**
  * One drawn layer of a morph: the layer's own seed, its spec at the morph's fraction, the [shape]
- * that decides which of its nodes show, and the two colors to blend by [colorFraction] once the theme
- * has resolved a null one.
+ * that decides which of its nodes show, and the two end specs a [NetworkGraphPalette] colors, blended
+ * by [colorFraction].
  */
 internal class MorphLayer(
     val seed: Int,
     val spec: NetworkGraphLayerSpec,
     val shape: LayerShape,
-    val fromColor: Color?,
-    val toColor: Color?,
+    val fromLayer: NetworkGraphLayerSpec,
+    val toLayer: NetworkGraphLayerSpec,
     val colorFraction: Float,
-)
+) {
+    val fromColor: Color? get() = fromLayer.surfaceColor
+    val toColor: Color? get() = toLayer.surfaceColor
+}
 
 /**
  * Which nodes of a layer show: a spec's own shape, or a morph between two shapes. A morph never
@@ -142,19 +143,19 @@ internal fun morphLayers(morph: NetworkGraphMorph): List<MorphLayer> {
                 seed = fromSeed,
                 spec = lerp(start, end, progress),
                 shape = LayerShape.Morph(startShape, LayerShape.Of(end), progress),
-                fromColor = start.surfaceColor,
-                toColor = end.surfaceColor,
+                fromLayer = start,
+                toLayer = end,
                 colorFraction = progress,
             )
-            progress < SNAP_FRACTION -> MorphLayer(fromSeed, start, startShape, start.surfaceColor, start.surfaceColor, 0f)
-            else -> MorphLayer(toSeed, end, LayerShape.Of(end), end.surfaceColor, end.surfaceColor, 0f)
+            progress < SNAP_FRACTION -> MorphLayer(fromSeed, start, startShape, start, start, 0f)
+            else -> MorphLayer(toSeed, end, LayerShape.Of(end), end, end, 1f)
         }
     }
 }
 
 /**
  * The spec [morphLayers] draws, as a spec of its own. A null color paired with a set one can't be
- * blended without the theme, so it snaps at [SNAP_FRACTION]; [animateNetworkGraphMorph] only uses
+ * blended without the palette's fallback, so it snaps at [SNAP_FRACTION]; [animateNetworkGraphMorph] only uses
  * this to restart a morph from part way through.
  */
 internal fun lerp(from: NetworkGraphSpec, to: NetworkGraphSpec, fraction: Float): NetworkGraphSpec {
@@ -170,7 +171,7 @@ internal fun lerp(from: NetworkGraphSpec, to: NetworkGraphSpec, fraction: Float)
 }
 
 /** True when every layer of this spec morphs into [other]'s smoothly, with no layer snapping. */
-internal fun NetworkGraphSpec.morphsSmoothlyInto(other: NetworkGraphSpec): Boolean {
+public fun NetworkGraphSpec.morphsSmoothlyInto(other: NetworkGraphSpec): Boolean {
     if (seed != other.seed) return false
     val pairs = min(layers.size, other.layers.size)
     return (1..pairs).all { fromFront -> layers[layers.size - fromFront].isSameMorphFamily(other.layers[other.layers.size - fromFront]) }

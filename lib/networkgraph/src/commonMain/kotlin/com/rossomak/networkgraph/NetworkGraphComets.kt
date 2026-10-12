@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import androidx.compose.ui.util.lerp
 import kotlin.math.PI
@@ -15,8 +15,6 @@ import kotlin.math.sin
 internal const val COMET_MIN_DIFFERENCE = 0.15f
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * One comet of a morph: an ellipse that leaves [source]'s stand-in and arrives at [target]'s, its
  * center, radii, angle and plateau all eased along the way, so the nodes between two shapes light up as
  * it passes. Its density is nothing at either end of the morph and peaks half way, so it never changes

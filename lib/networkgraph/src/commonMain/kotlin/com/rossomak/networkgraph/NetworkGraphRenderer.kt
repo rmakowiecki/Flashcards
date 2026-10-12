@@ -1,6 +1,7 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+@file:OptIn(ExperimentalNetworkGraphApi::class)
 
-import androidx.compose.material3.MaterialTheme
+package com.rossomak.networkgraph
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -13,71 +14,71 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalWindowInfo
-import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import kotlin.math.max
+import kotlin.time.TimeSource
 
 private const val NANOS_PER_SECOND = 1_000_000_000f
 private const val NANOS_PER_MILLI = 1_000_000f
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * Draws [spec] as an animated network-graph background: every layer's edges, glows and nodes,
- * back to front. Paints nothing else and is transparent everywhere it doesn't draw, so it
- * composes over whatever `Modifier.background(...)` ran earlier in the chain.
+ * back to front, painted with whatever [palette] gives each layer. Paints nothing else and is
+ * transparent everywhere it doesn't draw, so it composes over whatever `Modifier.background(...)` ran
+ * earlier in the chain.
  *
- * Color follows [style]: white on [FlashcardsComponentStyle.OnGradient] (the gradient never flips),
- * and each layer's [NetworkGraphLayerSpec.surfaceColor] — theme `onSurfaceVariant` when unset — on
- * [FlashcardsComponentStyle.OnSurface].
+ * Every drawn node has at least two visible edges, and its dot is at least as opaque as each of them;
+ * see [NetworkGraphLayerSpec].
  *
- * Every drawn node has at least two visible edges, and its dot is at least as opaque as each of them —
- * see [NetworkGraphLayerSpec], [enforceMinDegree] and [LayerField.draw]. [showViolations] rings in red
- * any node that breaks either rule anyway, as an on-device check.
- * [layerStats], when given, publishes each layer's visible, pruned and repaired counts.
- *
- * Before promoting a winner out of `:feature:debug`:
- * - respect the system animator-duration scale ("Remove animations") and render a still frame;
- * - stop the frame loop while the surface is off-screen or the app is backgrounded.
+ * Ignores the system animator-duration scale ("Remove animations") and keeps its frame loop running
+ * while the surface is off-screen or the app is backgrounded.
  */
 @Composable
-fun Modifier.networkGraphBackground(
-    spec: NetworkGraphSpec,
-    style: FlashcardsComponentStyle,
-    stats: NetworkGraphFrameStats? = null,
-    layerStats: NetworkGraphLayerStats? = null,
-    showViolations: Boolean = false,
-): Modifier = networkGraphBackground(NetworkGraphMorph(spec, spec, 0f), style, stats, layerStats, showViolations)
+public fun Modifier.networkGraphBackground(spec: NetworkGraphSpec, palette: NetworkGraphPalette): Modifier =
+    networkGraphBackground(NetworkGraphMorph(spec, spec, 0f), palette)
 
 /**
- * The [morph] between two specs, at its fraction; see [NetworkGraphMorph] and [morphLayers]. Drive the
- * fraction from anything — a pager's scroll position, a slider, or [animateNetworkGraphMorph] — and
- * the background follows it continuously, in either direction.
+ * The [morph] between two specs, at its fraction; see [NetworkGraphMorph]. Drive the fraction from
+ * anything — a pager's scroll position, a slider, or [animateNetworkGraphMorph] — and the background
+ * follows it continuously, in either direction.
  *
  * The surface may change size at any time without reshuffling: the node grid is sized from the
  * window, not the surface, and the shape follows the surface's new bounds the same way a morph does.
  */
 @Composable
-fun Modifier.networkGraphBackground(
+public fun Modifier.networkGraphBackground(morph: NetworkGraphMorph, palette: NetworkGraphPalette): Modifier =
+    drawNetworkGraph(morph, palette, stats = null, layerStats = null, showViolations = false)
+
+/**
+ * [networkGraphBackground] with diagnostics: [stats] gets each frame's draw time, [layerStats] each
+ * layer's visible, pruned and repaired counts, and [showViolations] rings in red any node that breaks
+ * the connectivity or alpha rules anyway, as an on-device check.
+ */
+@ExperimentalNetworkGraphApi
+@Composable
+public fun Modifier.networkGraphBackground(
     morph: NetworkGraphMorph,
-    style: FlashcardsComponentStyle,
-    stats: NetworkGraphFrameStats? = null,
+    palette: NetworkGraphPalette,
+    stats: NetworkGraphFrameStats?,
     layerStats: NetworkGraphLayerStats? = null,
     showViolations: Boolean = false,
+): Modifier = drawNetworkGraph(morph, palette, stats, layerStats, showViolations)
+
+@Composable
+private fun Modifier.drawNetworkGraph(
+    morph: NetworkGraphMorph,
+    palette: NetworkGraphPalette,
+    stats: NetworkGraphFrameStats?,
+    layerStats: NetworkGraphLayerStats?,
+    showViolations: Boolean,
 ): Modifier {
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val layers = morphLayers(morph)
-    val layerColors = layers.map { layer ->
-        when (style) {
-            FlashcardsComponentStyle.OnGradient -> Color.White
-            FlashcardsComponentStyle.OnSurface ->
-                lerp(layer.fromColor ?: onSurfaceVariant, layer.toColor ?: onSurfaceVariant, layer.colorFraction)
-        }
-    }
     val windowSize = LocalWindowInfo.current.containerSize
     val holder = remember { NetworkGraphHolder() }
     val elapsedSeconds = remember { mutableFloatStateOf(0f) }
@@ -92,7 +93,7 @@ fun Modifier.networkGraphBackground(
 
     return this.drawBehind {
         if (size.width <= 0f || size.height <= 0f) return@drawBehind
-        val drawStartNanos = System.nanoTime()
+        val drawStart = TimeSource.Monotonic.markNow()
         val timeSeconds = elapsedSeconds.floatValue
         // No window in previews; the surface itself is the next best fixed reference.
         val windowLongSide = max(windowSize.width, windowSize.height).toFloat()
@@ -101,13 +102,56 @@ fun Modifier.networkGraphBackground(
         // Nodes deliberately sit past the surface's edges, and drawBehind is not clipped.
         clipRect {
             fields.forEachIndexed { index, field ->
-                val color = layerColors[index]
+                val fill = layerFill(palette, layers, index, timeSeconds, size)
                 field.advance(timeSeconds, size.width, size.height)
-                field.draw(this, color, holder.halosFor(color), timeSeconds, showViolations)
+                field.draw(this, fill, holder.halosFor(fill.maskColor), timeSeconds, showViolations)
             }
         }
-        stats?.recordDraw(System.nanoTime() - drawStartNanos)
+        stats?.recordDraw(drawStart.elapsedNow().inWholeNanoseconds)
         layerStats?.record(fields)
+    }
+}
+
+/**
+ * What layer [index] paints with: [palette] asked about each end of the morph that shows, with two
+ * solid ends blended into one color and anything else crossfaded by [MorphLayer.colorFraction].
+ */
+internal fun layerFill(palette: NetworkGraphPalette, layers: List<MorphLayer>, index: Int, timeSeconds: Float, size: Size): LayerFill {
+    val layer = layers[index]
+    fun brushFor(side: NetworkGraphMorphSide, spec: NetworkGraphLayerSpec) =
+        palette.brushFor(NetworkGraphLayerContext(index, layers.size, spec, side, timeSeconds, size))
+    val fraction = layer.colorFraction
+    val from = if (fraction < 1f) brushFor(NetworkGraphMorphSide.From, layer.fromLayer) else null
+    val to = if (fraction > 0f) brushFor(NetworkGraphMorphSide.To, layer.toLayer) else null
+    return when {
+        from == null -> LayerFill.of(checkNotNull(to))
+        to == null -> LayerFill.of(from)
+        from is SolidColor && to is SolidColor ->
+            LayerFill.Solid(if (from.value == to.value) from.value else lerp(from.value, to.value, fraction))
+        else -> LayerFill.Masked(from, overlay = to, overlayAlpha = fraction)
+    }
+}
+
+/** How [LayerField.draw] colors a layer. */
+internal sealed interface LayerFill {
+    /** The color the layer's edges, halos and dots are drawn in before any brush is applied. */
+    val maskColor: Color
+
+    /** Every element drawn directly in [color]. */
+    data class Solid(val color: Color) : LayerFill {
+        override val maskColor: Color get() = color
+    }
+
+    /**
+     * Every element drawn in white, then the whole layer recolored with [base], keeping each pixel's
+     * alpha; [overlay], when set, is blended over [base] at [overlayAlpha], again keeping alpha.
+     */
+    data class Masked(val base: Brush, val overlay: Brush? = null, val overlayAlpha: Float = 0f) : LayerFill {
+        override val maskColor: Color get() = Color.White
+    }
+
+    companion object {
+        fun of(brush: Brush): LayerFill = if (brush is SolidColor) Solid(brush.value) else Masked(brush)
     }
 }
 
@@ -116,22 +160,23 @@ fun Modifier.networkGraphBackground(
  * recompose every frame. Draw time is CPU time spent recording every graph on the page into the
  * display list, summed per frame — a relative cost signal between presets, not a GPU measurement.
  */
+@ExperimentalNetworkGraphApi
 @Stable
-class NetworkGraphFrameStats {
-    var frameMillis by mutableFloatStateOf(0f)
+public class NetworkGraphFrameStats {
+    public var frameMillis: Float by mutableFloatStateOf(0f)
         private set
-    var drawMillis by mutableFloatStateOf(0f)
+    public var drawMillis: Float by mutableFloatStateOf(0f)
         private set
 
     private var intervalNanosSum = 0L
     private var drawNanosSum = 0L
     private var frames = 0
 
-    fun recordDraw(nanos: Long) {
+    public fun recordDraw(nanos: Long) {
         drawNanosSum += nanos
     }
 
-    fun recordFrame(intervalNanos: Long) {
+    public fun recordFrame(intervalNanos: Long) {
         intervalNanosSum += intervalNanos
         frames++
         if (intervalNanosSum >= PUBLISH_INTERVAL_NANOS) {
@@ -153,17 +198,18 @@ class NetworkGraphFrameStats {
  * repair. Refreshed twice a second. A layer that leans on repair hard is one whose filters fight
  * its density.
  */
+@ExperimentalNetworkGraphApi
 @Stable
-class NetworkGraphLayerStats {
-    var summary by mutableStateOf("")
+public class NetworkGraphLayerStats {
+    public var summary: String by mutableStateOf("")
         private set
 
-    private var lastPublishNanos = 0L
+    private var lastPublish: TimeSource.Monotonic.ValueTimeMark? = null
 
     internal fun record(fields: List<LayerField>) {
-        val nowNanos = System.nanoTime()
-        if (nowNanos - lastPublishNanos < PUBLISH_INTERVAL_NANOS) return
-        lastPublishNanos = nowNanos
+        val sincePublish = lastPublish?.elapsedNow()?.inWholeNanoseconds
+        if (sincePublish != null && sincePublish < PUBLISH_INTERVAL_NANOS) return
+        lastPublish = TimeSource.Monotonic.markNow()
         summary = fields.joinToString(separator = "  |  ") { field ->
             "${field.visibleNodeCount}/${field.prunedNodeCount} · ${field.repairedEdgeCount}"
         }

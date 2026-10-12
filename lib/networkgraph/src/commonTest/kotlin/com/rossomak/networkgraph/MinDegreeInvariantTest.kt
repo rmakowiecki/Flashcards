@@ -1,11 +1,11 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon
+import com.rossomak.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.networkgraph.ShapePrimitive.Ribbon
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import kotlin.math.max
-import org.junit.Test
+import kotlin.test.Test
 
 /**
  * Sweeps real [LayerField]s over seeds, both surface shapes and every slider extreme, and checks the

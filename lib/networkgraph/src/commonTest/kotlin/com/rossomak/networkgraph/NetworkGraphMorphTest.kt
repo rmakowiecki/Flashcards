@@ -1,7 +1,7 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import androidx.compose.ui.geometry.Offset
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.networkgraph.ShapePrimitive.Bloom
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.doubles.plusOrMinus as plusOrMinusDouble
@@ -14,7 +14,7 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sqrt
-import org.junit.Test
+import kotlin.test.Test
 
 /**
  * Morphs and resizes on real [LayerField]s: both invariants must hold on every frame part way through

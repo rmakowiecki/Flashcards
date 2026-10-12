@@ -34,9 +34,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Uniform
+import com.rossomak.networkgraph.EdgeRule
+import com.rossomak.networkgraph.MAX_SHAPE_PRIMITIVES
+import com.rossomak.networkgraph.NetworkGraphLayerSpec
+import com.rossomak.networkgraph.NetworkGraphSpec
+import com.rossomak.networkgraph.ShapePrimitive
+import com.rossomak.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.networkgraph.ShapePrimitive.Ribbon
+import com.rossomak.networkgraph.ShapePrimitive.Uniform
 import java.util.Locale
 
 /**
@@ -79,7 +84,7 @@ fun NetworkGraphTuningSheetContent(
             selectedLayer = layerIndex,
             onLayerSelect = { selectedLayer = it },
             onBackLayerAdd = {
-                onSpecChange(spec.copy(layers = listOf(NetworkGraphPresets.defaultBackLayer) + spec.layers))
+                onSpecChange(spec.copy(layers = listOf(FlashcardsNetworkGraphPresets.defaultBackLayer) + spec.layers))
                 selectedLayer = 0
             },
             onLayerRemove = {

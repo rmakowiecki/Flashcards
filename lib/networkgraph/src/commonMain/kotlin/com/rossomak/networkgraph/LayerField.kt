@@ -3,7 +3,7 @@
 // that turns 0..1 into -1..1), which naming individually would only bury.
 @file:Suppress("MagicNumber", "LoopWithTooManyJumpStatements", "TooManyFunctions", "LongParameterList")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -35,7 +35,7 @@ private const val BORDER_FADE_END_CELLS = 1.5f
 private const val MAX_STEP_SECONDS = 0.1f
 
 // Drift: three sine octaves per axis at non-rational ratios, so a node's path wanders instead of
-// tracing a closed Lissajous loop. Carried over unchanged from the single-renderer revision.
+// tracing a closed Lissajous loop.
 private const val DRIFT_FREQUENCY_BASE_PRIMARY = 0.115f
 private const val DRIFT_FREQUENCY_BASE_SECONDARY = 0.095f
 private const val DRIFT_FREQUENCY_SPREAD = 0.075f
@@ -299,8 +299,11 @@ internal class LayerField(
 
     private var lastTimeSeconds = Float.NaN
 
-    /** Composites the offscreen layer [draw] paints into with plain source-over at full alpha. */
-    private val layerPaint = Paint()
+    /**
+     * Composites the offscreen layer [draw] paints into with plain source-over at full alpha. Built on
+     * first draw: on desktop a paint needs the native graphics library, which geometry-only use never loads.
+     */
+    private val layerPaint by lazy(LazyThreadSafetyMode.NONE) { Paint() }
 
     /** Edge alpha of node [index]'s second-brightest edge, as of the last [advance]. */
     internal fun secondEdgeAlpha(index: Int): Float = secondEdgeAlphas[index]
@@ -381,12 +384,21 @@ internal class LayerField(
      * Paints the layer into its own offscreen layer, composited onto the canvas once. Edges and halos
      * blend with each other there, but each dot is drawn with [BlendMode.Src] and replaces whatever lies
      * under it, so a dot's pixels are exactly its own alpha instead of summing with the edges it anchors.
+     *
+     * A [LayerFill.Masked] layer is drawn in white first, then recolored as a whole while still
+     * offscreen: [BlendMode.SrcIn] takes the base brush's color and keeps each pixel's alpha, and
+     * [BlendMode.SrcAtop] blends the overlay over it the same way.
      */
-    fun draw(scope: DrawScope, color: Color, halos: HaloBrushCache, timeSeconds: Float, showViolations: Boolean) = with(scope) {
+    fun draw(scope: DrawScope, fill: LayerFill, halos: HaloBrushCache, timeSeconds: Float, showViolations: Boolean) = with(scope) {
+        val color = fill.maskColor
         drawIntoCanvas { canvas -> canvas.saveLayer(Rect(Offset.Zero, size), layerPaint) }
         drawEdges(color, timeSeconds)
         drawGlows(halos)
         drawCores(color)
+        if (fill is LayerFill.Masked) {
+            drawRect(brush = fill.base, blendMode = BlendMode.SrcIn)
+            fill.overlay?.let { overlay -> drawRect(brush = overlay, alpha = fill.overlayAlpha, blendMode = BlendMode.SrcAtop) }
+        }
         drawIntoCanvas { canvas -> canvas.restore() }
         if (showViolations) drawViolations(timeSeconds)
     }

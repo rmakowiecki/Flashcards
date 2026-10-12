@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalNetworkGraphApi::class)
+
 package com.rossomak.flashcards.debugtools.networkgraph
 
 import android.content.ClipData
@@ -72,6 +74,12 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.networkgraph.ExperimentalNetworkGraphApi
+import com.rossomak.networkgraph.NetworkGraphFrameStats
+import com.rossomak.networkgraph.NetworkGraphLayerStats
+import com.rossomak.networkgraph.NetworkGraphMorph
+import com.rossomak.networkgraph.NetworkGraphSpec
+import com.rossomak.networkgraph.morphsSmoothlyInto
 import java.util.Locale
 import kotlin.math.floor
 import kotlin.random.Random
@@ -84,12 +92,12 @@ import kotlinx.coroutines.launch
  * [com.rossomak.flashcards.debugtools.DebugScreen] / `MainScreenDebugTabs` once a winner is
  * promoted.
  *
- * One [NetworkGraphPresets] variant per pager page, each shown on the two aspect ratios a winner has
+ * One [FlashcardsNetworkGraphPresets] variant per pager page, each shown on the two aspect ratios a winner has
  * to hold up on: a wide, short top app bar strip and a tall hero. Three more pages follow the presets:
- * a morph page that scrubs or times a morph between two [NetworkGraphPresets.morphFamily] variants,
+ * a morph page that scrubs or times a morph between two [FlashcardsNetworkGraphPresets.morphFamily] variants,
  * and two fake onboarding pagers whose background morphs with their scroll position and whose surface
  * can shrink and grow: the first between simple shapes, the second through splits, merges and
- * crossings that send comets ([NetworkGraphPresets.onboardingCometPages]). Registered on the app's outer graph, so it runs full-screen without the bottom bar.
+ * crossings that send comets ([FlashcardsNetworkGraphPresets.onboardingCometPages]). Registered on the app's outer graph, so it runs full-screen without the bottom bar.
  *
  * The bottom overlay, laid out under the pages rather than over them, reseeds the page's layout,
  * flips the [FlashcardsComponentStyle] for every page, copies the page's current spec as Kotlin
@@ -100,11 +108,11 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit) {
-    val specs = remember { NetworkGraphPresets.all.toMutableStateList() }
-    val morphSpecs = remember { NetworkGraphPresets.morphFamily.toMutableStateList() }
+    val specs = remember { FlashcardsNetworkGraphPresets.all.toMutableStateList() }
+    val morphSpecs = remember { FlashcardsNetworkGraphPresets.morphFamily.toMutableStateList() }
     val onboardingDecks = listOf(
-        rememberOnboardingDeck(NetworkGraphPresets.onboardingPages),
-        rememberOnboardingDeck(NetworkGraphPresets.onboardingCometPages),
+        rememberOnboardingDeck(FlashcardsNetworkGraphPresets.onboardingPages),
+        rememberOnboardingDeck(FlashcardsNetworkGraphPresets.onboardingCometPages),
     )
     val morphSelection = remember { MorphSelection() }
     var style by remember { mutableStateOf(FlashcardsComponentStyle.entries.first()) }
@@ -244,7 +252,7 @@ private fun specSlotFor(
     }
 }
 
-/** Copies [spec] as Kotlin source to the clipboard and logcat, ready to paste into [NetworkGraphPresets]. */
+/** Copies [spec] as Kotlin source to the clipboard and logcat, ready to paste into [FlashcardsNetworkGraphPresets]. */
 private suspend fun copySpec(spec: NetworkGraphSpec, clipboard: Clipboard) {
     val source = spec.toKotlinSource()
     logd { "Network graph spec:\n$source" }
@@ -281,7 +289,7 @@ private const val MORPH_PLAY_MILLIS = 1_200
 private const val MORPH_HALFWAY = 0.5f
 
 /**
- * Which two [NetworkGraphPresets.morphFamily] variants the morph page morphs between, and how far:
+ * Which two [FlashcardsNetworkGraphPresets.morphFamily] variants the morph page morphs between, and how far:
  * [progress] runs from 0 (from) to 1 (to), scrubbed by the tuning sheet's slider and played end to
  * end by the overlay's Start button.
  */
@@ -348,7 +356,7 @@ private fun GraphPage(
                     .fillMaxWidth()
                     .weight(1f)
                     .background(heroBackgroundFor(style), RoundedCornerShape(HeroCornerRadius))
-                    .networkGraphBackground(morph, style, stats, layerStats, showViolations),
+                    .flashcardsNetworkGraphBackground(morph, style, stats, layerStats, showViolations),
             ) {
                 Text(
                     text = note,
@@ -362,7 +370,7 @@ private fun GraphPage(
 }
 
 /**
- * A morph between two [NetworkGraphPresets.morphFamily] variants at [MorphSelection.progress]. Its
+ * A morph between two [FlashcardsNetworkGraphPresets.morphFamily] variants at [MorphSelection.progress]. Its
  * controls live in the tuning sheet ([MorphControls]) and the overlay's Start button, so nothing
  * covers the graph while it morphs.
  */
@@ -458,7 +466,7 @@ private fun OnboardingPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(heightFraction)
-                .networkGraphBackground(morph, FlashcardsComponentStyle.OnGradient, stats, layerStats, showViolations),
+                .flashcardsNetworkGraphBackground(morph, FlashcardsComponentStyle.OnGradient, stats, layerStats, showViolations),
         )
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             Column(
@@ -531,7 +539,7 @@ private fun NetworkGraphAppBarDemo(
     LargeFlexibleTopAppBar(
         modifier = Modifier
             .background(cardBackgroundFor(style))
-            .networkGraphBackground(morph, style, stats, showViolations = showViolations),
+            .flashcardsNetworkGraphBackground(morph, style, stats, showViolations = showViolations),
         title = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         subtitle = { Text(text = styleLabel(style), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = {

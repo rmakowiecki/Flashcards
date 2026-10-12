@@ -1,18 +1,14 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import java.util.Locale
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * Everything that makes one network-graph background look different from another. A variant is a
- * value of this class, not a renderer of its own: [NetworkGraphPresets] holds the curated ones, the
- * tuning sheet edits a copy live, and [toKotlinSource] turns a tuned copy back into a preset.
+ * value of this class, not a renderer of its own: [NetworkGraphPresets] holds curated starting points,
+ * and a tuning tool can edit a copy live.
  *
- * [layers] draw back to front, each an independent mesh with its own nodes, envelope and seed, which
- * is what gives the "sharp foreground over a faint, larger background mesh" depth of the references.
+ * [layers] draw back to front, each an independent mesh with its own nodes, envelope and seed, so a
+ * sharp foreground can sit over a faint, larger background mesh for depth.
  * Layer seeds count from the front layer, so adding a back layer leaves the front one's layout alone.
  *
  * Two specs morph into each other smoothly (see [morphLayers]) when they share [seed] and each
@@ -20,7 +16,7 @@ import java.util.Locale
  * [NetworkGraphLayerSpec.edgeRule] and [NetworkGraphLayerSpec.strictTriangles]. Every other field
  * morphs.
  */
-data class NetworkGraphSpec(
+public data class NetworkGraphSpec(
     val name: String,
     val note: String,
     val seed: Int,
@@ -28,8 +24,8 @@ data class NetworkGraphSpec(
 )
 
 /** Which pairs of nodes get an edge. */
-enum class EdgeRule {
-    /** Every pair within reach, re-evaluated each frame — the original look. */
+public enum class EdgeRule {
+    /** Every pair within reach, re-evaluated each frame. */
     Proximity,
 
     /** Delaunay over the nodes' rest positions, triangulated once and kept while they drift. */
@@ -40,7 +36,7 @@ enum class EdgeRule {
 }
 
 /** A layer holds at most this many [ShapePrimitive]s; each one costs every node a density and closeness check per frame. */
-const val MAX_SHAPE_PRIMITIVES = 6
+public const val MAX_SHAPE_PRIMITIVES: Int = 6
 
 private const val RIBBON_DEFAULT_CENTER = 0.6f
 private const val RIBBON_DEFAULT_WIDTH = 0.45f
@@ -53,14 +49,14 @@ private const val BLOOM_DEFAULT_REACH = 0.8f
  * Two layers' primitives never need to match up for a morph: each node takes its presence from the two
  * ends, and comets travel between primitives that moved (see [LayerField]).
  */
-sealed interface ShapePrimitive {
-    val weight: Float
+public sealed interface ShapePrimitive {
+    public val weight: Float
 
     /** Even density over the whole surface. */
-    data class Uniform(override val weight: Float = 1f) : ShapePrimitive
+    public data class Uniform(override val weight: Float = 1f) : ShapePrimitive
 
     /** A meandering band across the width. */
-    data class Ribbon(
+    public data class Ribbon(
         override val weight: Float = 1f,
         /** Center line, as a fraction of height. */
         val center: Float = RIBBON_DEFAULT_CENTER,
@@ -73,7 +69,7 @@ sealed interface ShapePrimitive {
     ) : ShapePrimitive
 
     /** Dense around a center, thinning out; the default sits on the top-end corner. */
-    data class Bloom(
+    public data class Bloom(
         override val weight: Float = 1f,
         /** Center, as fractions of width and height. */
         val x: Float = 1f,
@@ -99,7 +95,7 @@ sealed interface ShapePrimitive {
  *   alpha: edges are limited by the dimmer of their two dots, and dots replace rather than blend with
  *   what the layer drew under them.
  */
-data class NetworkGraphLayerSpec(
+public data class NetworkGraphLayerSpec(
     /**
      * Where nodes sit: up to [MAX_SHAPE_PRIMITIVES] primitives, combined by taking the strongest weighted
      * one at each point. See [ShapePrimitive] and [NetworkGraphEnvelope].
@@ -158,94 +154,9 @@ data class NetworkGraphLayerSpec(
     val cometSpark: Boolean = false,
     /** Multiplies every alpha in the layer. */
     val alpha: Float = 1f,
-    /** Line/node color on a plain surface; null = theme `onSurfaceVariant`. Ignored on the gradient, which is always white. */
+    /**
+     * The layer's own line/node color, read by [NetworkGraphPalette.fromSpec]; null = that palette's
+     * fallback. Other palettes may ignore it.
+     */
     val surfaceColor: Color? = null,
 )
-
-/** The spec as Kotlin source for [NetworkGraphPresets], listing only layer fields that differ from the defaults. */
-fun NetworkGraphSpec.toKotlinSource(): String {
-    val defaults = NetworkGraphLayerSpec().sourceArguments()
-    val layerSources = layers.joinToString(separator = ",\n") { layer ->
-        val arguments = layer.sourceArguments().filter { (name, value) -> defaults[name] != value }
-        if (arguments.isEmpty()) {
-            "        NetworkGraphLayerSpec()"
-        } else {
-            arguments.entries.joinToString(
-                separator = ",\n",
-                prefix = "        NetworkGraphLayerSpec(\n",
-                postfix = ",\n        )",
-            ) { (name, value) -> "            $name = $value" }
-        }
-    }
-    return """
-        |NetworkGraphSpec(
-        |    name = "$name",
-        |    note = "$note",
-        |    seed = $seed,
-        |    layers = listOf(
-        |$layerSources,
-        |    ),
-        |)
-    """.trimMargin()
-}
-
-private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linkedMapOf(
-    "shapes" to shapes.joinToString(separator = ", ", prefix = "listOf(", postfix = ")") { it.toSource() },
-    "edgeRule" to "EdgeRule.$edgeRule",
-    "density" to density.toSource(),
-    "fillChance" to fillChance.toSource(),
-    "jitter" to jitter.toSource(),
-    "driftAmplitude" to driftAmplitude.toSource(),
-    "driftSpeed" to driftSpeed.toSource(),
-    "envelopeFloor" to envelopeFloor.toSource(),
-    "waveAmplitude" to waveAmplitude.toSource(),
-    "waveSpeed" to waveSpeed.toSource(),
-    "maxEdgeFactor" to maxEdgeFactor.toSource(),
-    "minAngleDegrees" to minAngleDegrees.toSource(),
-    "edgeKeepChance" to edgeKeepChance.toSource(),
-    "repairReach" to repairReach.toSource(),
-    "strictTriangles" to strictTriangles.toString(),
-    "strokeWidthDp" to strokeWidthDp.toSource(),
-    "edgeAlpha" to edgeAlpha.toSource(),
-    "lengthFalloff" to lengthFalloff.toSource(),
-    "pulseDepth" to pulseDepth.toSource(),
-    "nodeSizeDp" to nodeSizeDp.toSource(),
-    "nodeSizeVariance" to nodeSizeVariance.toSource(),
-    "hotNodeShare" to hotNodeShare.toSource(),
-    "glowRadiusDp" to glowRadiusDp.toSource(),
-    "glowStrength" to glowStrength.toSource(),
-    "depthDimming" to depthDimming.toSource(),
-    "cometStrength" to cometStrength.toSource(),
-    "cometSpark" to cometSpark.toString(),
-    "alpha" to alpha.toSource(),
-    "surfaceColor" to (surfaceColor?.let { color -> "Color(0x%08X)".format(Locale.US, color.toArgb()) } ?: "null"),
-)
-
-/** The primitive as a constructor call, listing only the arguments that differ from its defaults. */
-private fun ShapePrimitive.toSource(): String {
-    val arguments = when (this) {
-        is ShapePrimitive.Uniform -> listOf("weight" to (weight to 1f))
-        is ShapePrimitive.Ribbon -> listOf(
-            "weight" to (weight to 1f),
-            "center" to (center to RIBBON_DEFAULT_CENTER),
-            "width" to (width to RIBBON_DEFAULT_WIDTH),
-            "curve" to (curve to RIBBON_DEFAULT_CURVE),
-            "tilt" to (tilt to 0f),
-        )
-        is ShapePrimitive.Bloom -> listOf(
-            "weight" to (weight to 1f),
-            "x" to (x to 1f),
-            "y" to (y to 0f),
-            "reach" to (reach to BLOOM_DEFAULT_REACH),
-            "plateau" to (plateau to 0f),
-        )
-    }
-    val changed = arguments.filter { (_, values) -> values.first != values.second }
-    return changed.joinToString(separator = ", ", prefix = "ShapePrimitive.${this::class.simpleName}(", postfix = ")") { (name, values) ->
-        "$name = ${values.first.toSource()}"
-    }
-}
-
-private fun Float.toSource(): String = "%.3f".format(Locale.US, this).trimEnd('0').let { trimmed ->
-    if (trimmed.endsWith('.')) "${trimmed}0f" else "${trimmed}f"
-}

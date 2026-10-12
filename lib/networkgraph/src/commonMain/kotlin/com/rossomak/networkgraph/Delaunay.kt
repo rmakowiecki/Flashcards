@@ -1,6 +1,6 @@
 @file:Suppress("MagicNumber", "LoopWithTooManyJumpStatements")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import kotlin.math.abs
 import kotlin.math.cos
@@ -14,8 +14,6 @@ private const val DEGENERATE_DETERMINANT = 1e-9
 private const val DEGREES_TO_RADIANS = 0.017453292f
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * Bowyer–Watson Delaunay triangulation, hand-written rather than pulled in as a dependency. Each
  * insertion scans every live triangle, so it is O(n²) in the worst case — a few hundred background
  * nodes take on the order of a millisecond, which is what lets [EdgeRule.LivingDelaunay] re-run it

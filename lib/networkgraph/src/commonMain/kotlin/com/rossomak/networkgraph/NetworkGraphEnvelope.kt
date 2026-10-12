@@ -1,10 +1,10 @@
 @file:Suppress("MagicNumber")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Uniform
+import com.rossomak.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.networkgraph.ShapePrimitive.Ribbon
+import com.rossomak.networkgraph.ShapePrimitive.Uniform
 import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.cos
@@ -37,8 +37,6 @@ private const val RIBBON_PHASE_SEED_STRIDE = 104_729
 private const val RIBBON_STAND_IN_SPAN = 1.15f
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * The overall shape of one layer, from its [ShapePrimitive]s, in four parts:
  * - [densityAt] decides where nodes are *present*: a node shows in proportion to the density at its
  *   home, so a shape is just a density field over the surface, from 0 to 1. It is evaluated every
@@ -53,8 +51,8 @@ private const val RIBBON_STAND_IN_SPAN = 1.15f
  *
  * Only the random phases live here; every shape value comes from the spec passed in, so one envelope
  * serves every frame of a morph. Each ribbon takes its meander phases by its place among the spec's
- * ribbons, so two ribbons in one spec meander differently, and the first keeps the phases a single
- * ribbon always had.
+ * ribbons, so two ribbons in one spec meander differently, and the first takes the same phases as a
+ * lone ribbon.
  */
 internal class NetworkGraphEnvelope(private val seed: Int) {
     private val firstRibbonPhases: RibbonPhases

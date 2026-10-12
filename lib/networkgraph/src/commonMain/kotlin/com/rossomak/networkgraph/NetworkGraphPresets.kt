@@ -1,22 +1,17 @@
 @file:Suppress("MagicNumber")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
-import androidx.compose.ui.graphics.Color
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Bloom
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Ribbon
-import com.rossomak.flashcards.feature.debug.networkgraph.ShapePrimitive.Uniform
-
-private val BrandIndigo = Color(0xFF2A2E8F)
+import com.rossomak.networkgraph.ShapePrimitive.Bloom
+import com.rossomak.networkgraph.ShapePrimitive.Ribbon
+import com.rossomak.networkgraph.ShapePrimitive.Uniform
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
- * The curated variants, one pager page each. Each tests one idea against the others; [baseline] is
- * the control, a port of the look the single-renderer revision shipped. New presets come from the
- * tuning sheet's "copy spec" button, pasted here.
+ * Curated starting points, each built around one idea; [baseline] is the plainest, a uniform field
+ * with proximity edges. None of them sets a color, so each takes whatever the caller's
+ * [NetworkGraphPalette] gives it.
  */
-object NetworkGraphPresets {
+public object NetworkGraphPresets {
 
     private val ribbonFront = NetworkGraphLayerSpec(
         shapes = listOf(Ribbon(center = 0.62f, width = 0.4f)),
@@ -32,7 +27,7 @@ object NetworkGraphPresets {
         nodeSizeDp = 2f,
     )
 
-    /** The far mesh of the two-layer references: sparser, bigger dimmer nodes, slower (parallax). */
+    /** A far mesh for a back layer: sparser, bigger dimmer nodes, slower (parallax). */
     private val ribbonGhost = NetworkGraphLayerSpec(
         shapes = listOf(Ribbon(center = 0.55f, width = 0.7f, curve = 0.15f)),
         density = 12f,
@@ -52,9 +47,9 @@ object NetworkGraphPresets {
         alpha = 0.35f,
     )
 
-    val baseline = NetworkGraphSpec(
+    public val baseline: NetworkGraphSpec = NetworkGraphSpec(
         name = "Baseline",
-        note = "Control: the previous look — uniform field, proximity edges, depth, pulse",
+        note = "Uniform field, proximity edges, depth, pulse",
         seed = 1,
         layers = listOf(
             NetworkGraphLayerSpec(
@@ -76,23 +71,23 @@ object NetworkGraphPresets {
         ),
     )
 
-    val ribbonMesh = NetworkGraphSpec(
+    public val ribbonMesh: NetworkGraphSpec = NetworkGraphSpec(
         name = "Ribbon mesh",
         note = "Wavy triangulated band, fixed topology, single layer",
         seed = 2,
         layers = listOf(ribbonFront),
     )
 
-    val ribbonPlusGhost = NetworkGraphSpec(
+    public val ribbonPlusGhost: NetworkGraphSpec = NetworkGraphSpec(
         name = "Ribbon + ghost",
-        note = "Ribbon over a faint, sparser, slower far mesh — refs 1 and 4",
+        note = "Ribbon over a faint, sparser, slower far mesh",
         seed = 3,
         layers = listOf(ribbonGhost, ribbonFront),
     )
 
-    val glowConstellation = NetworkGraphSpec(
+    public val glowConstellation: NetworkGraphSpec = NetworkGraphSpec(
         name = "Glow constellation",
-        note = "Ribbon with a hot node subset haloed; long edges fade — ref 3",
+        note = "Ribbon with a hot node subset haloed; long edges fade",
         seed = 4,
         layers = listOf(
             ribbonFront.copy(
@@ -106,9 +101,9 @@ object NetworkGraphPresets {
         ),
     )
 
-    val cornerBloom = NetworkGraphSpec(
+    public val cornerBloom: NetworkGraphSpec = NetworkGraphSpec(
         name = "Corner bloom",
-        note = "Dense at the top-end corner, thinning out — built for app bars; brand indigo on surface",
+        note = "Dense at the top-end corner, thinning out — built for app bars",
         seed = 5,
         layers = listOf(
             NetworkGraphLayerSpec(
@@ -121,12 +116,11 @@ object NetworkGraphPresets {
                 nodeSizeVariance = 0.4f,
                 hotNodeShare = 0.1f,
                 glowStrength = 0.3f,
-                surfaceColor = BrandIndigo,
             ),
         ),
     )
 
-    val depthFog = NetworkGraphSpec(
+    public val depthFog: NetworkGraphSpec = NetworkGraphSpec(
         name = "Depth fog",
         note = "Uniform single mesh, per-node depth dims and shrinks far nodes",
         seed = 6,
@@ -145,7 +139,7 @@ object NetworkGraphPresets {
         ),
     )
 
-    val livingDelaunay = NetworkGraphSpec(
+    public val livingDelaunay: NetworkGraphSpec = NetworkGraphSpec(
         name = "Living Delaunay",
         note = "Ribbon re-triangulated every frame; flipped edges fade in and out",
         seed = 7,
@@ -158,7 +152,7 @@ object NetworkGraphPresets {
         ),
     )
 
-    val all: List<NetworkGraphSpec> = listOf(
+    public val all: List<NetworkGraphSpec> = listOf(
         baseline,
         ribbonMesh,
         ribbonPlusGhost,
@@ -202,7 +196,7 @@ object NetworkGraphPresets {
      * any two morph into each other smoothly. Back layers count from the front, so a variant with a
      * ghost layer fades it in against one without.
      */
-    val morphFamily: List<NetworkGraphSpec> = listOf(
+    public val morphFamily: List<NetworkGraphSpec> = listOf(
         morphVariant("Uniform field", "Even mesh over the whole surface", morphBase),
         morphVariant("Ribbon", "Band across the lower middle", morphRibbon),
         morphVariant(
@@ -245,24 +239,6 @@ object NetworkGraphPresets {
         ),
     )
 
-    private fun morphVariantNamed(name: String) = morphFamily.first { it.name == name }
-
-    /** The fake onboarding pager's backgrounds, one per page. */
-    val onboardingPages: List<NetworkGraphSpec> = listOf(morphFamily[0], morphFamily[2], morphFamily[3])
-
-    /**
-     * The second fake onboarding pager's backgrounds: one shape splitting in two, two primitives of one
-     * kind turning into two of another, two merging into one, and a corner bloom crossing the surface.
-     */
-    val onboardingCometPages: List<NetworkGraphSpec> = listOf(
-        "Centre disc",
-        "Corner pair",
-        "Double ribbon",
-        "Centre disc",
-        "Corner bloom",
-        "Bloom, bottom-start",
-    ).map(::morphVariantNamed)
-
-    /** What the tuning sheet inserts as a new back layer: [ribbonGhost]'s far-mesh look, over the whole surface. */
-    val defaultBackLayer = ribbonGhost.copy(shapes = listOf(Uniform()))
+    /** A ready-made back layer: [ribbonGhost]'s far-mesh look, over the whole surface. */
+    public val defaultBackLayer: NetworkGraphLayerSpec = ribbonGhost.copy(shapes = listOf(Uniform()))
 }

@@ -1,6 +1,6 @@
 @file:Suppress("LoopWithTooManyJumpStatements", "TooManyFunctions")
 
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.networkgraph
 
 import kotlin.math.max
 import kotlin.math.min
@@ -37,8 +37,6 @@ internal class MeshTopology(
 )
 
 /**
- * PROTOTYPE — throwaway, see [NetworkGraphPrototypeScreen].
- *
  * Enforces the network-graph invariant: every node that is drawn has at least two edges. A node with
  * one edge reads as a dangling tail, a node with none as a stray dot, and no slider setting is
  * allowed to produce either.
