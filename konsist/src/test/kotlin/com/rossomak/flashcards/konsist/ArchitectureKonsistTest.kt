@@ -208,15 +208,19 @@ class ArchitectureKonsistTest {
     }
 
     private fun isComposeModuleMainSource(path: String) =
-        path.contains("/src/main/") &&
+        isMainSource(path) &&
             (
                 path.contains("/feature/") ||
                     path.contains("/core/ui/") ||
                     path.contains("/app/src/main/") ||
-                    path.contains("/debug-tools/")
+                    path.contains("/debug-tools/") ||
+                    isLibSource(path)
                 )
 
-    private fun isMainSource(path: String) = path.contains("/src/main/")
+    /** Production sources: the Android/JVM `src/main` layout and every multiplatform main source set. */
+    private fun isMainSource(path: String) = mainSourceSetDirectories.any { path.contains(it) }
+
+    private fun isLibSource(path: String) = path.contains("/lib/") && path.contains("/src/")
 
     @Test
     fun `Repository interfaces reside in a domain package`() {
@@ -322,6 +326,18 @@ class ArchitectureKonsistTest {
         projectScope
             .classes()
             .filter { it.path.contains("/core/domain/src/main/") && it.resideInPackage("..domain.model..") }
+
+    @Test
+    fun `lib modules never import Flashcards code`() {
+        // lib/ holds app-agnostic libraries meant to outlive this app; any brand, theme or domain
+        // coupling belongs in the consuming module instead.
+        projectScope
+            .files
+            .filter { isLibSource(it.path) }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name.startsWith("com.rossomak.flashcards.") }
+            }
+    }
 
     @Test
     fun `feature modules never import other feature modules`() {
@@ -522,5 +538,7 @@ class ArchitectureKonsistTest {
         const val MUTABLE_COLLECTION_FIXTURE = "konsist/fixtures/MutableCollectionProperties.kt"
         const val GUARDED_NAV_COMPOSABLE_FILE = "/ui/navigation/GuardedNavComposable.kt"
         val NAVIGATION_GUARD_FILES = listOf(GUARDED_NAV_COMPOSABLE_FILE, "/ui/navigation/EntryNavigator.kt")
+
+        val mainSourceSetDirectories = listOf("/src/main/", "/src/commonMain/", "/src/androidMain/", "/src/jvmMain/")
     }
 }
