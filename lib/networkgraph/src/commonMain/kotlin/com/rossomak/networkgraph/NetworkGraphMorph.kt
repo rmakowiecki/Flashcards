@@ -1,15 +1,6 @@
 package com.rossomak.networkgraph
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.util.lerp
 import com.rossomak.networkgraph.NetworkGraphMorphSide.From
@@ -20,21 +11,17 @@ import kotlin.math.min
 /** Seeds of consecutive layers are this far apart, so two layers of one spec never share a layout. */
 private const val LAYER_SEED_STRIDE = 7_919
 
-private const val DEFAULT_MORPH_MILLIS = 900
-
 /** Where a value that can't be interpolated, such as a shape list, goes from one end to the other. */
 private const val SNAP_FRACTION = 0.5f
-
-/** How many interrupted morphs [animateNetworkGraphMorph] keeps nested under the current one before dropping the oldest. */
-private const val MAX_MORPH_NESTING = 4
 
 /**
  * A background part way between two specs: what [networkGraphBackground]'s morph overload draws.
  * [fraction] runs from 0 ([from]) to 1 ([to]) and can stop, scrub and reverse anywhere in between.
  *
- * [origin] is set only by [animateNetworkGraphMorph] when it is retargeted part way: the morph it
- * interrupted, frozen where it stopped, which then stands in for [from]'s node presences so the new
- * morph starts exactly from what was on screen. [from] is that frozen morph's specs interpolated.
+ * [origin] is set only by [NetworkGraphMorphState] when a morph starts part way through another: the
+ * morph it interrupted, frozen where it stopped, which then stands in for [from]'s meshes, shapes and
+ * fills so the new morph starts exactly from what was on screen. [from] is that frozen morph's specs
+ * interpolated.
  */
 @Immutable
 public data class NetworkGraphMorph(
@@ -43,35 +30,6 @@ public data class NetworkGraphMorph(
     val fraction: Float,
     internal val origin: NetworkGraphMorph? = null,
 )
-
-/**
- * A timed morph toward [target]: every time [target] changes, the background morphs from wherever it
- * is to the new target over [durationMillis], including from part way through an earlier morph.
- */
-@Composable
-public fun animateNetworkGraphMorph(target: NetworkGraphSpec, durationMillis: Int = DEFAULT_MORPH_MILLIS): NetworkGraphMorph {
-    var from by remember { mutableStateOf(target) }
-    var to by remember { mutableStateOf(target) }
-    var origin by remember { mutableStateOf<NetworkGraphMorph?>(null) }
-    val progress = remember { Animatable(1f) }
-    LaunchedEffect(target) {
-        if (target == to) return@LaunchedEffect
-        val interrupted = NetworkGraphMorph(from, to, progress.value, origin)
-        from = lerp(from, to, progress.value)
-        to = target
-        origin = if (progress.value < 1f) interrupted.withNestingAtMost(MAX_MORPH_NESTING) else null
-        progress.snapTo(0f)
-        progress.animateTo(1f, tween(durationMillis, easing = FastOutSlowInEasing))
-    }
-    return NetworkGraphMorph(from, to, progress.value, origin.takeIf { progress.value < 1f })
-}
-
-/** This morph with at most [levels] morphs nested under it; the oldest beyond that snaps to its interpolated [from]. */
-private fun NetworkGraphMorph.withNestingAtMost(levels: Int): NetworkGraphMorph? = when {
-    levels <= 0 -> null
-    fraction <= 0f -> origin?.withNestingAtMost(levels)
-    else -> copy(origin = origin?.withNestingAtMost(levels - 1))
-}
 
 /**
  * One drawn layer of a morph: the layer's own seed, its spec at the morph's fraction, the [shape]

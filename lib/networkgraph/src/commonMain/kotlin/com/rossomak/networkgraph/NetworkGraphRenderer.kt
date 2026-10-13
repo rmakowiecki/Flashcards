@@ -50,7 +50,15 @@ public fun Modifier.networkGraphBackground(spec: NetworkGraphSpec, fill: Network
  */
 @Composable
 public fun Modifier.networkGraphBackground(morph: NetworkGraphMorph, fill: NetworkGraphFill = LocalNetworkGraphFill.current): Modifier =
-    drawNetworkGraph(morph, fill, stats = null, layerStats = null, showViolations = false)
+    drawNetworkGraph({ morph }, fill, stats = null, layerStats = null, showViolations = false)
+
+/**
+ * Whatever [state] shows; see [NetworkGraphMorphState]. The state is read while drawing, so seeks,
+ * timed morphs and [Follow] redraw the background without recomposing anything.
+ */
+@Composable
+public fun Modifier.networkGraphBackground(state: NetworkGraphMorphState, fill: NetworkGraphFill = LocalNetworkGraphFill.current): Modifier =
+    drawNetworkGraph({ state.morph }, fill, stats = null, layerStats = null, showViolations = false)
 
 /**
  * [networkGraphBackground] with diagnostics: [stats] gets each frame's draw time, [layerStats] each
@@ -65,17 +73,27 @@ public fun Modifier.networkGraphBackground(
     stats: NetworkGraphFrameStats?,
     layerStats: NetworkGraphLayerStats? = null,
     showViolations: Boolean = false,
-): Modifier = drawNetworkGraph(morph, fill, stats, layerStats, showViolations)
+): Modifier = drawNetworkGraph({ morph }, fill, stats, layerStats, showViolations)
+
+/** The [state] overload of [networkGraphBackground] with diagnostics. */
+@ExperimentalNetworkGraphApi
+@Composable
+public fun Modifier.networkGraphBackground(
+    state: NetworkGraphMorphState,
+    fill: NetworkGraphFill,
+    stats: NetworkGraphFrameStats?,
+    layerStats: NetworkGraphLayerStats? = null,
+    showViolations: Boolean = false,
+): Modifier = drawNetworkGraph({ state.morph }, fill, stats, layerStats, showViolations)
 
 @Composable
 private fun Modifier.drawNetworkGraph(
-    morph: NetworkGraphMorph,
+    morph: () -> NetworkGraphMorph,
     fill: NetworkGraphFill,
     stats: NetworkGraphFrameStats?,
     layerStats: NetworkGraphLayerStats?,
     showViolations: Boolean,
 ): Modifier {
-    val layers = morphLayers(morph, fill)
     val windowSize = LocalWindowInfo.current.containerSize
     val holder = remember { NetworkGraphHolder() }
     val elapsedSeconds = remember { mutableFloatStateOf(0f) }
@@ -95,6 +113,7 @@ private fun Modifier.drawNetworkGraph(
         // No window in previews; the surface itself is the next best fixed reference.
         val windowLongSide = max(windowSize.width, windowSize.height).toFloat()
         val referenceSize = if (windowLongSide > 0f) windowLongSide else max(size.width, size.height)
+        val layers = holder.layersFor(morph(), fill)
         val fields = holder.fieldsFor(layers, referenceSize, density)
         // Two meshes dissolving into each other draw one spec layer, and a fill sees them as one.
         val layerCount = (layers.maxOfOrNull { it.slotFromFront } ?: -1) + 1
@@ -205,7 +224,7 @@ public class NetworkGraphLayerStats {
 }
 
 /**
- * Per-modifier state kept across frames: one [LayerField] per layer and the halo brushes.
+ * Per-modifier state kept across frames: the morph's layers, one [LayerField] per mesh and the halo brushes.
  *
  * A field is kept for as long as its layer stays in the same morph family and seed, whatever else
  * changes, so a morph, a tuning edit or a resize never rebuilds it; only a new window size, which
@@ -216,6 +235,19 @@ private class NetworkGraphHolder {
     private var builtPxPerDp = 0f
     private var fieldsByFamily = HashMap<LayerFamily, LayerField>()
     private val halosByColor = HashMap<Color, HaloBrushCache>()
+    private var lastMorph: NetworkGraphMorph? = null
+    private var lastFill: NetworkGraphFill? = null
+    private var lastLayers: List<MorphLayer> = emptyList()
+
+    /** [morph]'s layers, worked out again only when the morph or the inherited fill changes. */
+    fun layersFor(morph: NetworkGraphMorph, fill: NetworkGraphFill): List<MorphLayer> {
+        if (morph != lastMorph || fill != lastFill) {
+            lastLayers = morphLayers(morph, fill)
+            lastMorph = morph
+            lastFill = fill
+        }
+        return lastLayers
+    }
 
     fun fieldsFor(layers: List<MorphLayer>, referenceSize: Float, pxPerDp: Float): List<LayerField> {
         if (referenceSize != builtReferenceSize || pxPerDp != builtPxPerDp) {
