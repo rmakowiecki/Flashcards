@@ -47,9 +47,8 @@ public object NetworkGraphPresets {
         alpha = 0.35f,
     )
 
+    /** Uniform field, proximity edges, depth and pulse. */
     public val baseline: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Baseline",
-        note = "Uniform field, proximity edges, depth, pulse",
         seed = 1,
         layers = listOf(
             NetworkGraphLayerSpec(
@@ -71,23 +70,20 @@ public object NetworkGraphPresets {
         ),
     )
 
+    /** Wavy triangulated band, fixed topology, single layer. */
     public val ribbonMesh: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Ribbon mesh",
-        note = "Wavy triangulated band, fixed topology, single layer",
         seed = 2,
         layers = listOf(ribbonFront),
     )
 
+    /** Ribbon over a faint, sparser, slower far mesh. */
     public val ribbonPlusGhost: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Ribbon + ghost",
-        note = "Ribbon over a faint, sparser, slower far mesh",
         seed = 3,
         layers = listOf(ribbonGhost, ribbonFront),
     )
 
+    /** Ribbon with a hot node subset haloed; long edges fade. */
     public val glowConstellation: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Glow constellation",
-        note = "Ribbon with a hot node subset haloed; long edges fade",
         seed = 4,
         layers = listOf(
             ribbonFront.copy(
@@ -101,9 +97,8 @@ public object NetworkGraphPresets {
         ),
     )
 
+    /** Dense at the top-end corner, thinning out; built for app bars. */
     public val cornerBloom: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Corner bloom",
-        note = "Dense at the top-end corner, thinning out — built for app bars",
         seed = 5,
         layers = listOf(
             NetworkGraphLayerSpec(
@@ -120,9 +115,8 @@ public object NetworkGraphPresets {
         ),
     )
 
+    /** Uniform single mesh; per-node depth dims and shrinks far nodes. */
     public val depthFog: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Depth fog",
-        note = "Uniform single mesh, per-node depth dims and shrinks far nodes",
         seed = 6,
         layers = listOf(
             NetworkGraphLayerSpec(
@@ -139,9 +133,8 @@ public object NetworkGraphPresets {
         ),
     )
 
+    /** Ribbon re-triangulated every frame; flipped edges fade in and out. */
     public val livingDelaunay: NetworkGraphSpec = NetworkGraphSpec(
-        name = "Living Delaunay",
-        note = "Ribbon re-triangulated every frame; flipped edges fade in and out",
         seed = 7,
         layers = listOf(
             ribbonFront.copy(
@@ -162,7 +155,7 @@ public object NetworkGraphPresets {
         livingDelaunay,
     )
 
-    /** The front layer every [morphFamily] variant shares its seed, density, jitter and edge rule with. */
+    /** The front layer every [MorphFamily] variant shares its seed, density, jitter and edge rule with. */
     private val morphBase = NetworkGraphLayerSpec(
         density = 23f,
         driftAmplitude = 0.35f,
@@ -188,56 +181,68 @@ public object NetworkGraphPresets {
 
     private const val MORPH_SEED = 11
 
-    private fun morphVariant(name: String, note: String, vararg layers: NetworkGraphLayerSpec) =
-        NetworkGraphSpec(name = name, note = note, seed = MORPH_SEED, layers = layers.toList())
+    private fun morphVariant(vararg layers: NetworkGraphLayerSpec) = NetworkGraphSpec(seed = MORPH_SEED, layers = layers.toList())
 
     /**
      * One morph family: every variant shares a seed and its layers' density, jitter and edge rule, so
-     * any two morph into each other smoothly. Back layers count from the front, so a variant with a
-     * ghost layer fades it in against one without.
+     * any two morph into each other without rebuilding a mesh. Back layers count from the front, so a
+     * variant with a ghost layer fades it in against one without.
      */
-    public val morphFamily: List<NetworkGraphSpec> = listOf(
-        morphVariant("Uniform field", "Even mesh over the whole surface", morphBase),
-        morphVariant("Ribbon", "Band across the lower middle", morphRibbon),
-        morphVariant(
-            "Ribbon, high and narrow",
-            "The band moved up, thinned and tilted",
-            morphRibbon.copy(shapes = listOf(Ribbon(center = 0.3f, width = 0.22f, tilt = -12f))),
-        ),
-        morphVariant("Corner bloom", "Dense at the top-end corner, hot nodes glowing", morphBloom),
-        morphVariant(
-            "Bloom, bottom-start",
-            "The bloom moved to the opposite corner and tightened",
-            morphBloom.copy(shapes = listOf(Bloom(x = 0f, y = 1f, reach = 0.6f))),
-        ),
-        morphVariant("Ribbon + bloom", "Both shapes at once", morphRibbon.copy(shapes = listOf(morphRibbonShape, Bloom(weight = 0.9f, reach = 0.5f)))),
-        morphVariant(
-            "Uniform + ghost",
-            "Even mesh over a faint, sparser back layer",
-            ribbonGhost.copy(shapes = listOf(Uniform())),
-            morphBase,
-        ),
-        morphVariant(
-            "Centre disc",
-            "A hard-edged disc in the middle of the surface",
-            morphBloom.copy(shapes = listOf(Bloom(x = 0.5f, y = 0.5f, reach = 0.28f, plateau = 0.6f))),
-        ),
-        morphVariant(
-            "Corner pair",
-            "Blooms in the top-end and bottom-start corners at once",
-            morphBloom.copy(shapes = listOf(Bloom(reach = 0.55f), Bloom(x = 0f, y = 1f, reach = 0.55f))),
-        ),
-        morphVariant(
-            "Double ribbon",
-            "Two thin bands, one high, one low",
+    public object MorphFamily {
+        /** Even mesh over the whole surface. */
+        public val uniformField: NetworkGraphSpec = morphVariant(morphBase)
+
+        /** Band across the lower middle. */
+        public val ribbon: NetworkGraphSpec = morphVariant(morphRibbon)
+
+        /** The band moved up, thinned and tilted. */
+        public val highNarrowRibbon: NetworkGraphSpec =
+            morphVariant(morphRibbon.copy(shapes = listOf(Ribbon(center = 0.3f, width = 0.22f, tilt = -12f))))
+
+        /** Dense at the top-end corner, hot nodes glowing. */
+        public val cornerBloom: NetworkGraphSpec = morphVariant(morphBloom)
+
+        /** The bloom moved to the opposite corner and tightened. */
+        public val bottomStartBloom: NetworkGraphSpec = morphVariant(morphBloom.copy(shapes = listOf(Bloom(x = 0f, y = 1f, reach = 0.6f))))
+
+        /** Both shapes at once. */
+        public val ribbonAndBloom: NetworkGraphSpec =
+            morphVariant(morphRibbon.copy(shapes = listOf(morphRibbonShape, Bloom(weight = 0.9f, reach = 0.5f))))
+
+        /** Even mesh over a faint, sparser back layer. */
+        public val uniformWithGhost: NetworkGraphSpec = morphVariant(ribbonGhost.copy(shapes = listOf(Uniform())), morphBase)
+
+        /** A hard-edged disc in the middle of the surface. */
+        public val centreDisc: NetworkGraphSpec =
+            morphVariant(morphBloom.copy(shapes = listOf(Bloom(x = 0.5f, y = 0.5f, reach = 0.28f, plateau = 0.6f))))
+
+        /** Blooms in the top-end and bottom-start corners at once. */
+        public val cornerPair: NetworkGraphSpec =
+            morphVariant(morphBloom.copy(shapes = listOf(Bloom(reach = 0.55f), Bloom(x = 0f, y = 1f, reach = 0.55f))))
+
+        /** Two thin bands, one high, one low. */
+        public val doubleRibbon: NetworkGraphSpec = morphVariant(
             morphRibbon.copy(
                 shapes = listOf(
                     Ribbon(center = 0.25f, width = 0.18f, curve = 0.06f, tilt = 6f),
                     Ribbon(center = 0.75f, width = 0.18f, curve = 0.06f, tilt = -6f),
                 ),
             ),
-        ),
-    )
+        )
+
+        public val all: List<NetworkGraphSpec> = listOf(
+            uniformField,
+            ribbon,
+            highNarrowRibbon,
+            cornerBloom,
+            bottomStartBloom,
+            ribbonAndBloom,
+            uniformWithGhost,
+            centreDisc,
+            cornerPair,
+            doubleRibbon,
+        )
+    }
 
     /** A ready-made back layer: [ribbonGhost]'s far-mesh look, over the whole surface. */
     public val defaultBackLayer: NetworkGraphLayerSpec = ribbonGhost.copy(shapes = listOf(Uniform()))

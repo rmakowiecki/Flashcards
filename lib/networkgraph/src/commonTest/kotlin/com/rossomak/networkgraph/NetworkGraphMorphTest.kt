@@ -24,7 +24,7 @@ import kotlin.test.Test
  */
 class NetworkGraphMorphTest {
 
-    private val family = NetworkGraphPresets.morphFamily
+    private val family = NetworkGraphPresets.MorphFamily.all
     private val surfaces = listOf(WIDE_STRIP_WIDTH to WIDE_STRIP_HEIGHT, TALL_HERO_WIDTH to TALL_HERO_HEIGHT)
     private val fractions = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
 
@@ -34,7 +34,7 @@ class NetworkGraphMorphTest {
             family.filter { it != from }.flatMap { to ->
                 surfaces.flatMap { (width, height) ->
                     val run = MorphRun(from, to, width, height)
-                    fractions.flatMap { fraction -> run.frames("${from.name} → ${to.name} at $fraction", fraction, frameCount = 2) }
+                    fractions.flatMap { fraction -> run.frames("${from.label} → ${to.label} at $fraction", fraction, frameCount = 2) }
                 }
             }
         }
@@ -125,7 +125,7 @@ class NetworkGraphMorphTest {
                     val layerVisibility = visibility.map { it.getValue(layerSeed) }
                     layerVisibility.first().indices
                         .filter { node -> layerVisibility.first()[node] && layerVisibility.last()[node] && layerVisibility.any { !it[node] } }
-                        .map { node -> "${from.name} → ${to.name} ${width.toInt()}x${height.toInt()} layer $layerSeed node $node" }
+                        .map { node -> "${from.label} → ${to.label} ${width.toInt()}x${height.toInt()} layer $layerSeed node $node" }
                 }
             }
         }
@@ -158,8 +158,8 @@ class NetworkGraphMorphTest {
 
     @Test
     fun `a centre disc splitting into two corner blooms sends a comet to each`() {
-        val from = family.first { it.name == "Centre disc" }
-        val to = family.first { it.name == "Corner pair" }
+        val from = NetworkGraphPresets.MorphFamily.centreDisc
+        val to = NetworkGraphPresets.MorphFamily.cornerPair
 
         val comets = cometsFor(from, to)
 
@@ -170,8 +170,8 @@ class NetworkGraphMorphTest {
 
     @Test
     fun `two ribbons merging into a centre disc each send a comet that meets the other on the disc`() {
-        val from = family.first { it.name == "Double ribbon" }
-        val to = family.first { it.name == "Centre disc" }
+        val from = NetworkGraphPresets.MorphFamily.doubleRibbon
+        val to = NetworkGraphPresets.MorphFamily.centreDisc
 
         val comets = cometsFor(from, to)
 
@@ -192,8 +192,7 @@ class NetworkGraphMorphTest {
 
     @Test
     fun `both ends of a morph with comets draw exactly what each spec draws standing still`() {
-        val pairs = listOf("Centre disc" to "Corner pair", "Double ribbon" to "Centre disc", "Corner bloom" to "Bloom, bottom-start")
-            .map { (fromName, toName) -> family.first { it.name == fromName } to family.first { it.name == toName } }
+        val pairs = with(NetworkGraphPresets.MorphFamily) { listOf(centreDisc to cornerPair, doubleRibbon to centreDisc, cornerBloom to bottomStartBloom) }
 
         pairs.forEach { (from, to) ->
             surfaces.forEach { (width, height) ->
@@ -210,8 +209,8 @@ class NetworkGraphMorphTest {
 
     @Test
     fun `a uniform field morphing into a corner bloom removes the nodes furthest from the corner first`() {
-        val from = family.first { it.name == "Uniform field" }
-        val to = family.first { it.name == "Corner bloom" }
+        val from = NetworkGraphPresets.MorphFamily.uniformField
+        val to = NetworkGraphPresets.MorphFamily.cornerBloom
         val field = MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(0f) }.singleField()
         val initiallyPresent = (0 until field.nodeCount).filter { field.nodePresence(it) >= HALF_PRESENT }.toSet()
         val leftAt = HashMap<Int, Float>()
@@ -237,7 +236,7 @@ class NetworkGraphMorphTest {
                 forward.fields.flatMap { (layerSeed, field) ->
                     val mirror = backward.fields.getValue(layerSeed)
                     (0 until field.nodeCount).filter { abs(field.nodePresence(it) - mirror.nodePresence(it)) > PRESENCE_TOLERANCE }
-                        .map { node -> "${from.name} → ${to.name} at $fraction layer $layerSeed node $node" }
+                        .map { node -> "${from.label} → ${to.label} at $fraction layer $layerSeed node $node" }
                 }
             }
         }
@@ -247,8 +246,8 @@ class NetworkGraphMorphTest {
 
     @Test
     fun `a fraction jittering around one value never re-settles the mesh`() {
-        val from = family.first { it.name == "Uniform field" }
-        val to = family.first { it.name == "Corner bloom" }
+        val from = NetworkGraphPresets.MorphFamily.uniformField
+        val to = NetworkGraphPresets.MorphFamily.cornerBloom
         EdgeRule.entries.forEach { edgeRule ->
             val run = MorphRun(from.withEdgeRule(edgeRule), to.withEdgeRule(edgeRule), TALL_HERO_WIDTH, TALL_HERO_HEIGHT)
             val jitter = (0 until JITTER_FRAMES).map { frame -> JITTER_CENTER + if (frame % 2 == 0) JITTER_AMPLITUDE else -JITTER_AMPLITUDE }
@@ -269,9 +268,9 @@ class NetworkGraphMorphTest {
 
     @Test
     fun `a timed morph retargeted part way starts from exactly what was drawn`() {
-        val first = family.first { it.name == "Uniform field" }
-        val second = family.first { it.name == "Corner bloom" }
-        val third = family.first { it.name == "Ribbon" }
+        val first = NetworkGraphPresets.MorphFamily.uniformField
+        val second = NetworkGraphPresets.MorphFamily.cornerBloom
+        val third = NetworkGraphPresets.MorphFamily.ribbon
         val interrupted = NetworkGraphMorph(first, second, INTERRUPT_FRACTION)
         val retargeted = NetworkGraphMorph(lerp(first, second, INTERRUPT_FRACTION), third, 0f, origin = interrupted)
 
@@ -313,7 +312,7 @@ class NetworkGraphMorphTest {
 
     /** A morph family member with the one primitive given, so corner to corner leaves a gap for a comet to cross. */
     private fun cometTestSpec(primitive: ShapePrimitive) =
-        family.first { it.name == "Corner bloom" }.let { bloom -> bloom.copy(layers = listOf(bloom.layers.single().copy(shapes = listOf(primitive)))) }
+        NetworkGraphPresets.MorphFamily.cornerBloom.let { bloom -> bloom.copy(layers = listOf(bloom.layers.single().copy(shapes = listOf(primitive)))) }
 
     private fun distanceToSegment(point: Offset, start: Offset, end: Offset): Float {
         val along = end - start
@@ -382,6 +381,9 @@ class NetworkGraphMorphTest {
 
         fun singleField(): LayerField = fields.values.single()
     }
+
+    /** A spec's place in [family], to tell the pairs in a failure apart. */
+    private val NetworkGraphSpec.label: String get() = "variant ${family.indexOf(this)}"
 
     private fun NetworkGraphSpec.withEdgeRule(edgeRule: EdgeRule) = copy(layers = layers.map { it.copy(edgeRule = edgeRule) })
 

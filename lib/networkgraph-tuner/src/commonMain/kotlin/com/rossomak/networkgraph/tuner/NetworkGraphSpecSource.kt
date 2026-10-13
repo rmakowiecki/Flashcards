@@ -32,8 +32,6 @@ public fun NetworkGraphSpec.toKotlinSource(): String {
     }
     return """
         |NetworkGraphSpec(
-        |    name = "$name",
-        |    note = "$note",
         |    seed = $seed,
         |    layers = listOf(
         |$layerSources,

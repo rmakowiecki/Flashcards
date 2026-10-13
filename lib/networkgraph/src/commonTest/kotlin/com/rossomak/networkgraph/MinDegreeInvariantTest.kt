@@ -70,7 +70,7 @@ class MinDegreeInvariantTest {
         val violations = mutableListOf<String>()
         for (preset in NetworkGraphPresets.all) {
             preset.layers.forEachIndexed { index, layer ->
-                violations += layerViolations("${preset.name}/layer $index", layer)
+                violations += layerViolations("seed ${preset.seed}/layer $index", layer)
                 for (strictTriangles in listOf(false, true)) {
                     val field = LayerField(layer.copy(strictTriangles = strictTriangles), preset.seed, TALL_HERO_HEIGHT, PX_PER_DP)
                     field.advance(0f, TALL_HERO_WIDTH, TALL_HERO_HEIGHT)

@@ -51,7 +51,7 @@ class NetworkGraphSpecSourceTest {
 
     @Test
     fun `a default layer prints as a bare constructor call`() {
-        val spec = NetworkGraphSpec(name = "Plain", note = "", seed = 1, layers = listOf(NetworkGraphLayerSpec()))
+        val spec = NetworkGraphSpec(seed = 1, layers = listOf(NetworkGraphLayerSpec()))
 
         spec.toKotlinSource() shouldContain "        NetworkGraphLayerSpec(),\n"
     }
@@ -59,19 +59,19 @@ class NetworkGraphSpecSourceTest {
     @Test
     fun `only fields that differ from the defaults are printed`() {
         val layer = NetworkGraphLayerSpec(density = 12.5f, surfaceColor = Color(0xFF2A2E8F), shapes = listOf(ShapePrimitive.Bloom(x = 0.25f)))
-        val source = NetworkGraphSpec(name = "Custom", note = "A note", seed = 9, layers = listOf(layer)).toKotlinSource()
+        val source = NetworkGraphSpec(seed = 9, layers = listOf(layer)).toKotlinSource()
 
         source shouldContain "density = 12.5f"
         source shouldContain "surfaceColor = Color(0xFF2A2E8F)"
         source shouldContain "shapes = listOf(ShapePrimitive.Bloom(x = 0.25f))"
         source shouldNotContain "fillChance"
-        source shouldContain "    name = \"Custom\",\n    note = \"A note\",\n    seed = 9,"
+        source shouldContain "NetworkGraphSpec(\n    seed = 9,"
     }
 
     @Test
     fun `every preset exports without a JVM formatter`() {
         NetworkGraphPresets.all.forEach { spec ->
-            spec.toKotlinSource() shouldContain "name = \"${spec.name}\""
+            spec.toKotlinSource() shouldContain "seed = ${spec.seed},"
         }
     }
 

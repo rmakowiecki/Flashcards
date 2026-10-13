@@ -109,8 +109,8 @@ class NetworkGraphPaletteTest {
 
     @Test
     fun `a layer that snapped to the to spec asks the palette about its to end`() {
-        val from = NetworkGraphSpec(name = "from", note = "", seed = 1, layers = listOf(redLayer))
-        val to = NetworkGraphSpec(name = "to", note = "", seed = 2, layers = listOf(blueLayer))
+        val from = NetworkGraphSpec(seed = 1, layers = listOf(redLayer))
+        val to = NetworkGraphSpec(seed = 2, layers = listOf(blueLayer))
         val askedSides = mutableListOf<NetworkGraphMorphSide>()
         val palette = NetworkGraphPalette { context -> SolidColor(Color.Red).also { askedSides += context.side } }
 

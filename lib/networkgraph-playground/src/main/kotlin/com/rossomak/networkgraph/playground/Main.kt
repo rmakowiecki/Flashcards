@@ -16,7 +16,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.rossomak.networkgraph.NetworkGraphPalette
-import com.rossomak.networkgraph.NetworkGraphPresets
+import com.rossomak.networkgraph.tuner.LabeledNetworkGraphPresets
 import com.rossomak.networkgraph.tuner.NetworkGraphPlayground
 import com.rossomak.networkgraph.tuner.NetworkGraphPlaygroundStyle
 
@@ -31,9 +31,9 @@ fun main() = application {
             Surface {
                 val styles = rememberPlaygroundStyles(MaterialTheme.colorScheme)
                 NetworkGraphPlayground(
-                    presets = NetworkGraphPresets.all,
-                    morphFamily = NetworkGraphPresets.morphFamily,
-                    decks = listOf(NetworkGraphPresets.morphFamily),
+                    presets = LabeledNetworkGraphPresets.all,
+                    morphFamily = LabeledNetworkGraphPresets.morphFamily,
+                    decks = listOf(LabeledNetworkGraphPresets.morphFamily),
                     styles = styles.all,
                     deckStyle = styles.onGradient,
                     onSpecExport = ::println,

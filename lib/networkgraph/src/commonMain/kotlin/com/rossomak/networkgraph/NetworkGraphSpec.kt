@@ -17,8 +17,6 @@ import androidx.compose.ui.graphics.Color
  * morphs.
  */
 public data class NetworkGraphSpec(
-    val name: String,
-    val note: String,
     val seed: Int,
     val layers: List<NetworkGraphLayerSpec>,
 )

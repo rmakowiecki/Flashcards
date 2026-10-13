@@ -99,9 +99,9 @@ import kotlinx.coroutines.launch
 @Composable
 public fun NetworkGraphPlayground(
     modifier: Modifier = Modifier,
-    presets: List<NetworkGraphSpec>,
-    morphFamily: List<NetworkGraphSpec>,
-    decks: List<List<NetworkGraphSpec>>,
+    presets: List<NetworkGraphPreset>,
+    morphFamily: List<NetworkGraphPreset>,
+    decks: List<List<NetworkGraphPreset>>,
     styles: List<NetworkGraphPlaygroundStyle>,
     deckStyle: NetworkGraphPlaygroundStyle,
     onSpecExport: (source: String) -> Unit = {},
@@ -134,7 +134,7 @@ public fun NetworkGraphPlayground(
             val pageLayerStats = layerStats.takeIf { page == pagerState.currentPage } // A neighbour mid-swipe must not overwrite the counts.
             when {
                 page < specs.size -> GraphPage(
-                    morph = NetworkGraphMorph(specs[page], specs[page], 0f),
+                    morph = NetworkGraphMorph(specs[page].spec, specs[page].spec, 0f),
                     title = specs[page].name,
                     note = specs[page].note,
                     style = style,
@@ -203,10 +203,10 @@ private fun RecordFrameIntervals(stats: NetworkGraphFrameStats) {
 }
 
 /** One stand-in onboarding pager: its steps' specs, editable in place, and its own pager. */
-private class Deck(val specs: SnapshotStateList<NetworkGraphSpec>, val pagerState: PagerState)
+private class Deck(val specs: SnapshotStateList<NetworkGraphPreset>, val pagerState: PagerState)
 
 @Composable
-private fun rememberDeck(pages: List<NetworkGraphSpec>): Deck {
+private fun rememberDeck(pages: List<NetworkGraphPreset>): Deck {
     val specs = remember { pages.toMutableStateList() }
     val pagerState = rememberPagerState(pageCount = { specs.size })
     return remember(pagerState) { Deck(specs, pagerState) }
@@ -214,20 +214,20 @@ private fun rememberDeck(pages: List<NetworkGraphSpec>): Deck {
 
 private fun specSlotFor(
     page: Int,
-    specs: SnapshotStateList<NetworkGraphSpec>,
-    morphSpecs: SnapshotStateList<NetworkGraphSpec>,
+    specs: SnapshotStateList<NetworkGraphPreset>,
+    morphSpecs: SnapshotStateList<NetworkGraphPreset>,
     morphSelection: MorphSelection,
     deck: Deck?,
     coroutineScope: CoroutineScope,
 ): SpecSlot = when {
     page < specs.size -> SpecSlot(
-        spec = specs[page],
-        onSpecChange = { specs[page] = it },
-        onReseed = { specs[page] = specs[page].copy(seed = Random.nextInt()) },
+        preset = specs[page],
+        onSpecChange = { specs[page] = specs[page].copy(spec = it) },
+        onReseed = { specs[page] = specs[page].let { preset -> preset.copy(spec = preset.spec.copy(seed = Random.nextInt())) } },
     )
     page == specs.size -> SpecSlot(
-        spec = morphSpecs[morphSelection.toIndex],
-        onSpecChange = { morphSpecs[morphSelection.toIndex] = it },
+        preset = morphSpecs[morphSelection.toIndex],
+        onSpecChange = { morphSpecs[morphSelection.toIndex] = morphSpecs[morphSelection.toIndex].copy(spec = it) },
         onReseed = { morphSpecs.reseedTogether() },
         onStart = { coroutineScope.launch { morphSelection.play() } },
         sheetHeader = {
@@ -243,8 +243,8 @@ private fun specSlotFor(
         val pagerState = currentDeck.pagerState
         val step = pagerState.currentPage
         SpecSlot(
-            spec = currentDeck.specs[step],
-            onSpecChange = { currentDeck.specs[step] = it },
+            preset = currentDeck.specs[step],
+            onSpecChange = { currentDeck.specs[step] = currentDeck.specs[step].copy(spec = it) },
             onReseed = { currentDeck.specs.reseedTogether() },
             deckStep = DeckStep(
                 canGoBack = step > 0,
@@ -312,18 +312,20 @@ private class MorphSelection(defaultToIndex: Int) {
 }
 
 /**
- * The spec the overlay and the tuning sheet act on for the current page, plus the morph page's
+ * The spec the overlay and the tuning sheet act on for the current page, with its label, plus the morph page's
  * extras: [onStart] for the overlay's Start button and [sheetHeader] above the tuning sliders, and a
  * deck page's [deckStep] for the overlay's step buttons.
  */
 private class SpecSlot(
-    val spec: NetworkGraphSpec,
+    val preset: NetworkGraphPreset,
     val onSpecChange: (NetworkGraphSpec) -> Unit,
     val onReseed: () -> Unit,
     val onStart: (() -> Unit)? = null,
     val sheetHeader: (@Composable () -> Unit)? = null,
     val deckStep: DeckStep? = null,
-)
+) {
+    val spec: NetworkGraphSpec get() = preset.spec
+}
 
 /**
  * Steps a deck page's own pager one step back or forward, morphing its background on the way. Swiping
@@ -332,9 +334,9 @@ private class SpecSlot(
 private class DeckStep(val canGoBack: Boolean, val canGoForward: Boolean, val onBack: () -> Unit, val onForward: () -> Unit)
 
 /** One new seed for every spec in the list, so they stay one morph family. */
-private fun SnapshotStateList<NetworkGraphSpec>.reseedTogether() {
+private fun SnapshotStateList<NetworkGraphPreset>.reseedTogether() {
     val seed = Random.nextInt()
-    for (index in indices) this[index] = this[index].copy(seed = seed)
+    for (index in indices) this[index] = this[index].let { preset -> preset.copy(spec = preset.spec.copy(seed = seed)) }
 }
 
 @Suppress("LongParameterList") // The page is a pure function of these.
@@ -389,7 +391,7 @@ private fun GraphPage(
 @Suppress("LongParameterList") // The page is a pure function of these.
 @Composable
 private fun MorphPage(
-    specs: List<NetworkGraphSpec>,
+    specs: List<NetworkGraphPreset>,
     selection: MorphSelection,
     style: NetworkGraphPlaygroundStyle,
     stats: NetworkGraphFrameStats,
@@ -400,7 +402,7 @@ private fun MorphPage(
     val from = specs[selection.fromIndex]
     val to = specs[selection.toIndex]
     GraphPage(
-        morph = NetworkGraphMorph(from, to, selection.progress.value),
+        morph = NetworkGraphMorph(from.spec, to.spec, selection.progress.value),
         title = "${from.name} → ${to.name}",
         note = "Morph · ${from.note} → ${to.note}",
         style = style,
@@ -413,11 +415,11 @@ private fun MorphPage(
 
 /** The morph page's part of the tuning sheet: both pickers and the scrub slider. The "to" picker offers only specs "from" morphs into smoothly. */
 @Composable
-private fun MorphControls(specs: List<NetworkGraphSpec>, selection: MorphSelection, onScrub: (Float) -> Unit) {
+private fun MorphControls(specs: List<NetworkGraphPreset>, selection: MorphSelection, onScrub: (Float) -> Unit) {
     val from = specs[selection.fromIndex]
     Column {
         MorphPicker(label = "From", specs = specs, selected = selection.fromIndex, isEnabled = { true }, onSelect = { selection.fromIndex = it })
-        MorphPicker(label = "To", specs = specs, selected = selection.toIndex, isEnabled = { from.morphsSmoothlyInto(specs[it]) }, onSelect = { selection.toIndex = it })
+        MorphPicker(label = "To", specs = specs, selected = selection.toIndex, isEnabled = { from.spec.morphsSmoothlyInto(specs[it].spec) }, onSelect = { selection.toIndex = it })
         Text(text = "Morph ${selection.progress.value.toFixed(2)}", style = MaterialTheme.typography.bodySmall)
         Slider(value = selection.progress.value, onValueChange = onScrub)
         Text(text = "Tuning the \"to\" side", style = MaterialTheme.typography.labelLarge)
@@ -425,7 +427,7 @@ private fun MorphControls(specs: List<NetworkGraphSpec>, selection: MorphSelecti
 }
 
 @Composable
-private fun MorphPicker(label: String, specs: List<NetworkGraphSpec>, selected: Int, isEnabled: (Int) -> Boolean, onSelect: (Int) -> Unit) {
+private fun MorphPicker(label: String, specs: List<NetworkGraphPreset>, selected: Int, isEnabled: (Int) -> Boolean, onSelect: (Int) -> Unit) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(SpacingXSmall),
         verticalArrangement = Arrangement.Center,
@@ -467,7 +469,7 @@ private fun DeckPage(
     val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val lower = floor(position).toInt().coerceIn(0, specs.lastIndex)
     val upper = (lower + 1).coerceAtMost(specs.lastIndex)
-    val morph = NetworkGraphMorph(specs[lower], specs[upper], (position - lower).coerceIn(0f, 1f))
+    val morph = NetworkGraphMorph(specs[lower].spec, specs[upper].spec, (position - lower).coerceIn(0f, 1f))
 
     Box(
         modifier = Modifier
@@ -576,7 +578,7 @@ private fun PlaygroundOverlay(
                     Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous preset")
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "$pageLabel · ${spec.name}", style = MaterialTheme.typography.labelLarge)
+                    Text(text = "$pageLabel · ${slot.preset.name}", style = MaterialTheme.typography.labelLarge)
                     Text(
                         text = "frame ${stats.frameMillis.toFixed(1)}ms · graphs ${stats.drawMillis.toFixed(2)}ms · seed ${spec.seed}",
                         style = MaterialTheme.typography.labelSmall,
