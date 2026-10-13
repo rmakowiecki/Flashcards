@@ -14,12 +14,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalWindowInfo
 import kotlin.math.max
 import kotlin.time.TimeSource
@@ -29,9 +26,9 @@ private const val NANOS_PER_MILLI = 1_000_000f
 
 /**
  * Draws [spec] as an animated network-graph background: every layer's edges, glows and nodes,
- * back to front, painted with whatever [palette] gives each layer. Paints nothing else and is
- * transparent everywhere it doesn't draw, so it composes over whatever `Modifier.background(...)` ran
- * earlier in the chain.
+ * back to front, each painted with its own fill, else its spec's, else [fill] (see [NetworkGraphFill]).
+ * Paints nothing else and is transparent everywhere it doesn't draw, so it composes over whatever
+ * `Modifier.background(...)` ran earlier in the chain.
  *
  * Every drawn node has at least two visible edges, and its dot is at least as opaque as each of them;
  * see [NetworkGraphLayerSpec].
@@ -40,8 +37,8 @@ private const val NANOS_PER_MILLI = 1_000_000f
  * while the surface is off-screen or the app is backgrounded.
  */
 @Composable
-public fun Modifier.networkGraphBackground(spec: NetworkGraphSpec, palette: NetworkGraphPalette): Modifier =
-    networkGraphBackground(NetworkGraphMorph(spec, spec, 0f), palette)
+public fun Modifier.networkGraphBackground(spec: NetworkGraphSpec, fill: NetworkGraphFill = LocalNetworkGraphFill.current): Modifier =
+    networkGraphBackground(NetworkGraphMorph(spec, spec, 0f), fill)
 
 /**
  * The [morph] between two specs, at its fraction; see [NetworkGraphMorph]. Drive the fraction from
@@ -52,8 +49,8 @@ public fun Modifier.networkGraphBackground(spec: NetworkGraphSpec, palette: Netw
  * window, not the surface, and the shape follows the surface's new bounds the same way a morph does.
  */
 @Composable
-public fun Modifier.networkGraphBackground(morph: NetworkGraphMorph, palette: NetworkGraphPalette): Modifier =
-    drawNetworkGraph(morph, palette, stats = null, layerStats = null, showViolations = false)
+public fun Modifier.networkGraphBackground(morph: NetworkGraphMorph, fill: NetworkGraphFill = LocalNetworkGraphFill.current): Modifier =
+    drawNetworkGraph(morph, fill, stats = null, layerStats = null, showViolations = false)
 
 /**
  * [networkGraphBackground] with diagnostics: [stats] gets each frame's draw time, [layerStats] each
@@ -64,21 +61,21 @@ public fun Modifier.networkGraphBackground(morph: NetworkGraphMorph, palette: Ne
 @Composable
 public fun Modifier.networkGraphBackground(
     morph: NetworkGraphMorph,
-    palette: NetworkGraphPalette,
+    fill: NetworkGraphFill,
     stats: NetworkGraphFrameStats?,
     layerStats: NetworkGraphLayerStats? = null,
     showViolations: Boolean = false,
-): Modifier = drawNetworkGraph(morph, palette, stats, layerStats, showViolations)
+): Modifier = drawNetworkGraph(morph, fill, stats, layerStats, showViolations)
 
 @Composable
 private fun Modifier.drawNetworkGraph(
     morph: NetworkGraphMorph,
-    palette: NetworkGraphPalette,
+    fill: NetworkGraphFill,
     stats: NetworkGraphFrameStats?,
     layerStats: NetworkGraphLayerStats?,
     showViolations: Boolean,
 ): Modifier {
-    val layers = morphLayers(morph)
+    val layers = morphLayers(morph, fill)
     val windowSize = LocalWindowInfo.current.containerSize
     val holder = remember { NetworkGraphHolder() }
     val elapsedSeconds = remember { mutableFloatStateOf(0f) }
@@ -99,12 +96,13 @@ private fun Modifier.drawNetworkGraph(
         val windowLongSide = max(windowSize.width, windowSize.height).toFloat()
         val referenceSize = if (windowLongSide > 0f) windowLongSide else max(size.width, size.height)
         val fields = holder.fieldsFor(layers, referenceSize, density)
+        val layerCount = layers.size
         // Nodes deliberately sit past the surface's edges, and drawBehind is not clipped.
         clipRect {
             fields.forEachIndexed { index, field ->
-                val fill = layerFill(palette, layers, index, timeSeconds, size)
+                val layerFill = layers[index].fill.toLayerFill(index, layerCount, timeSeconds, size)
                 field.advance(timeSeconds, size.width, size.height)
-                field.draw(this, fill, holder.halosFor(fill.maskColor), timeSeconds, showViolations)
+                field.draw(this, layerFill, holder.halosFor(layerFill.maskColor), timeSeconds, showViolations)
             }
         }
         stats?.recordDraw(drawStart.elapsedNow().inWholeNanoseconds)
@@ -112,47 +110,31 @@ private fun Modifier.drawNetworkGraph(
     }
 }
 
-/**
- * What layer [index] paints with: [palette] asked about each end of the morph that shows, with two
- * solid ends blended into one color and anything else crossfaded by [MorphLayer.colorFraction].
- */
-internal fun layerFill(palette: NetworkGraphPalette, layers: List<MorphLayer>, index: Int, timeSeconds: Float, size: Size): LayerFill {
-    val layer = layers[index]
-    fun brushFor(side: NetworkGraphMorphSide, spec: NetworkGraphLayerSpec) =
-        palette.brushFor(NetworkGraphLayerContext(index, layers.size, spec, side, timeSeconds, size))
-    val fraction = layer.colorFraction
-    val from = if (fraction < 1f) brushFor(NetworkGraphMorphSide.From, layer.fromLayer) else null
-    val to = if (fraction > 0f) brushFor(NetworkGraphMorphSide.To, layer.toLayer) else null
-    return when {
-        from == null -> LayerFill.of(checkNotNull(to))
-        to == null -> LayerFill.of(from)
-        from is SolidColor && to is SolidColor ->
-            LayerFill.Solid(if (from.value == to.value) from.value else lerp(from.value, to.value, fraction))
-        else -> LayerFill.Masked(from, overlay = to, overlayAlpha = fraction)
-    }
-}
-
 /** How [LayerField.draw] colors a layer. */
 internal sealed interface LayerFill {
-    /** The color the layer's edges, halos and dots are drawn in before any brush is applied. */
+    /** The opaque color the layer's edges, halos and dots are drawn in before any brush is applied. */
     val maskColor: Color
 
-    /** Every element drawn directly in [color]. */
+    /** How opaque the whole layer is composited, on top of each element's own alpha. */
+    val layerAlpha: Float
+
+    /** Every element drawn in [color]: opaque, with [color]'s alpha applied to the layer as a whole. */
     data class Solid(val color: Color) : LayerFill {
-        override val maskColor: Color get() = color
+        override val maskColor: Color get() = color.copy(alpha = 1f)
+        override val layerAlpha: Float get() = color.alpha
     }
 
     /**
      * Every element drawn in white, then the whole layer recolored with [base], keeping each pixel's
-     * alpha; [overlay], when set, is blended over [base] at [overlayAlpha], again keeping alpha.
+     * alpha; each of [overlays] is then blended over what lies under it at its own alpha, again keeping
+     * each pixel's alpha.
      */
-    data class Masked(val base: Brush, val overlay: Brush? = null, val overlayAlpha: Float = 0f) : LayerFill {
+    data class Masked(val base: Brush, val overlays: List<Overlay> = emptyList()) : LayerFill {
         override val maskColor: Color get() = Color.White
+        override val layerAlpha: Float get() = 1f
     }
 
-    companion object {
-        fun of(brush: Brush): LayerFill = if (brush is SolidColor) Solid(brush.value) else Masked(brush)
-    }
+    data class Overlay(val brush: Brush, val alpha: Float)
 }
 
 /**

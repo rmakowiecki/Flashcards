@@ -1,6 +1,7 @@
 package com.rossomak.networkgraph
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import com.rossomak.networkgraph.ShapePrimitive.Bloom
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -61,8 +62,8 @@ class NetworkGraphMorphTest {
         val from = NetworkGraphPresets.baseline
         val to = NetworkGraphPresets.ribbonMesh
 
-        morphLayers(from, to, 0.49f).single().spec shouldBe from.layers.single()
-        morphLayers(from, to, 0.5f).single().spec shouldBe to.layers.single()
+        morphLayers(from, to, 0.49f, TestFill).single().spec shouldBe from.layers.single()
+        morphLayers(from, to, 0.5f, TestFill).single().spec shouldBe to.layers.single()
     }
 
     @Test
@@ -70,11 +71,11 @@ class NetworkGraphMorphTest {
         val single = family.first { it.layers.size == 1 }
         val withGhost = family.first { it.layers.size == 2 }
 
-        val layers = morphLayers(single, withGhost, 0.5f)
+        val layers = morphLayers(single, withGhost, 0.5f, TestFill)
 
         layers shouldHaveSize 2
         layers[0].spec.alpha shouldBe (withGhost.layers[0].alpha * 0.5f plusOrMinus 1e-4f)
-        layers[1].seed shouldBe morphLayers(single, single, 0f).single().seed
+        layers[1].seed shouldBe morphLayers(single, single, 0f, TestFill).single().seed
     }
 
     @Test
@@ -301,7 +302,7 @@ class NetworkGraphMorphTest {
 
     /** The comets a morph between the single-layer [from] and [to] sends on the tall surface. */
     private fun cometsFor(from: NetworkGraphSpec, to: NetworkGraphSpec): List<Comet> {
-        val envelope = NetworkGraphEnvelope(morphLayers(from, from, 0f).single().seed)
+        val envelope = NetworkGraphEnvelope(morphLayers(from, from, 0f, TestFill).single().seed)
         return cometsBetween(
             from = envelope.standIns(from.layers.single(), TALL_HERO_WIDTH, TALL_HERO_HEIGHT),
             to = envelope.standIns(to.layers.single(), TALL_HERO_WIDTH, TALL_HERO_HEIGHT),
@@ -353,7 +354,7 @@ class NetworkGraphMorphTest {
         /** One frame at [fraction]; the layers it drew, back to front. */
         fun advance(fraction: Float): List<MorphLayer> {
             timeSeconds += FRAME_SECONDS
-            return morphLayers(morph.copy(fraction = fraction)).onEach { layer ->
+            return morphLayers(morph.copy(fraction = fraction), TestFill).onEach { layer ->
                 val field = fields.getOrPut(layer.seed) { LayerField(layer.spec, layer.seed, max(width, height), PX_PER_DP) }
                 field.spec = layer.spec
                 field.shape = layer.shape
@@ -388,6 +389,7 @@ class NetworkGraphMorphTest {
     private fun NetworkGraphSpec.withEdgeRule(edgeRule: EdgeRule) = copy(layers = layers.map { it.copy(edgeRule = edgeRule) })
 
     private companion object {
+        val TestFill = NetworkGraphFill.Solid(Color.White)
         const val PX_PER_DP = 2.75f
         const val WIDE_STRIP_WIDTH = 1080f
         const val WIDE_STRIP_HEIGHT = 420f

@@ -300,8 +300,8 @@ internal class LayerField(
     private var lastTimeSeconds = Float.NaN
 
     /**
-     * Composites the offscreen layer [draw] paints into with plain source-over at full alpha. Built on
-     * first draw: on desktop a paint needs the native graphics library, which geometry-only use never loads.
+     * Composites the offscreen layer [draw] paints into with plain source-over, at the fill's layer
+     * alpha. Built on first draw: on desktop a paint needs the native graphics library, which geometry-only use never loads.
      */
     private val layerPaint by lazy(LazyThreadSafetyMode.NONE) { Paint() }
 
@@ -387,17 +387,19 @@ internal class LayerField(
      *
      * A [LayerFill.Masked] layer is drawn in white first, then recolored as a whole while still
      * offscreen: [BlendMode.SrcIn] takes the base brush's color and keeps each pixel's alpha, and
-     * [BlendMode.SrcAtop] blends the overlay over it the same way.
+     * [BlendMode.SrcAtop] blends each overlay over it the same way. The offscreen layer is composited
+     * at the fill's [LayerFill.layerAlpha].
      */
     fun draw(scope: DrawScope, fill: LayerFill, halos: HaloBrushCache, timeSeconds: Float, showViolations: Boolean) = with(scope) {
         val color = fill.maskColor
+        layerPaint.alpha = fill.layerAlpha
         drawIntoCanvas { canvas -> canvas.saveLayer(Rect(Offset.Zero, size), layerPaint) }
         drawEdges(color, timeSeconds)
         drawGlows(halos)
         drawCores(color)
         if (fill is LayerFill.Masked) {
             drawRect(brush = fill.base, blendMode = BlendMode.SrcIn)
-            fill.overlay?.let { overlay -> drawRect(brush = overlay, alpha = fill.overlayAlpha, blendMode = BlendMode.SrcAtop) }
+            fill.overlays.forEach { overlay -> drawRect(brush = overlay.brush, alpha = overlay.alpha, blendMode = BlendMode.SrcAtop) }
         }
         drawIntoCanvas { canvas -> canvas.restore() }
         if (showViolations) drawViolations(timeSeconds)

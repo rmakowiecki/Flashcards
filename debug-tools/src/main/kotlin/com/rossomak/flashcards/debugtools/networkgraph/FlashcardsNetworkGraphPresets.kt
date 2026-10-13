@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.debug.networkgraph
 
 import androidx.compose.ui.graphics.Color
+import com.rossomak.networkgraph.NetworkGraphFill
 import com.rossomak.networkgraph.NetworkGraphPresets
 import com.rossomak.networkgraph.tuner.LabeledNetworkGraphPresets
 import com.rossomak.networkgraph.tuner.NetworkGraphPreset
@@ -17,7 +18,7 @@ object FlashcardsNetworkGraphPresets {
     private val cornerBloom = LabeledNetworkGraphPresets.all.first { it.spec == NetworkGraphPresets.cornerBloom }.let { preset ->
         preset.copy(
             note = "${preset.note}; brand indigo on surface",
-            spec = preset.spec.copy(layers = preset.spec.layers.map { layer -> layer.copy(surfaceColor = BrandIndigo) }),
+            spec = preset.spec.copy(layers = preset.spec.layers.map { layer -> layer.copy(fill = NetworkGraphFill.Solid(BrandIndigo)) }),
         )
     }
 

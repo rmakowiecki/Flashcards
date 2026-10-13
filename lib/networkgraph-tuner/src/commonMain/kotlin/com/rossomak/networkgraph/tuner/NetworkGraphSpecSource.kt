@@ -2,6 +2,8 @@ package com.rossomak.networkgraph.tuner
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.rossomak.networkgraph.GradientStop
+import com.rossomak.networkgraph.NetworkGraphFill
 import com.rossomak.networkgraph.NetworkGraphLayerSpec
 import com.rossomak.networkgraph.NetworkGraphPresets
 import com.rossomak.networkgraph.NetworkGraphSpec
@@ -30,12 +32,13 @@ public fun NetworkGraphSpec.toKotlinSource(): String {
             ) { (name, value) -> "            $name = $value" }
         }
     }
+    val fillLine = fill?.let { "\n    fill = ${it.toSource()}," }.orEmpty()
     return """
         |NetworkGraphSpec(
         |    seed = $seed,
         |    layers = listOf(
         |$layerSources,
-        |    ),
+        |    ),$fillLine
         |)
     """.trimMargin()
 }
@@ -69,8 +72,22 @@ private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linke
     "cometStrength" to cometStrength.toSource(),
     "cometSpark" to cometSpark.toString(),
     "alpha" to alpha.toSource(),
-    "surfaceColor" to (surfaceColor?.let { color -> "Color(0x${color.toArgbHex()})" } ?: "null"),
+    "fill" to (fill?.toSource() ?: "null"),
 )
+
+/** The fill as a constructor call; a custom fill is code of the caller's own, so it exports as a comment. */
+private fun NetworkGraphFill.toSource(): String = when (this) {
+    is NetworkGraphFill.Solid -> "NetworkGraphFill.Solid(${color.toSource()})"
+    is NetworkGraphFill.Linear -> "NetworkGraphFill.Linear(${stops.toSource()}, angleDegrees = ${angleDegrees.toSource()})"
+    is NetworkGraphFill.Radial ->
+        "NetworkGraphFill.Radial(${stops.toSource()}, center = Offset(${center.x.toSource()}, ${center.y.toSource()}), radius = ${radius.toSource()})"
+    is NetworkGraphFill.Custom -> "null /* a custom fill */"
+}
+
+private fun List<GradientStop>.toSource(): String =
+    joinToString(separator = ", ", prefix = "listOf(", postfix = ")") { stop -> "GradientStop(${stop.position.toSource()}, ${stop.color.toSource()})" }
+
+private fun Color.toSource(): String = "Color(0x${toArgbHex()})"
 
 /** The primitive as a constructor call, listing only the arguments that differ from its defaults. */
 private fun ShapePrimitive.toSource(): String {

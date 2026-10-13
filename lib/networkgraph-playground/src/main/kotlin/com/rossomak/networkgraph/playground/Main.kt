@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.rossomak.networkgraph.NetworkGraphPalette
+import com.rossomak.networkgraph.NetworkGraphFill
 import com.rossomak.networkgraph.tuner.LabeledNetworkGraphPresets
 import com.rossomak.networkgraph.tuner.NetworkGraphPlayground
 import com.rossomak.networkgraph.tuner.NetworkGraphPlaygroundStyle
@@ -59,21 +59,21 @@ private fun rememberPlaygroundStyles(colorScheme: ColorScheme): PlaygroundStyles
     PlaygroundStyles(
         onSurface = NetworkGraphPlaygroundStyle(
             name = "On surface",
-            palette = NetworkGraphPalette.fromSpec(fallback = colorScheme.onSurfaceVariant),
+            fill = NetworkGraphFill.Solid(colorScheme.onSurfaceVariant),
             barBackground = surface,
             heroBackground = surface,
             contentColor = colorScheme.onSurface,
         ),
         onGradient = NetworkGraphPlaygroundStyle(
             name = "On gradient",
-            palette = NetworkGraphPalette.uniform(Color.White),
+            fill = NetworkGraphFill.Solid(Color.White),
             barBackground = gradient,
             heroBackground = gradient,
             contentColor = colorScheme.onPrimary,
         ),
         gradientGraph = NetworkGraphPlaygroundStyle(
             name = "Gradient graph",
-            palette = NetworkGraphPalette.gradient(gradient),
+            fill = NetworkGraphFill.linear(listOf(colorScheme.primary, colorScheme.tertiary), angleDegrees = GRADIENT_ANGLE_DEGREES),
             barBackground = surface,
             heroBackground = surface,
             contentColor = colorScheme.onSurface,
@@ -81,5 +81,6 @@ private fun rememberPlaygroundStyles(colorScheme: ColorScheme): PlaygroundStyles
     )
 }
 
+private const val GRADIENT_ANGLE_DEGREES = 45f
 private val WINDOW_WIDTH = 420.dp
 private val WINDOW_HEIGHT = 860.dp

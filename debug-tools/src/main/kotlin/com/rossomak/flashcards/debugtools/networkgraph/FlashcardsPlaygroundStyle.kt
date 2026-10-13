@@ -7,14 +7,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.networkgraph.NetworkGraphPalette
+import com.rossomak.networkgraph.NetworkGraphFill
 import com.rossomak.networkgraph.tuner.NetworkGraphPlaygroundStyle
 
 /**
- * The playground surface for [style] in Flashcards' colors. The graph is white on
- * [FlashcardsComponentStyle.OnGradient] (the gradient never flips) over the brand gradients, and each
- * layer's own color, theme `onSurfaceVariant` when unset, on [FlashcardsComponentStyle.OnSurface] over
- * the plain themed surface.
+ * The playground surface for [style] in Flashcards' colors. Graphs inherit white on
+ * [FlashcardsComponentStyle.OnGradient] (the gradient never flips) over the brand gradients, and theme
+ * `onSurfaceVariant` on [FlashcardsComponentStyle.OnSurface] over the plain themed surface; a layer
+ * with a fill of its own keeps it on both.
  */
 @Composable
 fun flashcardsPlaygroundStyle(style: FlashcardsComponentStyle): NetworkGraphPlaygroundStyle {
@@ -24,14 +24,14 @@ fun flashcardsPlaygroundStyle(style: FlashcardsComponentStyle): NetworkGraphPlay
         when (style) {
             FlashcardsComponentStyle.OnSurface -> NetworkGraphPlaygroundStyle(
                 name = "On surface",
-                palette = NetworkGraphPalette.fromSpec(fallback = colorScheme.onSurfaceVariant),
+                fill = NetworkGraphFill.Solid(colorScheme.onSurfaceVariant),
                 barBackground = SolidColor(colorScheme.surfaceContainerHigh),
                 heroBackground = SolidColor(colorScheme.surfaceContainerHigh),
                 contentColor = colorScheme.onSurface,
             )
             FlashcardsComponentStyle.OnGradient -> NetworkGraphPlaygroundStyle(
                 name = "On gradient",
-                palette = NetworkGraphPalette.uniform(Color.White),
+                fill = NetworkGraphFill.Solid(Color.White),
                 barBackground = brandColors.topBarGradient,
                 // The hero stands in for a full-screen surface, so it gets the full-screen gradient.
                 heroBackground = brandColors.screenGradient,

@@ -1,7 +1,5 @@
 package com.rossomak.networkgraph
 
-import androidx.compose.ui.graphics.Color
-
 /**
  * Everything that makes one network-graph background look different from another. A variant is a
  * value of this class, not a renderer of its own: [NetworkGraphPresets] holds curated starting points,
@@ -15,10 +13,14 @@ import androidx.compose.ui.graphics.Color
  * layer's morph family: [NetworkGraphLayerSpec.density], [NetworkGraphLayerSpec.jitter],
  * [NetworkGraphLayerSpec.edgeRule] and [NetworkGraphLayerSpec.strictTriangles]. Every other field
  * morphs.
+ *
+ * [fill] paints every layer that sets no fill of its own; null leaves them to the inherited fill
+ * (see [NetworkGraphFill]).
  */
 public data class NetworkGraphSpec(
     val seed: Int,
     val layers: List<NetworkGraphLayerSpec>,
+    val fill: NetworkGraphFill? = null,
 )
 
 /** Which pairs of nodes get an edge. */
@@ -152,9 +154,6 @@ public data class NetworkGraphLayerSpec(
     val cometSpark: Boolean = false,
     /** Multiplies every alpha in the layer. */
     val alpha: Float = 1f,
-    /**
-     * The layer's own line/node color, read by [NetworkGraphPalette.fromSpec]; null = that palette's
-     * fallback. Other palettes may ignore it.
-     */
-    val surfaceColor: Color? = null,
+    /** What this layer alone is painted with; null = its spec's fill, else the inherited one (see [NetworkGraphFill]). */
+    val fill: NetworkGraphFill? = null,
 )

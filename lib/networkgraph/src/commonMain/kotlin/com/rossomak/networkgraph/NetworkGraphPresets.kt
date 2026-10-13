@@ -8,8 +8,8 @@ import com.rossomak.networkgraph.ShapePrimitive.Uniform
 
 /**
  * Curated starting points, each built around one idea; [baseline] is the plainest, a uniform field
- * with proximity edges. None of them sets a color, so each takes whatever the caller's
- * [NetworkGraphPalette] gives it.
+ * with proximity edges. None of them sets a fill, so each is painted with whatever fill it inherits
+ * (see [NetworkGraphFill]).
  */
 public object NetworkGraphPresets {
 

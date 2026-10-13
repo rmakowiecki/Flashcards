@@ -11,8 +11,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.util.lerp
+import com.rossomak.networkgraph.NetworkGraphMorphSide.From
+import com.rossomak.networkgraph.NetworkGraphMorphSide.To
 import kotlin.math.max
 import kotlin.math.min
 
@@ -74,20 +75,14 @@ private fun NetworkGraphMorph.withNestingAtMost(levels: Int): NetworkGraphMorph?
 
 /**
  * One drawn layer of a morph: the layer's own seed, its spec at the morph's fraction, the [shape]
- * that decides which of its nodes show, and the two end specs a [NetworkGraphPalette] colors, blended
- * by [colorFraction].
+ * that decides which of its nodes show, and the [fill] it is painted with.
  */
 internal class MorphLayer(
     val seed: Int,
     val spec: NetworkGraphLayerSpec,
     val shape: LayerShape,
-    val fromLayer: NetworkGraphLayerSpec,
-    val toLayer: NetworkGraphLayerSpec,
-    val colorFraction: Float,
-) {
-    val fromColor: Color? get() = fromLayer.surfaceColor
-    val toColor: Color? get() = toLayer.surfaceColor
-}
+    val fill: FillState,
+)
 
 /**
  * Which nodes of a layer show: a spec's own shape, or a morph between two shapes. A morph never
@@ -115,15 +110,18 @@ internal sealed interface LayerShape {
  * jitter, edge rule and strict-triangles flag) has every other field interpolated and its shapes
  * morphed; any other pair snaps from one side to the other at [SNAP_FRACTION], rebuilding that layer.
  */
-internal fun morphLayers(from: NetworkGraphSpec, to: NetworkGraphSpec, fraction: Float): List<MorphLayer> =
-    morphLayers(NetworkGraphMorph(from, to, fraction))
+internal fun morphLayers(from: NetworkGraphSpec, to: NetworkGraphSpec, fraction: Float, inherited: NetworkGraphFill): List<MorphLayer> =
+    morphLayers(NetworkGraphMorph(from, to, fraction), inherited)
 
-/** [morph]'s layers; a layer [NetworkGraphMorph.origin] draws in the same family starts from that layer's shape. */
-internal fun morphLayers(morph: NetworkGraphMorph): List<MorphLayer> {
+/**
+ * [morph]'s layers, each painted with its own fill, else its spec's, else [inherited]. A layer
+ * [NetworkGraphMorph.origin] draws in the same family starts from that layer's shape and fill.
+ */
+internal fun morphLayers(morph: NetworkGraphMorph, inherited: NetworkGraphFill): List<MorphLayer> {
     val from = morph.from
     val to = morph.to
     val progress = morph.fraction.coerceIn(0f, 1f)
-    val originLayers = morph.origin?.let(::morphLayers).orEmpty()
+    val originLayers = morph.origin?.let { origin -> morphLayers(origin, inherited) }.orEmpty()
     val count = max(from.layers.size, to.layers.size)
     return (0 until count).mapNotNull { indexFromBack ->
         val indexFromFront = count - 1 - indexFromBack
@@ -134,41 +132,37 @@ internal fun morphLayers(morph: NetworkGraphMorph): List<MorphLayer> {
         val fromSeed = layerSeed(from.seed, indexFromFront)
         val toSeed = layerSeed(to.seed, indexFromFront)
         val originLayer = originLayers.getOrNull(originLayers.lastIndex - indexFromFront)
-        val startShape = originLayer
             ?.takeIf { it.seed == fromSeed && it.spec.isSameMorphFamily(start) }
-            ?.shape
-            ?: LayerShape.Of(start)
+        val startShape = originLayer?.shape ?: LayerShape.Of(start)
+        // A layer one side lacks takes the other side's fill, so it fades in or out in that one.
+        val startFill = originLayer?.fill ?: FillState.Of(resolveFill(start, if (fromLayer != null) from else to, inherited), start, From)
+        val endFill = FillState.Of(resolveFill(end, if (toLayer != null) to else from, inherited), end, To)
         when {
             fromSeed == toSeed && start.isSameMorphFamily(end) -> MorphLayer(
                 seed = fromSeed,
                 spec = lerp(start, end, progress),
                 shape = LayerShape.Morph(startShape, LayerShape.Of(end), progress),
-                fromLayer = start,
-                toLayer = end,
-                colorFraction = progress,
+                fill = blendFills(startFill, endFill, progress),
             )
-            progress < SNAP_FRACTION -> MorphLayer(fromSeed, start, startShape, start, start, 0f)
-            else -> MorphLayer(toSeed, end, LayerShape.Of(end), end, end, 1f)
+            progress < SNAP_FRACTION -> MorphLayer(fromSeed, start, startShape, startFill)
+            else -> MorphLayer(toSeed, end, LayerShape.Of(end), endFill)
         }
     }
 }
 
 /**
- * The spec [morphLayers] draws, as a spec of its own. A null color paired with a set one can't be
- * blended without the palette's fallback, so it snaps at [SNAP_FRACTION]; [animateNetworkGraphMorph] only uses
- * this to restart a morph from part way through.
+ * The spec [morphLayers] draws, as a spec of its own. Fills are left unresolved, each layer keeping the
+ * fill of the end it is nearer: only used to restart a morph from part way through, alongside the
+ * interrupted morph itself, which carries exactly what was on screen, fills included.
  */
 internal fun lerp(from: NetworkGraphSpec, to: NetworkGraphSpec, fraction: Float): NetworkGraphSpec {
     val nearer = if (fraction < SNAP_FRACTION) from else to
     if (from.seed != to.seed) return nearer
-    val layers = morphLayers(from, to, fraction).map { layer ->
-        val fromColor = layer.fromColor
-        val toColor = layer.toColor
-        val color = if (fromColor != null && toColor != null) lerpColor(fromColor, toColor, layer.colorFraction) else layer.spec.surfaceColor
-        layer.spec.copy(surfaceColor = color)
-    }
-    return nearer.copy(layers = layers)
+    return nearer.copy(layers = morphLayers(from, to, fraction, NeutralFill).map { it.spec })
 }
+
+/** Stands in for the inherited fill where only shapes and specs matter, never colors. */
+private val NeutralFill = NetworkGraphFill.Solid(Color.Transparent)
 
 /** True when every layer of this spec morphs into [other]'s smoothly, with no layer snapping. */
 public fun NetworkGraphSpec.morphsSmoothlyInto(other: NetworkGraphSpec): Boolean {
@@ -184,8 +178,8 @@ internal fun NetworkGraphLayerSpec.isSameMorphFamily(other: NetworkGraphLayerSpe
 
 /**
  * Every continuous field interpolated; the morph-family fields are equal on both sides already. The
- * shapes snap half way: which nodes show comes from [LayerShape], never from these, so only a morph
- * restarted from this spec without its origin ever sees them.
+ * shapes and fill snap half way: which nodes show comes from [LayerShape] and the colors from
+ * [FillState], never from these, so only a morph restarted from this spec without its origin sees them.
  */
 private fun lerp(from: NetworkGraphLayerSpec, to: NetworkGraphLayerSpec, fraction: Float): NetworkGraphLayerSpec = from.copy(
     shapes = if (fraction < SNAP_FRACTION) from.shapes else to.shapes,
@@ -212,5 +206,5 @@ private fun lerp(from: NetworkGraphLayerSpec, to: NetworkGraphLayerSpec, fractio
     cometStrength = lerp(from.cometStrength, to.cometStrength, fraction),
     cometSpark = if (fraction < SNAP_FRACTION) from.cometSpark else to.cometSpark,
     alpha = lerp(from.alpha, to.alpha, fraction),
-    surfaceColor = if (fraction < SNAP_FRACTION) from.surfaceColor else to.surfaceColor,
+    fill = if (fraction < SNAP_FRACTION) from.fill else to.fill,
 )

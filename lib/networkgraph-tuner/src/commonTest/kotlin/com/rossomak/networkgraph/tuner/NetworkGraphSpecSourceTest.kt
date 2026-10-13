@@ -1,6 +1,8 @@
 package com.rossomak.networkgraph.tuner
 
 import androidx.compose.ui.graphics.Color
+import com.rossomak.networkgraph.GradientStop
+import com.rossomak.networkgraph.NetworkGraphFill
 import com.rossomak.networkgraph.NetworkGraphLayerSpec
 import com.rossomak.networkgraph.NetworkGraphPresets
 import com.rossomak.networkgraph.NetworkGraphSpec
@@ -58,14 +60,23 @@ class NetworkGraphSpecSourceTest {
 
     @Test
     fun `only fields that differ from the defaults are printed`() {
-        val layer = NetworkGraphLayerSpec(density = 12.5f, surfaceColor = Color(0xFF2A2E8F), shapes = listOf(ShapePrimitive.Bloom(x = 0.25f)))
+        val layer = NetworkGraphLayerSpec(density = 12.5f, fill = NetworkGraphFill.Solid(Color(0xFF2A2E8F)), shapes = listOf(ShapePrimitive.Bloom(x = 0.25f)))
         val source = NetworkGraphSpec(seed = 9, layers = listOf(layer)).toKotlinSource()
 
         source shouldContain "density = 12.5f"
-        source shouldContain "surfaceColor = Color(0xFF2A2E8F)"
+        source shouldContain "fill = NetworkGraphFill.Solid(Color(0xFF2A2E8F))"
         source shouldContain "shapes = listOf(ShapePrimitive.Bloom(x = 0.25f))"
         source shouldNotContain "fillChance"
         source shouldContain "NetworkGraphSpec(\n    seed = 9,"
+    }
+
+    @Test
+    fun `a spec fill and gradient stops print as constructor calls`() {
+        val fill = NetworkGraphFill.Linear(listOf(GradientStop(0f, Color.White), GradientStop(1f, Color(0x33FFFFFF))), angleDegrees = 90f)
+        val source = NetworkGraphSpec(seed = 3, layers = listOf(NetworkGraphLayerSpec()), fill = fill).toKotlinSource()
+
+        source shouldContain
+            "    ),\n    fill = NetworkGraphFill.Linear(listOf(GradientStop(0.0f, Color(0xFFFFFFFF)), GradientStop(1.0f, Color(0x33FFFFFF))), angleDegrees = 90.0f),\n)"
     }
 
     @Test

@@ -34,28 +34,31 @@ come to depend on them by accident.
 
 A lib module never imports `com.rossomak.flashcards..`: no brand colors, no `MaterialTheme` tokens, no
 `AppLog`. Konsist enforces this. A consuming module applies the branding at its call site;
-`:feature:debug`'s `flashcardsNetworkGraphBackground` maps `FlashcardsComponentStyle` to a palette. The
-lib's presets set no colors for the same reason, and the branded variants stay in the consumer.
+`:feature:debug`'s `flashcardsPlaygroundStyle` maps `FlashcardsComponentStyle` to an inherited fill. The
+lib's presets set no fills for the same reason, and the branded variants stay in the consumer.
 
-### Color comes from a `Brush`-returning palette
+### Color comes from an inherited, lerpable fill
 
-`NetworkGraphPalette.brushFor(context)` is asked once per layer and frame, and once per end of a running
-morph. It can return a gradient or animated shader, not only a color.
+A layer paints with its own `NetworkGraphLayerSpec.fill`, else its spec's `NetworkGraphSpec.fill`, else
+the fill passed to `networkGraphBackground`, which defaults to the `LocalNetworkGraphFill` composition
+local. One fill set once colors every graph, and a single spec or layer can still override it.
 
-- **`SolidColor`**: every edge, halo and dot is drawn in that color. Two solid ends of a morph blend
-  color by color.
-- **Any other `Brush`**: the layer is drawn in white into its offscreen layer, then recolored with
-  `BlendMode.SrcIn`, so each element keeps its own alpha. A morph between two brushes draws the far end
-  over the near one with `BlendMode.SrcAtop` at the morph fraction: a crossfade that works for any
-  brush, custom shaders included.
+`NetworkGraphFill` is `Solid`, `Linear` or `Radial`, all plain values with geometry in fractions of the
+surface, or `Custom`, a `Brush` asked once per layer and frame and once per end of a running morph.
 
-Layer specs keep plain `Color`s, so they stay serializable data that a morph can interpolate.
+- **Plain values** interpolate during a morph: colors in Oklab, gradient stops matched by position,
+  angle, center and radius eased between the ends. A solid end acts as a one-color gradient, and a
+  linear end morphing into a radial one passes through a single color half way.
+- **`Custom`** can be any brush, animated shaders included. The layer is drawn in white into its
+  offscreen layer, then recolored with `BlendMode.SrcIn`, so each element keeps its own alpha. A morph
+  involving a custom fill draws the far end over the near one with `BlendMode.SrcAtop` at the morph
+  fraction, a crossfade that works for any brush, with both ends still animating.
 
 ## Considered options
 
 - **A `Color`-only palette.** Rejected: callers need gradient-fed graphs on plain backgrounds.
-- **Interpolating gradients themselves**, for example rotating an angle or sliding stops. This needs a
-  gradient model the lib owns. It is deferred, not rejected: a lerpable gradient type in the spec would
-  morph for real, with the crossfade kept as the fallback for arbitrary brushes.
+- **Only a `Brush`-returning palette**, crossfading every morph. Rejected: a crossfade between two
+  gradients reads as two layers, not one gradient moving, and leaves no way to set a color once for
+  every graph while overriding it for one.
 - **Material3 in the engine.** Rejected: the engine depends only on Compose runtime, UI and animation.
   The tuning UI, which does use Material3, goes in a separate lib module that consumers opt into.

@@ -370,7 +370,7 @@ private fun GraphPage(
                     .fillMaxWidth()
                     .weight(1f)
                     .background(style.heroBackground, RoundedCornerShape(HeroCornerRadius))
-                    .networkGraphBackground(morph, style.palette, stats, layerStats, showViolations),
+                    .networkGraphBackground(morph, style.fill, stats, layerStats, showViolations),
             ) {
                 Text(
                     text = note,
@@ -480,7 +480,7 @@ private fun DeckPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(heightFraction)
-                .networkGraphBackground(morph, style.palette, stats, layerStats, showViolations),
+                .networkGraphBackground(morph, style.fill, stats, layerStats, showViolations),
         )
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             Column(
@@ -526,7 +526,7 @@ private fun PlaygroundAppBar(
     LargeFlexibleTopAppBar(
         modifier = Modifier
             .background(style.barBackground)
-            .networkGraphBackground(morph, style.palette, stats, showViolations = showViolations),
+            .networkGraphBackground(morph, style.fill, stats, showViolations = showViolations),
         title = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         subtitle = { Text(text = style.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = navigationIcon,
