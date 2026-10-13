@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -18,6 +19,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlin.math.max
 import kotlin.time.TimeSource
 
@@ -33,8 +37,9 @@ private const val NANOS_PER_MILLI = 1_000_000f
  * Every drawn node has at least two visible edges, and its dot is at least as opaque as each of them;
  * see [NetworkGraphLayerSpec].
  *
- * Ignores the system animator-duration scale ("Remove animations") and keeps its frame loop running
- * while the surface is off-screen or the app is backgrounded.
+ * The graph's own motion (drift, waves, pulses) ignores the system animator-duration scale ("Remove
+ * animations"); timed morphs follow it (see [NetworkGraphMorphState]). The frame loop pauses while the
+ * lifecycle is below [Lifecycle.State.STARTED], and picks up where it left off.
  */
 @Composable
 public fun Modifier.networkGraphBackground(spec: NetworkGraphSpec, fill: NetworkGraphFill = LocalNetworkGraphFill.current): Modifier =
@@ -96,12 +101,17 @@ private fun Modifier.drawNetworkGraph(
 ): Modifier {
     val windowSize = LocalWindowInfo.current.containerSize
     val holder = remember { NetworkGraphHolder() }
-    val elapsedSeconds = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        val startNanos = withFrameNanos { it }
-        while (true) {
-            withFrameNanos { nowNanos ->
-                elapsedSeconds.floatValue = (nowNanos - startNanos) / NANOS_PER_SECOND
+    val elapsedNanos = remember { mutableLongStateOf(0L) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        // Stopped, the clock stands still rather than jumping ahead on return.
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var previousNanos = withFrameNanos { it }
+            while (true) {
+                withFrameNanos { nowNanos ->
+                    elapsedNanos.longValue += nowNanos - previousNanos
+                    previousNanos = nowNanos
+                }
             }
         }
     }
@@ -109,7 +119,7 @@ private fun Modifier.drawNetworkGraph(
     return this.drawBehind {
         if (size.width <= 0f || size.height <= 0f) return@drawBehind
         val drawStart = TimeSource.Monotonic.markNow()
-        val timeSeconds = elapsedSeconds.floatValue
+        val timeSeconds = elapsedNanos.longValue / NANOS_PER_SECOND
         // No window in previews; the surface itself is the next best fixed reference.
         val windowLongSide = max(windowSize.width, windowSize.height).toFloat()
         val referenceSize = if (windowLongSide > 0f) windowLongSide else max(size.width, size.height)

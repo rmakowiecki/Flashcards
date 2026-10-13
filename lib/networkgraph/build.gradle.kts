@@ -14,6 +14,7 @@ kotlin {
             implementation(libs.jetbrains.compose.ui.util)
             implementation(libs.jetbrains.compose.animation.core)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.jetbrains.lifecycle.runtime.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)

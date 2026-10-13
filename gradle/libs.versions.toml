@@ -47,6 +47,7 @@ detekt = "1.23.8"
 konsist = "0.17.3"
 # Compose Multiplatform for the KMP lib modules; keep it on the androidx Compose UI version the BOM resolves.
 composeMultiplatform = "1.12.1"
+jetbrainsLifecycle = "2.11.0"
 # CMP material3 ships on its own release train; this one wraps androidx material3 1.5.0-alpha22.
 composeMultiplatformMaterial3 = "1.12.0-alpha03"
 # The CMP material icons were frozen at this release.
@@ -142,6 +143,7 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 jetbrains-compose-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
 jetbrains-compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
+jetbrains-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "jetbrainsLifecycle" }
 jetbrains-compose-ui-util = { group = "org.jetbrains.compose.ui", name = "ui-util", version.ref = "composeMultiplatform" }
 jetbrains-compose-animation-core = { group = "org.jetbrains.compose.animation", name = "animation-core", version.ref = "composeMultiplatform" }
 jetbrains-compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
