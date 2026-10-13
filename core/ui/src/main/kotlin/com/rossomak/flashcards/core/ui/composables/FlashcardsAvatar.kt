@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
@@ -66,8 +67,9 @@ private val AVATAR_NAME_WORD_SEPARATOR = Regex("[\\p{Z}\\s]+")
  *
  * [style] follows the shared on-surface/on-gradient axis (ADR-0034): [OnSurface] is the tonal
  * container with no border, [OnGradient] is the translucent container with the
- * [com.rossomak.flashcards.core.ui.theme.AppSizes.onGradientBorder] hairline drawn over every
- * variant, the photo included, so the edge stays crisp on the brand gradient.
+ * [com.rossomak.flashcards.core.ui.theme.AppSizes.hairline] border drawn over every variant, the
+ * photo included, so the edge stays crisp on the brand gradient. [blursBackdrop] only adds the
+ * backdrop blur and is independent of [style].
  *
  * [contentDescription] is applied once to the whole avatar; null marks it decorative and hides it
  * (initials included) from accessibility services.
@@ -80,6 +82,7 @@ fun FlashcardsAvatar(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
 ) {
     val brandColors = MaterialTheme.brandColors
     val containerColor = when (style) {
@@ -92,7 +95,7 @@ fun FlashcardsAvatar(
     }
     val border = when (style) {
         OnSurface -> null
-        OnGradient -> BorderStroke(width = MaterialTheme.sizes.onGradientBorder, color = brandColors.onGradientBorder)
+        OnGradient -> BorderStroke(width = MaterialTheme.sizes.hairline, color = brandColors.onGradientBorder)
     }
     val description = contentDescription
     val resolvedPhotoUrl = photoUrl?.takeIf { it.isNotBlank() }
@@ -102,6 +105,7 @@ fun FlashcardsAvatar(
     Surface(
         modifier = modifier
             .size(size.diameter)
+            .blurBackdrop(shape = CircleShape, enabled = blursBackdrop)
             .clearAndSetSemantics {
                 description?.let {
                     this.contentDescription = it

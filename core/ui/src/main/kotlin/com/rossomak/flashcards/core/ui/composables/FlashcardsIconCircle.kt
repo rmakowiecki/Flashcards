@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
@@ -43,7 +44,8 @@ fun FlashcardsIconCircle(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
-) = FlashcardsIconCircle(modifier = modifier, style = style) {
+    blursBackdrop: Boolean = style == OnGradient,
+) = FlashcardsIconCircle(modifier = modifier, style = style, blursBackdrop = blursBackdrop) {
     Icon(imageVector = icon, contentDescription = contentDescription)
 }
 
@@ -52,6 +54,7 @@ fun FlashcardsIconCircle(
 fun FlashcardsIconCircle(
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
     content: @Composable () -> Unit,
 ) {
     val brandColors = MaterialTheme.brandColors
@@ -69,7 +72,7 @@ fun FlashcardsIconCircle(
     }
 
     Surface(
-        modifier = modifier.size(ICON_CIRCLE_SIZE),
+        modifier = modifier.size(ICON_CIRCLE_SIZE).blurBackdrop(shape = CircleShape, enabled = blursBackdrop),
         shape = CircleShape,
         color = containerColor,
         contentColor = contentColor,

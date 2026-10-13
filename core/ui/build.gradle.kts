@@ -29,6 +29,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.compose.shimmer)
+    implementation(libs.haze)
+    implementation(libs.haze.blur)
     // Annotation only on the main compile classpath so components can carry
     // @ShowkaseComposable; SOURCE-retained, so no release-runtime cost. The processor and
     // browser UI stay debug-only.
