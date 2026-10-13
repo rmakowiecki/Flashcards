@@ -1,5 +1,8 @@
 # Progress bar composables: linear, segmented, circular
 
+**Partially superseded:** the generic circular ring described below was removed; see
+[Amendment: one ring, the list-row ring](#amendment-one-ring-the-list-row-ring).
+
 ## Decision
 
 `core:ui` gets three progress composables, in `composables/progress/`, each in its own file — one
@@ -19,6 +22,7 @@ it's a parallel, not the reason this split exists.)
   progress are different enough inputs that folding them into one signature would mean one or the
   other parameter is always unused.
 - `FlashcardsCircularProgressRing` — determinate ring, `Normal`/`Small` via `FlashcardsComponentSize`.
+  **Superseded:** removed, see the final Amendment.
 
 **Deliberately excluded from this batch:**
 
@@ -112,7 +116,8 @@ this codebase's flat, role-based taxonomy).
 
 - `BrandColors` gains four new fields (`progressBarFillOnSurface`, `progressBarTrackOnSurface`,
   `progressBarFillOnGradient`, `progressBarTrackOnGradient`); `AppSizes` gains four
-  (`progressBarThicknessNormal/Small`, `progressRingDiameterNormal/Small`).
+  (`progressBarThicknessNormal/Small`, `progressRingDiameterNormal/Small`). **Superseded:** the
+  `progressRingDiameter*` tokens were removed, see the final Amendment.
 - Any composite component that embeds one of these bars (Level/XP card, "Continue learning" card,
   list-row rings, the 88dp daily-goal ring) is future work, built against real domain data once
   those screens are reached — not designed speculatively here.

@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.ui.composables
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -53,7 +54,6 @@ fun FlashcardsProgressRing(
     val fraction = progress?.coerceIn(0f, 1f)
     val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = TRACK_ALPHA)
     val arcColor = MaterialTheme.colorScheme.primary
-    val strokeWidth = RING_STROKE
 
     Box(
         modifier = modifier
@@ -61,8 +61,8 @@ fun FlashcardsProgressRing(
             .clearAndSetSemantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(RING_SIZE)) {
-            val stroke = Stroke(width = strokeWidth.toPx())
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(width = RING_STROKE.toPx())
             // Inset by half the stroke so the ring is drawn inside its bounds rather than clipped.
             val inset = stroke.width / 2
             val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
