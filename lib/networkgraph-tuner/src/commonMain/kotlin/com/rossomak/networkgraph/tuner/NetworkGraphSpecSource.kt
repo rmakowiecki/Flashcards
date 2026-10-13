@@ -70,7 +70,7 @@ private fun NetworkGraphLayerSpec.sourceArguments(): Map<String, String> = linke
     "glowStrength" to glowStrength.toSource(),
     "depthDimming" to depthDimming.toSource(),
     "cometStrength" to cometStrength.toSource(),
-    "cometSpark" to cometSpark.toString(),
+    "cometSpark" to cometSpark.toSource(),
     "alpha" to alpha.toSource(),
     "fill" to (fill?.toSource() ?: "null"),
 )

@@ -11,6 +11,7 @@ import io.kotest.matchers.floats.plusOrMinus
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
@@ -58,12 +59,123 @@ class NetworkGraphMorphTest {
     }
 
     @Test
-    fun `an incompatible pair snaps from one side to the other half way`() {
+    fun `a pair of different morph families dissolves one mesh into the other instead of snapping`() {
         val from = NetworkGraphPresets.baseline
         val to = NetworkGraphPresets.ribbonMesh
+        val fromSeed = morphLayers(from, from, 0f, TestFill).single().seed
+        val toSeed = morphLayers(to, to, 0f, TestFill).single().seed
 
-        morphLayers(from, to, 0.49f, TestFill).single().spec shouldBe from.layers.single()
-        morphLayers(from, to, 0.5f, TestFill).single().spec shouldBe to.layers.single()
+        morphLayers(from, to, 0f, TestFill).map { it.seed } shouldBe listOf(fromSeed)
+        morphLayers(from, to, 0.5f, TestFill).map { it.seed } shouldBe listOf(fromSeed, toSeed)
+        morphLayers(from, to, 1f, TestFill).map { it.seed } shouldBe listOf(toSeed)
+    }
+
+    @Test
+    fun `every pair of presets of different families keeps the invariants at every fraction of its dissolve`() {
+        val violations = presetPairs().flatMap { (from, to) ->
+            surfaces.flatMap { (width, height) ->
+                val run = MorphRun(from, to, width, height)
+                fractions.flatMap { fraction -> run.frames("${from.presetLabel} → ${to.presetLabel} at $fraction", fraction, frameCount = 2) }
+            }
+        }
+
+        violations.shouldBeEmpty()
+    }
+
+    /** Allows [CROSSING_FRONTS_BUDGET] and [COMET_GLITCH_BUDGET] exceptions, as the morph family's own scrub does. */
+    @Test
+    fun `scrubbing a dissolve end to end turns each leaving node off once and each arriving node on once`() {
+        val nodes = presetPairs().flatMap { (from, to) ->
+            val run = MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT)
+            val frames = scrubFrames().map { fraction -> run.visibility(fraction) }
+            frames.flatMap { it.keys }.distinct().flatMap { mesh ->
+                // A mesh not drawn in a frame shows none of its nodes there.
+                val meshFrames = frames.map { it[mesh] }
+                val nodeCount = meshFrames.filterNotNull().maxOf { it.size }
+                (0 until nodeCount).map { node ->
+                    val visibility = meshFrames.map { visible -> visible?.getOrNull(node) ?: false }
+                    NodeToggles(shownAtAnEnd = visibility.first() || visibility.last(), toggles = visibility.zipWithNext { before, after -> before != after }.count { it })
+                }
+            }
+        }
+
+        nodes.count { it.shownAtAnEnd && it.toggles > 1 } shouldBeLessThanOrEqual CROSSING_FRONTS_BUDGET
+        nodes.count { !it.shownAtAnEnd && it.toggles > 2 } shouldBeLessThanOrEqual COMET_GLITCH_BUDGET
+    }
+
+    @Test
+    fun `a dissolve played backwards gives every node of both meshes the presence it had at the mirrored fraction`() {
+        val mismatches = presetPairs().flatMap { (from, to) ->
+            fractions.flatMap { fraction ->
+                val forward = MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(fraction) }
+                val backward = MorphRun(to, from, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(1f - fraction) }
+                forward.fields.filterKeys { it in backward.fields }.flatMap { (mesh, field) ->
+                    val mirror = backward.fields.getValue(mesh)
+                    (0 until field.nodeCount).filter { abs(field.nodePresence(it) - mirror.nodePresence(it)) > PRESENCE_TOLERANCE }
+                        .map { node -> "${from.presetLabel} → ${to.presetLabel} at $fraction mesh $mesh node $node" }
+                }
+            }
+        }
+
+        mismatches.shouldBeEmpty()
+    }
+
+    @Test
+    fun `two uniform meshes dissolve place by place, each leaving node next to arriving ones`() {
+        val from = NetworkGraphPresets.baseline
+        val to = NetworkGraphPresets.depthFog
+        val run = MorphRun(from, to, TALL_HERO_WIDTH, TALL_HERO_HEIGHT)
+        val switchedAt = HashMap<String, HashMap<Int, Float>>()
+        for (step in 0..ORDER_STEPS) {
+            val fraction = step / ORDER_STEPS.toFloat()
+            run.advance(fraction)
+            run.fields.forEach { (mesh, field) -> recordHalfwaySwitches(field, switchedAt.getOrPut(mesh) { HashMap() }, isLeaving = mesh == run.fields.keys.first(), fraction) }
+        }
+        val (leavingMesh, arrivingMesh) = run.fields.keys.toList()
+        val leavingField = run.fields.getValue(leavingMesh)
+        val arrivingField = run.fields.getValue(arrivingMesh)
+        val leaving = switchedAt.getValue(leavingMesh)
+        val gaps = switchedAt.getValue(arrivingMesh).map { (node, arrivedAt) ->
+            val home = arrivingField.nodeHome(node)
+            val nearest = leaving.keys.minBy { (leavingField.nodeHome(it) - home).getDistance() }
+            abs(leaving.getValue(nearest) - arrivedAt)
+        }
+
+        gaps.size shouldBeGreaterThan MIN_LEAVING_NODES
+        gaps.average() shouldBeLessThan MAX_PLACE_BY_PLACE_GAP
+    }
+
+    @Test
+    fun `a dissolve retargeted part way starts from exactly what both meshes drew`() {
+        val first = NetworkGraphPresets.baseline
+        val second = NetworkGraphPresets.ribbonMesh
+        val third = NetworkGraphPresets.cornerBloom
+        val interrupted = NetworkGraphMorph(first, second, INTERRUPT_FRACTION)
+        val retargeted = NetworkGraphMorph(lerp(first, second, INTERRUPT_FRACTION), third, 0f, origin = interrupted)
+
+        val drawn = MorphRun(interrupted, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(INTERRUPT_FRACTION) }
+        val restarted = MorphRun(retargeted, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(0f) }
+        val halfway = MorphRun(retargeted, TALL_HERO_WIDTH, TALL_HERO_HEIGHT).also { it.advance(0.5f) }
+
+        restarted.fields.keys shouldBe drawn.fields.keys
+        drawn.fields.forEach { (mesh, field) ->
+            (0 until field.nodeCount).map(field::nodePresence) shouldBe
+                restarted.fields.getValue(mesh).let { restartedField -> (0 until restartedField.nodeCount).map(restartedField::nodePresence) }
+        }
+        halfway.frames("retargeted dissolve half way", 0.5f, frameCount = 1).shouldBeEmpty()
+    }
+
+    @Test
+    fun `a dissolve sent back where it came from reverses the leaving mesh instead of adding a third`() {
+        val first = NetworkGraphPresets.baseline
+        val second = NetworkGraphPresets.ribbonMesh
+        val interrupted = NetworkGraphMorph(first, second, INTERRUPT_FRACTION)
+        val reversed = NetworkGraphMorph(lerp(first, second, INTERRUPT_FRACTION), first, 0.5f, origin = interrupted)
+
+        val layers = morphLayers(reversed, TestFill)
+
+        layers.map { it.seed } shouldBe morphLayers(interrupted, TestFill).map { it.seed }
+        layers.first().shape.shouldBeInstanceOf<LayerShape.Morph>().to shouldBe LayerShape.Of(first.layers.single())
     }
 
     @Test
@@ -321,6 +433,22 @@ class NetworkGraphMorphTest {
         return (point - (start + along * share)).getDistance()
     }
 
+    /** Records in [switches] the fraction each of [field]'s nodes not yet in it first passes half presence, going out if [isLeaving], else coming in. */
+    private fun recordHalfwaySwitches(field: LayerField, switches: HashMap<Int, Float>, isLeaving: Boolean, fraction: Float) {
+        for (node in 0 until field.nodeCount) {
+            if (node in switches) continue
+            val presence = field.nodePresence(node)
+            val passed = if (isLeaving) fraction > 0f && presence > 0f && presence < HALF_PRESENT else presence >= HALF_PRESENT
+            if (passed) switches[node] = fraction
+        }
+    }
+
+    /** Every ordered pair of distinct presets, each its own morph family. */
+    private fun presetPairs(): List<Pair<NetworkGraphSpec, NetworkGraphSpec>> =
+        NetworkGraphPresets.all.flatMap { from -> NetworkGraphPresets.all.filter { it != from }.map { to -> Pair(from, to) } }
+
+    private val NetworkGraphSpec.presetLabel: String get() = "preset ${NetworkGraphPresets.all.indexOf(this)}"
+
     /** Every ordered pair of distinct [family] variants. */
     private fun morphFamilyPairs(): List<Pair<NetworkGraphSpec, NetworkGraphSpec>> =
         family.flatMap { from -> family.filter { it != from }.map { to -> Pair(from, to) } }
@@ -348,14 +476,15 @@ class NetworkGraphMorphTest {
     private class MorphRun(private val morph: NetworkGraphMorph, private val width: Float, private val height: Float) {
         constructor(from: NetworkGraphSpec, to: NetworkGraphSpec, width: Float, height: Float) : this(NetworkGraphMorph(from, to, 0f), width, height)
 
-        val fields = LinkedHashMap<Int, LayerField>()
+        /** One field per mesh, keyed by [meshKey]. */
+        val fields = LinkedHashMap<String, LayerField>()
         private var timeSeconds = 0f
 
         /** One frame at [fraction]; the layers it drew, back to front. */
         fun advance(fraction: Float): List<MorphLayer> {
             timeSeconds += FRAME_SECONDS
             return morphLayers(morph.copy(fraction = fraction), TestFill).onEach { layer ->
-                val field = fields.getOrPut(layer.seed) { LayerField(layer.spec, layer.seed, max(width, height), PX_PER_DP) }
+                val field = fields.getOrPut(meshKey(layer)) { LayerField(layer.spec, layer.seed, max(width, height), PX_PER_DP) }
                 field.spec = layer.spec
                 field.shape = layer.shape
                 field.advance(timeSeconds, width, height)
@@ -368,19 +497,22 @@ class NetworkGraphMorphTest {
          */
         fun frames(label: String, fraction: Float, frameCount: Int): List<String> = (0 until frameCount).flatMap {
             advance(fraction).flatMap { layer ->
-                val field = fields.getValue(layer.seed)
+                val field = fields.getValue(meshKey(layer))
                 val still = fraction <= 0f || fraction >= 1f
                 frameViolations("$label ${width.toInt()}x${height.toInt()} layer ${layer.seed}", field, layer.spec.strictTriangles && still, timeSeconds)
             }
         }
 
-        /** One frame at [fraction]: which dots are drawn, per layer seed. */
-        fun visibility(fraction: Float): Map<Int, List<Boolean>> = advance(fraction).associate { layer ->
-            val field = fields.getValue(layer.seed)
-            layer.seed to (0 until field.nodeCount).map { field.nodeAlpha(it) >= NODE_VISIBLE_ALPHA }
+        /** One frame at [fraction]: which dots are drawn, per mesh. */
+        fun visibility(fraction: Float): Map<String, List<Boolean>> = advance(fraction).associate { layer ->
+            val field = fields.getValue(meshKey(layer))
+            meshKey(layer) to (0 until field.nodeCount).map { field.nodeAlpha(it) >= NODE_VISIBLE_ALPHA }
         }
 
         fun singleField(): LayerField = fields.values.single()
+
+        /** A layer's mesh: its seed and morph family, which a field is built for and never changes. */
+        private fun meshKey(layer: MorphLayer): String = with(layer.spec) { "${layer.seed}/$density/$jitter/$edgeRule/$strictTriangles" }
     }
 
     /** A spec's place in [family], to tell the pairs in a failure apart. */
@@ -417,5 +549,6 @@ class NetworkGraphMorphTest {
         const val JITTER_CENTER = 0.5f
         const val JITTER_AMPLITUDE = 0.01f
         const val INTERRUPT_FRACTION = 0.4f
+        const val MAX_PLACE_BY_PLACE_GAP = 0.12
     }
 }

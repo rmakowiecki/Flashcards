@@ -72,7 +72,6 @@ import com.rossomak.networkgraph.NetworkGraphFrameStats
 import com.rossomak.networkgraph.NetworkGraphLayerStats
 import com.rossomak.networkgraph.NetworkGraphMorph
 import com.rossomak.networkgraph.NetworkGraphSpec
-import com.rossomak.networkgraph.morphsSmoothlyInto
 import com.rossomak.networkgraph.networkGraphBackground
 import kotlin.math.floor
 import kotlin.random.Random
@@ -413,13 +412,12 @@ private fun MorphPage(
     )
 }
 
-/** The morph page's part of the tuning sheet: both pickers and the scrub slider. The "to" picker offers only specs "from" morphs into smoothly. */
+/** The morph page's part of the tuning sheet: both pickers and the scrub slider. */
 @Composable
 private fun MorphControls(specs: List<NetworkGraphPreset>, selection: MorphSelection, onScrub: (Float) -> Unit) {
-    val from = specs[selection.fromIndex]
     Column {
-        MorphPicker(label = "From", specs = specs, selected = selection.fromIndex, isEnabled = { true }, onSelect = { selection.fromIndex = it })
-        MorphPicker(label = "To", specs = specs, selected = selection.toIndex, isEnabled = { from.spec.morphsSmoothlyInto(specs[it].spec) }, onSelect = { selection.toIndex = it })
+        MorphPicker(label = "From", specs = specs, selected = selection.fromIndex, onSelect = { selection.fromIndex = it })
+        MorphPicker(label = "To", specs = specs, selected = selection.toIndex, onSelect = { selection.toIndex = it })
         Text(text = "Morph ${selection.progress.value.toFixed(2)}", style = MaterialTheme.typography.bodySmall)
         Slider(value = selection.progress.value, onValueChange = onScrub)
         Text(text = "Tuning the \"to\" side", style = MaterialTheme.typography.labelLarge)
@@ -427,7 +425,7 @@ private fun MorphControls(specs: List<NetworkGraphPreset>, selection: MorphSelec
 }
 
 @Composable
-private fun MorphPicker(label: String, specs: List<NetworkGraphPreset>, selected: Int, isEnabled: (Int) -> Boolean, onSelect: (Int) -> Unit) {
+private fun MorphPicker(label: String, specs: List<NetworkGraphPreset>, selected: Int, onSelect: (Int) -> Unit) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(SpacingXSmall),
         verticalArrangement = Arrangement.Center,
@@ -436,7 +434,6 @@ private fun MorphPicker(label: String, specs: List<NetworkGraphPreset>, selected
         specs.forEachIndexed { index, spec ->
             FilterChip(
                 selected = index == selected,
-                enabled = isEnabled(index),
                 onClick = { onSelect(index) },
                 label = { Text(text = spec.name, style = MaterialTheme.typography.labelSmall) },
             )

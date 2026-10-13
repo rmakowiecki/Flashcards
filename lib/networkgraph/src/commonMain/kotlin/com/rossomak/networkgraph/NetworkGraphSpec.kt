@@ -9,10 +9,11 @@ package com.rossomak.networkgraph
  * sharp foreground can sit over a faint, larger background mesh for depth.
  * Layer seeds count from the front layer, so adding a back layer leaves the front one's layout alone.
  *
- * Two specs morph into each other smoothly (see [morphLayers]) when they share [seed] and each
- * layer's morph family: [NetworkGraphLayerSpec.density], [NetworkGraphLayerSpec.jitter],
- * [NetworkGraphLayerSpec.edgeRule] and [NetworkGraphLayerSpec.strictTriangles]. Every other field
- * morphs.
+ * Any two specs morph into each other (see [morphLayers]). Layers that share [seed] and their morph
+ * family ([NetworkGraphLayerSpec.density], [NetworkGraphLayerSpec.jitter],
+ * [NetworkGraphLayerSpec.edgeRule] and [NetworkGraphLayerSpec.strictTriangles]) morph within one mesh,
+ * every other field interpolated and the nodes staying put; any other pair dissolves one mesh into the
+ * other.
  *
  * [fill] paints every layer that sets no fill of its own; null leaves them to the inherited fill
  * (see [NetworkGraphFill]).
@@ -150,8 +151,11 @@ public data class NetworkGraphLayerSpec(
      * nothing, 0 none at all. See [Comet].
      */
     val cometStrength: Float = 1f,
-    /** Comet nodes heat up as the comet reaches them and cool down once it has passed. */
-    val cometSpark: Boolean = false,
+    /**
+     * How many of a comet's nodes heat up as it reaches them and cool down once it has passed, averaged
+     * over the morph's two ends: 0 none, 1 a good share of them.
+     */
+    val cometSpark: Float = 0f,
     /** Multiplies every alpha in the layer. */
     val alpha: Float = 1f,
     /** What this layer alone is painted with; null = its spec's fill, else the inherited one (see [NetworkGraphFill]). */

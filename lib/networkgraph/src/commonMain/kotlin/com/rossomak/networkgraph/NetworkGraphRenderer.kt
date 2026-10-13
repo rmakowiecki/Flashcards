@@ -96,11 +96,13 @@ private fun Modifier.drawNetworkGraph(
         val windowLongSide = max(windowSize.width, windowSize.height).toFloat()
         val referenceSize = if (windowLongSide > 0f) windowLongSide else max(size.width, size.height)
         val fields = holder.fieldsFor(layers, referenceSize, density)
-        val layerCount = layers.size
+        // Two meshes dissolving into each other draw one spec layer, and a fill sees them as one.
+        val layerCount = (layers.maxOfOrNull { it.slotFromFront } ?: -1) + 1
         // Nodes deliberately sit past the surface's edges, and drawBehind is not clipped.
         clipRect {
             fields.forEachIndexed { index, field ->
-                val layerFill = layers[index].fill.toLayerFill(index, layerCount, timeSeconds, size)
+                val layer = layers[index]
+                val layerFill = layer.fill.toLayerFill(layerCount - 1 - layer.slotFromFront, layerCount, timeSeconds, size)
                 field.advance(timeSeconds, size.width, size.height)
                 field.draw(this, layerFill, holder.halosFor(layerFill.maskColor), timeSeconds, showViolations)
             }

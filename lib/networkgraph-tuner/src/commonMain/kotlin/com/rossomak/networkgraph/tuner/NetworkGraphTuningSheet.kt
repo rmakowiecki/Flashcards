@@ -101,11 +101,6 @@ public fun NetworkGraphTuningSheetContent(
         )
         SwitchRow(label = "Show violations (all layers)", checked = showViolations, onCheckedChange = onShowViolationsChange)
         ShapeEditor(shapes = layer.shapes, onShapesChange = { onLayerChange(layer.copy(shapes = it)) })
-        SwitchRow(
-            label = "Comet spark (comet nodes heat up)",
-            checked = layer.cometSpark,
-            onCheckedChange = { onLayerChange(layer.copy(cometSpark = it)) },
-        )
         layerSliders.filter { it.appliesTo(layer) }.forEach { slider ->
             SliderRow(
                 label = slider.label,
@@ -345,5 +340,6 @@ private val layerSliders = listOf(
     LayerSlider("Glow strength", 0f..1f, { it.glowStrength }, { spec, value -> spec.copy(glowStrength = value) }),
     LayerSlider("Depth dimming", 0f..1f, { it.depthDimming }, { spec, value -> spec.copy(depthDimming = value) }),
     LayerSlider("Comet strength", 0f..2f, { it.cometStrength }, { spec, value -> spec.copy(cometStrength = value) }),
+    LayerSlider("Comet spark (comet nodes heat up)", 0f..1f, { it.cometSpark }, { spec, value -> spec.copy(cometSpark = value) }),
     LayerSlider("Layer alpha", 0f..1f, { it.alpha }, { spec, value -> spec.copy(alpha = value) }),
 )

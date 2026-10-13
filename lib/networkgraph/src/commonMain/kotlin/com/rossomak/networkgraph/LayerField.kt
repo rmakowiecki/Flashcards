@@ -89,6 +89,19 @@ private const val FRONT_NOISE_FREQUENCY_Y = 0.7f
 private const val FRONT_NOISE_FREQUENCY_DIAGONAL = 0.45f
 private const val FRONT_NOISE_SEED_SALT = 0x2F6B_1D3
 
+/**
+ * A dissolve's sweep (see [LayerShape.Vanish]) is laid out in cells of the window's longer side over
+ * this many, whatever each mesh's own density, so both meshes sample one and the same sweep. Its
+ * frequencies are in radians per such cell.
+ */
+private const val SWEEP_CELLS = 20f
+private const val SWEEP_FREQUENCY_X = 0.55f
+private const val SWEEP_FREQUENCY_Y = 0.4f
+private const val SWEEP_FREQUENCY_DIAGONAL = 0.3f
+private const val SWEEP_PHASE_X = 1.3f
+private const val SWEEP_PHASE_Y = 0.4f
+private const val SWEEP_PHASE_DIAGONAL = 2.1f
+
 /** Presences at a morph's two ends closer than this count as equal: the node has no switch and simply blends between them. */
 private const val MORPH_CHANGE_EPSILON = 1e-3f
 
@@ -110,7 +123,7 @@ private const val COMET_LIGHT_LEVEL = 0.45f
 private const val COMET_LIGHT_JITTER = 0.12f
 private const val COMET_LIGHT_BAND = 0.1f
 
-/** Share of a comet's nodes that heat up as it reaches them, under [NetworkGraphLayerSpec.cometSpark]. */
+/** Share of a comet's nodes that heat up as it reaches them, at a [NetworkGraphLayerSpec.cometSpark] of 1. */
 private const val COMET_SPARK_SHARE = 0.4f
 
 /** How long before its comet peaks a sparking node starts cooling, and how long after it has cooled, as fractions of the morph. */
@@ -215,7 +228,9 @@ internal class LayerField(
     var shape: LayerShape = LayerShape.Of(spec)
 
     private val cell = referenceSize / spec.density.coerceAtLeast(1f)
-    private val envelope = NetworkGraphEnvelope(seed)
+    private val sweepCell = referenceSize / SWEEP_CELLS
+    private val envelopes = MeshEnvelopes(seed)
+    private val envelope = envelopes.own
     private val frontNoisePhases = Random(seed xor FRONT_NOISE_SEED_SALT).let { random -> FloatArray(3) { random.nextFloat() * TWO_PI } }
 
     private val nodes = ArrayList<NodeTraits>()
@@ -241,7 +256,7 @@ internal class LayerField(
     private var switchArrivals = BooleanArray(0)
 
     /** The comets of each morph nesting level, sampled per node. */
-    private val cometTracks = CometTracks(envelope)
+    private val cometTracks = CometTracks(envelopes::of)
 
     /** The [EdgeRule.FixedTriangulation] mesh of each end of the current morph, and how its edges switch. */
     private var morphMesh: MorphMesh? = null
@@ -550,6 +565,7 @@ internal class LayerField(
                 val target = envelope.densityAt(shape.spec, width, height, homeX[index], homeY[index]) * shape.spec.fillChance
                 out[index] = rollWeight(nodes[index].presenceRoll, target)
             }
+            is LayerShape.Vanish -> out.fill(0f, 0, count)
             is LayerShape.Morph -> when {
                 shape.fraction <= 0f -> evaluateShape(shape.from, level, width, height, out)
                 shape.fraction >= 1f -> evaluateShape(shape.to, level, width, height, out)
@@ -589,6 +605,10 @@ internal class LayerField(
      * A node the same at both ends takes the light of any [comets] passing it on top. Nodes that leave or
      * arrive never do: one of them caught by a comet would turn back, and the comet lights the gap
      * between the two shapes, where neither end has nodes, anyway.
+     *
+     * In a dissolve, one end is [LayerShape.Vanish] and stands for the other mesh's shape, ranked the
+     * same way; where neither shape ranks anything, every node switches by the shared sweep instead
+     * of its roll (see [sweepAt]).
      */
     private fun blendEnds(
         morph: LayerShape.Morph,
@@ -604,22 +624,15 @@ internal class LayerField(
     ) {
         val intoSpec = morph.to.nearestSpec
         val outOfSpec = morph.from.nearestSpec
-        val leavingInto = ClosenessRange()
-        val leavingOutOf = ClosenessRange()
-        val arrivingInto = ClosenessRange()
-        val arrivingOutOf = ClosenessRange()
+        val intoEnvelope = envelopes.of(morph.to)
+        val outOfEnvelope = envelopes.of(morph.from)
+        val order = SwitchOrder(dissolve = morph.to as? LayerShape.Vanish ?: morph.from as? LayerShape.Vanish)
         for (index in 0 until count) {
             val change = end[index] - start[index]
             if (abs(change) <= MORPH_CHANGE_EPSILON) continue
-            closenessInto[index] = envelope.closenessAt(intoSpec, width, height, homeX[index], homeY[index])
-            closenessOutOf[index] = envelope.closenessAt(outOfSpec, width, height, homeX[index], homeY[index])
-            if (change < 0f) {
-                leavingInto.include(closenessInto[index])
-                leavingOutOf.include(closenessOutOf[index])
-            } else {
-                arrivingInto.include(closenessInto[index])
-                arrivingOutOf.include(closenessOutOf[index])
-            }
+            closenessInto[index] = intoEnvelope.closenessAt(intoSpec, width, height, homeX[index], homeY[index])
+            closenessOutOf[index] = outOfEnvelope.closenessAt(outOfSpec, width, height, homeX[index], homeY[index])
+            order.include(arriving = change > 0f, closenessInto[index], closenessOutOf[index])
         }
         for (index in 0 until count) {
             val change = end[index] - start[index]
@@ -628,21 +641,15 @@ internal class LayerField(
                 switches?.set(index, Float.NaN)
                 continue
             }
-            val roll = nodes[index].morphRoll
-            val jitter = nodes[index].frontNoise * MORPH_FRONT_JITTER
-            val switchAt = if (change < 0f) {
-                when {
-                    leavingInto.ranks -> leavingInto.rank(closenessInto[index]) + jitter
-                    leavingOutOf.ranks -> 1f - arrivingOutOf.or(leavingOutOf).rank(closenessOutOf[index]) - jitter
-                    else -> roll
-                }
-            } else {
-                when {
-                    arrivingOutOf.ranks -> 1f - arrivingOutOf.rank(closenessOutOf[index]) - jitter
-                    arrivingInto.ranks -> leavingInto.or(arrivingInto).rank(closenessInto[index]) + jitter
-                    else -> 1f - roll
-                }
-            }
+            val arriving = change > 0f
+            val switchAt = order.switchAt(
+                arriving = arriving,
+                closenessInto = closenessInto[index],
+                closenessOutOf = closenessOutOf[index],
+                roll = nodes[index].morphRoll,
+                jitter = nodes[index].frontNoise * MORPH_FRONT_JITTER,
+                sweep = order.sweepReversal(arriving)?.let { reversed -> sweepAt(homeX[index], homeY[index], sweepCell, reversed) } ?: 0f,
+            )
             if (switches != null) {
                 switches[index] = switchAt.coerceIn(0f, 1f)
                 switchArrivals[index] = change > 0f
@@ -678,8 +685,9 @@ internal class LayerField(
                 max(max(startPresences[index], endPresences[index]), comets.peaks[index] * borderFactor(index, width, height))
             }
             // Never strict: a comet's patch lights and darkens node by node, and with only triangle edges
-            // its nodes run short of visible ones and blink.
-            TransitMesh(settleTopology(homeX, homeY, everyMask, everyPresences, morph.to.nearestSpec.copy(strictTriangles = false)), transitMask)
+            // its nodes run short of visible ones and blink. A mesh dissolving away keeps its own filters.
+            val filters = if (morph.to is LayerShape.Vanish) morph.from.nearestSpec else morph.to.nearestSpec
+            TransitMesh(settleTopology(homeX, homeY, everyMask, everyPresences, filters.copy(strictTriangles = false)), transitMask)
         } else {
             null
         }
@@ -1028,6 +1036,76 @@ private class NodeSwitches(private val fractions: FloatArray, val arriving: Bool
     fun at(node: Int): Float? = fractions[node].takeIf { !it.isNaN() }
 }
 
+/**
+ * The order one morph switches its changing nodes in; see [LayerField]'s blendEnds. Each node's
+ * closeness is [include]d first, so every group knows its range, then [switchAt] places each node.
+ */
+private class SwitchOrder(private val dissolve: LayerShape.Vanish?) {
+    private val leavingInto = ClosenessRange()
+    private val leavingOutOf = ClosenessRange()
+    private val arrivingInto = ClosenessRange()
+    private val arrivingOutOf = ClosenessRange()
+
+    fun include(arriving: Boolean, closenessInto: Float, closenessOutOf: Float) {
+        if (arriving) {
+            arrivingInto.include(closenessInto)
+            arrivingOutOf.include(closenessOutOf)
+        } else {
+            leavingInto.include(closenessInto)
+            leavingOutOf.include(closenessOutOf)
+        }
+    }
+
+    /** Whether nodes moving the [arriving] way switch by the dissolve's sweep, mirrored or not; null when they don't. */
+    fun sweepReversal(arriving: Boolean): Boolean? {
+        val ranked = if (arriving) arrivingOutOf.ranks || arrivingInto.ranks else leavingInto.ranks || leavingOutOf.ranks
+        return dissolve?.reversed?.takeIf { !ranked }
+    }
+
+    /** A node's switch fraction; [sweep] is its [sweepAt] value, read only where [sweepReversal] says the sweep applies. */
+    @Suppress("LongParameterList") // One node's place: its direction, closeness to both ends, and its own randoms.
+    fun switchAt(arriving: Boolean, closenessInto: Float, closenessOutOf: Float, roll: Float, jitter: Float, sweep: Float): Float =
+        if (arriving) {
+            when {
+                arrivingOutOf.ranks -> 1f - arrivingOutOf.rank(closenessOutOf) - jitter
+                arrivingInto.ranks -> leavingInto.or(arrivingInto).rank(closenessInto) + jitter
+                dissolve != null -> sweep
+                else -> 1f - roll
+            }
+        } else {
+            when {
+                leavingInto.ranks -> leavingInto.rank(closenessInto) + jitter
+                leavingOutOf.ranks -> 1f - arrivingOutOf.or(leavingOutOf).rank(closenessOutOf) - jitter
+                dissolve != null -> sweep
+                else -> roll
+            }
+        }
+}
+
+/**
+ * Where a node at ([x], [y]) switches in a dissolve whose shapes put no nodes in order, from 0 to 1: a
+ * smooth noise over the surface, in [cell]s, that every mesh samples alike, so the leaving and arriving
+ * nodes at one place switch together. [reversed] mirrors it for the dissolve's opposite direction.
+ */
+private fun sweepAt(x: Float, y: Float, cell: Float, reversed: Boolean): Float {
+    val column = x / cell
+    val row = y / cell
+    val noise = 0.25f * (
+        sin(column * SWEEP_FREQUENCY_X + SWEEP_PHASE_X) * cos(row * SWEEP_FREQUENCY_Y + SWEEP_PHASE_Y) +
+            sin((column + row) * SWEEP_FREQUENCY_DIAGONAL + SWEEP_PHASE_DIAGONAL)
+        )
+    return if (reversed) 0.5f - noise else 0.5f + noise
+}
+
+/** A layer's own envelope, and those of the other meshes a dissolve hands its nodes over to or takes them from, by seed. */
+private class MeshEnvelopes(seed: Int) {
+    val own = NetworkGraphEnvelope(seed)
+    private val guides = HashMap<Int, NetworkGraphEnvelope>()
+
+    /** The envelope [shape]'s own mesh draws it with. */
+    fun of(shape: LayerShape): NetworkGraphEnvelope = shape.nearestSeed?.let { guideSeed -> guides.getOrPut(guideSeed) { NetworkGraphEnvelope(guideSeed) } } ?: own
+}
+
 /** The span of closeness values one group of a morph's nodes covers, and each value's place in it. */
 private class ClosenessRange {
     private var low = Float.MAX_VALUE
@@ -1181,7 +1259,7 @@ private fun proximityEdges(presentIndices: IntArray, xs: FloatArray, ys: FloatAr
  * Each morph nesting level's [CometTrack], built on first use and kept until that level's morph or the
  * surface changes. [topLevel] is the drawn morph's own.
  */
-private class CometTracks(private val envelope: NetworkGraphEnvelope) {
+private class CometTracks(private val envelopeFor: (LayerShape) -> NetworkGraphEnvelope) {
     private val byLevel = ArrayList<CometTrack?>()
 
     val topLevel: CometTrack? get() = byLevel.getOrNull(0)
@@ -1193,15 +1271,26 @@ private class CometTracks(private val envelope: NetworkGraphEnvelope) {
         val fromSpec = morph.from.nearestSpec
         val toSpec = morph.to.nearestSpec
         val strength = (fromSpec.cometStrength + toSpec.cometStrength) / 2f
-        val comets = if (strength > 0f) {
-            cometsBetween(envelope.standIns(fromSpec, width, height), envelope.standIns(toSpec, width, height), width, height)
+        val comets = if (strength > 0f && sendsComets(morph)) {
+            cometsBetween(envelopeFor(morph.from).standIns(fromSpec, width, height), envelopeFor(morph.to).standIns(toSpec, width, height), width, height)
         } else {
             emptyList()
         }
         val fillChance = (fromSpec.fillChance + toSpec.fillChance) / 2f
-        val spark = fromSpec.cometSpark || toSpec.cometSpark
+        val spark = (fromSpec.cometSpark + toSpec.cometSpark) / 2f
         return CometTrack(morph.from, morph.to, width, height, comets, strength, fillChance, spark, nodes, homeX, homeY)
             .also { byLevel[level] = it }
+    }
+}
+
+/** False for the one mesh of a dissolve that leaves the comets to the other (see [LayerShape.Vanish]). */
+private fun sendsComets(morph: LayerShape.Morph): Boolean {
+    val leavingInto = morph.to as? LayerShape.Vanish
+    val arrivingOutOf = morph.from as? LayerShape.Vanish
+    return when {
+        leavingInto != null -> leavingInto.reversed
+        arrivingOutOf != null -> !arrivingOutOf.reversed
+        else -> true
     }
 }
 
@@ -1226,7 +1315,7 @@ private class CometTrack(
     comets: List<Comet>,
     strength: Float,
     fillChance: Float,
-    private val spark: Boolean,
+    private val spark: Float,
     nodes: List<NodeTraits>,
     homeX: FloatArray,
     homeY: FloatArray,
@@ -1254,9 +1343,9 @@ private class CometTrack(
 
     /** How hot [node] is from the comet passing it, under [NetworkGraphLayerSpec.cometSpark]: hot as the comet reaches it, cooling once it has passed. */
     fun sparkAt(node: Int, hotRoll: Float, fraction: Float): Float {
-        if (!spark || peaks[node] <= 0f) return 0f
+        if (spark <= 0f || peaks[node] <= 0f) return 0f
         val peakAt = peakFractions[node]
-        return rollWeight(hotRoll, COMET_SPARK_SHARE) * (1f - smoothStep(peakAt - COMET_SPARK_LEAD, peakAt + COMET_SPARK_TRAIL, fraction))
+        return rollWeight(hotRoll, COMET_SPARK_SHARE * spark.coerceIn(0f, 1f)) * (1f - smoothStep(peakAt - COMET_SPARK_LEAD, peakAt + COMET_SPARK_TRAIL, fraction))
     }
 
     fun presenceAt(node: Int, fraction: Float): Float {
