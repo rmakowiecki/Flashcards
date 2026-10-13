@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.LastPage
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.PlayArrow
@@ -68,12 +69,13 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rossomak.networkgraph.ExperimentalNetworkGraphApi
+import com.rossomak.networkgraph.Follow
 import com.rossomak.networkgraph.NetworkGraphFrameStats
 import com.rossomak.networkgraph.NetworkGraphLayerStats
 import com.rossomak.networkgraph.NetworkGraphMorph
 import com.rossomak.networkgraph.NetworkGraphSpec
 import com.rossomak.networkgraph.networkGraphBackground
-import kotlin.math.floor
+import com.rossomak.networkgraph.rememberNetworkGraphMorphState
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -250,6 +252,7 @@ private fun specSlotFor(
                 canGoForward = step < pagerState.pageCount - 1,
                 onBack = { coroutineScope.launch { pagerState.animateScrollToPage(step - 1) } },
                 onForward = { coroutineScope.launch { pagerState.animateScrollToPage(step + 1) } },
+                onJump = { coroutineScope.launch { pagerState.scrollToPage(if (step == pagerState.pageCount - 1) 0 else pagerState.pageCount - 1) } },
             ),
         )
     }
@@ -328,9 +331,10 @@ private class SpecSlot(
 
 /**
  * Steps a deck page's own pager one step back or forward, morphing its background on the way. Swiping
- * does the same, but a desktop mouse can't drag a pager.
+ * does the same, but a desktop mouse can't drag a pager. [onJump] leaps straight to the last step, or
+ * back to the first from there, the way an onboarding Skip does.
  */
-private class DeckStep(val canGoBack: Boolean, val canGoForward: Boolean, val onBack: () -> Unit, val onForward: () -> Unit)
+private class DeckStep(val canGoBack: Boolean, val canGoForward: Boolean, val onBack: () -> Unit, val onForward: () -> Unit, val onJump: () -> Unit)
 
 /** One new seed for every spec in the list, so they stay one morph family. */
 private fun SnapshotStateList<NetworkGraphPreset>.reseedTogether() {
@@ -443,7 +447,8 @@ private fun MorphPicker(label: String, specs: List<NetworkGraphPreset>, selected
 
 /**
  * Stands in for onboarding: a full-screen [NetworkGraphPlaygroundStyle.heroBackground] whose graph
- * morphs from one step's spec to the next as the pager scrolls, scrubbing back when it scrolls back.
+ * [Follow]s the pager, morphing from one step's spec to the next as it scrolls, scrubbing back when it
+ * scrolls back, and running a timed morph when it jumps.
  * The surface button animates the graph's surface between full and [DECK_SHRUNK_HEIGHT] of the page,
  * to show a resize keeping every node in place while the shape follows the new bounds.
  */
@@ -463,10 +468,8 @@ private fun DeckPage(
         animationSpec = tween(DECK_RESIZE_MILLIS),
         label = "deckSurfaceHeight",
     )
-    val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
-    val lower = floor(position).toInt().coerceIn(0, specs.lastIndex)
-    val upper = (lower + 1).coerceAtMost(specs.lastIndex)
-    val morph = NetworkGraphMorph(specs[lower].spec, specs[upper].spec, (position - lower).coerceIn(0f, 1f))
+    val morphState = rememberNetworkGraphMorphState(specs[pagerState.currentPage].spec)
+    morphState.Follow(specs.map { it.spec }) { pagerState.currentPage + pagerState.currentPageOffsetFraction }
 
     Box(
         modifier = Modifier
@@ -477,7 +480,7 @@ private fun DeckPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(heightFraction)
-                .networkGraphBackground(morph, style.fill, stats, layerStats, showViolations),
+                .networkGraphBackground(morphState, style.fill, stats, layerStats, showViolations),
         )
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             Column(
@@ -599,6 +602,9 @@ private fun PlaygroundOverlay(
                     }
                     IconButton(onClick = deckStep.onForward, enabled = deckStep.canGoForward) {
                         Icon(imageVector = Icons.Default.SkipNext, contentDescription = "Next step")
+                    }
+                    IconButton(onClick = deckStep.onJump) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.LastPage, contentDescription = "Jump to the last or first step")
                     }
                 }
                 if (onStart != null) {
