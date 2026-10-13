@@ -4,8 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,13 +43,14 @@ import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
+import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.auth.LoginDestination.Main
 import com.rossomak.flashcards.feature.auth.LoginDestination.Onboarding
@@ -162,42 +163,43 @@ private fun LoginContent(
         }
     }
 
-    Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.brandColors.screenGradient),
-        containerColor = Color.Transparent,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            verticalArrangement = Arrangement.SpaceEvenly,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            val buttonRiseDistance = MaterialTheme.spacing.medium
-            Image(
-                painter = painterResource(CoreUiR.drawable.flashcards_white),
-                contentDescription = null,
+    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
+        BrandGradientBackdrop()
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { innerPadding ->
+            Column(
                 modifier = Modifier
-                    .sharedElementByKey(SharedElementKey.APP_LOGO)
-                    .width(LogoWidth),
-            )
-            LoginButtons(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = MaterialTheme.spacing.large)
-                    .graphicsLayer {
-                        alpha = buttonReveal.value
-                        translationY = (1f - buttonReveal.value) * buttonRiseDistance.toPx()
-                    },
-                phase = state.phase,
-                // Disabled until they start to appear, so an invisible button can't be tapped.
-                enabled = state.phase == Idle && hasButtonStartedRevealing,
-                onGoogleSignInClick = onGoogleSignInClick,
-                onGitHubSignInClick = onGitHubSignInClick,
-            )
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                verticalArrangement = Arrangement.SpaceEvenly,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                val buttonRiseDistance = MaterialTheme.spacing.medium
+                Image(
+                    painter = painterResource(CoreUiR.drawable.flashcards_white),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .sharedElementByKey(SharedElementKey.APP_LOGO)
+                        .width(LogoWidth),
+                )
+                LoginButtons(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = MaterialTheme.spacing.large)
+                        .graphicsLayer {
+                            alpha = buttonReveal.value
+                            translationY = (1f - buttonReveal.value) * buttonRiseDistance.toPx()
+                        },
+                    phase = state.phase,
+                    // Disabled until they start to appear, so an invisible button can't be tapped.
+                    enabled = state.phase == Idle && hasButtonStartedRevealing,
+                    onGoogleSignInClick = onGoogleSignInClick,
+                    onGitHubSignInClick = onGitHubSignInClick,
+                )
+            }
         }
     }
 }

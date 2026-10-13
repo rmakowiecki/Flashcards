@@ -3,7 +3,6 @@ package com.rossomak.flashcards.feature.study.preview
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +69,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
@@ -249,11 +250,8 @@ fun PreviewStudySessionContent(
     // sheet out here instead, outside Scaffold entirely, lets it reach the true screen bottom
     // uncontested. [ReadyContent] (below, inside Scaffold's own content) still wants that inset —
     // its Start button must stay clear of the gesture bar — so Scaffold itself is untouched.
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.brandColors.screenGradient),
-    ) {
+    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
+        BrandGradientBackdrop()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
