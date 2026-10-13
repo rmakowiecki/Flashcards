@@ -25,6 +25,9 @@ class FakeFlashcardRepository : FlashcardRepository {
     /** Every subcategory id [fetchFlashcards] was called with, in call order. */
     val fetchedSubcategoryIds: MutableList<String> = mutableListOf()
 
+    /** Every id set [fetchCategoriesByIds] was called with, in call order. */
+    val fetchedCategoryIds: MutableList<Set<String>> = mutableListOf()
+
     /** How many times [invalidateFlashcardCache] was called, for tests that drive the cache seam. */
     var invalidationCount: Int = 0
         private set
@@ -38,7 +41,10 @@ class FakeFlashcardRepository : FlashcardRepository {
         return subcategoriesToReturn
     }
 
-    override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> = categoriesByIdsToReturn
+    override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> {
+        fetchedCategoryIds += ids
+        return categoriesByIdsToReturn
+    }
 
     override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> = subcategoriesByIdsToReturn
 

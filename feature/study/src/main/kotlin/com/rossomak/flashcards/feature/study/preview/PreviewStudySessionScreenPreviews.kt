@@ -7,12 +7,16 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 
+private const val SAMPLE_ICON_SVG =
+    """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>"""
+
 @Preview(showBackground = true)
 @Composable
 private fun PreviewStudySessionLoadingPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = true,
         ),
@@ -33,6 +37,7 @@ private fun PreviewStudySessionErrorPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = false,
             isLoadFailed = true,
@@ -54,6 +59,7 @@ private fun PreviewStudySessionEmptyStatePreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = false,
             config = StudySessionConfig(
@@ -82,6 +88,7 @@ private fun PreviewStudySessionSingleSubcategoryRatedManualPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = false,
             config = StudySessionConfig(
@@ -110,6 +117,7 @@ private fun PreviewStudySessionSingleSubcategoryRatedVoicePreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = false,
             config = StudySessionConfig(
@@ -139,6 +147,7 @@ private fun PreviewStudySessionMicPermissionRejectedPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = false,
             config = StudySessionConfig(
@@ -166,6 +175,7 @@ private fun PreviewStudySessionQuickSessionPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose", "Coroutines", "Architecture", "Testing", "Navigation"),
             sourceType = Quick,
             isLoading = false,
@@ -189,6 +199,7 @@ private fun PreviewStudySessionCustomSessionPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose", "Coroutines", "Architecture"),
             isLoading = false,
             config = StudySessionConfig(subcategoryIds = listOf("a", "b", "c"), mode = StudyMode.Fast),
@@ -212,6 +223,7 @@ private fun PreviewStudySessionFastReadAloudPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose", "Coroutines", "Architecture"),
             isLoading = false,
             config = StudySessionConfig(subcategoryIds = listOf("a", "b", "c"), mode = StudyMode.Fast, readAloudEnabled = true),
@@ -235,6 +247,7 @@ private fun PreviewStudySessionSheetOpenPreview() {
     PreviewStudySessionContent(
         state = PreviewStudySessionScreenState(
             categoryName = "Android",
+            categoryIconSvg = SAMPLE_ICON_SVG,
             subcategoryNames = listOf("Compose"),
             isLoading = false,
             config = StudySessionConfig(

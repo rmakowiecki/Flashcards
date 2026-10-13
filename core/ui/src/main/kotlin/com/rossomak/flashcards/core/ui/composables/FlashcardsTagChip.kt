@@ -19,11 +19,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val TAG_CHIP_HEIGHT = 40.dp
+private val TAG_CHIP_ICON_SIZE = 18.dp
 
 /**
  * The checkable tag chip — a Material 3 [FilterChip] restyled to the design system: 40dp tall,
@@ -45,14 +49,14 @@ fun FlashcardsTagChip(
         selected = selected,
         onClick = { onSelectedChange(!selected) },
         label = { Text(text = label) },
-        modifier = modifier.height(MaterialTheme.sizes.tagChipHeight),
+        modifier = modifier.height(TAG_CHIP_HEIGHT),
         enabled = enabled,
         leadingIcon = if (selected) {
             {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    modifier = Modifier.size(MaterialTheme.sizes.tagChipIcon),
+                    modifier = Modifier.size(TAG_CHIP_ICON_SIZE),
                 )
             }
         } else {

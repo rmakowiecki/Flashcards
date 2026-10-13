@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.ui.composables
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -17,11 +18,15 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import kotlin.math.roundToInt
+
+private val RING_STROKE = 3.dp
+private val RING_SIZE = 40.dp
 
 private const val FULL_CIRCLE_DEGREES = 360f
 private const val ARC_START_DEGREES = -90f
@@ -49,16 +54,15 @@ fun FlashcardsProgressRing(
     val fraction = progress?.coerceIn(0f, 1f)
     val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = TRACK_ALPHA)
     val arcColor = MaterialTheme.colorScheme.primary
-    val strokeWidth = MaterialTheme.sizes.progressRingStroke
 
     Box(
         modifier = modifier
-            .size(MaterialTheme.sizes.progressRing)
+            .size(RING_SIZE)
             .clearAndSetSemantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(MaterialTheme.sizes.progressRing)) {
-            val stroke = Stroke(width = strokeWidth.toPx())
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(width = RING_STROKE.toPx())
             // Inset by half the stroke so the ring is drawn inside its bounds rather than clipped.
             val inset = stroke.width / 2
             val arcSize = Size(size.width - stroke.width, size.height - stroke.width)

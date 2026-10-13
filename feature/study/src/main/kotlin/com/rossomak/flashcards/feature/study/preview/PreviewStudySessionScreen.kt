@@ -36,6 +36,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -61,6 +62,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -71,6 +73,7 @@ import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
+import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -97,6 +100,8 @@ import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private val HERO_GLYPH_SIZE = 24.dp
 
 @Composable
 fun PreviewStudySessionScreen(
@@ -398,7 +403,7 @@ private fun ReadyContent(
                 onSwitchToManualAnswering = onSwitchToManualAnswering,
             )
             else -> {
-                HeroTop()
+                HeroTop(iconSvg = state.categoryIconSvg)
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
                 ScopeHeroBody(state = state, onOpenSettings = onOpenSettings, onOpenSettingsDialog = onOpenSettingsDialog)
             }
@@ -415,14 +420,21 @@ private fun ReadyContent(
 }
 
 @Composable
-private fun HeroTop(modifier: Modifier = Modifier) {
+private fun HeroTop(iconSvg: String?, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        FlashcardsIconCircle(
-            icon = Icons.Default.PlayArrow,
-            // Decorative: "Ready to start?" right below already names what this circle means.
-            contentDescription = null,
-            style = OnGradient,
-        )
+        FlashcardsIconCircle(style = OnGradient) {
+            // Null until the Category resolves; drawing then would flash the fallback glyph.
+            if (iconSvg != null) {
+                FlashcardsInlineCategoryGlyph(
+                    iconSvg = iconSvg,
+                    tint = LocalContentColor.current,
+                    // Decorative: the top bar already names the Category.
+                    contentDescription = null,
+                    size = HERO_GLYPH_SIZE,
+                    reserveSpaceWhileLoading = false,
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
         Text(
             // titleMedium, not a headline style: matches FlashcardsEmptyState's own title size —

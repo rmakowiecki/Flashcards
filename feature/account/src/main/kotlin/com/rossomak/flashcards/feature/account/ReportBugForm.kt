@@ -23,11 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.domain.model.BugReport
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val BULLET_DOT_SIZE = 4.dp
 
 @Composable
 internal fun ColumnScope.ReportBugForm(
@@ -83,7 +85,7 @@ private fun GuidingQuestion(text: String) {
         Box(
             modifier = Modifier
                 .padding(end = MaterialTheme.spacing.xsmall)
-                .size(MaterialTheme.sizes.bulletDot)
+                .size(BULLET_DOT_SIZE)
                 .background(color = MaterialTheme.colorScheme.onSurfaceVariant, shape = CircleShape),
         )
         Text(

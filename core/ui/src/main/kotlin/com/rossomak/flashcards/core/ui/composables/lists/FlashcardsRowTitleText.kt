@@ -15,7 +15,9 @@ import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import com.rossomak.flashcards.core.ui.theme.sizes
+import androidx.compose.ui.unit.dp
+
+private val FAVORITE_ICON_SIZE = 16.dp
 
 private const val FAVORITE_ICON_INLINE_ID = "favorite"
 private const val ROW_TITLE_MAX_LINES = 3
@@ -47,7 +49,7 @@ internal fun FlashcardsRowTitleText(
         )
         return
     }
-    val iconSizeSp = with(LocalDensity.current) { MaterialTheme.sizes.favoriteInlineIcon.toSp() }
+    val iconSizeSp = with(LocalDensity.current) { FAVORITE_ICON_SIZE.toSp() }
     val annotatedTitle = buildAnnotatedString {
         append(title)
         append('\u00A0') // add non-breaking space to never orphan the favorite icon

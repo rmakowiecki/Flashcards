@@ -25,7 +25,7 @@ current value and opens a focused edit popup.
 
 ## Hero (read-only scope)
 
-Keeps: play icon, "Ready to start?", one-line scope sentence, and read-only chips —
+Keeps: the Category glyph circle, "Ready to start?", one-line scope sentence, and read-only chips —
 estimated minutes + card count (+ Subcategory count for multi-subcategory sessions).
 
 Removed from the hero: the Sort chip and the "Filtered by …" line — both are rows now.

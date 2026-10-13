@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.preview
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AppPermission
+import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
@@ -23,6 +24,7 @@ import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
@@ -57,6 +59,7 @@ import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
@@ -169,6 +172,7 @@ class PreviewStudySessionViewModelTest {
      */
     private fun createViewModel(): PreviewStudySessionViewModel = PreviewStudySessionViewModel(
         savedStateHandle,
+        GetCategoryUseCase(flashcardRepository),
         GetSubcategoriesUseCase(flashcardRepository),
         SelectSessionFlashcardsUseCase(
             getFlashcards = GetFlashcardsUseCase(flashcardRepository),
@@ -183,6 +187,16 @@ class PreviewStudySessionViewModelTest {
         ObservePermissionStatusUseCase(permissionGateway),
         RequestPermissionUseCase(permissionGateway),
         voiceSettingsController,
+    )
+
+    private fun category(iconSvg: String?) = Category(
+        id = categoryId,
+        name = categoryName,
+        order = 0,
+        subcategoryCount = 1,
+        iconSvg = iconSvg,
+        color = null,
+        featuredSubcategoryNames = emptyList(),
     )
 
     private fun flashcard(
@@ -272,6 +286,31 @@ class PreviewStudySessionViewModelTest {
 
         viewModel.state.value.isLoadFailed shouldBe true
         viewModel.state.value.canStart shouldBe false
+    }
+
+    @Test
+    fun `the session's category glyph reaches state`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(singleSubcategoryRoute)
+        flashcardRepository.categoriesByIdsToReturn = Result.success(listOf(category(iconSvg = CATEGORY_ICON_SVG)))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.categoryIconSvg shouldBe CATEGORY_ICON_SVG
+        flashcardRepository.fetchedCategoryIds shouldContainExactly listOf(setOf(categoryId))
+    }
+
+    @Test
+    fun `a failed category fetch leaves no glyph and does not fail the load`() = runTest(mainDispatcherRule.testDispatcher) {
+        stubRoute(singleSubcategoryRoute)
+        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+        flashcardRepository.categoriesByIdsToReturn = Result.failure(IllegalStateException("offline"))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.categoryIconSvg shouldBe null
+        viewModel.state.value.isLoadFailed shouldBe false
     }
 
     /**
@@ -1802,6 +1841,8 @@ class PreviewStudySessionViewModelTest {
         }
 
     private companion object {
+        const val CATEGORY_ICON_SVG = "<svg/>"
+
         /**
          * Verified (by the reshuffle tests above passing deterministically) to advance
          * [SelectSessionFlashcardsUseCase]'s draw to a different subset on a second call — a
