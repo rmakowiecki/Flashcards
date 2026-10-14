@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
@@ -115,6 +116,7 @@ fun PreviewStudySessionScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
 
@@ -154,7 +156,11 @@ fun PreviewStudySessionScreen(
             context.startActivity(intent)
         },
         onSwitchToManualAnswering = viewModel::onSwitchToManualAnswering,
-        onStartSession = viewModel::onStartSession,
+        onStartSession = {
+            // While leaving, the event collector is stopped but Start is still tappable; a queued
+            // tap would start a second session on return.
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) viewModel.onStartSession()
+        },
         snackbarHostState = snackbarHostState,
     )
 }

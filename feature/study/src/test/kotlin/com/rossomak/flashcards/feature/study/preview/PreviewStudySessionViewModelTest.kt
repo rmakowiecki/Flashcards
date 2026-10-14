@@ -1002,20 +1002,42 @@ class PreviewStudySessionViewModelTest {
     }
 
     @Test
-    fun `onStartSession ignores re-entrant calls while a session is already pending`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(singleSubcategoryRoute)
-        flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+    fun `onStartSession ignores a second tap while the microphone prompt is still open`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            val viewModel = createVoiceAnsweringViewModel()
+            val promptGate = CompletableDeferred<Unit>()
+            permissionGateway.requestGate = promptGate
 
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-        viewModel.onStartSession()
-        viewModel.onStartSession()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+            promptGate.complete(Unit)
+            advanceUntilIdle()
 
-        viewModel.events.test {
-            awaitItem() as PreviewStudySessionDestination.RatedStudySession
-            expectNoEvents()
+            permissionGateway.launchedRequests shouldBe listOf(AppPermission.RecordAudio)
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+                expectNoEvents()
+            }
         }
-    }
+
+    @Test
+    fun `onStartSession starts again when the user comes back from a started session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.events.test {
+                viewModel.onStartSession()
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+                viewModel.onStartSession()
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
 
     @Test
     fun `onRetry recovers from a previous failure and loads the pool`() = runTest(mainDispatcherRule.testDispatcher) {
