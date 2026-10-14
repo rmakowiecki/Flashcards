@@ -116,7 +116,7 @@ fun FastStudySessionScreen(
 
     val voicePlaybackUnavailableMessage = stringResource(R.string.study_session_voice_playback_unavailable_message)
     val openTtsSettingsAction = stringResource(R.string.study_session_open_tts_settings_button)
-    val curationReportFailedMessage = stringResource(R.string.fast_study_session_report_failure_message)
+    val curationReportFailedMessage = stringResource(R.string.study_session_report_failure_message)
     val playIgnoredDuringCallMessage = stringResource(R.string.study_session_play_ignored_during_call_message)
 
     val snackbarScope = rememberCoroutineScope()

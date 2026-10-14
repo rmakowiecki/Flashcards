@@ -277,7 +277,7 @@ private fun RatedManualSheetContent(isAnswerRevealed: Boolean, onShowAnswer: () 
 
 private fun resolveRatedStudySessionMessage(context: Context, message: RatedStudySessionMessage): String = when (message) {
     VoicePlaybackUnavailable -> context.getString(R.string.study_session_voice_playback_unavailable_message)
-    CurationReportFailed -> context.getString(R.string.fast_study_session_report_failure_message)
+    CurationReportFailed -> context.getString(R.string.study_session_report_failure_message)
     PlayIgnoredDuringCall -> context.getString(R.string.study_session_play_ignored_during_call_message)
     VoiceAnswerGradingOffline -> context.getString(R.string.study_session_voice_answer_offline_message)
     VoiceAnswerGradingServiceError -> context.getString(R.string.study_session_voice_answer_service_error_message)

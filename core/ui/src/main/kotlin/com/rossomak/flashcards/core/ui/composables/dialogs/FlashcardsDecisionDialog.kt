@@ -85,7 +85,7 @@ fun FlashcardsDecisionDialogShowcase() {
                 onConfirm = {},
                 onCancel = {},
                 icon = Icons.AutoMirrored.Filled.Logout,
-                supportingText = "All progress for this session will be lost. This can't be undone.",
+                supportingText = "The session ends now. Everything you've studied so far is saved.",
             )
         }
     }
