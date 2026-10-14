@@ -1,6 +1,6 @@
 # User Flow — Progress
 
-NYI — flows designed from ADRs and design docs. See [docs/design/progress-dashboard.md](../design/progress-dashboard.md), [docs/design/launcher-widget.md](../design/launcher-widget.md), [docs/design/session-stats-data-model.md](../design/session-stats-data-model.md).
+NYI — flows designed from ADRs and design docs. See [docs/design/planned/progress-dashboard.md](../design/planned/progress-dashboard.md), [docs/design/planned/launcher-widget.md](../design/planned/launcher-widget.md), [docs/design/session-submission.md](../design/session-submission.md).
 
 ## Entry points & screen
 
@@ -12,7 +12,7 @@ flowchart TD
     %% Legend: (Screen)  [/Action/]  {Decision}  ([Entry/Exit])  {{NYI}}
 
     %% ── Entry points ──────────────────────────────────────────────
-    WidgetTap([Launcher widget tap\n2×2 or 4×2]) --> ProgressScreen
+    WidgetTap([Launcher widget tap\ncompact or large]) --> ProgressScreen
     ProgressTab([Progress tab]) --> ProgressScreen
 
     %% ── Progress Screen ───────────────────────────────────────────
@@ -23,17 +23,17 @@ flowchart TD
 
     %% Section 2 — Daily goal
     ProgressScreen --> TapGoalRing[/Tap daily goal ring\ncircular progress: today / goal min/]
-    TapGoalRing --> GoalPicker(GOAL PICKER\nnumber input dialog)
+    TapGoalRing --> GoalPicker(GOAL PICKER\nstepper dialog)
     GoalPicker -->|set new goal| ProgressScreen
 
     %% Section 3 — Streak
     ProgressScreen --> StreakRow[Streak row\ncurrent streak · best streak\nno action]
 
     %% Section 4 — Weekly time
-    ProgressScreen --> WeeklyTime[Weekly study time\nno action]
+    ProgressScreen --> WeeklyTime[Weekly study time\nlast 7 days · no action]
 
     %% Section 5 — Stats row
-    ProgressScreen --> StatsRow[Stats row\ntotal time · sessions completed · cards mastered\nno action]
+    ProgressScreen --> StatsRow[Stats row\ntotal time · sessions completed · cards studied · cards mastered\nno action]
 
     %% Section 6 — History chart
     ProgressScreen --> HistoryChart[History chart\nstacked bar by category · one bar per day]
@@ -41,24 +41,24 @@ flowchart TD
     ChartToggle --> HistoryChart
 
     %% Section 7 — Per-category breakdown
-    ProgressScreen --> PerCategory[Per-category breakdown\ncategory · color swatch · minutes this week\nordered by time studied desc\nno action in MVP]
+    ProgressScreen --> PerCategory[Per-category breakdown\ncategory · color swatch · minutes in the chart window\nordered by time studied desc\nno action in MVP]
 ```
 
 ## Widget sizes
 
 | Size | Content |
 |---|---|
-| 2×2 small | Streak (flame + day count) · Daily goal ring (X / Y min) |
-| 4×2 medium | Level number + XP progress bar · Streak · Today's goal · Weekly minutes |
+| Compact (1 row × 4 columns) | Streak (flame + day count) · Daily goal ring with today's minutes |
+| Large (2 rows × 4 columns) | Level number + XP progress bar · Streak · Today's goal · Last 7 days minutes |
 
-Widget reads from DataStore only — no Firestore reads at widget update time. Updated after each session end. Shows placeholder state before first session.
+The widget reads the same figures as the Progress tab and refreshes on events, not on a timer. See [launcher-widget.md](../design/planned/launcher-widget.md).
 
 ## Data sources
 
-| Stat | Source | When updated |
-|---|---|---|
-| Level, XP, streak, best streak | DataStore cache | Each session end |
-| Today's minutes, weekly minutes | DataStore cache | Each session end |
-| Total time, sessions completed, cards mastered | DataStore cache | Each session end |
-| History chart (7/30 days) | Recomputed from Firestore | Progress screen load |
-| Per-category breakdown | Recomputed from Firestore | Progress screen load |
+Every figure is read from a server-written document and includes Pending Sessions. See [progress-dashboard.md](../design/planned/progress-dashboard.md#where-the-figures-come-from).
+
+| Stat | Source |
+|---|---|
+| Level, XP, streak, best streak, today's minutes | Scoring state |
+| Cards studied, cards mastered | Progress summary |
+| Total time, sessions completed, weekly minutes, history chart (7/30 days), per-category breakdown | Activity aggregate |

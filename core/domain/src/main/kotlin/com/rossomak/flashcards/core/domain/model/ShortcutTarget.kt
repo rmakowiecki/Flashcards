@@ -6,7 +6,7 @@ package com.rossomak.flashcards.core.domain.model
  * target already pinned and later re-synced as a dynamic shortcut updates in place instead of
  * duplicating, since pinned and dynamic shortcuts share one app-wide id namespace.
  *
- * [route] is the ADR-0003 tab-prefixed route string (`/study/category/{id}` or
+ * [route] is the ADR-0003 shortcut route string (`/study/category/{id}` or
  * `/study/category/{id}/subcategory/{id}`), carried in the shortcut's Intent via
  * `AppShortcutsRepository.EXTRA_ROUTE` under action `AppShortcutsRepository.ACTION_OPEN_ROUTE`.
  *

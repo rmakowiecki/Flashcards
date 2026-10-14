@@ -77,7 +77,8 @@ and no TTL, so freshness policy lives in app code. It is a **cache generation** 
 consults: the first read of a Subcategory in a given generation goes to the server, every read after
 that is served from cache. What bumps that generation — a server-side knowledge-base seed value
 compared at app start against a locally stored copy — is a separate effort; this ADR fixes only the
-seam the repository exposes. See `docs/temp/seed-versioned-cache-invalidation-context.md`.
+seam the repository exposes. The invalidation itself is described in
+[flashcard-cache.md](../design/flashcard-cache.md).
 
 ## Context
 
@@ -98,8 +99,7 @@ that ADR-0022 pins down, or extracting them.
 "re-run selection on every dialog confirm" affordable. Splitting the use case apart would have
 destroyed it silently, turning every Preview dialog confirm back into a network round trip.
 
-Primary-source research into the Firestore Android SDK (`docs/temp/firestore-offline-cache-research.md`)
-supplied the facts behind the caching half. The load-bearing ones: `Source.DEFAULT` is server-*first*,
+Primary-source research into the Firestore Android SDK supplied the facts behind the caching half. The load-bearing ones: `Source.DEFAULT` is server-*first*,
 not cache-first — the SDK suppresses the cached snapshot whenever it believes it is online — so every
 read in the app today is a server round trip. There is no per-collection cache policy in the API at
 all. `Source.CACHE` misses return an empty list rather than an error. And because flashcards are
@@ -172,7 +172,7 @@ selection re-run on emissions the Preview screen does not want.
   read path is unsound without it. It is recorded in `CONTEXT.md` and any future ability to create an
   empty Subcategory would have to revisit this ADR.
 - Subcategory Details' content state has four cases, not five — a genuinely empty Subcategory is
-  unreachable under the invariant, leaving `Loading`, `Error`, `Cards` and `NoMatches`.
+  unreachable under the invariant, leaving `Loading`, `Error`, `FlashcardsList` and `NoMatches`.
 - Until the seed-versioned invalidation effort lands, the cache generation is never bumped, so a
   curation update is invisible on-device for the lifetime of the cache entry. The two efforts must
   land in that order.

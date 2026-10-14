@@ -117,7 +117,7 @@ grading it. Once the card is graded, only the resulting `state` and `attemptsUse
 `cardResults` — the spoken content itself is not retained in Firestore, in the session ViewModel's
 result, or on the Summary route. Nothing today reads a transcript back after the session ends; adding
 persistence for a hypothetical future revisit feature is deferred until that feature is actually
-designed (see `docs/design/premium-voice-grading-pipeline.md`).
+designed (see `docs/design/voice-answering.md`).
 
 The one real cost is that the Android client SDK has no field projection, so Recents transfers
 `cardResults` it never renders. If that ever measures badly, the fix is a separate slim index

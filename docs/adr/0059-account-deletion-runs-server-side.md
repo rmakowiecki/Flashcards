@@ -26,7 +26,7 @@ A `deleteAccount` callable deletes the caller's account. It takes no payload, ac
 caller's uid and returns nothing. It runs, in order:
 
 1. The revoked-token guard of
-   [ADR-0057](0057-callables-that-write-user-data-verify-token-revocation.md) (`unauthenticated`). A
+   [ADR-0064](0064-callables-that-write-user-data-verify-token-revocation.md) (`unauthenticated`). A
    token revoked from the console, or one whose User is already deleted, deletes nothing.
 2. Delete every Bug Report whose `uid` is the caller's, queried in pages. Bug Reports are top-level,
    so the recursive delete in step 3 does not reach them.

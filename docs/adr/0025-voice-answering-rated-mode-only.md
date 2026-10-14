@@ -12,7 +12,7 @@ Engine-sharing, silence-timeout, and grade-band mechanics are documented in [ADR
 
 The original implementation gated the voice-answering controller's activation on `StudySessionViewModel.isVoiceActive`, which only ever became `true` via `onVoiceAutoStart()` — itself only triggered `when route.studyMode == StudyMode.FAST`. Net effect: voice answering was reachable only in Fast mode and unreachable in Rated mode — the opposite of the intended use case (phone-in-pocket hands-free *rating*, which only makes sense where a rating step exists at all — Fast mode has none, per ADR-0016: "Fast mode has no Rating step... There is no Correct/Failed outcome per card").
 
-Neither the design doc (`docs/design/premium-voice-grading-pipeline.md`) nor any prior ADR specified Fast vs. Rated scoping — this was an implementation gap, not a documented decision being reversed.
+Neither the design doc (`docs/design/voice-answering.md`) nor any prior ADR specified Fast vs. Rated scoping — this was an implementation gap, not a documented decision being reversed.
 
 ## Alternatives considered
 

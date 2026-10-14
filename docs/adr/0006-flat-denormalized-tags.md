@@ -2,7 +2,7 @@
 
 ## Decision
 
-Tags are stored as plain strings in a `tags[]` array on each Flashcard document. There is no `tags/` collection, no global tag registry, and no tag kind distinction in Firestore — all tags are treated equally. The `"private"` tag is a special case: it is inferred and automatically added to user-generated flashcards; it is not manually assigned.
+Tags are stored as plain strings in a `tags[]` array on each Flashcard document. There is no `tags/` collection, no global tag registry, and no tag kind distinction in Firestore — all tags are treated equally. There is no private tag: a user-generated flashcard is Private because of where it is stored, not because of a tag it carries (see the Private flag in `CONTEXT.md`).
 
 ## Context
 
@@ -19,4 +19,4 @@ Tags are user-facing filter chips on Subcategory Details. The chip set for a giv
 - No global tag rename without a corpus migration script.
 - New tags appear automatically as cards are imported — zero admin overhead.
 - Filter chips on Subcategory Details are derived from loaded cards (`distinct(card.tags)`) — no extra Firestore read.
-- The `"private"` tag is automatically added to user-generated flashcards and is never surfaced in the tag selector for new cards.
+- User-generated flashcards carry no private tag. Their Private status is derived from their storage path.

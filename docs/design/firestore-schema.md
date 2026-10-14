@@ -1,241 +1,218 @@
 # Firestore Schema
 
-This is the single source of truth for the current Firestore data schema — don't reconstruct it from ADRs, which are a
-decision history and not always kept in sync with the live shape.
+The current Firestore data schema, collection by collection: every path, every field, who writes it and who may read it. This is the single source of truth for persisted shapes; ADRs record why a shape was chosen but are not kept in sync with every field.
+
+Fields marked `?` may be absent. Unless a section says otherwise, the owning User may read their own documents under `users/{uid}`, and nothing under `users/{uid}` is readable by anyone else.
 
 ## Taxonomy: categories and subcategories
 
 ```
-// Global taxonomy (admin-defined)
-categories/{categoryId}                               → { name, order, subcategoryCount, color?, iconSvg? }
-subcategories/{categoryId-subSlug}                    → { name, categoryId, order, cardCount }
-subcategories/{categoryId-subSlug}/shards/{n}         → { flashcards: { "<cardId>": { id, question,
-                                                           answer, tags[], difficulty, createdAt,
-                                                           questionCode?, answerCode?,
-                                                           extendedContext?,
-                                                           questionSpoken?, answerSpoken? }, ... } }
+categories/{categoryId}                         → { name, order, subcategoryCount,
+                                                    featuredSubcategoryNames[], color?, iconSvg? }
+subcategories/{categoryId-subSlug}              → { name, nameLower, categoryId, categoryName,
+                                                    order, cardCount }
+subcategories/{categoryId-subSlug}/shards/{n}   → { flashcards: { "<cardId>": {
+                                                      id, question, answer, tags[], difficulty, createdAt,
+                                                      questionCode[]?, answerCode[]?,
+                                                      questionSpoken?, answerSpoken?,
+                                                      extendedContext? }, ... } }
 ```
 
-- **Strict 2-level taxonomy**: Categories and Subcategories are separate top-level collections. Subcategory IDs are namespaced `{categoryId}-{subSlug}` (e.g. `android-testing`) to guarantee uniqueness across parent categories. See [ADR-0001](../adr/0001-flat-two-level-taxonomy.md) and [ADR-0007](../adr/0007-firestore-collection-structure.md).
-- **Cards live as a subcollection of their Subcategory** (`subcategories/{subcategoryId}/shards/`), packed into a small number of byte-budgeted shard docs (`{ flashcards: {cardId: {...}, ...} }`, a map keyed by card id — not an array, so a future admin curation-fix tool can dot-path-patch one card without touching any other) rather than one Firestore document per card. Fetching all Flashcards for a Subcategory is a single `getDocuments()` over `shards` — no WHERE clause, no index — followed by flattening each shard's `flashcards` map values client-side. No separate `cards/` collection. See [ADR-0007](../adr/0007-firestore-collection-structure.md) for the subcollection placement and [ADR-0037](../adr/0037-flashcard-content-sharded-by-byte-budget.md) for the shard-doc granularity.
-- **`subcategoryId` is not stored on Flashcard documents** — it is encoded in the collection path. Each card's own `id` field, however, *is* stored inside its shard's `flashcards["<cardId>"]` entry (a shard doc's id is just its shard index, so it can no longer stand in for the card's id).
-- **`difficulty` is a mandatory integer (1–10)** on every Flashcard document, global and Private alike. Global documents missing this field are filtered at the DTO layer and never reach the domain (a backfill concern for the pre-existing corpus); Private Flashcards have no such gap — the creation dialog's mandatory Slider means none can be saved without one. See [ADR-0010](../adr/0010-difficulty-field-design.md).
-- **`extendedContext` is nullable** on global Flashcard documents. Omitted on simple cards (difficulty 1–3) where the Q&A is fully self-explanatory. Present and progressively richer as difficulty rises: mid cards (4–6) carry a concrete example or short snippet; hard/expert cards (7–10) carry fuller context — edge cases, cross-concept relationships, pitfalls. Never duplicates the `answer` field.
-- **Tags are flat untyped strings** in `tags[]` on each Flashcard. No `tags/` collection. See [ADR-0006](../adr/0006-flat-denormalized-tags.md).
-- **Category `iconSvg`**: inline plain SVG text (not a URL), rendered on-device via `androidsvg`. No Firebase Storage SDK dependency. Nullable alongside `color`, since the seed pipeline may auto-create a category before either is curated. See [category-icon-color.md](category-icon-color.md).
+- **Two levels, two top-level collections.** Subcategory ids are namespaced `{categoryId}-{subSlug}` (for example `android-testing`), so they are unique across Categories. See [ADR-0001](../adr/0001-flat-two-level-taxonomy.md) and [ADR-0007](../adr/0007-firestore-collection-structure.md).
+- **Written only by the seed pipeline** (Admin SDK). Any signed-in user, a Guest included, may read all three.
+- `order` ranks Categories by card volume and Subcategories by card volume within their Category. `featuredSubcategoryNames` holds the display names of the Category's top-ranked Subcategories, recomputed on every seed run; it backs the topic summary line on the Browse screen ([category-search.md](category-search.md)). `nameLower` backs the Subcategory name prefix search and is never shown.
+- **`color` and `iconSvg` may be absent**, since the seed pipeline can create a Category before either is curated. `iconSvg` is inline SVG text, not a URL. See [category-icon-color.md](category-icon-color.md).
+- **Flashcards are packed into shard documents** under their Subcategory instead of one document per card, each shard filled up to a byte budget ([ADR-0037](../adr/0037-flashcard-content-sharded-by-byte-budget.md)). Reading a Subcategory's Flashcards is one unfiltered read of its `shards` collection. There is no separate `cards` collection.
+- **`flashcards` is a map keyed by card id, not an array**, so one card's field can be patched in place without rewriting the rest of its shard ([ADR-0037](../adr/0037-flashcard-content-sharded-by-byte-budget.md)). Each entry also stores its own `id`, which must match its key. A Flashcard's Subcategory is not stored on the card; it is the shard's parent document.
+- `difficulty` is the Flashcard's **Difficulty**; a global card without it is dropped on read and never reaches the domain. `extendedContext` is the card's **Extended Context**. Both are defined in `CONTEXT.md`; see also [ADR-0010](../adr/0010-difficulty-field-design.md).
+- **Tags are flat, untyped strings** on each card. There is no `tags` collection ([ADR-0006](../adr/0006-flat-denormalized-tags.md)).
+- `questionCode` and `answerCode` are lists of code blocks, each `{ language, code }`. `questionSpoken` and `answerSpoken` are the text read aloud in place of `question` and `answer` when present. `createdAt` is an ISO-8601 string.
 
 ## Onboarding's curated Subcategory picker
 
 ```
-// Single document, publicly readable (firestore.rules: allow read: if true) — onboarding's
-// Favorites step runs before Login, so this must be readable with no signed-in user at all,
-// anonymous or otherwise. One document, one read: every curated entry lives in the `subcategories`
-// map field, keyed by subcategory id.
-onboarding/subcategories                                    → { subcategories: {
-                                                                "{categoryId-subSlug}": {
-                                                                  order, categoryId, categoryName,
-                                                                  subcategoryId, subcategoryName,
-                                                                  iconSvg
-                                                                }, ...
-                                                              } }
+onboarding/subcategories                        → { subcategories: { "<subcategoryId>": {
+                                                      order, categoryId, categoryName,
+                                                      subcategoryId, subcategoryName, iconSvg
+                                                    }, ... } }
 ```
 
-- **Denormalized and trimmed, not the `subcategories` document shape verbatim**: each entry drops
-  `nameLower`/`cardCount` (onboarding never needs them) and adds `iconSvg`, joined in at seed time
-  from the subcategory's parent Category doc — onboarding never reads `categories` itself. Maps
-  onto its own domain type, `OnboardingSubcategory`, not `Subcategory`.
-- **One document, not a collection**: every curated subcategory lives in the single
-  `onboarding/subcategories` doc's `subcategories` map, so the whole Favorites step's content costs
-  exactly one Firestore read. `scripts/seed/curated_onboarding_topics.py` holds the admin-picked
-  allowlist of subcategory ids; `build_fixture.py` cross-references it, joins in each entry's
-  parent-category `iconSvg`, and `seed_firestore.py` overwrites the doc in full every run (no
-  sticky/merge fields, unlike `categories.iconSvg`/`color`).
-- **A separate document, not a wider rule on `subcategories`**: the full taxonomy stays
-  `request.auth != null`-gated; only this small curated subset is public, so widening onboarding's
-  read boundary never widens the real taxonomy's.
-- No cache-generation/freshness tracking — a plain one-shot fetch, deliberately: the `meta/seed`
-  signal `subcategories` reads check against is itself auth-gated, and this payload is small and
-  changes rarely.
+- **One document holding an admin-picked subset of Subcategories**, so onboarding's Favorites step costs exactly one read. Each entry is trimmed to what onboarding shows, and carries its parent Category's `iconSvg`, so onboarding never reads `categories`.
+- **Readable by anyone, signed in or not**, because onboarding runs before Login ([onboarding-flow.md](onboarding-flow.md)). It is a separate document rather than a looser rule on `subcategories`, so the real taxonomy stays readable only by signed-in users.
+- Written only by the seed pipeline, which replaces it whole on every run. It takes no part in the cache freshness signal below: it is small, changes rarely, and the signal itself needs a signed-in reader.
 
 ## Cache freshness signal
 
 ```
-// Cache freshness signal (ADR-0039)
-meta/seed                                             → { value: Int }  // monotonic, bumped by seed_firestore.py
+meta/seed                                       → { value }
 ```
 
-## User identity and entitlement
+- `value` is an integer that every seed run increments as its last write. Clients compare it with the value their cached Flashcards were read under ([flashcard-cache.md](flashcard-cache.md), [ADR-0039](../adr/0039-seed-versioned-flashcard-cache-invalidation.md)). Readable by any signed-in user; written only by the seed pipeline.
+
+## Entitlement
 
 ```
-// Per-user — admin-managed identity data only; scoring state lives under progress/, not here
-users/{uid}                                           → {}  // no client-writable fields today
-users/{uid}/entitlement/premium                       → { isPremium }  // Admin SDK only, functions/src/lib/entitlement.ts
+users/{uid}/entitlement/premium                 → { isPremium }
 ```
 
-- **Scoring state is deliberately NOT on `users/{uid}`.** Entitlement is a separate document, `users/{uid}/entitlement/premium` (`functions/src/lib/entitlement.ts`), written only by the Admin SDK and read server-side by the premium Cloud Function; that subcollection is default-denied regardless of any rule on the parent `users/{uid}` document. The real reason scoring state lives under `progress/` instead is separation of concerns, not privilege escalation: `users/{uid}` is reserved for identity/admin-managed data, while `progress/user-stats` is the one document a session commit needs to touch and nothing else. `dailyGoalMinutes` is likewise absent — it is device-scoped local state that Settings already owns.
+- **No client access.** No security rule matches it, so every client read and write is denied. Only Cloud Functions read it: the premium voice grading call checks it, and an entitlement call reports it to the app ([voice-answering.md](voice-answering.md)). It is set with the Admin SDK.
+- The `users/{uid}` document itself has no fields and no client access. Every per-User document lives in a subcollection below it: identity and entitlement are kept apart from the scoring state in `progress`, which is the only state a session commit changes.
 
 ## Favorites
 
 ```
-users/{uid}/favorites/state                           → { categories: { "<categoryId>": Timestamp | null, ... },
-                                                          subcategories: { "<subcategoryId>": Timestamp | null, ... } }
+users/{uid}/favorites/state                     → { categories:    { "<categoryId>":    Timestamp | null, ... },
+                                                    subcategories: { "<subcategoryId>": Timestamp | null, ... } }
 ```
 
-- **`favorites/state` is a single document per user** holding both category and subcategory favorites as two independent id → `Timestamp` maps — favoriting or unfavoriting any number of items, and reading every favorite a user has, each costs exactly one write/read, regardless of how many ids are involved. `categories` and `subcategories` never cascade into each other: favoriting a category does not favorite its subcategories, and vice versa. The map value is the bare `FieldValue.serverTimestamp()` set when the id was added — no nested object — and unfavoriting overwrites the entry with `null` rather than deleting the key (`FieldValue.delete()`): the Firestore SDK's offline local view loses an earlier pending nested-key delete when a later write to the same document is composed, which made an offline unfavorite silently come back. A key is favorited only when its value is a `Timestamp`; a `null` entry is an unfavorited tombstone and readers ignore it. Tombstones are bounded by the number of Categories and Subcategories.
-- Single-document shape was chosen specifically so an offline multi-add (e.g. onboarding's favorite-topics step, which can favorite several subcategories at once) stays correct once connectivity returns: every mutation targets the same document, so Firestore's offline write queue coalesces and replays same-document writes in order, unlike N separate per-item documents which could partially fail or race independently.
-- **Client-writable directly** — favorites are non-sensitive by design, so unlike `sessions`/`progress` there is no Cloud Function gating; the security rule matches `curationRequests`' `request.auth.uid == uid` pattern. See `firestore.rules`.
-- A write's returned Task is wrapped with a timeout on the Android client rather than awaited unboundedly: Firestore's offline persistence applies a write to the local cache immediately but leaves the Task itself pending until the server acks, so an offline caller would otherwise hang forever (see [onboarding-flow.md](onboarding-flow.md)). A timeout treats the already-applied local write as success; a genuine failure (e.g. permission-denied) still surfaces normally since it throws before the timeout elapses.
+- **One document per User** holds both kinds of **Favorite**, as two independent maps from id to the server time it was favorited. Reading every Favorite, or changing any number of them, costs one read or one write. The two maps never cascade into each other.
+- **Unfavoriting writes `null` instead of deleting the key.** The Firestore SDK's offline view loses a pending nested-key delete once a later write to the same document is queued, which made an offline unfavorite come back. An id is a Favorite only when its value is a timestamp; a `null` entry is ignored. The number of `null` entries is bounded by the number of Categories and Subcategories.
+- One document keeps offline multi-adds correct: every change targets the same document, so the SDK replays them in order, where separate per-item documents could fail or race independently. Onboarding's Favorites step relies on this.
+- **Written directly by the client.** Favorites are not sensitive, so no Cloud Function sits in front of them; the owner may read and write.
 
 ## Study sessions
 
 ```
-// Written server-side by the submitStudySession Cloud Function, queued durably client-side
-// (SubmitStudySessionUseCase → DefaultSessionSubmissionRepository → SessionSubmissionDeliveryWorker
-// → SessionSubmissionRemoteDataSource). Shape follows studyMode: RATED carries the four counters and full
-// cardResults entries below; FAST has none of the RATED-only fields at all — not zeroed, genuinely absent.
-users/{uid}/sessions/{sessionId}                      → { sessionId, startTimestamp, durationSeconds,
-                                                          studyMode: "Rated"|"Fast", isAbandoned,
-                                                          sourceType: "SingleSubcategory"|"Quick"|"Custom",
-                                                          voiceAnswering,  // RATED only
-                                                          readAloud,       // FAST only
-                                                          categoryId, categoryName,
-                                                          subcategoryIds[], subcategoryNames[],
-                                                          cardCount, newCardsStudied,
-                                                          // RATED only:
-                                                          cardsMastered, cardsPartial,
-                                                          cardsDefended, cardsDemastered,
-                                                          // scoring, both modes:
-                                                          newCards … streakBonus, xpTotal,
-                                                          levelAfter, xpIntoCurrentLevelAfter,
-                                                          xpForNextLevelAfter, levelsCrossed[],
-                                                          levelBefore, xpIntoCurrentLevelBefore,
-                                                          xpForNextLevelBefore, currentStreakAfter,
-                                                          xpRates: { newCardStudied, cardMastered,
-                                                            cardPartial, masteryDefended, cardDemastered,
-                                                            minuteStudied, sessionCompleted } }
-    ... plus embedded  cardResults: { <cardId>: { subcategoryId, state,
-                                                          // RATED entries only:
-                                                          attemptsUsed, wasPreviouslyMastered
-                                                          } }  // no transcript, ever
+users/{uid}/sessions/{sessionId}                → {
+    sessionId, startTimestamp, durationSeconds, studyDate,
+    studyMode: "Rated" | "Fast", isAbandoned,
+    sourceType: "SingleSubcategory" | "Quick" | "Custom",
+    voiceAnswering?,        // Rated only
+    readAloud?,             // Fast only
+    categoryId, categoryName, subcategoryIds[], subcategoryNames[],
+    cardCount, newCardsStudied,
+    cardsMastered?, cardsPartial?, cardsDefended?, cardsDemastered?,   // Rated only
+    cardResults: { "<cardId>": {
+        subcategoryId, state,
+        attemptsUsed?, wasPreviouslyMastered?                           // Rated only
+    }, ... },
+    newCards, mastered, partial, masteryDefenseBonus, demastered,
+    timeStudied, sessionCompletionBonus, dailyGoalBonus, streakBonus, xpTotal,
+    levelBefore, xpIntoCurrentLevelBefore, xpForNextLevelBefore,
+    levelAfter, xpIntoCurrentLevelAfter, xpForNextLevelAfter, levelsCrossed[],
+    currentStreakAfter,
+    xpRates: { newCardStudied, cardMastered, cardPartial, masteryDefended,
+               cardDemastered, minuteStudied, sessionCompleted }
+}
 ```
 
-- **`sessions` is the single session collection** for both Study Modes, and **one session is one document**: aggregates, denormalized names (`categoryName`, `subcategoryNames[]`, `cardCount`) and the per-card results embedded as a `cardResults` map. `cardResults` is embedded rather than split into a subcollection because no reader needs a session without its cards, so a subcollection would only add a write per card. Home does not query this collection: it reads [`recents/state`](#recents). The document is sealed by `studyMode`: Rated-only counters (`cardsMastered`, `cardsPartial`, `cardsDefended`, `cardsDemastered`) and Rated-only `cardResults` fields (`attemptsUsed`, `wasPreviouslyMastered`) are **absent** on a Fast document, not written as 0 — Fast has no Ratings, Attempts or mastery to report. Written by the `submitStudySession` Cloud Function; see [ADR-0049](../adr/0049-server-authoritative-session-commit.md). `sourceType` is the Study Creation entry point that started the session, not its Subcategory count. Delivery is sealed the same way: `voiceAnswering` exists only on a Rated document and `readAloud` only on a Fast one. The scoring fields let a retried submission answer from this document alone: `xpRates` records the per-line rates the session was scored with, `levelBefore`/`xpIntoCurrentLevelBefore`/`xpForNextLevelBefore` record the account's Level position right before the session (the prior `user-stats` and its Level's threshold), and `currentStreakAfter` the account's Streak right after it. The function's response returns `breakdown`, `level`, `xpIntoCurrentLevel`, `xpForNextLevel`, `levelsCrossed`, `levelBefore`, `xpIntoCurrentLevelBefore`, `xpForNextLevelBefore`, `currentStreak`, `durationSeconds`, `counts` and `rates`, all read from this document, and derives each XP line's count from the stored counters (newly Mastered = `cardsMastered − cardsDefended`).
+- **One document per Study Session, for both Study Modes**: the session's aggregates, its denormalized Category and Subcategory names, and its **Flashcard Results** embedded as `cardResults`. The results are embedded because no reader needs a session without them, so a subcollection would only add a write per card. Home does not read this collection; it reads [`recents/state`](#recents).
+- **The shape follows `studyMode`.** Rated-only fields are absent from a Fast document, not written as `0` or `false`: the four Terminal State counters, and `attemptsUsed` and `wasPreviouslyMastered` on each result. Delivery follows the same rule: `voiceAnswering` exists only on a Rated document and `readAloud` only on a Fast one.
+- `cardsMastered` counts every result ending Mastered, defended Flashcards included; `cardsDefended` counts the ones among them that were already Mastered, and `cardsDemastered` the already-Mastered ones ending Failed.
+- `sourceType` is the Study Creation entry point that started the session, not its Subcategory count. A result's `state` is that session's own outcome, not the card's stored **Card Progress**.
+- `studyDate` is the session's local calendar day (`yyyy-MM-dd`), derived by the server from the session's start time and the device's UTC offset, which the client submits with it ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). The server sums the day's sessions by an exact match on it.
+- **Written only by the `submitStudySession` Cloud Function**, in one transaction with every progress, scoring and Recents write the session causes ([ADR-0049](../adr/0049-server-authoritative-session-commit.md)). The owner may read; no client write of any kind is allowed.
+- **The scoring fields let a retried submission answer from this document alone.** The XP lines (`newCards` through `xpTotal`) are the session's XP breakdown. `xpRates` holds the per-line rates it was scored with, so a later change to the XP configuration does not change the answer. The `…Before` fields hold the User's Level position just before the session, the `…After` fields and `levelsCrossed` the position just after, and `currentStreakAfter` the Streak just after. A retry of a session that already has a document reads everything from it and writes nothing.
 
 ## Recents
 
 ```
-// Written only by the submitStudySession Cloud Function, inside the session's own transaction.
-users/{uid}/recents/state                             → { entries: { "<sessionId>": {
-                                                            sessionId: string,
-                                                            startTimestamp: Timestamp,
-                                                            durationSeconds: number,
-                                                            studyMode: "Rated"|"Fast",
-                                                            voiceAnswering: boolean,  // RATED only
-                                                            readAloud: boolean,       // FAST only
-                                                            sourceType: "SingleSubcategory"|"Quick"|"Custom",
-                                                            categoryId: string,
-                                                            categoryName: string,
-                                                            subcategoryIds: string[],
-                                                            subcategoryNames: string[],  // parallel to subcategoryIds
-                                                            cardCount: number,
-                                                            xpTotal: number  // signed
-                                                          }, ... } }
+users/{uid}/recents/state                       → { entries: { "<sessionId>": {
+                                                      sessionId, startTimestamp, durationSeconds,
+                                                      studyMode, voiceAnswering?, readAloud?, sourceType,
+                                                      categoryId, categoryName,
+                                                      subcategoryIds[], subcategoryNames[],
+                                                      cardCount, xpTotal
+                                                    }, ... } }
 ```
 
-- **One document per User holding their latest 15 sessions**, so Home's Recently studied list costs one read on attach and one per change instead of a query over `sessions`. See [ADR-0057](../adr/0057-recents-state-projection.md).
-- Each entry repeats its session document's field names and values, **names included**: names never change, so a row shows and replays without any taxonomy read. The client looks up the Category only for its color and icon, and an entry missing its names, or whose `subcategoryIds` and `subcategoryNames` differ in length, is skipped.
-- Keyed by `sessionId`, so a retried submission is idempotent: an id already present leaves the document untouched. A new entry is added, then the map is trimmed to the 15 newest by `startTimestamp`, ties evicting the lower `sessionId` first. A late-delivered old session therefore never pushes out a newer one; one older than every kept entry is not written at all.
-- **Client-read-only**: the owner may read it; only the function (Admin SDK) writes it. See `firestore.rules`.
+- **One document per User holding their latest 15 sessions**, so Home's Recently studied list costs one read on attach and one per change, instead of a query over `sessions` ([ADR-0057](../adr/0057-recents-state-projection.md)).
+- **Each entry repeats its session document's fields and values, names included.** Names never change, so a **Recent** shows and replays without reading the taxonomy. `subcategoryNames` is parallel to `subcategoryIds`; `xpTotal` may be negative.
+- **Keyed by `sessionId`, so a retried submission changes nothing**: a session already present leaves the document untouched. A new entry is added, then the map is trimmed to the 15 newest by `startTimestamp`, with equal timestamps evicting the lower `sessionId` first. A late-delivered session therefore never pushes out a newer one, and one older than every kept entry is not written at all.
+- **Written only by `submitStudySession`**, inside the session's own transaction. The owner may read.
 
-## Per-subcategory progress detail
+## Card Progress
 
 ```
-// progress/details is a fixed anchor doc with no fields of its own, hosting the real
-// subcategories subcollection — Firestore can't nest a collection directly inside a collection.
 users/{uid}/progress/details/subcategories/{subcategoryId} → { categoryId,
-                                                          cards: { <cardId>: {
-                                                            state: Seen|Failed|Partial|Mastered,
-                                                            firstStudiedAt, masteredAt? } } }
+                                                    cards: { "<cardId>": {
+                                                      state: "Seen" | "Failed" | "Partial" | "Mastered",
+                                                      firstStudiedAt, masteredAt?
+                                                    }, ... } }
 ```
 
-- **`progress/details/subcategories/{subcategoryId}` is one packed document per Subcategory per User**, holding a `cards` map keyed by card id, and carries both progress sets: a key exists iff the Flashcard is **Studied**, and its `state == Mastered` iff it is in **Persistent Mastery**. De-mastery moves `state` down rather than removing the key, so coverage never regresses. Written by **both** Study Modes — Rated writes the Terminal State, Fast writes `Seen` only where no entry exists. **Private Flashcards never receive one.** Packing makes a session's progress cost one write per Subcategory instead of one per card, and makes any screen's progress read a single document. `details` is a fixed anchor document with no fields of its own, hosting the real `subcategories` subcollection — Firestore can't nest a collection directly inside a collection, so the packed documents sit one hop below the `progress` collection's own singletons. See [ADR-0016](../adr/0016-card-progress-model.md).
-- **Partial is a Terminal State**, written to Firestore as a card's progress `state` and counted on the session record — not an in-session mechanic only.
+- **One packed document per User per Subcategory**, holding the User's **Card Progress** for every Flashcard in it they have studied ([ADR-0016](../adr/0016-card-progress-model.md)). A key exists exactly when the Flashcard is **Studied**; its `state` is `Mastered` exactly when it is in **Persistent Mastery**. Packing makes a session's progress cost one write per Subcategory and any screen's progress one read. Private Flashcards never get an entry.
+- `firstStudiedAt` and `masteredAt` are server timestamps. How a session's results merge into these entries is defined under **Card Progress** in `CONTEXT.md` and in [ADR-0016](../adr/0016-card-progress-model.md).
+- `progress/details` is a fixed document with no fields of its own. It exists only to host this subcollection, because Firestore paths alternate collection and document.
+- **Written only by `submitStudySession`**, merged into the existing document. The owner may read.
 
-## Per-user progress summary (ring rollup)
-
-```
-users/{uid}/progress/summary                          → { subcategories: { <subcategoryId>: {
-                                                            masteredCount, studiedCount } } }
-```
-
-- **`progress/summary` is a single document per User** holding every Subcategory's `masteredCount` and `studiedCount`, so Category Details draws every ring on the screen from **one read**. The denominator is `Subcategory.cardCount` from the taxonomy, already loaded by the screens that draw rings, so it is duplicated nowhere. The denominator excludes Private Flashcards, so the card count printed beside a ring must exclude them too.
-
-## XP, level and streak stats
+## Progress summary
 
 ```
-users/{uid}/progress/user-stats                       → { xp, level, xpIntoCurrentLevel,
-                                                          currentStreak, bestStreak,
-                                                          lastStudyDate, goalMetDate,
-                                                          studiedSecondsOnLastStudyDate,
-                                                          appliedSessionIds: string[] }  // latest 20, oldest first
+users/{uid}/progress/summary                    → { subcategories: { "<subcategoryId>": {
+                                                      masteredCount, studiedCount
+                                                    }, ... } }
 ```
 
-- **`progress` holds the User's singleton documents** — the progress summary (`summary`) and the scoring state (`user-stats`) — alongside the fixed `details` anchor document that hosts the packed per-Subcategory documents one hop deeper. Firestore paths alternate collection and document, so each per-User singleton needs a fixed document id inside a collection; one security rule covers them all.
-- **`user-stats` is the scoring state**, written only by the `submitStudySession` Cloud Function. `lastStudyDate` and `goalMetDate` only move forward ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). `studiedSecondsOnLastStudyDate` is the seconds of every recorded session on `lastStudyDate`: a submission sets it to that day's total when its `studyDate` is not earlier than `lastStudyDate`, and leaves it unchanged otherwise. A missing field reads as `0`. The client reads it as the day's baseline when it previews the Daily Goal for a Pending Session ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
-- **`appliedSessionIds`** lists the latest 20 sessions applied to `user-stats`, oldest first. Only the function writes it, appending the session's id in the commit transaction in the same write as the scoring fields; a retry leaves it untouched. A missing field reads as empty. It is not part of the scoring state: the device's projection reads it to skip the Pending Sessions this document already includes ([ADR-0061](../adr/0061-delivered-sessions-applied-once-in-the-projection.md)).
+- **One document per User holding every Subcategory's mastered and studied counts**, so a screen draws every progress ring for a Category from one read. The denominator is the Subcategory's `cardCount` from the taxonomy, which excludes Private Flashcards, so any card count shown beside a ring must exclude them too.
+- **Written only by `submitStudySession`**, as increments in the session's transaction. The owner may read.
+
+## Scoring state
+
+```
+users/{uid}/progress/user-stats                 → { xp, level, xpIntoCurrentLevel,
+                                                    currentStreak, bestStreak,
+                                                    lastStudyDate, goalMetDate,
+                                                    studiedSecondsOnLastStudyDate,
+                                                    appliedSessionIds[] }
+```
+
+- **The User's XP, Level, Streak and Daily Goal state.** `progress` holds the User's singleton documents, `summary` and `user-stats`, next to the `details` anchor, so one security rule covers them all.
+- **Written only by `submitStudySession`**, overwritten whole in the session's transaction. The owner may read. The update rules for each field are in [session-submission.md](session-submission.md).
+- `lastStudyDate` and `goalMetDate` are local calendar days (`yyyy-MM-dd`) and only ever move forward ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)).
+- `studiedSecondsOnLastStudyDate` is the total duration of every recorded session on `lastStudyDate`. A submission sets it to that day's total when its `studyDate` is not earlier than `lastStudyDate`, and leaves it unchanged otherwise. A missing field reads as `0`. The client uses it as the day's starting point when it previews the Daily Goal for a **Pending Session** ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
+- `appliedSessionIds` lists the ids of the latest sessions applied to this document, oldest first and capped in length. Each new session's id is appended in the same write as the scoring fields. It is not scoring state: the device reads it to skip the Pending Sessions this document already includes ([ADR-0061](../adr/0061-delivered-sessions-applied-once-in-the-projection.md)). A missing field reads as empty.
 
 ## XP configuration
 
 ```
-config/xp                                             → { newCardStudied, cardMastered, cardPartial,
-                                                          masteryDefended, cardDemastered,
-                                                          sessionCompleted, dailyGoalMet,
-                                                          streakPerDay, streakMaxPerDay,
-                                                          minuteStudied,
-                                                          levelCurveBase, levelCurveExponent }
+config/xp                                       → { newCardStudied, cardMastered, cardPartial,
+                                                    masteryDefended, cardDemastered,
+                                                    sessionCompleted, dailyGoalMet,
+                                                    streakPerDay, streakMaxPerDay,
+                                                    minuteStudied,
+                                                    levelCurveBase, levelCurveExponent }
 ```
 
-- **`config/xp` is the one server-owned XP configuration**, every `XpConfig` field in one document ([ADR-0047](../adr/0047-xp-values-behind-a-config-repository.md)). `submitStudySession` scores each session with its current copy. Readable by any signed-in user, a Guest included; written only by the Admin SDK (`scripts/seed/seed_xp_config.py` or a console edit), never by a client. The client refreshes its copy on every sign-in and keeps it on the device for offline scoring, falling back to the bundled defaults only until a first fetch succeeds.
+- **The one server-owned XP configuration**: every XP amount and the level curve's parameters ([ADR-0047](../adr/0047-xp-values-behind-a-config-repository.md)). `submitStudySession` scores each session with its current copy, falling back to the bundled defaults if the document is missing or invalid. How the client keeps its own copy is in [xp-leveling-system.md](xp-leveling-system.md).
+- Readable by any signed-in user, a Guest included. Written only with the Admin SDK, by a seed script or a console edit.
 
-## Private flashcards
-
-```
-users/{uid}/privateCards/{subcategoryId}/flashcards/{cardId} → { question, answer, tags[], difficulty, status, createdAt }
-```
-
-- **Private Flashcards are unaffected by sharding** — `users/{uid}/privateCards/{subcategoryId}/flashcards/{cardId}` stays one document per card, since they're appended one at a time via the creation FAB rather than seeded in batch.
-- Private Flashcard `status`: `"private" | "submitted" | "approved"` — promotion pipeline to global pool.
-
-## Curation requests (report a problem)
+## Curation requests
 
 ```
-// Report a problem (in-session flag icon)
-users/{uid}/curationRequests/{cardId}                       → { subcategoryId: String,
-                                                               actions: {
-                                                                 "<CurationAction>": { flaggedAt: Timestamp }
-                                                               } }
-// CurationAction values: DifficultyTooEasy | DifficultyTooHard | WrongTags |
-//                        NeedsCodeExample | BacktickRedo | FullRedo | Delete
+users/{uid}/curationRequests/{cardId}           → { subcategoryId,
+                                                    actions: { "<CurationAction>": { flaggedAt }, ... } }
 ```
 
-- **`curationRequests/{cardId}` is a flat collection** keyed by globally-unique cardId. Stores structured content-fix directives raised by any user via the in-session "Report a problem" dialog, consumed by admin sync scripts — not surfaced back to users anywhere in the app. Actions are a map of `CurationAction` string → `{ flaggedAt }`. Doc is deleted when all actions are removed. See [ADR-0017](../adr/0017-curation-report-system.md).
+- **One document per User per reported Flashcard**, keyed by the card's globally unique id, holding that User's **Curation Request** for it ([ADR-0017](../adr/0017-curation-report-system.md)). `actions` maps each **Curation Action** name (as listed in `CONTEXT.md`) to the server time it was flagged.
+- **Written directly by the client** and readable by the owner. Each submission merges its actions into the document and never removes one, except that flagging one of the two difficulty actions deletes the other, so the pair stays mutually exclusive in storage. Admin sync scripts consume these documents; the app never shows them back to the User. See [curation-requests.md](curation-requests.md).
 
 ## Bug Reports
 
 ```
-bugReports/{reportId}                                 → { uid, description, severity,
-                                                          appVersionName, appVersionCode,
-                                                          deviceModel, androidVersion,
-                                                          createdAt, status }
-// severity: blocker | minor | cosmetic
-// status:   new | triaged | fixed
+bugReports/{reportId}                           → { uid, description, severity,
+                                                    appVersionName, appVersionCode,
+                                                    deviceModel, androidVersion,
+                                                    createdAt, status }
 ```
 
-- **`bugReports` is top-level**, with an auto id and the reporter's `uid` as a field, so every report can be browsed and queried in one place. `androidVersion` is the SDK int.
-- **Written only by the `submitBugReport` Cloud Function**, which validates the report, allows at most 10 per uid in a rolling 24 hours, and sets `uid`, `createdAt` (server timestamp) and `status: "new"` itself ([ADR-0058](../adr/0058-bug-reports-written-only-by-a-callable.md)). The rate limit counts on a composite index over `uid` and `createdAt`.
-- **No client access at all**: security rules deny every read and write, the reporter's own included. The developer, or an investigation agent, moves `status` to `triaged` or `fixed` with the Admin SDK.
+- **Top-level, with an auto id and the reporter's `uid` as a field**, so every report can be browsed and queried in one place. `severity` is `blocker`, `minor` or `cosmetic`. `androidVersion` is the Android SDK level.
+- **Written only by the `submitBugReport` Cloud Function**, which validates the report, rate-limits it per `uid`, and sets `uid`, `createdAt` (server time) and `status` itself ([ADR-0058](../adr/0058-bug-reports-written-only-by-a-callable.md)). The rate limit is counted over a composite index on `uid` and `createdAt`.
+- `status` starts as `new`. The developer, or an investigation agent, moves it to `triaged` or `fixed` with the Admin SDK.
+- **No client access at all**: security rules deny every read and write, the reporter's own included.
+
+## Account deletion
+
+Account Deletion removes every document under `users/{uid}` and every Bug Report whose `uid` matches ([ADR-0059](../adr/0059-account-deletion-runs-server-side.md)).
 
 ## Offline persistence
 
-- Offline: Firestore Android SDK built-in persistence. No Room needed.
-- Pending Sessions live outside Firestore, in a local file queue that the delivery worker drains through `submitStudySession`. The Card Progress, progress summary and scoring state repositories replay them on top of the cached documents above, so every screen counts a session as soon as it is queued ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
+- The Android client relies on the Firestore SDK's built-in offline persistence for every document above. There is no separate local database.
+- **Pending Sessions live outside Firestore**, in a local queue on the device that is delivered through `submitStudySession`. The Card Progress, progress summary and scoring state reads replay them on top of the cached documents, so every screen counts a session as soon as it is queued ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
+
+## Related
+
+- [CONTEXT.md](../../CONTEXT.md): definitions of every domain term used above.
+- [session-submission.md](session-submission.md): how a session is delivered and recorded, and the Streak and Daily Goal rules.
+- [flashcard-cache.md](flashcard-cache.md): cache-first Flashcard reads.
+- [planned/private-flashcards.md](planned/private-flashcards.md): planned storage for Private Flashcards.

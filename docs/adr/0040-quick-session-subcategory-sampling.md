@@ -114,22 +114,17 @@ clutter/read-count problem.
   that only touches `subcategoryIds`/`subcategoryNames` when `route.isQuickSession`; every other
   session type's resolution is byte-for-byte what it is today.
 - `CONTEXT.md`'s Study Session and Study Creation entries now state the Composite/Custom relationship
-  explicitly, rather than leaving it to be inferred from two similar-sounding words. `SYSTEMDESIGN.md`,
-  `docs/adr/0007`, `docs/adr/0030`, `docs/design/study-session-preview-sheet.md`, and
+  explicitly, rather than leaving it to be inferred from two similar-sounding words. `docs/adr/0007`, `docs/adr/0030`, `docs/design/preview-study-session.md`, and
   `docs/user-flow/study.md` were swept for the same distinction; anywhere "composite" was structural
   (composite Recent, "a composite session") was left alone.
 - The Preview screen's Filters dialog drops its Tag section outright for any multi-Subcategory
   session (not an empty-chips fallback), and the filter call passes `tagIds = emptySet()` explicitly
   for multi-Subcategory rather than relying on it staying empty by omission — a separate, smaller
-  decision bundled into the same implementation pass, recorded in
-  `docs/temp/quick-session-subcategory-sampling-spec.md`. That file is intentionally absent from the
-  repository — `docs/temp/` is gitignored planning scratch, not a durable reference — so this ADR is
-  the durable record of the decision; the spec file itself is a working artifact, not a citation a
-  reader can expect to fetch.
+  decision bundled into the same implementation pass.
 - A 0-card resolution (Difficulty filter narrowed too far, on any session) gets an explicit empty
   state instead of a silently disabled Start button — `FlashcardsEmptyState` gains an `OnGradient`
-  style for this, detailed in the same (gitignored) spec file rather than here, since it's a
-  UI-composition decision with no real alternative that was seriously considered.
+  style for this. It is a UI-composition decision with no real alternative that was seriously
+  considered.
 - Until Custom's own entry point is built (Category Details multi-select, tracked separately), this
   ADR's `subcategoryCountRange` exclusion for Custom is unverified by any actual code path — it is a
   constraint on that future work, not yet an enforced one.

@@ -64,14 +64,15 @@ The create-if-absent rule is what makes this safe: a Fast session can never over
 Rated session made, so re-listening to a mastered card cannot downgrade it.
 
 Fast gains nothing else. No Ratings, no Attempts, no Terminal States, no Persistent Mastery, no
-Mastery Defense, no shield icon.
+shield icon.
 
-### Mastery Defense stays Rated-only
+### Mastery Defense: the floor is mode-agnostic, the stakes are Rated-only
 
 **Mastery Defense** — guaranteeing a floor of previously mastered cards in a session so mastery is
-re-tested rather than assumed, with a bonus for holding it and a penalty for losing it — applies to
-Rated sessions exclusively. Fast has no
-Rating step, so there is no outcome to defend with.
+re-tested rather than assumed — draws the same way in both Study Modes, so a Fast session also
+repeats mastered cards. The bonus for holding mastery, the penalty for losing it and the shield icon
+apply to Rated sessions exclusively. Fast has no Rating step, so there is no outcome to defend with,
+and a mastered card it re-presents keeps its Card Progress unchanged.
 
 De-mastery fires on Terminal **Failed** only. A defended card ending Terminal Partial keeps its
 mastery and earns neither the bonus nor the penalty.
@@ -108,10 +109,10 @@ displays read the same document.
 | Screen | Reads |
 |---|---|
 | Category Details (a ring per Subcategory), Home progress | `progress/summary` — **one document** |
-| Subcategory Details (per-card filtering), Preview (defense selection), Study Session (new-card and defense accounting) | the packed `progress/details/subcategories/{subcategoryId}` document for each Subcategory in scope |
+| Study Session (new-card and defense accounting); planned: Subcategory Details (per-card filtering), Preview (defense selection) | the packed `progress/details/subcategories/{subcategoryId}` document for each Subcategory in scope |
 
-Counter deltas are applied as nested-key `FieldValue.increment`s inside the single session-commit
-batch ([ADR-0014](0014-session-stats-written-at-summary-screen.md)), never separately.
+Counter deltas are applied inside the session's one commit, the `submitStudySession` transaction
+([ADR-0049](0049-server-authoritative-session-commit.md)), never separately.
 
 ### The ring denominator is already in the taxonomy
 
@@ -199,7 +200,7 @@ private card to, showing a permanent ceiling with no visible cause.
 - A session commit performs **one** progress write per Subcategory it touched, plus one summary
   write — regardless of how many cards were studied.
 - Fast sessions perform progress writes, which they previously did not. The write is one per
-  Subcategory and lands in the single commit batch rather than during the session.
+  Subcategory and lands in the session's one commit rather than during the session.
 - A Fast session's state must track which cards reached the answer — one boolean set it did not
   previously need.
 - A Rated session's per-card state must retain the **best Rating so far**; see ADR-0044.

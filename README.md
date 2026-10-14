@@ -17,8 +17,9 @@ Open in Android Studio. Requires `local.properties` with Firebase config.
 
 | File | Contents |
 |------|----------|
-| `SYSTEMDESIGN.md` | Product design, screens, flows, Firestore schema |
+| `docs/design/` | Feature design docs (start at `docs/design/INDEX.md`) |
 | `CONTEXT.md` | Domain vocabulary glossary |
 | `AGENTS.md` | Code architecture, style guide, patterns |
 | `TESTING.md` | Testing conventions |
-| `docs/` | Architecture decision records |
+| `docs/adr/` | Architecture decision records |
+| `docs/user-flow/` | Per-screen navigation flows |

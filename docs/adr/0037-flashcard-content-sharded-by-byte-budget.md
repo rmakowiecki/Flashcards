@@ -19,7 +19,7 @@ subcategories/{categoryId-subSlug}/shards/{n} → { flashcards: { "<cardId>": { 
 
 Card ids must never contain `.` or `/`, and must never start with `__` — Firestore treats `.` as a nesting separator in a dot-path field reference (`"flashcards.<id>.answer"`), `/` is invalid in a map key, and `__`-prefixed names collide with Firestore's own reserved field convention. `build_fixture.py` asserts every id against this before packing. The existing id format (timestamp + short hash, e.g. `2026-08-22T18-53-16-0e5bd8`) already satisfies it.
 
-Private Flashcards (`users/{uid}/privateCards/{subcategoryId}/flashcards/{cardId}`) are **explicitly excluded** — they stay one doc per card. They are appended one at a time by a single user via the creation FAB; packing them into shared shard docs would mean rewriting a whole shard on every single add, trading a real problem (broadcast-read cost) for a fake one (rare, tiny, per-user writes).
+Private Flashcards (`users/{uid}/privateCards/{subcategoryId}/flashcards/{cardId}`) are **explicitly excluded** — they stay one doc per card. They are appended one at a time by a single user via the Add action; packing them into shared shard docs would mean rewriting a whole shard on every single add, trading a real problem (broadcast-read cost) for a fake one (rare, tiny, per-user writes).
 
 Migration is big-bang: `build_fixture.py`/`seed_firestore.py` are rewritten to emit shards, `purge_firestore.py` removes every existing `flashcards` subcollection, then a full reseed writes shards fresh. This requires a coordinated app release — an old client reading the now-purged `flashcards` subcollection sees nothing — accepted because the app has no live userbase yet.
 

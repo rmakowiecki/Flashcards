@@ -47,8 +47,17 @@ selection over a well-defined empty state, and it stays.
 
 **2026-08-29 — the empty-filtered-results state is now specified concretely.** This ADR left it
 "designed but not yet implemented". `SubcategoryDetailsScreenState` now carries a sealed content
-field with four cases — `Loading`, `Error`, `Cards`, `NoMatches`. There is deliberately no
+field with four cases — `Loading`, `Error`, `FlashcardsList`, `NoMatches`. There is deliberately no
 fifth case for a Subcategory with no flashcards at all: `CONTEXT.md` records that a Subcategory
 always contains at least one Flashcard, which also makes the repository's cache-first read path
 sound (see ADR-0038). The "Clear filters" action clears tags and difficulty only and leaves sort
 untouched, matching this ADR's separation of the two axes.
+
+**2026-10-13 — what shipped differs from the Decision above in four places.**
+
+- **Top app bar.** It carries the bookmark and an "Add to home screen" action directly. They move into the overflow menu only when the bar runs out of room. There is no empty placeholder overflow.
+- **No Add(+) on the toolbar.** It is left out until Private Flashcards are built ([planned/private-flashcards.md](../design/planned/private-flashcards.md)), so the toolbar is Filter, Sort, then the Start session button.
+- **Sort is a dialog, not a menu.** It has the same three options plus a "keep as default" checkbox ([ADR-0038](0038-one-sort-order-and-flashcard-selection-seam.md)). Filter is a dialog too, and both apply only on Confirm.
+- **The filtered-count overline** reads "filtered to N of M", not "N OF M CARDS FILTERED".
+
+The current behavior is in [browse.md](../design/browse.md).

@@ -25,8 +25,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Never writes to Firestore per answer (ADR-0014): grades are handed back to the caller only.
- * Batch persistence at session end belongs to the not-yet-built Rating/Attempt/Terminal-State
- * pipeline (ADR-0016/ADR-0026).
+ * A grade becomes a Rating in the Rated session (ADR-0026), and only the session's Ratings reach
+ * the server, through the Session Result submitted from the Session Summary.
  */
 class DefaultVoiceAnswerGradingRepository internal constructor(
     private val voiceGradingRemoteDataSource: VoiceGradingRemoteDataSource,

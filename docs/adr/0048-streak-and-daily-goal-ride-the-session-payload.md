@@ -10,9 +10,12 @@ evaluates the day's cumulative minutes against whatever value arrives with each 
 day-locked snapshot and no server-side memory of "the goal that governed today" — editing the goal
 mid-day takes effect on the very next session *submitted* that day, not the next calendar day.
 
-The session's local calendar day (`studyDate`, `yyyy-MM-dd`) is likewise computed client-side, from the
-session's start instant and the device's own timezone, and rides the payload the same way — the server
-has no way to derive a device-local calendar day from a UTC instant on its own.
+The session's local calendar day (`studyDate`, `yyyy-MM-dd`) is derived server-side from the session's
+start instant and the device's UTC offset at that instant, which the client reads from its own timezone
+and sends on the payload as `studyDateUtcOffsetMinutes` — the server has no way to derive a device-local
+calendar day from a UTC instant on its own. The server never trusts a client-supplied date string: a
+forged offset can shift the day only as far as a real-world UTC offset does (±14 hours), never further
+([ADR-0049](0049-server-authoritative-session-commit.md)).
 
 Both `lastStudyDate` (streak) and `goalMetDate` (daily-goal gate) on `progress/user-stats` only ever move
 forward: a submission whose `studyDate` is not later than the stored value never advances the streak,
@@ -29,8 +32,9 @@ to gate the bonus on it, but the objection to a synced Firestore copy — routin
 edit through a second write path — holds regardless of where the calculation runs.
 
 The alternative considered at length was a day-locked design: the function stores the goal value in
-effect at the day's first session and holds it fixed against later same-day edits, mirroring the
-[XpConfig snapshot rule](0047-xp-values-behind-a-config-repository.md). This closes a real gap — under
+effect at the day's first session and holds it fixed against later same-day edits, much like the
+per-session XP configuration snapshot that [ADR-0047](0047-xp-values-behind-a-config-repository.md)
+also rejected. This closes a real gap — under
 live evaluation, a user who studies under a higher goal, falls short, then lowers the goal and submits a
 trivial top-up session gets the flat daily-goal bonus for minutes studied under a threshold they hadn't
 actually met at the time. Day-locking was rejected anyway: it still needs *some* server-side memory of
@@ -58,9 +62,9 @@ day's `dailyGoalMet` award.
 - The daily-goal bonus is not reproducible from `progress/user-stats` alone after the fact; it depends
   on whatever `dailyGoalMinutes` rode the triggering submission, not a value persisted independently of
   the session document's own stored breakdown.
-- `studyDate` becomes a new field on both the `submitStudySession` payload and the persisted
-  `sessions/{sessionId}` document — needed for streak/goal day comparison and for querying "today's
-  sessions" without server-side timezone math.
+- `studyDateUtcOffsetMinutes` becomes a new field on the `submitStudySession` payload, and the derived
+  `studyDate` a new field on the persisted `sessions/{sessionId}` document — needed for streak/goal day
+  comparison and for querying "today's sessions" by an exact day match.
 - Out-of-order submission delivery (multi-device, or a long-queued offline backlog crossing a streak
   boundary) can silently under-award streak/goal — the same class of accepted drift as `XpConfig`'s own
   redeploy-mid-queue gap (ADR-0047).

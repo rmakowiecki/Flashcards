@@ -4,7 +4,7 @@
 
 ## Decision
 
-The premium voice-grading backend (design doc: `docs/design/premium-voice-grading-pipeline.md`) runs on Firebase Cloud Functions (2nd gen, Node.js 20, TypeScript), deployed from `functions/` at the repo root — not a separate server.
+The premium voice-grading backend (design doc: `docs/design/voice-answering.md`) runs on Firebase Cloud Functions (2nd gen, Node.js 20, TypeScript), deployed from `functions/` at the repo root — not a separate server.
 
 Grading LLM is Gemini via Vertex AI, not Claude/OpenAI/OpenRouter (all three were live options per the design doc's "Open decisions"). Vertex AI runs in the same GCP project as Firestore/Cloud Functions already — no separate API key or vendor account, auth is the function's own runtime service account plus `roles/aiplatform.user`.
 

@@ -12,8 +12,8 @@ import java.time.Instant
  * Every operation takes the current time as a parameter; this type never reads a system clock
  * itself, which is what makes it testable with no dispatcher, fake clock or rule.
  *
- * The *policies* — starting at first card shown rather than route entry, pausing a backgrounded
- * session unless voice playback is active, excluding time spent on the Summary screen — are wiring
+ * The *policies* — starting at first card shown rather than route entry, never pausing until
+ * termination, excluding time spent on the Summary screen — are wiring
  * decisions the two session ViewModels own. This type only has to make them expressible: call
  * [stopClock] whenever a policy says time should stop accruing, [startClock] when it should resume.
  *

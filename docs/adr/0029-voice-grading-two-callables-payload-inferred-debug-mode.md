@@ -85,7 +85,7 @@ There are no production users yet, so breaking wire changes (renaming the functi
 
 ## Consequences
 
-- **`functions/README.md` and `docs/design/premium-voice-grading-pipeline.md`** need updating: two functions not four, callable transport, the payload-inferred debug mode, and the deleted REST/Retrofit stack.
+- **`functions/README.md` and [docs/design/voice-answering.md](../design/voice-answering.md)** describe the callable transport, the payload-inferred debug mode and the absence of a REST/Retrofit stack.
 - **Redeploy is a delete + create**, not an update: `functions:delete gradeVoiceAnswer transcribe sanitizeAndGrade`, then deploy `entitlement` (now `onCall`) + `transcribeAndGradeSpokenAnswer`.
 - **`google-services.json` becomes the single backend selector** for auth, Firestore, and voice — aligning cleanly with the future Option-A dev/prod project split (swap that one file per build flavor; no parallel base URL to keep in sync).
 - **Node 20 is deprecated** (decommission 2026-10-30); bump `runtime`/`engines` to `nodejs22` opportunistically during this rework.

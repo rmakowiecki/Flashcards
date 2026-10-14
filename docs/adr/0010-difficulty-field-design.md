@@ -2,7 +2,7 @@
 
 ## Decision
 
-Every Flashcard — global admin-curated or user-created Private — carries a mandatory `difficulty: Int` (1–10). For the global admin-curated pool, Flashcard documents in Firestore that have no `difficulty` field are silently filtered out at the DTO→domain mapping layer and never reach the domain (a backfill concern, since the initial global corpus predates the field). Private Flashcards have no backfill concern — the creation dialog requires a difficulty value (Slider, 1-10, discrete steps) before a card can be saved, so no Private Flashcard can exist without one. Difficulty is immutable once written to Firestore.
+Every Flashcard — global admin-curated or user-created Private — carries a mandatory `difficulty: Int` (1–10). For the global admin-curated pool, Flashcard documents in Firestore that have no `difficulty` field are silently filtered out at the DTO→domain mapping layer and never reach the domain (a backfill concern, since the initial global corpus predates the field). Private Flashcards have no backfill concern — the creation dialog requires a difficulty value (Slider, 1-10, discrete steps) before a card can be saved, so no Private Flashcard can exist without one. Difficulty is immutable once written to Firestore for a global Flashcard. A User can change the Difficulty of their own Private Flashcard, and the field stays mandatory.
 
 ## Context
 
