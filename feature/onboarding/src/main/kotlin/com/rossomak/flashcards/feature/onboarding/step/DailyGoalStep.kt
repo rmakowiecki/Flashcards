@@ -32,7 +32,7 @@ import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
 /**
  * Sets the Daily Goal, and shows what a streak looks like once one exists.
  *
- * The streak card is an illustration on its own surface, labelled EXAMPLE, and is deliberately not
+ * The streak card is an illustration on its own surface, and is deliberately not
  * merged into the goal card below it: a brand-new user's real streak is zero, and a fabricated
  * figure rendered in the same surface as a live control would read as their own statistic.
  */
@@ -74,11 +74,6 @@ internal fun DailyGoalStep(
 @Composable
 private fun StreakExampleCard(modifier: Modifier = Modifier) {
     OnboardingCard(modifier = modifier) {
-        Text(
-            text = stringResource(R.string.daily_goal_example_label).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Text(
             text = stringResource(R.string.daily_goal_streak_label).uppercase(),
             style = MaterialTheme.typography.labelSmall,
