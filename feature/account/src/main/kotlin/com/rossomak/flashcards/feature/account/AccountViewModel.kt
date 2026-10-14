@@ -58,6 +58,9 @@ class AccountViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<AccountMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<AccountMessage> = _messages.asSharedFlow()
 
+    /** Keeps the confirm dialog up until Login opens, so no other tap navigates away first. */
+    private var isSigningOut = false
+
     init {
         viewModelScope.launch {
             val appVersion = getAppVersion()
@@ -107,9 +110,9 @@ class AccountViewModel @Inject constructor(
         _messages.tryEmit(NoEmailApp)
     }
 
-    /** Single entry point for every dialog on this screen. Ignored while the account is being deleted. */
+    /** Single entry point for every dialog on this screen. Ignored while signing out or deleting the account. */
     fun onDialogEvent(event: AccountDialogEvent) {
-        if (_state.value.isDeletingAccount) return
+        if (isSigningOut || _state.value.isDeletingAccount) return
         when (event) {
             is Open -> _state.update { it.copy(activeDialog = event.dialog) }
             is DraftChange -> _state.update { it.copy(activeDialog = event.dialog) }
@@ -122,7 +125,7 @@ class AccountViewModel @Inject constructor(
     private fun onDialogConfirm() {
         when (_state.value.activeDialog) {
             SignOut -> {
-                _state.update { it.copy(activeDialog = null) }
+                isSigningOut = true
                 performSignOut()
             }
             DeleteAccount -> {
