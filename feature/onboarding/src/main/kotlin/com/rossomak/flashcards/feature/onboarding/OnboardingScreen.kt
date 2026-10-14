@@ -272,7 +272,7 @@ private fun OnboardingContent(
                         if (currentStep == OnboardingStep.LAST) {
                             actions.onFinish()
                         } else {
-                            coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                            coroutineScope.launch { pagerState.animateScrollToPage(pagerState.pageAfterTarget()) }
                         }
                     },
                 )
@@ -281,13 +281,22 @@ private fun OnboardingContent(
     }
 }
 
+/** The page after the one the pager heads for, so quick Next taps add up instead of repeating the same page. */
+private fun PagerState.pageAfterTarget(): Int = (targetPage + 1).coerceAtMost(OnboardingStep.entries.lastIndex)
+
 /** The background graph: [entranceStep]'s spec, hidden until the entrance unless [isInspecting], then following [pagerState]. */
 @Composable
 private fun rememberOnboardingGraph(pagerState: PagerState, entranceStep: OnboardingStep, isInspecting: Boolean): NetworkGraphMorphState {
     val graphState = rememberNetworkGraphMorphState(
         if (isInspecting) OnboardingNetworkGraphs.specFor(entranceStep) else OnboardingNetworkGraphs.hiddenFor(entranceStep),
     )
-    graphState.Follow(OnboardingNetworkGraphs.pages) { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+    graphState.Follow(
+        OnboardingNetworkGraphs.pages,
+        minMorphDuration = OnboardingNetworkGraphs.minMorphDuration,
+        target = { pagerState.targetPage },
+    ) {
+        pagerState.currentPage + pagerState.currentPageOffsetFraction
+    }
     return graphState
 }
 

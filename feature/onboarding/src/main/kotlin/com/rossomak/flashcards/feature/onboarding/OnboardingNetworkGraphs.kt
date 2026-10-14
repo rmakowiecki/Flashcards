@@ -17,6 +17,8 @@ import com.rossomak.networkgraph.NetworkGraphSpec
 import com.rossomak.networkgraph.ShapePrimitive.Bloom
 import com.rossomak.networkgraph.ShapePrimitive.Ribbon
 import com.rossomak.networkgraph.ShapePrimitive.Uniform
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The network graph behind each onboarding step. Every spec is one layer of one morph family (same
@@ -28,6 +30,9 @@ object OnboardingNetworkGraphs {
 
     /** Every onboarding graph is white; the steps differ only in how dim their layer is. */
     val fill: NetworkGraphFill = NetworkGraphFill.Solid(Color.White)
+
+    /** The least a step-to-step morph takes, so a quick flick or a Next tap still morphs instead of jumping. */
+    val minMorphDuration: Duration = 500.milliseconds
 
     private const val SEED = 29
 
