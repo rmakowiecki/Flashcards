@@ -113,6 +113,58 @@ class ArchitectureKonsistTest {
             }
     }
 
+    @Test
+    fun `destinations are declared only through guardedNavComposable`() {
+        // A bare composable<T> exposes the raw NavController, which navigates even while the screen is leaving.
+        projectScope
+            .files
+            .filter { !it.path.endsWith(GUARDED_NAV_COMPOSABLE_FILE) }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name == "androidx.navigation.compose.composable" }
+            }
+    }
+
+    @Test
+    fun `production code navigates only through an EntryNavigator`() {
+        // The bottom bar's tab switch has no back-stack entry, so it is the one raw call.
+        val sanctionedRawCalls = listOf("tabNavController.navigate(route, tabNavOptions)")
+        val rawControllerCall = Regex("""\b\w*[nN]avController\s*\.\s*(navigate|popBackStack|navigateUp)\b""")
+        projectScope
+            .files
+            .filter { file -> !file.path.contains("/src/test/") && !file.path.contains("/src/androidTest/") }
+            .filter { file -> NAVIGATION_GUARD_FILES.none { file.path.endsWith(it) } }
+            .assertFalse { file ->
+                val text = sanctionedRawCalls.fold(file.text) { remaining, call -> remaining.replace(call, "") }
+                rawControllerCall.containsMatchIn(text)
+            }
+    }
+
+    @Test
+    fun `a navigation callback makes at most one navigator call`() {
+        // After the first call the entry is no longer on top, so a second is always dropped; use a
+        // method like navigateStacked. Heuristic: two calls sharing their innermost enclosing brace.
+        val navigatorCall = Regex("""\bnavigator\s*\.\s*(navigate\w*|popBackStack)\s*\(""")
+        projectScope
+            .files
+            .filter { file -> !file.path.contains("/src/test/") }
+            .assertFalse { file ->
+                val enclosingBraces = navigatorCall.findAll(file.text).map { enclosingBraceIndex(file.text, it.range.first) }.toList()
+                enclosingBraces.size != enclosingBraces.toSet().size
+            }
+    }
+
+    /** Index of the innermost `{` still open at [position], or -1 at the top level. */
+    private fun enclosingBraceIndex(text: String, position: Int): Int {
+        val openBraces = ArrayDeque<Int>()
+        text.substring(0, position).forEachIndexed { index, char ->
+            when (char) {
+                '{' -> openBraces.addLast(index)
+                '}' -> openBraces.removeLastOrNull()
+            }
+        }
+        return openBraces.lastOrNull() ?: -1
+    }
+
     private fun typeArgumentNames(typeArguments: List<KoTypeArgumentDeclaration>?): List<String> =
         typeArguments.orEmpty().flatMap { listOf(it.name) + typeArgumentNames(it.typeArguments) }
 
@@ -447,5 +499,7 @@ class ArchitectureKonsistTest {
 
     private companion object {
         const val MUTABLE_COLLECTION_FIXTURE = "konsist/fixtures/MutableCollectionProperties.kt"
+        const val GUARDED_NAV_COMPOSABLE_FILE = "/ui/navigation/GuardedNavComposable.kt"
+        val NAVIGATION_GUARD_FILES = listOf(GUARDED_NAV_COMPOSABLE_FILE, "/ui/navigation/EntryNavigator.kt")
     }
 }

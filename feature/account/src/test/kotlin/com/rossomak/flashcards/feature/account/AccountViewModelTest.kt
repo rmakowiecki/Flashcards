@@ -309,7 +309,7 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `confirming sign out signs out and emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `confirming sign out signs out and emits Login with the dialog still up`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { signOut() } returns Unit
 
         val viewModel = createViewModel()
@@ -319,7 +319,23 @@ class AccountViewModelTest {
         viewModel.events.test {
             awaitItem() shouldBe AccountDestination.Login
         }
-        viewModel.state.value.activeDialog shouldBe null
+        viewModel.state.value.activeDialog shouldBe SignOut
+        coVerify(exactly = 1) { signOut() }
+    }
+
+    @Test
+    fun `dialog events are ignored once sign out is confirmed`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { signOut() } coAnswers { awaitCancellation() }
+        val viewModel = createViewModel()
+
+        viewModel.onDialogEvent(Open(SignOut))
+        viewModel.onDialogEvent(Confirm)
+        viewModel.onDialogEvent(Dismiss)
+        viewModel.onDialogEvent(Confirm)
+        viewModel.onDialogEvent(Open(DeleteAccount))
+        advanceUntilIdle()
+
+        viewModel.state.value.activeDialog shouldBe SignOut
         coVerify(exactly = 1) { signOut() }
     }
 

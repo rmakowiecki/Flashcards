@@ -100,7 +100,8 @@ class PreviewStudySessionViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<PreviewStudySessionMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<PreviewStudySessionMessage> = _messages.asSharedFlow()
 
-    private var sessionStartInFlight = false
+    /** Active while Start waits on the microphone handshake, so a second tap can't stack a prompt. */
+    private var sessionStartJob: Job? = null
 
     /**
      * Seeded once in `init` before the first selection, so it is known before Start can ever be
@@ -377,13 +378,9 @@ class PreviewStudySessionViewModel @Inject constructor(
      * the button stays enabled so a draw served from cache doesn't blink it.
      */
     fun onStartSession() {
-        if (selectedCardIds.isEmpty() || sessionStartInFlight || _state.value.isLoading) return
-        sessionStartInFlight = true
-        viewModelScope.launch {
-            if (_state.value.isMicPermissionNeeded && !ensureMicPermission()) {
-                sessionStartInFlight = false
-                return@launch
-            }
+        if (selectedCardIds.isEmpty() || sessionStartJob?.isActive == true || _state.value.isLoading) return
+        sessionStartJob = viewModelScope.launch {
+            if (_state.value.isMicPermissionNeeded && !ensureMicPermission()) return@launch
             eventChannel.send(_state.value.toSessionDestination(categoryId = route.categoryId, cardIds = selectedCardIds))
         }
     }

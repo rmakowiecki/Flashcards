@@ -78,7 +78,7 @@ The microphone status is read again every time the screen resumes, so a change m
 
 ## Starting the session
 
-Start is enabled only when cards are drawn and no load has failed. It stays enabled during a redraw so a quick draw does not make it blink, but a tap while a draw runs does nothing, and neither does a second tap while a start is in flight. The confirmed Study Mode picks the destination: Rated and Fast each open their own session screen, carrying the drawn cards in Preview's order and only the settings that mode uses ([ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md)). The session's delivery is fixed from then on.
+Start is enabled only when cards are drawn and no load has failed. It stays enabled during a redraw so a quick draw does not make it blink, but a tap while a draw runs does nothing. A second tap does nothing either, while the microphone request is open or once the session is opening, so coming back from a session never starts another one on its own. The confirmed Study Mode picks the destination: Rated and Fast each open their own session screen, carrying the drawn cards in Preview's order and only the settings that mode uses ([ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md)). The session's delivery is fixed from then on.
 
 Preview stays on the back stack under the session. A session that ends with nothing Studied, or whose cards fail to load, returns here with the same draw and settings, so Start plays the same cards again unless the user changes something. A session that reaches the Summary removes itself and Preview from the back stack.
 

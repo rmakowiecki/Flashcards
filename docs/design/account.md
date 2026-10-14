@@ -33,7 +33,7 @@ Opens an email draft to the support address in the User's email app. The body st
 
 ## Sign out
 
-Sign out asks for confirmation first. On confirm the User is signed out and the app goes to Login, clearing everything above it ([navigation.md](navigation.md)). The app goes to Login even if signing out fails, so a User is never stuck signed in.
+Sign out asks for confirmation first. On confirm the confirmation stays open and takes no further input until Login appears. The User is signed out and the app goes to Login, clearing everything above it ([navigation.md](navigation.md)). The app goes to Login even if signing out fails, so a User is never stuck signed in.
 
 Signing out removes nothing from the device:
 

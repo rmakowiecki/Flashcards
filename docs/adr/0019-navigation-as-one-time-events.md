@@ -60,3 +60,12 @@ persistent state.
 - [docs/design/navigation.md](../design/navigation.md) and the `AGENTS.md` navigation bullet describe this pattern.
 - Every screen that navigates from a ViewModel handler (Home and CategoryDetails included) follows this
   pattern; none holds navigation in ViewModel state.
+
+## Amendments
+
+**2026-10-14 — Destinations navigate only from their own back-stack entry.** The nav callback an
+event reaches goes through an `EntryNavigator` that drops it unless the screen is still on top
+([ADR-0067](0067-destinations-navigate-only-from-their-own-back-stack-entry.md)). Buffering still
+holds: an event sent while the screen is covered waits and is delivered when the screen is back on
+top, where the guard lets it through. ADR-0067 records where that matters and how Preview's Start
+handles it.

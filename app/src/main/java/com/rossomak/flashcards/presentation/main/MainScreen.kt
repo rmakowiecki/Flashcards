@@ -31,8 +31,8 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
@@ -48,6 +48,7 @@ import com.rossomak.flashcards.ui.navigation.SettingsGraph
 import com.rossomak.flashcards.ui.navigation.SettingsRoot
 import com.rossomak.flashcards.ui.navigation.StudyGraph
 import com.rossomak.flashcards.ui.navigation.StudyRoot
+import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 
 @Composable
 private fun mainTabs(): List<TabItem> = buildList {
@@ -153,15 +154,15 @@ fun MainScreen(
     val tabNavController = rememberNavController()
     val navBackStackEntry by tabNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val navigateToTab: (route: Any) -> Unit = { route ->
-        tabNavController.navigate(route) {
-            popUpTo(tabNavController.graph.findStartDestination().id) {
-                saveState = true
-            }
-            launchSingleTop = true
-            restoreState = true
+    val tabNavOptions: NavOptionsBuilder.() -> Unit = {
+        popUpTo(tabNavController.graph.findStartDestination().id) {
+            saveState = true
         }
+        launchSingleTop = true
+        restoreState = true
     }
+    // The bottom bar has no back-stack entry; launchSingleTop makes a repeated tap harmless.
+    val navigateToTab: (route: Any) -> Unit = { route -> tabNavController.navigate(route, tabNavOptions) }
 
     Scaffold(
         modifier = modifier,
@@ -198,19 +199,20 @@ fun MainScreen(
             popExitTransition = { ExitTransition.None },
         ) {
             navigation<HomeGraph>(startDestination = HomeRoot) {
-                composable<HomeRoot> {
+                guardedNavComposable<HomeRoot>(tabNavController) { navigator ->
                     HomeScreen(
                         onNavigateToCategoryDetails = onNavigateToCategoryDetails,
                         onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
                         onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = onNavigateToPreviewQuickSession,
                         onNavigateToPreviewRecentSession = onNavigateToPreviewRecentSession,
-                        onNavigateToBrowse = { navigateToTab(StudyGraph) },
+                        // Guarded, unlike navigateToTab: a tap while Home is leaving is dropped.
+                        onNavigateToBrowse = { navigator.navigate(StudyGraph, tabNavOptions) },
                     )
                 }
             }
             navigation<StudyGraph>(startDestination = StudyRoot) {
-                composable<StudyRoot> {
+                guardedNavComposable<StudyRoot>(tabNavController) {
                     BrowseScreen(
                         onNavigateToCategoryDetails = onNavigateToCategoryDetails,
                         onNavigateToSubcategoryDetails = onNavigateToSubcategoryDetails,
@@ -219,7 +221,7 @@ fun MainScreen(
                 }
             }
             navigation<SettingsGraph>(startDestination = SettingsRoot) {
-                composable<SettingsRoot> {
+                guardedNavComposable<SettingsRoot>(tabNavController) {
                     SettingsScreen(
                         onNavigateToAccount = onNavigateToAccount,
                     )
