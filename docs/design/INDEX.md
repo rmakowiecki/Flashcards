@@ -51,6 +51,10 @@ Entry format:
   Read when: changing any session screen behavior common to both modes, the voice/media service, transport controls or audio interruption handling.
 - [voice-answering.md](voice-answering.md): Voice Answering in Rated sessions: the round, the answer panel, notices and pauses, transport by phase, capture and Bluetooth routing, on-device obfuscation and privacy, the streamed transcribe-and-grade backend, entitlement.
   Read when: changing `core:voice`, the voice grading callables in `functions/`, or Voice Answering behavior.
+- [voice-capture-indicator.md](voice-capture-indicator.md): The animated microphone indicator: how the live input level is measured in decibels, smoothed, shaped into a travelling wave of bars and drawn, and how it follows playback in the voice test.
+  Read when: changing the microphone indicator, the input level, or where the indicator shows.
+- [voice-obfuscation.md](voice-obfuscation.md): The on-device voice transform applied to every spoken answer: the random pitch and formant shift, the time-stretch and resample math, what leaves the device, and the limits of the protection.
+  Read when: changing `core:voice` obfuscation, the privacy claims about voice, or what audio is sent for grading.
 - [xp-leveling-system.md](xp-leveling-system.md): XP sources and their rules, the XP configuration, the Level curve, and how XP and Level are stored.
   Read when: changing XP awards, the XP configuration, the Level curve or Level-floor clamping.
 

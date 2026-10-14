@@ -26,7 +26,7 @@ The bottom panel shows one thing at a time:
 - the progress disc beside the recognized answer once it arrives;
 - the Rating and the grader's rationale while the feedback is spoken.
 
-Voice settings can be changed only from the transport row, never mid-round. The indicator follows the real microphone level, of any sound and not only speech, to show that the microphone hears the User. The level is computed on the device and is never logged, stored or uploaded.
+Voice settings can be changed only from the transport row, never mid-round. The indicator follows the real microphone level, of any sound and not only speech, to show that the microphone hears the User. The level is computed on the device and is never logged, stored or uploaded. How the level is measured, shaped and drawn is in [voice-capture-indicator.md](voice-capture-indicator.md).
 
 The recognized answer is the User's, not the Flashcard's. It shows only in the panel, only until the grade, and it is never read aloud or exposed to TalkBack. TalkBack hears one announcement per step: listening, grading, then the Rating's name.
 
@@ -62,7 +62,7 @@ Capture runs only inside the session's foreground playback service, never outsid
 
 ## Privacy
 
-- **Obfuscated on the device.** Before an answer leaves the phone, its pitch and formants are shifted together by a factor randomized for each session. Its timing is then restored, so the speech stays intelligible to transcription. The raw recording is wiped as soon as the obfuscated copy exists. This deters casual re-identification and voice cloning. It is not strong anonymization.
+- **Obfuscated on the device.** Before an answer leaves the phone, its pitch and formants are shifted together by a random factor, redrawn each time the microphone opens for listening. Its timing is then restored, so the speech stays intelligible to transcription. The raw recording is wiped as soon as the obfuscated copy exists. This deters casual re-identification and voice cloning. It is not strong anonymization. The transform and its math are in [voice-obfuscation.md](voice-obfuscation.md).
 - **Never stored.** The obfuscated audio is sent once per answer and kept nowhere, on the device or the server. The transcript and the grade exist only during the round. A session records only the resulting Ratings ([session-submission.md](session-submission.md)).
 - **No keys in the app.** The transcription and model keys stay on the server, which is why grading needs a backend at all ([ADR-0024](../adr/0024-voice-grading-cloud-function-proxy.md)).
 
@@ -95,3 +95,5 @@ The app does not check entitlement before offering Voice Answering. A User witho
 - [preview-study-session.md](preview-study-session.md): choosing Voice Answering and the microphone handshake.
 - [planned/voice-answering.md](planned/voice-answering.md): entitlement sync from purchases.
 - [firestore-schema.md](firestore-schema.md): the entitlement record.
+- [voice-obfuscation.md](voice-obfuscation.md): how the answer's voice is transformed before it leaves the phone.
+- [voice-capture-indicator.md](voice-capture-indicator.md): the live microphone indicator.

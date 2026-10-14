@@ -34,7 +34,7 @@ Onboarding deliberately captures nothing else. Session length, Sort Order, Attem
 
 ## Voice test
 
-The voice test records the User, transforms the recording on the device and plays it back. It runs entirely on the device: nothing is uploaded, transcribed or graded, which is what makes it free. The shared microphone indicator follows the live input level while recording and the playback level while playing back. The User can stop recording early. A take with nothing usable in it, or a capture failure, shows a snackbar.
+The voice test records the User, transforms the recording on the device and plays it back. It runs entirely on the device: nothing is uploaded, transcribed or graded, which is what makes it free. The shared microphone indicator follows the live input level while recording and the playback level while playing back ([voice-capture-indicator.md](voice-capture-indicator.md)). The transform applied to the recording is described in [voice-obfuscation.md](voice-obfuscation.md). The User can stop recording early. A take with nothing usable in it, or a capture failure, shows a snackbar.
 
 The test stops the moment the pager leaves its step or the app goes to the background, so the microphone never listens on another step or with the screen gone.
 
@@ -70,4 +70,6 @@ At Login the Guest is linked to the provider the User picks, keeping the Favorit
 - [settings.md](settings.md): where the defaults captured here are edited later, and how they are stored.
 - [home.md](home.md): where the Favorites picked here appear.
 - [voice-answering.md](voice-answering.md): the full Voice Answering feature this step previews.
+- [voice-obfuscation.md](voice-obfuscation.md): the transform the voice test plays back.
+- [voice-capture-indicator.md](voice-capture-indicator.md): the indicator the voice test shows.
 - [firestore-schema.md](firestore-schema.md): the curated Topic list and the Favorites document.

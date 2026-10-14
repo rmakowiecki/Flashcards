@@ -8,8 +8,9 @@ package com.rossomak.flashcards.core.voice
 interface VoiceObfuscator {
 
     /**
-     * Re-draws the randomized shift parameters. Called once per study session so repeated
-     * sessions cannot be correlated by a stable transform.
+     * Re-draws the randomized shift parameters. [VoiceCaptureEngine] calls it each time the
+     * microphone opens for listening, so successive answers cannot be correlated by a stable
+     * transform. The shift holds for every utterance captured in that listening window.
      */
     fun randomizeSessionShift()
 
