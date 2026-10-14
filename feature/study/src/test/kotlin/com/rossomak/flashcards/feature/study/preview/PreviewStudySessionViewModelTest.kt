@@ -68,9 +68,11 @@ import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlin.random.Random
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -1464,6 +1466,107 @@ class PreviewStudySessionViewModelTest {
             viewModel.state.value.config.difficultyRange shouldBe 3..7
             viewModel.state.value.selectedCardCount shouldBe 1
             viewModel.state.value.activeDialog shouldBe null
+        }
+
+    @Test
+    fun `a redraw keeps the drawn session until it lands`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(quickSessionRoute)
+            quickSessionRoute.subcategoryIds.forEach { id ->
+                flashcardRepository.flashcardsBySubcategory[id] =
+                    Result.success(listOf(flashcard(id = "$id-card", subcategoryId = id)))
+            }
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            val drawnBeforeReshuffle = viewModel.state.value
+            val fetchGate = CompletableDeferred<Unit>()
+            flashcardRepository.fetchFlashcardsGate = fetchGate
+
+            viewModel.onReshuffleSubcategories()
+            runCurrent()
+
+            with(viewModel.state.value) {
+                isLoading shouldBe true
+                subcategoryNames shouldBe drawnBeforeReshuffle.subcategoryNames
+                selectedCardCount shouldBe drawnBeforeReshuffle.selectedCardCount
+                hasDrawnSession shouldBe true
+            }
+
+            fetchGate.complete(Unit)
+            advanceUntilIdle()
+
+            with(viewModel.state.value) {
+                isLoading shouldBe false
+                subcategoryNames shouldNotBe drawnBeforeReshuffle.subcategoryNames
+                hasDrawnSession shouldBe true
+            }
+        }
+
+    @Test
+    fun `onResetFilters without routed tags selects every available tag before the redraw lands`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(
+                listOf(
+                    flashcard(id = "card-1", tags = listOf("State")),
+                    flashcard(id = "card-2", tags = listOf("Modifiers")),
+                )
+            )
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onDialogEvent(
+                Open(
+                    Filters(
+                        draftState = FlashcardFilters(selectedTags = setOf("Modifiers"), difficultyRange = 1..10),
+                        availableTags = viewModel.state.value.availableTags,
+                    ),
+                ),
+            )
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+            viewModel.state.value.config.tagIds shouldBe setOf("Modifiers")
+            flashcardRepository.fetchFlashcardsGate = CompletableDeferred()
+
+            viewModel.onResetFilters()
+            runCurrent()
+
+            viewModel.state.value.isLoading shouldBe true
+            viewModel.state.value.config.tagIds shouldBe setOf("State", "Modifiers")
+        }
+
+    @Test
+    fun `a failed redraw drops the drawn session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.state.value.hasDrawnSession shouldBe true
+            flashcardRepository.flashcardsToReturn = Result.failure(IllegalStateException("offline"))
+
+            viewModel.onRetry()
+            advanceUntilIdle()
+
+            viewModel.state.value.isLoadFailed shouldBe true
+            viewModel.state.value.hasDrawnSession shouldBe false
+        }
+
+    @Test
+    fun `onStartSession is ignored while a redraw runs`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            flashcardRepository.fetchFlashcardsGate = CompletableDeferred()
+
+            viewModel.onRetry()
+            runCurrent()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.canStart shouldBe true
+            viewModel.events.test { expectNoEvents() }
         }
 
     /**
