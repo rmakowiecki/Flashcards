@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.feature.browse
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +18,6 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -61,6 +59,7 @@ import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
+import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -214,15 +213,14 @@ fun BrowseContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopSearchBar(state = searchBarState, inputField = inputField, colors = barColors)
-        Box(modifier = Modifier.fillMaxSize()) {
-            CategoryListContent(
-                isLoading = state.isLoading,
-                categories = state.categories,
-                favorites = state.favorites,
-                onRefresh = onRefresh,
-                onCategoryClick = onCategoryClick,
-            )
-        }
+        CategoryListContent(
+            modifier = Modifier.fillMaxSize(),
+            isLoading = state.isLoading,
+            categories = state.categories,
+            favorites = state.favorites,
+            onRefresh = onRefresh,
+            onCategoryClick = onCategoryClick,
+        )
     }
 
     // Renders nothing until expanded — it early-returns on the collapsed state — so calling it
@@ -256,7 +254,7 @@ internal fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressRe
     }
 
 /**
- * The three things this content slot can show: a spinner during the initial load, an error card,
+ * The three things this content slot can show: a delayed spinner while loading, an error card,
  * or the category list. An empty [categories] always reads as failure — whether
  * a real load error or genuinely zero categories, there's nothing useful to show and retry is the
  * only recourse — so both collapse into the same error state.
@@ -265,29 +263,41 @@ internal fun rememberProgressFor(progressSummary: ProgressSummary?, isProgressRe
  * (which changes only the search fields) doesn't recompose the list hidden under the search bar.
  */
 @Composable
-private fun BoxScope.CategoryListContent(
+private fun CategoryListContent(
+    modifier: Modifier = Modifier,
     isLoading: Boolean,
     categories: List<Category>,
     favorites: UserFavorites,
     onRefresh: () -> Unit,
     onCategoryClick: (String, String) -> Unit,
 ) {
-    when {
-        isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        categories.isEmpty() -> CenteredEmptyState(
-            icon = Icons.Filled.CloudOff,
-            title = stringResource(R.string.browse_categories_error_title),
-            supportingText = stringResource(R.string.browse_categories_error_message),
-            tone = FlashcardsEmptyStateTone.Error,
-            button = {
-                FlashcardsFilledButton(
-                    text = stringResource(CoreUiR.string.common_retry_button),
-                    onClick = onRefresh,
-                    icon = Icons.Filled.Refresh,
+    // `null` while loading, so the loading check reads the state handed to the classifier, never a capture.
+    FlashcardsLoadStateContent(
+        targetState = categories.takeUnless { isLoading },
+        modifier = modifier,
+        // Keyed by kind: a refresh that returns a changed list updates it in place.
+        contentKey = { loadedCategories -> loadedCategories?.isEmpty() },
+    ) { loadedCategories ->
+        when {
+            loadedCategories == null -> loading()
+            loadedCategories.isEmpty() -> content {
+                CenteredEmptyState(
+                    icon = Icons.Filled.CloudOff,
+                    title = stringResource(R.string.browse_categories_error_title),
+                    supportingText = stringResource(R.string.browse_categories_error_message),
+                    tone = FlashcardsEmptyStateTone.Error,
+                    button = {
+                        FlashcardsFilledButton(
+                            text = stringResource(CoreUiR.string.common_retry_button),
+                            onClick = onRefresh,
+                            icon = Icons.Filled.Refresh,
+                        )
+                    },
                 )
-            },
-        )
-        else -> CategoryList(categories = categories, favorites = favorites, onCategoryClick = onCategoryClick)
+            }
+
+            else -> content { CategoryList(categories = loadedCategories, favorites = favorites, onCategoryClick = onCategoryClick) }
+        }
     }
 }
 
@@ -352,38 +362,46 @@ private fun ExpandedSearchContent(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
-    when (searchStatus) {
-        SearchStatus.Prompt -> CenteredEmptyState(
-            icon = Icons.Filled.Search,
-            title = stringResource(R.string.browse_search_prompt_title),
-            supportingText = stringResource(R.string.browse_search_prompt_message),
-        )
+    // Default key: every new set of results reveals, while the previous one stays up as the next query loads.
+    FlashcardsLoadStateContent(targetState = searchStatus) { status ->
+        when (status) {
+            SearchStatus.Prompt -> content {
+                CenteredEmptyState(
+                    icon = Icons.Filled.Search,
+                    title = stringResource(R.string.browse_search_prompt_title),
+                    supportingText = stringResource(R.string.browse_search_prompt_message),
+                )
+            }
 
-        SearchStatus.Loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            SearchStatus.Loading -> loading()
+            is SearchStatus.Results -> content {
+                SearchResults(
+                    results = status.results,
+                    favorites = favorites,
+                    progressFor = progressFor,
+                    onCategoryClick = onCategoryClick,
+                    onSubcategoryClick = onSubcategoryClick,
+                    onSubcategorySessionStart = onSubcategorySessionStart,
+                )
+            }
+
+            SearchStatus.NoMatch -> content {
+                CenteredEmptyState(
+                    icon = Icons.Filled.SearchOff,
+                    title = stringResource(R.string.browse_search_no_results_title),
+                    supportingText = stringResource(R.string.browse_search_no_results_message),
+                )
+            }
+
+            SearchStatus.Error -> content {
+                CenteredEmptyState(
+                    icon = Icons.Filled.ErrorOutline,
+                    title = stringResource(R.string.browse_search_error_title),
+                    supportingText = stringResource(R.string.browse_search_error_message),
+                    tone = FlashcardsEmptyStateTone.Error,
+                )
+            }
         }
-
-        is SearchStatus.Results -> SearchResults(
-            results = searchStatus.results,
-            favorites = favorites,
-            progressFor = progressFor,
-            onCategoryClick = onCategoryClick,
-            onSubcategoryClick = onSubcategoryClick,
-            onSubcategorySessionStart = onSubcategorySessionStart,
-        )
-
-        SearchStatus.NoMatch -> CenteredEmptyState(
-            icon = Icons.Filled.SearchOff,
-            title = stringResource(R.string.browse_search_no_results_title),
-            supportingText = stringResource(R.string.browse_search_no_results_message),
-        )
-
-        SearchStatus.Error -> CenteredEmptyState(
-            icon = Icons.Filled.ErrorOutline,
-            title = stringResource(R.string.browse_search_error_title),
-            supportingText = stringResource(R.string.browse_search_error_message),
-            tone = FlashcardsEmptyStateTone.Error,
-        )
     }
 }
 
