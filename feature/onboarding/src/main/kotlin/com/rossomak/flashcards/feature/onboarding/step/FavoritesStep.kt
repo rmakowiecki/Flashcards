@@ -26,6 +26,10 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButto
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.flashcardsGridScrollFade
 import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Content
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Failed
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Loading
 import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.FavoriteSubcategoryCard
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader
@@ -51,10 +55,8 @@ private val FavoriteGridHeight = 372.dp
  */
 @Composable
 internal fun FavoritesStep(
-    options: ImmutableList<FavoriteSubcategoryOption>,
+    favoriteSubcategories: FavoriteSubcategoriesState,
     selectedIds: ImmutableSet<String>,
-    isLoading: Boolean,
-    loadFailed: Boolean,
     onSubcategoryToggle: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -72,15 +74,14 @@ internal fun FavoritesStep(
             )
         },
         grid = {
-            val gridState = when {
-                isLoading -> FavoritesGridState.Loading
-                loadFailed -> FavoritesGridState.Failed
-                else -> FavoritesGridState.Ready
-            }
-            FlashcardsLoadStateContent(targetState = gridState, style = FlashcardsComponentStyle.OnGradient) { shownState ->
+            FlashcardsLoadStateContent(
+                targetState = favoriteSubcategories,
+                style = FlashcardsComponentStyle.OnGradient,
+                contentKey = { shownState -> shownState::class },
+            ) { shownState ->
                 when (shownState) {
-                    FavoritesGridState.Loading -> loading()
-                    FavoritesGridState.Failed -> content {
+                    Loading -> loading()
+                    Failed -> content {
                         FlashcardsEmptyState(
                             icon = Icons.Default.CloudOff,
                             title = stringResource(R.string.favorites_load_error_title),
@@ -98,17 +99,14 @@ internal fun FavoritesStep(
                         )
                     }
 
-                    FavoritesGridState.Ready -> content {
-                        FavoritesGrid(options = options, selectedIds = selectedIds, onSubcategoryToggle = onSubcategoryToggle)
+                    is Content -> content {
+                        FavoritesGrid(options = shownState.options, selectedIds = selectedIds, onSubcategoryToggle = onSubcategoryToggle)
                     }
                 }
             }
         },
     )
 }
-
-/** What the grid slot shows; the options themselves are read straight from the step's parameters. */
-private enum class FavoritesGridState { Loading, Failed, Ready }
 
 @Composable
 private fun FavoritesGrid(

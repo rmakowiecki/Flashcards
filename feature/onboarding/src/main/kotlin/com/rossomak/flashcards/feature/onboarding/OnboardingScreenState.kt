@@ -4,10 +4,8 @@ import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
-import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
-import kotlinx.collections.immutable.ImmutableList
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Loading
 import kotlinx.collections.immutable.ImmutableSet
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
 
 /**
@@ -20,10 +18,7 @@ data class OnboardingScreenState(
     val userName: String? = null,
     val defaultStudyMode: StudyMode = StudyMode.Rated,
     val dailyGoalMinutes: Int = DailyGoal.DEFAULT_MINUTES,
-    val favoriteSubcategoryOptions: ImmutableList<FavoriteSubcategoryOption> = persistentListOf(),
-    val isFavoriteSubcategoriesLoading: Boolean = false,
-    val favoriteSubcategoriesLoaded: Boolean = false,
-    val favoriteSubcategoriesLoadingFailed: Boolean = false,
+    val favoriteSubcategories: FavoriteSubcategoriesState = Loading,
     val selectedFavoriteSubcategoriesIds: ImmutableSet<String> = persistentSetOf(),
     val isCommitting: Boolean = false,
     val voiceDemoState: VoiceDemoState = VoiceDemoState.Idle,

@@ -368,10 +368,8 @@ private fun OnboardingStepPage(
             modifier = modifier,
         )
         OnboardingStep.Favorites -> FavoritesStep(
-            options = state.favoriteSubcategoryOptions,
+            favoriteSubcategories = state.favoriteSubcategories,
             selectedIds = state.selectedFavoriteSubcategoriesIds,
-            isLoading = state.isFavoriteSubcategoriesLoading,
-            loadFailed = state.favoriteSubcategoriesLoadingFailed,
             onSubcategoryToggle = actions.onFavoriteSubcategoryToggle,
             onRetry = actions.onFavoriteSubcategoriesRetry,
             modifier = modifier,

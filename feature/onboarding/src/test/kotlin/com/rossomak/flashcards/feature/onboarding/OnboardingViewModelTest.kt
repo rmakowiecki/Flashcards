@@ -33,6 +33,9 @@ import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Content
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Failed
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Loading
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.milliseconds
@@ -81,6 +84,8 @@ class OnboardingViewModelTest {
     private fun setMicStatus(status: PermissionStatus) {
         permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to status)
     }
+
+    private fun OnboardingViewModel.loadedFavoriteOptions() = (state.value.favoriteSubcategories as Content).options
 
     private fun authUser(displayName: String?, email: String?) = AuthUser(
         uid = "uid-1",
@@ -146,7 +151,7 @@ class OnboardingViewModelTest {
         val viewModel = createViewModel()
         viewModel.onFavoritesStepEntered()
         advanceUntilIdle()
-        val subcategoryId = viewModel.state.value.favoriteSubcategoryOptions.first().id
+        val subcategoryId = viewModel.loadedFavoriteOptions().first().id
 
         viewModel.onFavoriteSubcategoryToggle(subcategoryId)
         viewModel.state.value.selectedFavoriteSubcategoriesIds shouldBe setOf(subcategoryId)
@@ -156,17 +161,23 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun `favorites start out loading before the step is reached`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.state.value.favoriteSubcategories shouldBe Loading
+    }
+
+    @Test
     fun `favorites step entry shows loading then the fetched options`() = runTest(mainDispatcherRule.testDispatcher) {
         onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
         val viewModel = createViewModel()
 
         viewModel.onFavoritesStepEntered()
-        viewModel.state.value.isFavoriteSubcategoriesLoading shouldBe true
+        viewModel.state.value.favoriteSubcategories shouldBe Loading
 
         advanceUntilIdle()
 
-        viewModel.state.value.isFavoriteSubcategoriesLoading shouldBe false
-        viewModel.state.value.favoriteSubcategoryOptions.map { it.id } shouldBe listOf("android-compose")
+        viewModel.loadedFavoriteOptions().map { it.id } shouldBe listOf("android-compose")
     }
 
     @Test
@@ -177,9 +188,18 @@ class OnboardingViewModelTest {
         viewModel.onFavoritesStepEntered()
         advanceUntilIdle()
 
-        viewModel.state.value.isFavoriteSubcategoriesLoading shouldBe false
-        viewModel.state.value.favoriteSubcategoriesLoadingFailed shouldBe true
-        viewModel.state.value.favoriteSubcategoryOptions shouldBe emptyList()
+        viewModel.state.value.favoriteSubcategories shouldBe Failed
+    }
+
+    @Test
+    fun `favorites step entry treats an empty list as a load failure`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn = Result.success(emptyList())
+        val viewModel = createViewModel()
+
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+
+        viewModel.state.value.favoriteSubcategories shouldBe Failed
     }
 
     @Test
@@ -193,7 +213,7 @@ class OnboardingViewModelTest {
         viewModel.onFavoritesStepEntered()
         advanceUntilIdle()
 
-        viewModel.state.value.favoriteSubcategoryOptions.map { it.id } shouldBe listOf("android-compose")
+        viewModel.loadedFavoriteOptions().map { it.id } shouldBe listOf("android-compose")
     }
 
     @Test
@@ -202,14 +222,14 @@ class OnboardingViewModelTest {
         val viewModel = createViewModel()
         viewModel.onFavoritesStepEntered()
         advanceUntilIdle()
-        viewModel.state.value.favoriteSubcategoriesLoadingFailed shouldBe true
+        viewModel.state.value.favoriteSubcategories shouldBe Failed
 
         onboardingSubcategoriesRepository.resultToReturn = Result.success(listOf(subcategory("android-compose")))
         viewModel.onFavoriteSubcategoriesRetry()
+        viewModel.state.value.favoriteSubcategories shouldBe Loading
         advanceUntilIdle()
 
-        viewModel.state.value.favoriteSubcategoriesLoadingFailed shouldBe false
-        viewModel.state.value.favoriteSubcategoryOptions.map { it.id } shouldBe listOf("android-compose")
+        viewModel.loadedFavoriteOptions().map { it.id } shouldBe listOf("android-compose")
     }
 
     @Test
