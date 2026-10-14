@@ -29,15 +29,16 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 
-/** Border alpha for [FlashcardsComponentStyle.OnGradient]'s white outline. */
 /**
  * The border-only button — transparent fill, [MaterialTheme.colorScheme.primary] border and
  * content ("Cancel", "Share"). Use for a secondary action that should read lighter than
  * [FlashcardsTonalButton] but still show a defined tap target.
+ *
+ * On [FlashcardsComponentStyle.OnGradient] the border is the opaque white content color; disabled,
+ * border and content share the same alpha.
  */
 @Composable
 fun FlashcardsOutlinedButton(
-
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -60,14 +61,10 @@ fun FlashcardsOutlinedButton(
             contentColor = contentColor,
             disabledContentColor = disabledButtonContentColorFor(style),
         ),
-        border = if (enabled) {
-            BorderStroke(
-                width = MaterialTheme.sizes.onGradientBorder,
-                color = if (onGradient) MaterialTheme.brandColors.onGradientOutline else contentColor,
-            )
-        } else {
-            BorderStroke(MaterialTheme.sizes.onGradientBorder, disabledButtonContentColorFor(style))
-        },
+        border = BorderStroke(
+            width = MaterialTheme.sizes.onGradientButtonBorder,
+            color = if (enabled) contentColor else disabledButtonContentColorFor(style),
+        ),
         contentPadding = PaddingValues(horizontal = metrics.horizontalPadding, vertical = MaterialTheme.spacing.none),
     ) {
         FlashcardsButtonContent(text = text, icon = icon, iconPosition = iconPosition, metrics = metrics)

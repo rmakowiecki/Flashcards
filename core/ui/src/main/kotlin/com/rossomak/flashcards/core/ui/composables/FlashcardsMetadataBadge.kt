@@ -33,6 +33,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
@@ -90,6 +91,7 @@ fun FlashcardsMetadataBadge(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     onClick: (() -> Unit)? = null,
 ) {
@@ -120,6 +122,7 @@ fun FlashcardsMetadataBadge(
     Surface(
         modifier = modifier
             .height(metrics.height)
+            .blurBackdrop(shape = shape, enabled = blursBackdrop)
             .clip(shape)
             .then(
                 if (onClick != null) {

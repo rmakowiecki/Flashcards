@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.animation.rememberAnimationsEnabled
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
@@ -95,6 +96,8 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  *   [com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContainer] plus a hairline border
  *   that gives it an edge.
  *
+ * [blursBackdrop] only adds the backdrop blur and is independent of [style].
+ *
  * The top row is `[name ……… LVL N]` on one shared baseline. Only the name gives way: it is one
  * line, ellipsized, while the "LVL N" pair keeps its size. The name is the display name trimmed
  * ([levelCardName]); a null or blank name leaves its slot empty, with no fallback label — the
@@ -104,11 +107,6 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  * The figures are one accessibility node described as "name, level, xp of xp" (without the name
  * when there is none), built from the final values in [Content], so a progress animation never
  * changes the announcement.
- *
- * The mock's frosted-glass `OnGradient` surface (`rgba(255,255,255,0.11)` + backdrop blur) is
- * approximated with a flat translucent container color only — `Modifier.blur` needs API 31+ and
- * silently no-ops below it (this project's `minSdk = 26`). Real blur-as-a-design-token is tracked
- * separately.
  *
  * What the card draws follows [state]:
  * - [Loading]: a same-height skeleton whose blocks shimmer, standing where each piece of text sits.
@@ -137,6 +135,7 @@ fun FlashcardsLevelCard(
     state: FlashcardsLevelCardState,
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
 ) {
     AnimatedContent(
         targetState = state,
@@ -146,17 +145,17 @@ fun FlashcardsLevelCard(
         label = "FlashcardsLevelCard",
     ) { shownState ->
         when (shownState) {
-            Loading -> LevelCardSkeleton(isShimmering = true, style = style)
+            Loading -> LevelCardSkeleton(isShimmering = true, style = style, blursBackdrop = blursBackdrop)
 
-            Unavailable -> LevelCardSkeleton(isShimmering = false, style = style)
+            Unavailable -> LevelCardSkeleton(isShimmering = false, style = style, blursBackdrop = blursBackdrop)
 
-            is Content -> LevelCardFigures(content = shownState, style = style)
+            is Content -> LevelCardFigures(content = shownState, style = style, blursBackdrop = blursBackdrop)
         }
     }
 }
 
 @Composable
-private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) {
+private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle, blursBackdrop: Boolean) {
     val level = content.level
     val xpIntoCurrentLevel = content.xpIntoCurrentLevel
     val xpForNextLevel = content.xpForNextLevel
@@ -175,6 +174,7 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle) 
     LevelCardFrame(
         modifier = Modifier.clearAndSetSemantics { contentDescription = description },
         style = style,
+        blursBackdrop = blursBackdrop,
         avatar = {
             FlashcardsAvatar(
                 photoUrl = content.photoUrl,
@@ -268,7 +268,7 @@ private fun LevelCardXpCount(pour: LevelCardPour, mutedContentColor: Color) {
  * provided only here. The skeleton never shows data, so it has no accessibility semantics.
  */
 @Composable
-private fun LevelCardSkeleton(isShimmering: Boolean, style: FlashcardsComponentStyle) {
+private fun LevelCardSkeleton(isShimmering: Boolean, style: FlashcardsComponentStyle, blursBackdrop: Boolean) {
     val blockColor = MaterialTheme.brandColors.onGradientContent.copy(alpha = LEVEL_CARD_SKELETON_BLOCK_ALPHA)
     val blockShape = RoundedCornerShape(MaterialTheme.cornerRadius.small)
     val density = LocalDensity.current
@@ -281,6 +281,7 @@ private fun LevelCardSkeleton(isShimmering: Boolean, style: FlashcardsComponentS
         LevelCardFrame(
             modifier = Modifier.clearAndSetSemantics {},
             style = style,
+            blursBackdrop = blursBackdrop,
             contentModifier = if (isShimmering) Modifier.shimmer() else Modifier,
             avatar = {
                 Box(
@@ -316,6 +317,7 @@ private fun SkeletonBlock(sizeModifier: Modifier, color: Color, shape: Shape) {
 private fun LevelCardFrame(
     modifier: Modifier,
     style: FlashcardsComponentStyle,
+    blursBackdrop: Boolean,
     avatar: @Composable () -> Unit,
     contentModifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
@@ -332,11 +334,11 @@ private fun LevelCardFrame(
     }
     val border = when (style) {
         OnSurface -> null
-        OnGradient -> BorderStroke(width = MaterialTheme.sizes.onGradientBorder, color = brandColors.onGradientBorder)
+        OnGradient -> BorderStroke(width = MaterialTheme.sizes.hairline, color = brandColors.onGradientBorder)
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth().then(containerModifier),
+        modifier = modifier.fillMaxWidth().then(containerModifier).blurBackdrop(shape = shape, enabled = blursBackdrop),
         shape = shape,
         color = containerColor,
         contentColor = brandColors.onGradientContent,

@@ -33,20 +33,24 @@ data class SemanticColors(
     val negativeContainer: Color,
     val onNegativeContainer: Color,
     val onGradientLossContainer: Color,
+    val onGradientLossBorder: Color,
 )
 
 /**
- * The container fill/border base for a `Loss` row on the brand gradient — currently
- * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]. Reuses
- * [errorContainerDark] (the same saturated maroon in both themes): unlike every other pair in this
- * file, it does **not** flip light/dark, because the gradient it sits on doesn't either — it lives
- * here rather than in [BrandColors] because it is still a valence color, grouped with this file's
- * other container/on-container pairs rather than the fixed brand-asset tokens.
+ * The container fill and border for a `Loss` surface on the brand gradient —
+ * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]'s `Loss` tone and
+ * [com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState]'s error tone. Both are
+ * [errorContainerDark] at an alpha and, unlike every other pair in this file, do **not** flip
+ * light/dark, because the gradient they sit on doesn't either.
  *
  * Deliberately not [negativeContainer]: that pair is tuned for a themed surface and reads too
  * washed-out once tinted onto the gradient at a usable alpha.
  */
-private val onGradientLossContainerColor = errorContainerDark
+private const val ON_GRADIENT_LOSS_CONTAINER_ALPHA = 0.33f
+private const val ON_GRADIENT_LOSS_BORDER_ALPHA = 0.5f
+
+private val onGradientLossContainerColor = errorContainerDark.copy(alpha = ON_GRADIENT_LOSS_CONTAINER_ALPHA)
+private val onGradientLossBorderColor = errorContainerDark.copy(alpha = ON_GRADIENT_LOSS_BORDER_ALPHA)
 
 val lightSemanticColors = SemanticColors(
     positiveContainer = positiveContainerLight,
@@ -56,6 +60,7 @@ val lightSemanticColors = SemanticColors(
     negativeContainer = negativeContainerLight,
     onNegativeContainer = onNegativeContainerLight,
     onGradientLossContainer = onGradientLossContainerColor,
+    onGradientLossBorder = onGradientLossBorderColor,
 )
 
 val darkSemanticColors = SemanticColors(
@@ -66,6 +71,7 @@ val darkSemanticColors = SemanticColors(
     negativeContainer = negativeContainerDark,
     onNegativeContainer = onNegativeContainerDark,
     onGradientLossContainer = onGradientLossContainerColor,
+    onGradientLossBorder = onGradientLossBorderColor,
 )
 
 val LocalSemanticColors = staticCompositionLocalOf { lightSemanticColors }

@@ -27,6 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone.Info
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone.Positive
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone.Warning
@@ -69,6 +70,7 @@ fun FlashcardsInfoBanner(
     modifier: Modifier = Modifier,
     tone: FlashcardsInfoBannerTone = Info,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
 ) {
     val semanticColors = MaterialTheme.semanticColors
     val brandColors = MaterialTheme.brandColors
@@ -80,6 +82,7 @@ fun FlashcardsInfoBanner(
         }
         OnGradient -> brandColors.onGradientContainer
     }
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium)
     val contentColor = when (style) {
         OnSurface -> when (tone) {
             Positive -> semanticColors.onPositiveContainer
@@ -97,8 +100,8 @@ fun FlashcardsInfoBanner(
     }
 
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium),
+        modifier = modifier.blurBackdrop(shape = shape, enabled = blursBackdrop),
+        shape = shape,
         color = containerColor,
         contentColor = contentColor,
         border = border,

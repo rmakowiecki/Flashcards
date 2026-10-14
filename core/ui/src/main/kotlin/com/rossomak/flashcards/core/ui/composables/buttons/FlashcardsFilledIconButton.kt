@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -42,6 +43,7 @@ fun FlashcardsFilledIconButton(
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     enabled: Boolean = true,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+    blursBackdrop: Boolean = style == FlashcardsComponentStyle.OnGradient,
 ) {
     val onGradient = style == FlashcardsComponentStyle.OnGradient
     val metrics = size.metrics()
@@ -59,7 +61,11 @@ fun FlashcardsFilledIconButton(
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(metrics.height).then(gradientModifier),
+        modifier = modifier
+            .size(metrics.height)
+            // Only the translucent disabled fill shows the blur; the enabled fill is opaque.
+            .blurBackdrop(shape = CircleShape, enabled = blursBackdrop && !enabled)
+            .then(gradientModifier),
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = colors.containerColor,
             contentColor = colors.contentColor,

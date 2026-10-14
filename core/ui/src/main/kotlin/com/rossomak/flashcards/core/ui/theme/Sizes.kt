@@ -59,8 +59,11 @@ object AppSizes {
     /** Progress-bar thickness at [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Small]. */
     val progressBarThicknessSmall: Dp = 4.dp
 
-    /** Larger border width of any component drawn on a brand gradient. */
-    val onGradientBorder: Dp = 1.5.dp
+    /** Border of every `Flashcards*Button`, `FlashcardsOptionCard` and `FavoriteSubcategoryCard`; other on-gradient borders are a [hairline]. */
+    val onGradientButtonBorder: Dp = 1.5.dp
+
+    /** Blur radius behind every translucent on-gradient fill; `LocalBackdropBlurRadius` defaults to it. */
+    val backdropBlurRadius: Dp = 20.dp
 
     /** Leading icon inside a [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]. */
     val xpBreakdownRowIcon: Dp = 20.dp
