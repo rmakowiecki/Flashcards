@@ -2,7 +2,6 @@ package com.rossomak.flashcards.feature.browse.details.category
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +23,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.AppBarRow
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,6 +57,7 @@ import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
+import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
@@ -182,7 +181,6 @@ fun CategoryDetailsContent(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     val progressFor = rememberProgressFor(state.progressSummary, state.isProgressResolved)
-    val subcategoryCount = (state.content as? SubcategoriesList)?.subcategories?.size
 
     // System back leaves Selection Mode (if active) rather than the screen, same as the top app bar's back arrow below
     BackHandler(enabled = state.isSelectionMode, onBack = onSelectionModeToggle)
@@ -198,7 +196,6 @@ fun CategoryDetailsContent(
                 isSelectionMode = state.isSelectionMode,
                 selectedCount = state.selectedCount,
                 selectedCardCount = state.selectedCardCount,
-                subcategoryCount = subcategoryCount,
                 isFavorite = state.isFavorite,
                 scrollBehavior = scrollBehavior,
                 onNavigateBack = onNavigateBack,
@@ -212,7 +209,7 @@ fun CategoryDetailsContent(
                 isSelectionMode = state.isSelectionMode,
                 selectedCount = state.selectedCount,
                 isAllSelected = state.isAllSelected,
-                hasSubcategories = subcategoryCount != null,
+                hasSubcategories = state.content is SubcategoriesList,
                 onSelectionModeToggle = onSelectionModeToggle,
                 onSelectAllToggle = onSelectAllToggle,
                 onQuickSessionStart = onQuickSessionStart,
@@ -220,40 +217,45 @@ fun CategoryDetailsContent(
             )
         },
     ) { innerPadding ->
-        Box(
+        FlashcardsLoadStateContent(
+            targetState = state.content,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             contentAlignment = Alignment.Center,
-        ) {
-            when (val content = state.content) {
-                Loading -> CircularProgressIndicator()
-                is SubcategoriesList -> SubcategoryList(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    listState = listState,
-                    subcategories = content.subcategories,
-                    isSelectionMode = state.isSelectionMode,
-                    selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
-                    favorites = state.favorites,
-                    progressFor = progressFor,
-                    onSubcategorySelect = onSubcategorySelect,
-                    onSubcategorySessionStart = onSubcategorySessionStart,
-                    onSubcategoryLongPress = onSubcategoryLongPress,
-                    onSubcategorySelectionChange = onSubcategorySelectionChange,
-                )
-
-                is Error -> FlashcardsEmptyState(
-                    icon = Icons.Filled.CloudOff,
-                    title = stringResource(CoreUiR.string.common_load_error_title),
-                    supportingText = stringResource(content.messageRes),
-                    tone = FlashcardsEmptyStateTone.Error,
-                    button = {
-                        FlashcardsFilledButton(
-                            text = stringResource(CoreUiR.string.common_retry_button),
-                            onClick = onRetry,
-                        )
-                    },
-                )
+        ) { contentState ->
+            when (contentState) {
+                Loading -> loading()
+                is SubcategoriesList -> content {
+                    SubcategoryList(
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        listState = listState,
+                        subcategories = contentState.subcategories,
+                        isSelectionMode = state.isSelectionMode,
+                        selectedCount = state.selectedCount,
+                        selectedSubcategoryIds = state.selectedSubcategoryIds ?: emptySet(),
+                        favorites = state.favorites,
+                        progressFor = progressFor,
+                        onSubcategorySelect = onSubcategorySelect,
+                        onSubcategorySessionStart = onSubcategorySessionStart,
+                        onSubcategoryLongPress = onSubcategoryLongPress,
+                        onSubcategorySelectionChange = onSubcategorySelectionChange,
+                    )
+                }
+                is Error -> content {
+                    FlashcardsEmptyState(
+                        icon = Icons.Filled.CloudOff,
+                        title = stringResource(CoreUiR.string.common_load_error_title),
+                        supportingText = stringResource(contentState.messageRes),
+                        tone = FlashcardsEmptyStateTone.Error,
+                        button = {
+                            FlashcardsFilledButton(
+                                text = stringResource(CoreUiR.string.common_retry_button),
+                                onClick = onRetry,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
@@ -263,8 +265,7 @@ fun CategoryDetailsContent(
  * The subtitle reads "Category" by default; in Selection Mode, the selection's total card count — so
  * the size of a Custom session is legible before starting it — falling back to a bare label rather
  * than rendering "· 0 cards" while nothing is selected yet. The back arrow leaves Selection Mode (if
- * active) rather than the screen. [subcategoryCount] is `null` until the list loads, which hides the
- * overline.
+ * active) rather than the screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
@@ -274,7 +275,6 @@ private fun CategoryDetailsTopBar(
     isSelectionMode: Boolean,
     selectedCount: Int,
     selectedCardCount: Int,
-    subcategoryCount: Int?,
     isFavorite: Boolean,
     scrollBehavior: TopAppBarScrollBehavior,
     onNavigateBack: () -> Unit,
@@ -292,28 +292,19 @@ private fun CategoryDetailsTopBar(
 
         else -> stringResource(R.string.category_details_selection_subtitle_label)
     }
-    Column {
-        FlashcardsTopAppBar(
-            title = categoryName,
-            subtitle = subtitle,
-            onNavigateBack = if (isSelectionMode) onSelectionModeToggle else onNavigateBack,
-            scrollBehavior = scrollBehavior,
-            actions = {
-                CategoryDetailsActions(
-                    isFavorite = isFavorite,
-                    onFavoriteToggle = onFavoriteToggle,
-                    onAddShortcut = onAddShortcut,
-                )
-            },
-        )
-        if (subcategoryCount != null) {
-            CategoryDetailsOverline(
-                isSelectionMode = isSelectionMode,
-                selectedCount = selectedCount,
-                subcategoryCount = subcategoryCount,
+    FlashcardsTopAppBar(
+        title = categoryName,
+        subtitle = subtitle,
+        onNavigateBack = if (isSelectionMode) onSelectionModeToggle else onNavigateBack,
+        scrollBehavior = scrollBehavior,
+        actions = {
+            CategoryDetailsActions(
+                isFavorite = isFavorite,
+                onFavoriteToggle = onFavoriteToggle,
+                onAddShortcut = onAddShortcut,
             )
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -460,6 +451,7 @@ private fun CategoryDetailsActions(
     }
 }
 
+/** The rows under their count overline, which belongs to the list so it never shows beside the loading indicator. */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
 private fun SubcategoryList(
@@ -467,6 +459,7 @@ private fun SubcategoryList(
     listState: LazyListState,
     subcategories: List<Subcategory>,
     isSelectionMode: Boolean,
+    selectedCount: Int,
     selectedSubcategoryIds: Set<String>,
     favorites: UserFavorites,
     progressFor: (String) -> SubcategoryProgressState,
@@ -475,30 +468,37 @@ private fun SubcategoryList(
     onSubcategoryLongPress: (String) -> Unit,
     onSubcategorySelectionChange: (String, Boolean) -> Unit,
 ) {
-    LazyColumn(
-        state = listState,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
-            .flashcardsListGroupContainer(listState)
-            .flashcardsListScrollFade(listState)
-    ) {
-        flashcardsListGroupItems(
-            items = subcategories,
-            key = { subcategory -> subcategory.id },
-        ) { subcategory, rowModifier ->
-            SubcategoryRow(
-                modifier = rowModifier,
-                subcategory = subcategory,
-                isSelectionMode = isSelectionMode,
-                isSelected = subcategory.id in selectedSubcategoryIds,
-                isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
-                progress = progressFor(subcategory.id),
-                onSelect = onSubcategorySelect,
-                onSessionStart = onSubcategorySessionStart,
-                onLongPress = onSubcategoryLongPress,
-                onSelectedChange = onSubcategorySelectionChange,
-            )
+    Column(modifier = modifier) {
+        CategoryDetailsOverline(
+            isSelectionMode = isSelectionMode,
+            selectedCount = selectedCount,
+            subcategoryCount = subcategories.size,
+        )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
+                .flashcardsListGroupContainer(listState)
+                .flashcardsListScrollFade(listState)
+        ) {
+            flashcardsListGroupItems(
+                items = subcategories,
+                key = { subcategory -> subcategory.id },
+            ) { subcategory, rowModifier ->
+                SubcategoryRow(
+                    modifier = rowModifier,
+                    subcategory = subcategory,
+                    isSelectionMode = isSelectionMode,
+                    isSelected = subcategory.id in selectedSubcategoryIds,
+                    isFavorited = favorites.subcategoryIds.containsKey(subcategory.id),
+                    progress = progressFor(subcategory.id),
+                    onSelect = onSubcategorySelect,
+                    onSessionStart = onSubcategorySessionStart,
+                    onLongPress = onSubcategoryLongPress,
+                    onSelectedChange = onSubcategorySelectionChange,
+                )
+            }
         }
     }
 }

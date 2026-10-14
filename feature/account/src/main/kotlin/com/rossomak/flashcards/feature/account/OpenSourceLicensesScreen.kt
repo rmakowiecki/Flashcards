@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +49,7 @@ import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheetState
+import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
@@ -151,21 +151,22 @@ private fun OpenSourceLicensesContent(
                 )
             },
         ) { innerPadding ->
-            Box(
+            FlashcardsLoadStateContent(
+                targetState = libraries,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (libraries == null) {
-                    CircularProgressIndicator()
-                } else {
-                    LibraryList(
-                        modifier = Modifier.align(Alignment.TopCenter),
-                        listState = listState,
-                        libraries = libraries,
-                        onLibraryClick = onLibraryClick,
-                    )
+                contentAlignment = Alignment.TopCenter,
+            ) { loadedLibraries ->
+                when (loadedLibraries) {
+                    null -> loading()
+                    else -> content {
+                        LibraryList(
+                            listState = listState,
+                            libraries = loadedLibraries,
+                            onLibraryClick = onLibraryClick,
+                        )
+                    }
                 }
             }
         }

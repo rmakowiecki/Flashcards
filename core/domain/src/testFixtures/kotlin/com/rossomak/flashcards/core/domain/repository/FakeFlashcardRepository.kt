@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.domain.repository
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import kotlinx.coroutines.CompletableDeferred
 
 class FakeFlashcardRepository : FlashcardRepository {
     var categoriesToReturn: Result<List<Category>> = Result.success(emptyList())
@@ -34,6 +35,9 @@ class FakeFlashcardRepository : FlashcardRepository {
 
     var cacheSeedToReturn: Result<Int> = Result.success(0)
 
+    /** When set, [fetchFlashcards] suspends until it completes, so a test can observe state mid-draw. */
+    var fetchFlashcardsGate: CompletableDeferred<Unit>? = null
+
     override suspend fun fetchCategories(): Result<List<Category>> = categoriesToReturn
 
     override suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>> {
@@ -55,6 +59,7 @@ class FakeFlashcardRepository : FlashcardRepository {
 
     override suspend fun fetchFlashcards(subcategoryId: String): Result<List<Flashcard>> {
         fetchedSubcategoryIds += subcategoryId
+        fetchFlashcardsGate?.await()
         return flashcardsBySubcategory[subcategoryId] ?: flashcardsToReturn
     }
 

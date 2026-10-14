@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.feature.onboarding.step
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,10 +10,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
@@ -23,11 +20,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
+import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsScrollFadeHeight
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.flashcardsGridScrollFade
-import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.FavoriteSubcategoryCard
@@ -75,51 +72,71 @@ internal fun FavoritesStep(
             )
         },
         grid = {
-            when {
-                isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
-                }
-                loadFailed -> FlashcardsEmptyState(
-                    icon = Icons.Default.CloudOff,
-                    title = stringResource(R.string.favorites_load_error_title),
-                    supportingText = stringResource(R.string.favorites_load_error_message),
-                    modifier = Modifier.fillMaxSize(),
-                    tone = FlashcardsEmptyStateTone.Error,
-                    style = FlashcardsComponentStyle.OnGradient,
-                    button = {
-                        FlashcardsFilledButton(
-                            text = stringResource(R.string.favorites_load_error_retry_button),
-                            onClick = onRetry,
+            val gridState = when {
+                isLoading -> FavoritesGridState.Loading
+                loadFailed -> FavoritesGridState.Failed
+                else -> FavoritesGridState.Ready
+            }
+            FlashcardsLoadStateContent(targetState = gridState, style = FlashcardsComponentStyle.OnGradient) { shownState ->
+                when (shownState) {
+                    FavoritesGridState.Loading -> loading()
+                    FavoritesGridState.Failed -> content {
+                        FlashcardsEmptyState(
+                            icon = Icons.Default.CloudOff,
+                            title = stringResource(R.string.favorites_load_error_title),
+                            supportingText = stringResource(R.string.favorites_load_error_message),
+                            modifier = Modifier.fillMaxSize(),
+                            tone = FlashcardsEmptyStateTone.Error,
                             style = FlashcardsComponentStyle.OnGradient,
+                            button = {
+                                FlashcardsFilledButton(
+                                    text = stringResource(R.string.favorites_load_error_retry_button),
+                                    onClick = onRetry,
+                                    style = FlashcardsComponentStyle.OnGradient,
+                                )
+                            },
                         )
-                    },
-                )
-                else -> {
-                    val gridState = rememberLazyGridState()
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = GridCells.Fixed(FAVORITE_GRID_COLUMNS),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .flashcardsGridScrollFade(gridState),
-                        contentPadding = PaddingValues(bottom = FlashcardsScrollFadeHeight),
-                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
-                        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
-                    ) {
-                        items(items = options, key = { option -> option.id }) { option ->
-                            FavoriteSubcategoryCard(
-                                name = option.name,
-                                categoryName = option.categoryName,
-                                iconSvg = option.iconSvg,
-                                selected = option.id in selectedIds,
-                                onSelectedChange = { onSubcategoryToggle(option.id) },
-                            )
-                        }
+                    }
+
+                    FavoritesGridState.Ready -> content {
+                        FavoritesGrid(options = options, selectedIds = selectedIds, onSubcategoryToggle = onSubcategoryToggle)
                     }
                 }
             }
         },
     )
+}
+
+/** What the grid slot shows; the options themselves are read straight from the step's parameters. */
+private enum class FavoritesGridState { Loading, Failed, Ready }
+
+@Composable
+private fun FavoritesGrid(
+    options: ImmutableList<FavoriteSubcategoryOption>,
+    selectedIds: ImmutableSet<String>,
+    onSubcategoryToggle: (String) -> Unit,
+) {
+    val gridState = rememberLazyGridState()
+    LazyVerticalGrid(
+        state = gridState,
+        columns = GridCells.Fixed(FAVORITE_GRID_COLUMNS),
+        modifier = Modifier
+            .fillMaxSize()
+            .flashcardsGridScrollFade(gridState),
+        contentPadding = PaddingValues(bottom = FlashcardsScrollFadeHeight),
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+    ) {
+        items(items = options, key = { option -> option.id }) { option ->
+            FavoriteSubcategoryCard(
+                name = option.name,
+                categoryName = option.categoryName,
+                iconSvg = option.iconSvg,
+                selected = option.id in selectedIds,
+                onSelectedChange = { onSubcategoryToggle(option.id) },
+            )
+        }
+    }
 }
 
 /**

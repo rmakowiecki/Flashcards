@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.browse.details.subcategory
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +21,6 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.AppBarRow
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +52,7 @@ import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
+import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
@@ -164,9 +163,6 @@ fun SubcategoryDetailsContent(
                 subcategoryName = state.subcategoryName,
                 categoryName = state.categoryName,
                 isFavorite = state.isFavorite,
-                visibleCardCount = (state.content as? FlashcardsList)?.flashcards?.size,
-                totalCount = state.totalCount,
-                hasActiveFilters = state.hasActiveFilters,
                 scrollBehavior = scrollBehavior,
                 onNavigateBack = onNavigateBack,
                 onFavoriteToggle = onFavoriteToggle,
@@ -187,24 +183,62 @@ fun SubcategoryDetailsContent(
             )
         },
     ) { innerPadding ->
-        Box(
+        SubcategoryDetailsBody(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (val content = state.content) {
-                Loading -> CircularProgressIndicator()
-                is FlashcardsList -> FlashcardList(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    flashcards = content.flashcards,
-                    listState = listState,
-                )
+            bodyState = state.content,
+            totalCount = state.totalCount,
+            hasActiveFilters = state.hasActiveFilters,
+            listState = listState,
+            onRetry = onRetry,
+            onResetFilters = onResetFilters,
+        )
+    }
 
-                is Error -> FlashcardsEmptyState(
+    SubcategoryDetailsDialogHost(activeDialog = state.activeDialog, onDialogEvent = onDialogEvent)
+}
+
+/**
+ * The list under its count overline, its empty and error states, and the delayed loading indicator,
+ * revealed as one block. The overline is part of the list's block, so it never shows beside the
+ * loading indicator.
+ */
+@Composable
+private fun SubcategoryDetailsBody(
+    modifier: Modifier = Modifier,
+    bodyState: SubcategoryDetailsContentState,
+    totalCount: Int,
+    hasActiveFilters: Boolean,
+    listState: LazyListState,
+    onRetry: () -> Unit,
+    onResetFilters: () -> Unit,
+) {
+    FlashcardsLoadStateContent(
+        targetState = bodyState,
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+        // Keyed by kind: a filter or sort change reorders the list in place instead of re-revealing it.
+        contentKey = { contentState -> contentState::class },
+    ) { contentState ->
+        when (contentState) {
+            Loading -> loading()
+            is FlashcardsList -> content {
+                Column(modifier = Modifier.align(Alignment.TopCenter)) {
+                    SubcategoryDetailsOverline(
+                        visibleCardCount = contentState.flashcards.size,
+                        totalCount = totalCount,
+                        hasActiveFilters = hasActiveFilters,
+                    )
+                    FlashcardList(flashcards = contentState.flashcards, listState = listState)
+                }
+            }
+
+            is Error -> content {
+                FlashcardsEmptyState(
                     icon = Icons.Filled.CloudOff,
                     title = stringResource(CoreUiR.string.common_load_error_title),
-                    supportingText = stringResource(content.messageRes),
+                    supportingText = stringResource(contentState.messageRes),
                     tone = FlashcardsEmptyStateTone.Error,
                     button = {
                         FlashcardsFilledButton(
@@ -213,9 +247,11 @@ fun SubcategoryDetailsContent(
                         )
                     },
                 )
-                // Resetting restores every tag and the difficulty range but deliberately leaves the sort order alone
-                // sort cannot cause an empty result, so resetting it here would undo an unrelated choice (ADR-0022).
-                NoMatches -> FlashcardsEmptyState(
+            }
+            // Resetting restores every tag and the difficulty range but deliberately leaves the sort order alone
+            // sort cannot cause an empty result, so resetting it here would undo an unrelated choice (ADR-0022).
+            NoMatches -> content {
+                FlashcardsEmptyState(
                     icon = Icons.Filled.SearchOff,
                     title = stringResource(R.string.subcategory_details_no_matches_title),
                     supportingText = stringResource(R.string.subcategory_details_no_matches_message),
@@ -230,61 +266,55 @@ fun SubcategoryDetailsContent(
             }
         }
     }
-
-    SubcategoryDetailsDialogHost(activeDialog = state.activeDialog, onDialogEvent = onDialogEvent)
 }
 
-/** [visibleCardCount] is `null` unless cards are listed, which hides the overline. */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("LongParameterList") // one field per rendered value; the whole state would recompose on every dialog draft tick.
 @Composable
 private fun SubcategoryDetailsTopBar(
     modifier: Modifier = Modifier,
     subcategoryName: String,
     categoryName: String,
     isFavorite: Boolean,
-    visibleCardCount: Int?,
-    totalCount: Int,
-    hasActiveFilters: Boolean,
     scrollBehavior: TopAppBarScrollBehavior,
     onNavigateBack: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onAddShortcut: () -> Unit,
 ) {
-    Column(modifier = modifier) {
-        FlashcardsTopAppBar(
-            title = subcategoryName,
-            subtitle = stringResource(R.string.subcategory_details_subtitle_label, categoryName),
-            onNavigateBack = onNavigateBack,
-            scrollBehavior = scrollBehavior,
-            actions = {
-                SubcategoryDetailsActions(
-                    isFavorite = isFavorite,
-                    onFavoriteToggle = onFavoriteToggle,
-                    onAddShortcut = onAddShortcut,
-                )
-            },
-        )
-        if (visibleCardCount != null) {
-            FlashcardsOverlineLabel(
-                text = if (hasActiveFilters) {
-                    pluralStringResource(
-                        R.plurals.subcategory_details_filtered_card_count_label,
-                        totalCount,
-                        visibleCardCount,
-                        totalCount,
-                    )
-                } else {
-                    pluralStringResource(
-                        R.plurals.browse_card_count_label,
-                        totalCount,
-                        totalCount,
-                    )
-                },
-                isHeading = false,
+    FlashcardsTopAppBar(
+        title = subcategoryName,
+        modifier = modifier,
+        subtitle = stringResource(R.string.subcategory_details_subtitle_label, categoryName),
+        onNavigateBack = onNavigateBack,
+        scrollBehavior = scrollBehavior,
+        actions = {
+            SubcategoryDetailsActions(
+                isFavorite = isFavorite,
+                onFavoriteToggle = onFavoriteToggle,
+                onAddShortcut = onAddShortcut,
             )
-        }
-    }
+        },
+    )
+}
+
+@Composable
+private fun SubcategoryDetailsOverline(visibleCardCount: Int, totalCount: Int, hasActiveFilters: Boolean) {
+    FlashcardsOverlineLabel(
+        text = if (hasActiveFilters) {
+            pluralStringResource(
+                R.plurals.subcategory_details_filtered_card_count_label,
+                totalCount,
+                visibleCardCount,
+                totalCount,
+            )
+        } else {
+            pluralStringResource(
+                R.plurals.browse_card_count_label,
+                totalCount,
+                totalCount,
+            )
+        },
+        isHeading = false,
+    )
 }
 
 @Suppress("LongParameterList") // one field per rendered value; the whole state would recompose on every dialog draft tick.
