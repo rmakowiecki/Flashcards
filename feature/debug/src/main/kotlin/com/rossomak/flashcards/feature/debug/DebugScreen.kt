@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
@@ -59,6 +60,7 @@ fun DebugScreen(
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
     onNavigateToVoiceIndicatorDebug: () -> Unit,
+    onNavigateToBackdropBlurDebug: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -78,6 +80,7 @@ fun DebugScreen(
         showcaseIntent = showcaseIntent,
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
+        onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
     )
 }
@@ -91,6 +94,7 @@ private fun DebugContent(
     showcaseIntent: Intent?,
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
+    onBackdropBlurDebugClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -132,6 +136,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_voice_indicator_message,
                             icon = Icons.Default.Mic,
                             onClick = onVoiceIndicatorDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_backdrop_blur_label,
+                            messageRes = R.string.debug_backdrop_blur_message,
+                            icon = Icons.Default.BlurOn,
+                            onClick = onBackdropBlurDebugClick,
                         ),
                     )
                     add(
@@ -214,6 +226,7 @@ private fun DebugContentPreview() {
             showcaseIntent = null,
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
+            onBackdropBlurDebugClick = {},
             onReplayOnboardingClick = {},
         )
     }

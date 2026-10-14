@@ -102,6 +102,17 @@ class ArchitectureKonsistTest {
             }
     }
 
+    @Test
+    fun `only the backdrop blur wrapper imports Haze`() {
+        // ADR-0062: Haze stays an implementation detail of the blurBackdrop* modifiers.
+        projectScope
+            .files
+            .filter { !it.path.endsWith("/core/ui/backdrop/BlurBackdrop.kt") }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name.startsWith("dev.chrisbanes.haze") }
+            }
+    }
+
     private fun typeArgumentNames(typeArguments: List<KoTypeArgumentDeclaration>?): List<String> =
         typeArguments.orEmpty().flatMap { listOf(it.name) + typeArgumentNames(it.typeArguments) }
 

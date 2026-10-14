@@ -10,12 +10,14 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import com.rossomak.flashcards.BuildConfig
+import com.rossomak.flashcards.feature.debug.DebugBackdropBlurRoot
 import com.rossomak.flashcards.feature.debug.DebugGraph
 import com.rossomak.flashcards.feature.debug.DebugRoot
 import com.rossomak.flashcards.feature.debug.DebugScreen
 import com.rossomak.flashcards.feature.debug.DebugVoiceIndicatorRoot
 import com.rossomak.flashcards.feature.debug.DebugVoiceRoot
 import com.rossomak.flashcards.feature.debug.R as DebugR
+import com.rossomak.flashcards.feature.debug.backdropblur.BackdropBlurDebugScreen
 import com.rossomak.flashcards.feature.debug.voice.VoiceDebugScreen
 import com.rossomak.flashcards.feature.debug.voiceindicator.VoiceIndicatorDebugScreen
 
@@ -52,10 +54,14 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 onNavigateToOnboarding = onNavigateToOnboarding,
                 onNavigateToVoiceDebug = { navController.navigate(DebugVoiceRoot) },
                 onNavigateToVoiceIndicatorDebug = { navController.navigate(DebugVoiceIndicatorRoot) },
+                onNavigateToBackdropBlurDebug = { navController.navigate(DebugBackdropBlurRoot) },
             )
         }
         composable<DebugVoiceRoot> {
             VoiceDebugScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable<DebugBackdropBlurRoot> {
+            BackdropBlurDebugScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable<DebugVoiceIndicatorRoot> {
             VoiceIndicatorDebugScreen(onNavigateBack = { navController.popBackStack() })

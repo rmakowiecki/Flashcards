@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.domain.repository
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import kotlinx.coroutines.CompletableDeferred
 
 class FakeFlashcardRepository : FlashcardRepository {
     var categoriesToReturn: Result<List<Category>> = Result.success(emptyList())
@@ -25,11 +26,17 @@ class FakeFlashcardRepository : FlashcardRepository {
     /** Every subcategory id [fetchFlashcards] was called with, in call order. */
     val fetchedSubcategoryIds: MutableList<String> = mutableListOf()
 
+    /** Every id set [fetchCategoriesByIds] was called with, in call order. */
+    val fetchedCategoryIds: MutableList<Set<String>> = mutableListOf()
+
     /** How many times [invalidateFlashcardCache] was called, for tests that drive the cache seam. */
     var invalidationCount: Int = 0
         private set
 
     var cacheSeedToReturn: Result<Int> = Result.success(0)
+
+    /** When set, [fetchFlashcards] suspends until it completes, so a test can observe state mid-draw. */
+    var fetchFlashcardsGate: CompletableDeferred<Unit>? = null
 
     override suspend fun fetchCategories(): Result<List<Category>> = categoriesToReturn
 
@@ -38,7 +45,10 @@ class FakeFlashcardRepository : FlashcardRepository {
         return subcategoriesToReturn
     }
 
-    override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> = categoriesByIdsToReturn
+    override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> {
+        fetchedCategoryIds += ids
+        return categoriesByIdsToReturn
+    }
 
     override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> = subcategoriesByIdsToReturn
 
@@ -49,6 +59,7 @@ class FakeFlashcardRepository : FlashcardRepository {
 
     override suspend fun fetchFlashcards(subcategoryId: String): Result<List<Flashcard>> {
         fetchedSubcategoryIds += subcategoryId
+        fetchFlashcardsGate?.await()
         return flashcardsBySubcategory[subcategoryId] ?: flashcardsToReturn
     }
 

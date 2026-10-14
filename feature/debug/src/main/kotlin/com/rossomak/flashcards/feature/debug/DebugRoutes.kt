@@ -12,3 +12,6 @@ import kotlinx.serialization.Serializable
 
 /** The voice capture indicator preview, animated from a synthetic level stream — no audio involved. */
 @Serializable object DebugVoiceIndicatorRoot
+
+/** Backdrop blur harness with a live radius slider. */
+@Serializable object DebugBackdropBlurRoot

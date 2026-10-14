@@ -27,16 +27,8 @@ internal data class FlashcardsSegmentedProgressBarMetrics(
     val segmentGap: Dp,
 )
 
-/** Geometry for [FlashcardsCircularProgressRing]: overall diameter plus stroke width. */
-internal data class FlashcardsCircularProgressRingMetrics(
-    val diameter: Dp,
-    val strokeWidth: Dp,
-)
-
 /**
- * Track height (linear) / stroke width (circular) shared by every `Flashcards*Progress*`
- * composable at the given [FlashcardsComponentSize] — one resolver, since the design uses the
- * same thickness value for both shapes.
+ * Track height shared by the linear and segmented bars at the given [FlashcardsComponentSize].
  */
 @Composable
 @ReadOnlyComposable
@@ -64,21 +56,6 @@ internal fun FlashcardsComponentSize.segmentedProgressBarMetrics(
     segmentHeight = thickness(),
     segmentGap = spacing.xxsmall,
 )
-
-@Composable
-@ReadOnlyComposable
-internal fun FlashcardsComponentSize.circularProgressRingMetrics(
-    sizes: AppSizes = MaterialTheme.sizes,
-): FlashcardsCircularProgressRingMetrics = when (this) {
-    FlashcardsComponentSize.Normal -> FlashcardsCircularProgressRingMetrics(
-        diameter = sizes.progressRingDiameterNormal,
-        strokeWidth = thickness(sizes),
-    )
-    FlashcardsComponentSize.Small -> FlashcardsCircularProgressRingMetrics(
-        diameter = sizes.progressRingDiameterSmall,
-        strokeWidth = thickness(sizes),
-    )
-}
 
 /** Fill color for the given [style], shared by every `Flashcards*Progress*` composable. */
 @Composable
@@ -124,8 +101,7 @@ internal fun clampFilledSegmentCount(filledSegmentCount: Int, segmentCount: Int)
     filledSegmentCount.coerceIn(0, segmentCount)
 
 /**
- * Default fill-transition spec for [FlashcardsLinearProgressBar]/[FlashcardsCircularProgressRing]
- * — reuses [FlashcardsMotion]'s standard medium duration/easing rather than a bespoke value.
+ * Default fill-transition spec for [FlashcardsLinearProgressBar] — reuses [FlashcardsMotion]'s standard medium duration/easing rather than a bespoke value.
  *
  * Not part of either composable's public signature — `AnimationSpec<T>` carries no `@Stable`/
  * `@Immutable` annotation in `androidx.compose.animation.core`, so exposing it as a parameter type

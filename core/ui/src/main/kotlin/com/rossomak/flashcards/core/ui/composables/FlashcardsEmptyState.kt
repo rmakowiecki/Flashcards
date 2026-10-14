@@ -24,7 +24,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone.Error
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone.Info
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -37,11 +39,8 @@ import com.rossomak.flashcards.core.ui.theme.semanticColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 
-/** Container fill alpha for [FlashcardsEmptyStateTone.Error]'s [OnGradient] circle. */
-private const val ON_GRADIENT_ERROR_CONTAINER_ALPHA = 0.33f
-
-/** Border alpha for [FlashcardsEmptyStateTone.Error]'s [OnGradient] circle. */
-private const val ON_GRADIENT_ERROR_BORDER_ALPHA = 0.5f
+private val EMPTY_STATE_CIRCLE_SIZE = 80.dp
+private val EMPTY_STATE_ICON_SIZE = 40.dp
 
 /**
  * The shared layout for "nothing to show" and "something went wrong" screens: a tinted, color-coded
@@ -65,8 +64,8 @@ private const val ON_GRADIENT_ERROR_BORDER_ALPHA = 0.5f
  * [style] follows the shared on-surface/on-gradient axis every `Flashcards*` component family uses
  * (ADR-0034). [OnGradient]'s [FlashcardsEmptyStateTone.Error] circle mirrors
  * [FlashcardsXpBreakdownRow][com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]'s
- * own `Loss` tone: `semanticColors.onGradientLossContainer` at a low alpha for the fill and a higher
- * one for the border, so the gradient shows through rather than sitting under a flat, opaque circle.
+ * own `Loss` tone: `semanticColors.onGradientLossContainer` for the fill and `onGradientLossBorder`
+ * for the border.
  * The icon and title use `brandColors.onGradientLoss` rather than [OnSurface]'s own
  * `onNegativeContainer` red: that token is tuned for a themed surface and falls short of the
  * body-text contrast floor against the gradient, whereas `onGradientLoss` is pinned for exactly this
@@ -126,13 +125,13 @@ private fun emptyStateColors(
                 border = BorderStroke(width = MaterialTheme.sizes.hairline, color = brandColors.onGradientBorder),
             )
             Error -> EmptyStateColors(
-                container = semanticColors.onGradientLossContainer.copy(alpha = ON_GRADIENT_ERROR_CONTAINER_ALPHA),
+                container = semanticColors.onGradientLossContainer,
                 icon = brandColors.onGradientLoss,
                 title = brandColors.onGradientLoss,
                 supportingText = brandColors.onGradientContent,
                 border = BorderStroke(
                     width = MaterialTheme.sizes.hairline,
-                    color = semanticColors.onGradientLossContainer.copy(alpha = ON_GRADIENT_ERROR_BORDER_ALPHA),
+                    color = semanticColors.onGradientLossBorder,
                 ),
             )
         }
@@ -147,6 +146,7 @@ fun FlashcardsEmptyState(
     modifier: Modifier = Modifier,
     tone: FlashcardsEmptyStateTone = Info,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
     button: (@Composable () -> Unit)? = null,
 ) {
     val colors = emptyStateColors(tone, style)
@@ -156,7 +156,9 @@ fun FlashcardsEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            modifier = Modifier.size(MaterialTheme.sizes.emptyStateIconCircle),
+            modifier = Modifier
+                .size(EMPTY_STATE_CIRCLE_SIZE)
+                .blurBackdrop(shape = CircleShape, enabled = blursBackdrop),
             shape = CircleShape,
             color = colors.container,
             contentColor = colors.icon,
@@ -167,7 +169,7 @@ fun FlashcardsEmptyState(
                     imageVector = icon,
                     // Decorative: the title below already names the state for a screen reader.
                     contentDescription = null,
-                    modifier = Modifier.size(MaterialTheme.sizes.emptyStateIcon),
+                    modifier = Modifier.size(EMPTY_STATE_ICON_SIZE),
                 )
             }
         }

@@ -23,7 +23,6 @@ data class BrandColors(
     val progressBarTrackOnGradient: Color,
     val onGradientContainer: Color,
     val onGradientBorder: Color,
-    val onGradientOutline: Color,
     val onGradientContent: Color,
     val onGradientLoss: Color,
 )
@@ -130,27 +129,17 @@ private val progressBarTrackOnGradientColor = Color.White.copy(alpha = PROGRESS_
  * behind a [com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton], a
  * [com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge], a
  * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner]. One fill and one
- * border for all of them: before these tokens existed each component carried its own private
- * alpha constants and they had drifted three ways (0.18/0.35, 0.16/0.22, and a lone 0.55), so the
- * same "white on gradient" surface read differently per component.
+ * border for all of them, buttons included, so the same "white on gradient" surface reads the same
+ * on every component.
  *
  * Fixed across themes like every other on-gradient color here — the gradients they sit on never
  * flip either.
  */
-private const val ON_GRADIENT_CONTAINER_ALPHA = 0.18f
+private const val ON_GRADIENT_CONTAINER_ALPHA = 0.24f
 private const val ON_GRADIENT_BORDER_ALPHA = 0.35f
-
-/**
- * Border alpha for a component with **no fill** behind it — currently only
- * [com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton]. Deliberately
- * heavier than [ON_GRADIENT_BORDER_ALPHA]: with no container to define the shape the outline is
- * doing that job alone, and 0.35 reads mushy against the gradient.
- */
-private const val ON_GRADIENT_OUTLINE_ALPHA = 0.55f
 
 private val onGradientContainerColor = Color.White.copy(alpha = ON_GRADIENT_CONTAINER_ALPHA)
 private val onGradientBorderColor = Color.White.copy(alpha = ON_GRADIENT_BORDER_ALPHA)
-private val onGradientOutlineColor = Color.White.copy(alpha = ON_GRADIENT_OUTLINE_ALPHA)
 
 /**
  * The red a negative row uses on a brand gradient — currently
@@ -180,7 +169,6 @@ val lightBrandColors = BrandColors(
     progressBarTrackOnGradient = progressBarTrackOnGradientColor,
     onGradientContainer = onGradientContainerColor,
     onGradientBorder = onGradientBorderColor,
-    onGradientOutline = onGradientOutlineColor,
     onGradientContent = onBrandTopBarGradient,
     onGradientLoss = onGradientLossColor,
 )
@@ -207,7 +195,6 @@ val darkBrandColors = BrandColors(
     progressBarTrackOnGradient = progressBarTrackOnGradientColor,
     onGradientContainer = onGradientContainerColor,
     onGradientBorder = onGradientBorderColor,
-    onGradientOutline = onGradientOutlineColor,
     onGradientContent = onBrandTopBarGradient,
     onGradientLoss = onGradientLossColor,
 )

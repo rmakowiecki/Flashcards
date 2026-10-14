@@ -13,6 +13,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
+import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
@@ -51,6 +52,7 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList") // one UseCase per collaborator; a holder class would only rename the sprawl.
 class PreviewStudySessionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val getCategory: GetCategoryUseCase,
     private val getSubcategories: GetSubcategoriesUseCase,
     private val selectSessionFlashcards: SelectSessionFlashcardsUseCase,
     private val sampleQuickSessionSubcategories: SampleQuickSessionSubcategoriesUseCase,
@@ -140,6 +142,12 @@ class PreviewStudySessionViewModel @Inject constructor(
      * answering and read-aloud, for this session only.
      */
     init {
+        viewModelScope.launch {
+            // Cosmetic: a failed lookup leaves the hero's fallback glyph and never blocks the session.
+            getCategory(route.categoryId).onSuccess { category ->
+                _state.update { it.copy(categoryIconSvg = category.iconSvg) }
+            }
+        }
         viewModelScope.launch {
             val defaults = observeStudySessionPreferences().first()
             hasSeenVoiceAnsweringInfo = observeUserPreferences().first().hasSeenVoiceAnsweringInfo
@@ -330,12 +338,16 @@ class PreviewStudySessionViewModel @Inject constructor(
      * Restores the filters the screen was originally handed — `route.filterTagIds`/
      * `route.difficultyRange` — discarding any in-screen narrowing. Does not open the Filters
      * dialog: this is a direct reset, not a shortcut into editing.
+     *
+     * No route tags means every tag, seeded here straight away rather than when the draw lands:
+     * the Subcategory set is unchanged, so [PreviewStudySessionScreenState.availableTags] is
+     * already the right vocabulary, and an open settings sheet goes to "All tags" in one step.
      */
     fun onResetFilters() {
         _state.update {
             it.copy(
                 config = it.config.copy(
-                    tagIds = route.filterTagIds.toSet(),
+                    tagIds = route.filterTagIds.toSet().ifEmpty { it.availableTags.toSet() },
                     difficultyRange = route.difficultyRange,
                 ),
             )
@@ -360,9 +372,12 @@ class PreviewStudySessionViewModel @Inject constructor(
     /**
      * A Rated session with voice answering only leaves this screen with the microphone granted —
      * anything else keeps the user here with voice answering still selected.
+     *
+     * Ignored while a draw runs: [selectedCardIds] hasn't caught up with the latest edit yet, and
+     * the button stays enabled so a draw served from cache doesn't blink it.
      */
     fun onStartSession() {
-        if (selectedCardIds.isEmpty() || sessionStartInFlight) return
+        if (selectedCardIds.isEmpty() || sessionStartInFlight || _state.value.isLoading) return
         sessionStartInFlight = true
         viewModelScope.launch {
             if (_state.value.isMicPermissionNeeded && !ensureMicPermission()) {
@@ -396,10 +411,12 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * `isLoading` is set unconditionally, not just on the initial load: [canStart] gates the Start
-     * button on it, and a resample or filter change needs that same gate — otherwise Start stays
-     * clickable against a [selectedCardIds] that hasn't caught up with the Subcategory set just
-     * written to `config.subcategoryIds` below.
+     * `isLoading` is set unconditionally, not just on the initial load: [onStartSession] ignores
+     * taps while it is set, since [selectedCardIds] hasn't caught up with the user's latest edit.
+     *
+     * The resolved Subcategories and everything drawn from them are published together when the
+     * draw lands, never ahead of it: the hero keeps the previous drawn session until then, so its
+     * numbers change once (see [PreviewStudySessionScreenState]).
      *
      * @param resampleQuickSession rerolls the Quick Session's Subcategory sample first, fetching the
      * pool if none is held yet. A pool that cannot be fetched sets [PreviewStudySessionScreenState.isLoadFailed].
@@ -409,52 +426,49 @@ class PreviewStudySessionViewModel @Inject constructor(
         selectionJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, isLoadFailed = false) }
             val resolved = resolveSubcategories(resampleQuickSession) ?: return@launch
-            _state.update { state ->
-                state.copy(
-                    subcategoryNames = resolved.names,
-                    config = state.config.copy(
-                        subcategoryIds = resolved.ids,
-                        // A changed Subcategory set invalidates any tags carried from the
-                        // previous one — tags belong to a single Subcategory (ADR-0030).
-                        tagIds = if (resolved.ids != state.config.subcategoryIds) {
-                            emptySet()
-                        } else {
-                            state.config.tagIds
-                        },
-                    ),
+            val isSingleSubcategory = resolved.names.size == 1
+            val resolvedConfig = _state.value.config.let { config ->
+                config.copy(
+                    subcategoryIds = resolved.ids,
+                    // A changed Subcategory set invalidates any tags carried from the
+                    // previous one — tags belong to a single Subcategory (ADR-0030).
+                    tagIds = if (resolved.ids != config.subcategoryIds) emptySet() else config.tagIds,
                 )
             }
-            val selectionConfig = _state.value.config.forSelection(isSingleSubcategory = _state.value.isSingleSubcategory)
-            selectSessionFlashcards(selectionConfig)
+            selectSessionFlashcards(resolvedConfig.forSelection(isSingleSubcategory = isSingleSubcategory))
                 .onSuccess { plan ->
                     lastDrawnCards = plan.cards
                     selectedCardIds = plan.cards.map { it.id }
+                    // Tags belong to one subcategory, so a multi-subcategory session has no
+                    // coherent tag vocabulary to offer (ADR-0030).
+                    val availableTags = if (isSingleSubcategory) plan.poolTags else emptyList()
                     _state.update { state ->
-                        // Tags belong to one subcategory, so a multi-subcategory session has no
-                        // coherent tag vocabulary to offer (ADR-0030).
-                        val availableTags = if (state.isSingleSubcategory) plan.poolTags else emptyList()
-                        state.copy(
-                            isLoading = false,
-                            isLoadFailed = false,
-                            selectedCardCount = plan.cards.size,
-                            estimatedMinutes = plan.estimatedMinutes,
-                            availableTags = availableTags,
+                        // Laid over the live config, so an edit that needs no redraw (sort,
+                        // switching to manual answering) made while this draw ran is kept.
+                        val drawnConfig = state.config.copy(
+                            subcategoryIds = resolvedConfig.subcategoryIds,
                             // Materializes "no tag filter" into every tag actually selected, the
                             // same seed SubcategoryDetails applies on its own first load — mirrored
                             // here rather than left as a dialog-open-only translation, since
                             // config.tagIds is the same field a session is drawn from (ADR-0038).
                             // Idempotent once seeded: a route-carried or user-chosen tagIds is
                             // already non-empty and is left alone.
-                            config = if (state.config.tagIds.isEmpty() && availableTags.isNotEmpty()) {
-                                state.config.copy(tagIds = availableTags.toSet())
-                            } else {
-                                state.config
-                            },
+                            tagIds = resolvedConfig.tagIds.ifEmpty { availableTags.toSet() },
+                        )
+                        state.copy(
+                            isLoading = false,
+                            isLoadFailed = false,
+                            subcategoryNames = resolved.names,
+                            config = drawnConfig,
+                            hasDrawnSession = true,
+                            selectedCardCount = plan.cards.size,
+                            estimatedMinutes = plan.estimatedMinutes,
+                            availableTags = availableTags,
                         )
                     }
                 }
                 .onFailure {
-                    _state.update { it.copy(isLoading = false, isLoadFailed = true) }
+                    _state.update { it.copy(isLoading = false, isLoadFailed = true, hasDrawnSession = false) }
                 }
         }
     }
@@ -492,7 +506,7 @@ class PreviewStudySessionViewModel @Inject constructor(
             ?.associate { subcategory -> subcategory.id to subcategory.name }
             ?.also { fetchedPool -> candidatePool = fetchedPool }
         if (pool == null) {
-            _state.update { it.copy(isLoading = false, isLoadFailed = true) }
+            _state.update { it.copy(isLoading = false, isLoadFailed = true, hasDrawnSession = false) }
             return false
         }
         val sampledIds = sampleQuickSessionSubcategories(

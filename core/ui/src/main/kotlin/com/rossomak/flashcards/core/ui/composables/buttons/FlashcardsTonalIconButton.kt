@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.FilledIconButton
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -42,13 +44,16 @@ fun FlashcardsTonalIconButton(
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     enabled: Boolean = true,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+    blursBackdrop: Boolean = style == FlashcardsComponentStyle.OnGradient,
 ) {
     val metrics = size.metrics()
 
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(metrics.height),
+        modifier = modifier
+            .size(metrics.height)
+            .blurBackdrop(shape = CircleShape, enabled = blursBackdrop),
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = enabledButtonContainerColorFor(style, MaterialTheme.colorScheme.secondaryContainer),
             contentColor = enabledButtonContentColorFor(style, MaterialTheme.colorScheme.onSecondaryContainer),

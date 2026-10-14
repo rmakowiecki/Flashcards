@@ -25,7 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone.Info
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone.Positive
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone.Warning
@@ -38,6 +40,8 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.semanticColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val BANNER_ICON_SIZE = 16.dp
 
 /**
  * The tip/info banner — a single-line-or-wrapping strip that explains a rule, a consequence, or a
@@ -66,6 +70,7 @@ fun FlashcardsInfoBanner(
     modifier: Modifier = Modifier,
     tone: FlashcardsInfoBannerTone = Info,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
 ) {
     val semanticColors = MaterialTheme.semanticColors
     val brandColors = MaterialTheme.brandColors
@@ -77,6 +82,7 @@ fun FlashcardsInfoBanner(
         }
         OnGradient -> brandColors.onGradientContainer
     }
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium)
     val contentColor = when (style) {
         OnSurface -> when (tone) {
             Positive -> semanticColors.onPositiveContainer
@@ -94,8 +100,8 @@ fun FlashcardsInfoBanner(
     }
 
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium),
+        modifier = modifier.blurBackdrop(shape = shape, enabled = blursBackdrop),
+        shape = shape,
         color = containerColor,
         contentColor = contentColor,
         border = border,
@@ -112,7 +118,7 @@ fun FlashcardsInfoBanner(
                 imageVector = icon,
                 // Decorative: the banner text carries the whole message.
                 contentDescription = null,
-                modifier = Modifier.size(MaterialTheme.sizes.infoBannerIcon),
+                modifier = Modifier.size(BANNER_ICON_SIZE),
             )
             Text(text = text, style = MaterialTheme.typography.bodySmall)
         }

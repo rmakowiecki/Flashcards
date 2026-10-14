@@ -1,28 +1,19 @@
 package com.rossomak.flashcards.core.ui.composables
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
-import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large
-import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Medium
-import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small
-import com.rossomak.flashcards.core.ui.theme.sizes
+import androidx.compose.ui.unit.dp
 
 /**
  * Size tier of a [FlashcardsAvatar]: each entry fixes the circle's diameter. The initials, the
  * person icon and the photo all scale linearly with it.
  */
-enum class FlashcardsAvatarSize {
-    Small,
-    Medium,
-    Large;
+enum class FlashcardsAvatarSize(val diameter: Dp) {
+    /** Settings' top app bar. */
+    Small(32.dp),
 
-    val diameter: Dp
-        @Composable get() = with(MaterialTheme.sizes) {
-            when (this@FlashcardsAvatarSize) {
-                Small -> avatarSmall
-                Medium -> avatarMedium
-                Large -> avatarLarge
-            }
-        }
+    /** Level card. */
+    Medium(56.dp),
+
+    /** Account header. */
+    Large(88.dp),
 }

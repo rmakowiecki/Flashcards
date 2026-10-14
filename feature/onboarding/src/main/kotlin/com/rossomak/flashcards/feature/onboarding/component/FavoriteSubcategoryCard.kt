@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.DEFAULT_CONTAINER_ALPHA
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -50,9 +51,12 @@ private val PreviewCardHeight = 96.dp
  * parent category, and a trailing bookmark that fills once picked.
  *
  * Unselected cards sit in the same translucent-on-gradient treatment as
- * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner]'s `OnGradient` style —
- * they read as glass panes over the brand background. A picked card switches to an opaque themed
- * surface so it visibly pops off the grid instead of only gaining a border.
+ * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner]'s `OnGradient` style,
+ * with the heavier `onGradientButtonBorder` like the other selection cards. A picked card switches to
+ * an opaque themed surface so it visibly pops off the grid instead of only gaining a border.
+ *
+ * [blursBackdrop] only adds the backdrop blur; it defaults to on while unselected, since a picked
+ * card's opaque surface hides it.
  *
  * A toggleable card rather than a row with a checkbox — the Favorites step lays these out as a
  * two-column grid, and the whole card is the target. One `toggleable` node with [Role.Checkbox], so
@@ -66,22 +70,26 @@ internal fun FavoriteSubcategoryCard(
     selected: Boolean,
     onSelectedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    blursBackdrop: Boolean = !selected,
 ) {
     val brandColors = MaterialTheme.brandColors
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.card)
 
     Surface(
-        modifier = modifier.toggleable(
-            value = selected,
-            role = Role.Checkbox,
-            onValueChange = onSelectedChange,
-        ),
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.card),
+        modifier = modifier
+            .blurBackdrop(shape = shape, enabled = blursBackdrop)
+            .toggleable(
+                value = selected,
+                role = Role.Checkbox,
+                onValueChange = onSelectedChange,
+            ),
+        shape = shape,
         color = if (selected) MaterialTheme.colorScheme.surface else brandColors.onGradientContainer,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else brandColors.onGradientContent,
         border = if (selected) {
             null
         } else {
-            BorderStroke(MaterialTheme.sizes.onGradientBorder, brandColors.onGradientBorder)
+            BorderStroke(MaterialTheme.sizes.onGradientButtonBorder, brandColors.onGradientBorder)
         },
     ) {
         Column(

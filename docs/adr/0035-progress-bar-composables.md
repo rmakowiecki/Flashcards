@@ -1,5 +1,8 @@
 # Progress bar composables: linear, segmented, circular
 
+**Partially superseded:** the generic circular ring described below was removed; see
+[Amendment: one ring, the list-row ring](#amendment-one-ring-the-list-row-ring).
+
 ## Decision
 
 `core:ui` gets three progress composables, in `composables/progress/`, each in its own file — one
@@ -19,6 +22,7 @@ it's a parallel, not the reason this split exists.)
   progress are different enough inputs that folding them into one signature would mean one or the
   other parameter is always unused.
 - `FlashcardsCircularProgressRing` — determinate ring, `Normal`/`Small` via `FlashcardsComponentSize`.
+  **Superseded:** removed, see the final Amendment.
 
 **Deliberately excluded from this batch:**
 
@@ -112,9 +116,21 @@ this codebase's flat, role-based taxonomy).
 
 - `BrandColors` gains four new fields (`progressBarFillOnSurface`, `progressBarTrackOnSurface`,
   `progressBarFillOnGradient`, `progressBarTrackOnGradient`); `AppSizes` gains four
-  (`progressBarThicknessNormal/Small`, `progressRingDiameterNormal/Small`).
+  (`progressBarThicknessNormal/Small`, `progressRingDiameterNormal/Small`). **Superseded:** the
+  `progressRingDiameter*` tokens were removed, see the final Amendment.
 - Any composite component that embeds one of these bars (Level/XP card, "Continue learning" card,
   list-row rings, the 88dp daily-goal ring) is future work, built against real domain data once
   those screens are reached — not designed speculatively here.
 - Exact `progressBarTrackOnSurface`/`OnGradient` alpha values may be revisited once a concrete
   screen renders these on a real background (mirrors the same caveat in ADR-0033).
+
+## Amendment: one ring, the list-row ring
+
+`FlashcardsCircularProgressRing` never gained a production caller, while the list-row
+`FlashcardsProgressRing` (Browse search and Category Details Topic rows) shipped with its own look:
+3dp stroke, `colorScheme.primary` fill over a 16% `primary` track, butt ends, no animation, and a
+built-in percentage plus a nullable unknown state. Two rings with different looks was one too many,
+so the unused generic ring, its metrics and the `progressRingDiameterNormal/Small` tokens are
+removed and `FlashcardsProgressRing` is the only ring. The progress family above is now linear and
+segmented; a future ring use (the "Continue learning" card, the daily-goal ring) extends
+`FlashcardsProgressRing` against its real design rather than reviving the generic one.

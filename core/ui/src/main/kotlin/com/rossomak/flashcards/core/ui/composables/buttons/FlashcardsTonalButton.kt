@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -45,15 +46,19 @@ fun FlashcardsTonalButton(
     icon: ImageVector? = null,
     iconPosition: FlashcardsButtonIconPosition = FlashcardsButtonIconPosition.Leading,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+    blursBackdrop: Boolean = style == FlashcardsComponentStyle.OnGradient,
 ) {
     val onGradient = style == FlashcardsComponentStyle.OnGradient
     val metrics = size.metrics()
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.full)
 
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier.height(metrics.height),
+        modifier = modifier
+            .height(metrics.height)
+            .blurBackdrop(shape = shape, enabled = blursBackdrop),
         enabled = enabled,
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.full),
+        shape = shape,
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = enabledButtonContainerColorFor(style, MaterialTheme.brandColors.tonalButtonContainer),
             contentColor = enabledButtonContentColorFor(style, MaterialTheme.brandColors.onTonalButtonContainer),
@@ -62,8 +67,8 @@ fun FlashcardsTonalButton(
         ),
         border = when {
             !onGradient -> null
-            !enabled -> BorderStroke(MaterialTheme.sizes.onGradientBorder, disabledButtonContentColorFor(style))
-            else -> BorderStroke(MaterialTheme.sizes.onGradientBorder, MaterialTheme.brandColors.onGradientBorder)
+            !enabled -> BorderStroke(MaterialTheme.sizes.onGradientButtonBorder, disabledButtonContentColorFor(style))
+            else -> BorderStroke(MaterialTheme.sizes.onGradientButtonBorder, MaterialTheme.brandColors.onGradientBorder)
         },
         contentPadding = PaddingValues(horizontal = metrics.horizontalPadding, vertical = MaterialTheme.spacing.none),
     ) {

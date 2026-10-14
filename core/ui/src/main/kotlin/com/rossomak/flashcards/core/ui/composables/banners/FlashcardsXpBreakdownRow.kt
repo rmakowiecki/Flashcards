@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone.Gain
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone.Loss
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -33,12 +34,6 @@ import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.semanticColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
-
-/** Container fill alpha for the [FlashcardsXpBreakdownTone.Loss] row's red tint. */
-private const val LOSS_CONTAINER_ALPHA = 0.33f
-
-/** Border alpha for the [FlashcardsXpBreakdownTone.Loss] row. */
-private const val LOSS_BORDER_ALPHA = 0.5f
 
 /**
  * One line of a session's XP breakdown, drawn on the brand gradient: a leading icon, a recessed
@@ -63,12 +58,13 @@ fun FlashcardsXpBreakdownRow(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     tone: FlashcardsXpBreakdownTone = Gain,
+    blursBackdrop: Boolean = true,
 ) {
     val brandColors = MaterialTheme.brandColors
     val semanticColors = MaterialTheme.semanticColors
     val containerColor = when (tone) {
         Gain -> brandColors.onGradientContainer
-        Loss -> semanticColors.onGradientLossContainer.copy(alpha = LOSS_CONTAINER_ALPHA)
+        Loss -> semanticColors.onGradientLossContainer
     }
     val contentColor = when (tone) {
         Gain -> brandColors.onGradientContent
@@ -76,15 +72,19 @@ fun FlashcardsXpBreakdownRow(
     }
     val borderColor = when (tone) {
         Gain -> brandColors.onGradientBorder
-        Loss -> semanticColors.onGradientLossContainer.copy(alpha = LOSS_BORDER_ALPHA)
+        Loss -> semanticColors.onGradientLossBorder
     }
 
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium)
+
     Surface(
-        modifier = modifier.semantics(mergeDescendants = true) {},
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium),
+        modifier = modifier
+            .semantics(mergeDescendants = true) {}
+            .blurBackdrop(shape = shape, enabled = blursBackdrop),
+        shape = shape,
         color = containerColor,
         contentColor = contentColor,
-        border = BorderStroke(width = MaterialTheme.sizes.onGradientBorder, color = borderColor),
+        border = BorderStroke(width = MaterialTheme.sizes.hairline, color = borderColor),
     ) {
         Row(
             modifier = Modifier.padding(

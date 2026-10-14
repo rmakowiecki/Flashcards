@@ -7,13 +7,25 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 
+/**
+ * [config] is what the user asked for and updates on every edit. The drawn session —
+ * [subcategoryNames], [selectedCardCount], [estimatedMinutes] and [availableTags] — is published in
+ * one update when a draw lands, so the hero's numbers change once per edit rather than half before
+ * the draw and half after it.
+ */
 data class PreviewStudySessionScreenState(
     val categoryName: String = "",
+    val categoryIconSvg: String? = null,
     val subcategoryNames: List<String> = emptyList(),
     val sourceType: SessionSourceType = SingleSubcategory,
     val isLoading: Boolean = true,
     val isLoadFailed: Boolean = false, // A read failed, most often offline; Retry can recover.
     val config: StudySessionConfig = StudySessionConfig(subcategoryIds = emptyList()),
+    /**
+     * A drawn session is on screen to keep during a redraw. False before the first draw lands and
+     * after a failed one, which is when a load shows the loading indicator instead.
+     */
+    val hasDrawnSession: Boolean = false,
     val selectedCardCount: Int = 0,
     val estimatedMinutes: Int = 0,
     /**
@@ -50,5 +62,9 @@ data class PreviewStudySessionScreenState(
      */
     val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
 
-    val canStart: Boolean get() = !isLoading && !isLoadFailed && selectedCardCount > 0
+    /**
+     * Not gated on [isLoading], so a redraw served from cache doesn't blink Start disabled; a tap
+     * during a redraw is ignored by the ViewModel instead.
+     */
+    val canStart: Boolean get() = !isLoadFailed && selectedCardCount > 0
 }

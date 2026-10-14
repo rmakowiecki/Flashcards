@@ -31,7 +31,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
@@ -42,6 +44,9 @@ import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
+
+private val BADGE_HEIGHT_COMPACT = 24.dp
+private val BADGE_HEIGHT = 32.dp
 
 /** Geometry for [FlashcardsMetadataBadge] at a given [FlashcardsComponentSize]. */
 private data class FlashcardsMetadataBadgeMetrics(
@@ -57,12 +62,12 @@ private fun FlashcardsComponentSize.metadataBadgeMetrics(
     typography: Typography = MaterialTheme.typography,
 ): FlashcardsMetadataBadgeMetrics = when (this) {
     FlashcardsComponentSize.Normal -> FlashcardsMetadataBadgeMetrics(
-        height = sizes.metadataBadgeHeight,
+        height = BADGE_HEIGHT,
         iconSize = sizes.metadataBadgeIcon,
         textStyle = typography.labelMedium,
     )
     FlashcardsComponentSize.Small -> FlashcardsMetadataBadgeMetrics(
-        height = sizes.metadataBadgeHeightCompact,
+        height = BADGE_HEIGHT_COMPACT,
         iconSize = sizes.metadataBadgeIconCompact,
         textStyle = typography.labelSmall,
     )
@@ -86,6 +91,7 @@ fun FlashcardsMetadataBadge(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     style: FlashcardsComponentStyle = OnSurface,
+    blursBackdrop: Boolean = style == OnGradient,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     onClick: (() -> Unit)? = null,
 ) {
@@ -116,6 +122,7 @@ fun FlashcardsMetadataBadge(
     Surface(
         modifier = modifier
             .height(metrics.height)
+            .blurBackdrop(shape = shape, enabled = blursBackdrop)
             .clip(shape)
             .then(
                 if (onClick != null) {

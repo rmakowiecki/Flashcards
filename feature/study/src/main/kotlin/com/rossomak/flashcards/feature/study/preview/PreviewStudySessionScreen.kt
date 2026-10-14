@@ -3,7 +3,6 @@ package com.rossomak.flashcards.feature.study.preview
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,10 +31,10 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -61,6 +60,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -68,10 +68,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
+import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
+import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
+import com.rossomak.flashcards.core.ui.composables.FlashcardsRevealContent
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
@@ -97,6 +102,8 @@ import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private val HERO_GLYPH_SIZE = 24.dp
 
 @Composable
 fun PreviewStudySessionScreen(
@@ -244,11 +251,8 @@ fun PreviewStudySessionContent(
     // sheet out here instead, outside Scaffold entirely, lets it reach the true screen bottom
     // uncontested. [ReadyContent] (below, inside Scaffold's own content) still wants that inset —
     // its Start button must stay clear of the gesture bar — so Scaffold itself is untouched.
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.brandColors.screenGradient),
-    ) {
+    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
+        BrandGradientBackdrop()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
@@ -272,38 +276,37 @@ fun PreviewStudySessionContent(
                 )
             },
         ) { innerPadding ->
-            when {
-                state.isLoading -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
+            FlashcardsLoadStateContent(
+                targetState = state,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                style = OnGradient,
+                // Keyed by kind: a redraw updates the ready content in place rather than re-revealing it.
+                contentKey = { shownState -> shownState.isLoadFailed },
+            ) { shownState ->
+                when {
+                    // Loading only while there is no drawn session to keep: a redraw the user started
+                    // keeps the hero on screen (it describes the previous draw until the new one lands),
+                    // while the first load and a Retry after a failure show the indicator.
+                    shownState.isLoading && !shownState.hasDrawnSession -> loading()
+                    shownState.isLoadFailed -> content { LoadFailureContent(modifier = Modifier.fillMaxSize(), onRetry = onRetry) }
+                    else -> content {
+                        ReadyContent(
+                            modifier = Modifier.fillMaxSize(),
+                            state = shownState,
+                            settingsSheetOpen = settingsSheetOpen,
+                            onOpenSettings = { settingsSheetOpen = true },
+                            onToggleSettings = onToggleSettings,
+                            onOpenSettingsDialog = onOpenSettingsDialog,
+                            onReshuffleSubcategories = onReshuffleSubcategories,
+                            onResetFilters = onResetFilters,
+                            onOpenAppSettings = onOpenAppSettings,
+                            onSwitchToManualAnswering = onSwitchToManualAnswering,
+                            onStartSession = onStartSession,
+                        )
+                    }
                 }
-
-                state.isLoadFailed -> LoadFailureContent(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    onRetry = onRetry,
-                )
-
-                else -> ReadyContent(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    state = state,
-                    settingsSheetOpen = settingsSheetOpen,
-                    onOpenSettings = { settingsSheetOpen = true },
-                    onToggleSettings = onToggleSettings,
-                    onOpenSettingsDialog = onOpenSettingsDialog,
-                    onReshuffleSubcategories = onReshuffleSubcategories,
-                    onResetFilters = onResetFilters,
-                    onOpenAppSettings = onOpenAppSettings,
-                    onSwitchToManualAnswering = onSwitchToManualAnswering,
-                    onStartSession = onStartSession,
-                )
             }
         }
         // Gated to a load failure only, deliberately NOT to state.isLoading: a settings edit re-triggers
@@ -380,8 +383,6 @@ private fun ReadyContent(
     onSwitchToManualAnswering: () -> Unit,
     onStartSession: () -> Unit,
 ) {
-    val isEmpty = state.selectedCardCount == 0
-
     Column(
         modifier = modifier.padding(
             start = MaterialTheme.spacing.medium,
@@ -391,16 +392,25 @@ private fun ReadyContent(
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        when {
-            isEmpty -> EmptyHeroBody(onResetFilters = onResetFilters)
-            state.isMicPermissionRejected -> MicPermissionRejectedHeroBody(
-                onOpenAppSettings = onOpenAppSettings,
-                onSwitchToManualAnswering = onSwitchToManualAnswering,
-            )
-            else -> {
-                HeroTop()
-                Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
-                ScopeHeroBody(state = state, onOpenSettings = onOpenSettings, onOpenSettingsDialog = onOpenSettingsDialog)
+        // Revealed as its own block when it switches kind, e.g. from nothing-matches to a session.
+        FlashcardsRevealContent(
+            targetState = state,
+            modifier = Modifier.fillMaxWidth(),
+            contentKey = { shownState -> shownState.heroBodyKind() },
+        ) { shownState ->
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                when (shownState.heroBodyKind()) {
+                    HeroBodyKind.NothingMatches -> EmptyHeroBody(onResetFilters = onResetFilters)
+                    HeroBodyKind.MicPermissionRejected -> MicPermissionRejectedHeroBody(
+                        onOpenAppSettings = onOpenAppSettings,
+                        onSwitchToManualAnswering = onSwitchToManualAnswering,
+                    )
+                    HeroBodyKind.Scope -> {
+                        HeroTop(iconSvg = shownState.categoryIconSvg)
+                        Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
+                        ScopeHeroBody(state = shownState, onOpenSettings = onOpenSettings, onOpenSettingsDialog = onOpenSettingsDialog)
+                    }
+                }
             }
         }
         Spacer(modifier = Modifier.weight(1f))
@@ -414,15 +424,31 @@ private fun ReadyContent(
     }
 }
 
+/** Which body fills the hero slot; the nothing-matches state wins over the microphone one. */
+private enum class HeroBodyKind { NothingMatches, MicPermissionRejected, Scope }
+
+private fun PreviewStudySessionScreenState.heroBodyKind(): HeroBodyKind = when {
+    selectedCardCount == 0 -> HeroBodyKind.NothingMatches
+    isMicPermissionRejected -> HeroBodyKind.MicPermissionRejected
+    else -> HeroBodyKind.Scope
+}
+
 @Composable
-private fun HeroTop(modifier: Modifier = Modifier) {
+private fun HeroTop(iconSvg: String?, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        FlashcardsIconCircle(
-            icon = Icons.Default.PlayArrow,
-            // Decorative: "Ready to start?" right below already names what this circle means.
-            contentDescription = null,
-            style = OnGradient,
-        )
+        FlashcardsIconCircle(style = OnGradient) {
+            // Null until the Category resolves; drawing then would flash the fallback glyph.
+            if (iconSvg != null) {
+                FlashcardsInlineCategoryGlyph(
+                    iconSvg = iconSvg,
+                    tint = LocalContentColor.current,
+                    // Decorative: the top bar already names the Category.
+                    contentDescription = null,
+                    size = HERO_GLYPH_SIZE,
+                    reserveSpaceWhileLoading = false,
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.normal))
         Text(
             // titleMedium, not a headline style: matches FlashcardsEmptyState's own title size —
@@ -686,7 +712,6 @@ private fun HeroActions(
                 FlashcardsTonalButton(
                     text = stringResource(R.string.preview_session_reshuffle_button),
                     onClick = onReshuffleSubcategories,
-                    enabled = !state.isLoading,
                     icon = Icons.Default.Shuffle,
                     style = OnGradient,
                     modifier = Modifier.weight(1f),
