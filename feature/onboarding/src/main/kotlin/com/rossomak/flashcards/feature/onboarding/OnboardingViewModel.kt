@@ -24,6 +24,9 @@ import com.rossomak.flashcards.core.domain.usecase.SignInAnonymouslyUseCase
 import com.rossomak.flashcards.core.domain.usecase.StartVoiceDemoUseCase
 import com.rossomak.flashcards.core.domain.usecase.StopVoiceDemoUseCase
 import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Content
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Failed
+import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Loading
 import com.rossomak.flashcards.feature.onboarding.model.FavoriteSubcategoryOption
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -82,6 +85,9 @@ class OnboardingViewModel @Inject constructor(
     val voiceBarsLevels: StateFlow<ImmutableList<Float>> = flow { emitAll(observeRawVoiceLevel()) }.stateInVoiceBarsLevels(viewModelScope)
 
     private var permissionStatusJob: Job? = null
+
+    /** Set once the Favorites fetch has been requested, so re-entering the step never starts another. */
+    private var favoriteSubcategoriesJob: Job? = null
 
     /** Guards "Test your voice" against a second tap while the microphone request is still pending. */
     private var micRequestInFlight = false
@@ -196,14 +202,11 @@ class OnboardingViewModel @Inject constructor(
     /**
      * Fires the curated Favorites list fetch the first time the step is actually reached — never
      * prefetched in [init], since the list is meaningless until the user gets there. A no-op on any
-     * later re-entry (e.g. swiping back and forth): once a load has settled, success or failure,
-     * only [onFavoriteSubcategoriesRetry] fires another attempt.
+     * later re-entry (e.g. swiping back and forth): once a fetch has been requested, success or
+     * failure, only [onFavoriteSubcategoriesRetry] fires another attempt.
      */
     fun onFavoritesStepEntered() {
-        val current = _state.value
-        if (current.isFavoriteSubcategoriesLoading || current.favoriteSubcategoriesLoaded || current.favoriteSubcategoriesLoadingFailed) {
-            return
-        }
+        if (favoriteSubcategoriesJob != null) return
         loadFavoriteSubcategoryOptions()
     }
 
@@ -212,8 +215,9 @@ class OnboardingViewModel @Inject constructor(
     }
 
     private fun loadFavoriteSubcategoryOptions() {
-        _state.update { it.copy(isFavoriteSubcategoriesLoading = true, favoriteSubcategoriesLoadingFailed = false) }
-        viewModelScope.launch {
+        favoriteSubcategoriesJob?.cancel()
+        _state.update { it.copy(favoriteSubcategories = Loading) }
+        favoriteSubcategoriesJob = viewModelScope.launch {
             getOnboardingSubcategories()
                 .onSuccess { subcategories ->
                     val options = subcategories.map { subcategory ->
@@ -224,16 +228,11 @@ class OnboardingViewModel @Inject constructor(
                             iconSvg = subcategory.iconSvg,
                         )
                     }.toPersistentList()
-                    _state.update {
-                        it.copy(
-                            favoriteSubcategoryOptions = options,
-                            isFavoriteSubcategoriesLoading = false,
-                            favoriteSubcategoriesLoaded = true,
-                        )
-                    }
+                    val loadedState = if (options.isEmpty()) Failed else Content(options)
+                    _state.update { it.copy(favoriteSubcategories = loadedState) }
                 }
                 .onFailure {
-                    _state.update { it.copy(isFavoriteSubcategoriesLoading = false, favoriteSubcategoriesLoadingFailed = true) }
+                    _state.update { it.copy(favoriteSubcategories = Failed) }
                 }
         }
     }

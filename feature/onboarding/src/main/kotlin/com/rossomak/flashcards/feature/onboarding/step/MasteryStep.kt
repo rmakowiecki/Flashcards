@@ -96,10 +96,7 @@ private fun MasteryQuestionCard(modifier: Modifier = Modifier) {
             LabelledSlot(label = stringResource(R.string.mastery_attempts_label)) {
                 FlashcardsAttemptIndicator(slots = ILLUSTRATED_ATTEMPTS)
             }
-            LabelledSlot(
-                label = stringResource(R.string.mastery_difficulty_label),
-                horizontalAlignment = Alignment.End,
-            ) {
+            LabelledSlot(label = stringResource(R.string.mastery_difficulty_label)) {
                 FlashcardsDifficultyBadge(level = ILLUSTRATED_DIFFICULTY)
             }
         }
@@ -172,13 +169,12 @@ private fun MasteryCard(
 private fun LabelledSlot(
     label: String,
     modifier: Modifier = Modifier,
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     content: @Composable () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = modifier,
-        horizontalAlignment = horizontalAlignment,
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label.uppercase(),
