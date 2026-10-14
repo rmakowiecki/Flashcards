@@ -23,8 +23,7 @@ coordinators, the second orchestration kind described in
 
 ## Context
 
-The launcher-shortcuts feature (see `docs/temp/specs/launcher-shortcuts-spec.md` and
-`.scratch/launcher-shortcuts/issues/`) needed a new seam wrapping `ShortcutManagerCompat`. The initial
+The launcher-shortcuts feature needed a new seam wrapping `ShortcutManagerCompat`. The initial
 draft named it `AppShortcutsGateway`, following `VoicePreviewGateway`'s naming. A grilling session
 surfaced that this codebase has no consistent rule for when something is a "Gateway" vs a
 "Repository" — investigation found:

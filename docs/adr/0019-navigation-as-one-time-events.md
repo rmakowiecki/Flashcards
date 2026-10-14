@@ -2,8 +2,7 @@
 
 ## Status
 
-Accepted. **Supersedes** the state-field navigation approach previously documented in
-`docs/navigation-pattern.md` (nullable `navigationDestination` on screen state + `onNavigationHandled()`).
+Accepted. **Supersedes** the earlier state-field navigation approach (nullable `navigationDestination` on screen state + `onNavigationHandled()`).
 
 ## Decision
 
@@ -12,7 +11,7 @@ Navigation is modeled as a **one-time side effect**, never as persistent UI stat
 - Each ViewModel that triggers navigation owns a `private val eventChannel = Channel<XxxDestination>(Channel.BUFFERED)`
   and exposes `val events = eventChannel.receiveAsFlow()`.
 - Navigation is dispatched from a handler with `viewModelScope.launch { eventChannel.send(XxxDestination.Foo) }`.
-- The `XxxScreen` composable collects it exactly once via the shared `ObserveAsEvents(viewModel.events) { … }`
+- The `XxxScreen` composable collects it exactly once via the shared `observeAsEvents(viewModel.events) { … }`
   helper (`core:ui`, `core/ui/.../navigation/ObserveAsEvents.kt`), and calls the nav callback inside the `when`.
 - Destinations remain **type-safe sealed interfaces** (no route strings). Every per-screen destination
   interface implements the marker `NavigationEvent` (`core:ui`, `core/ui/.../navigation/NavigationEvent.kt`).
@@ -20,7 +19,7 @@ Navigation is modeled as a **one-time side effect**, never as persistent UI stat
 
 `Channel.BUFFERED` queues events emitted while no collector is attached (e.g. mid-recomposition or before
 the composable attaches), and `receiveAsFlow()` is uni-cast — each event is delivered exactly once.
-`ObserveAsEvents` collects under `repeatOnLifecycle(STARTED)` on `Dispatchers.Main.immediate`.
+`observeAsEvents` collects under `repeatOnLifecycle(STARTED)` on `Dispatchers.Main.immediate`.
 
 ## Context
 
@@ -57,7 +56,7 @@ persistent state.
 
 ## Consequences
 
-- New `core:ui` primitives: `NavigationEvent` marker + `ObserveAsEvents` composable, reused by every feature.
-- `docs/navigation-pattern.md` rewritten to this pattern; `AGENTS.md` §Async navigation bullet updated to match.
+- New `core:ui` primitives: `NavigationEvent` marker + `observeAsEvents` composable, reused by every feature.
+- [docs/design/navigation.md](../design/navigation.md) and the `AGENTS.md` navigation bullet describe this pattern.
 - Every screen that navigates from a ViewModel handler (Home and CategoryDetails included) follows this
   pattern; none holds navigation in ViewModel state.

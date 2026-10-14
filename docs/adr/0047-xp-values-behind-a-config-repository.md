@@ -20,14 +20,21 @@ levelCurveBase: Double
 levelCurveExponent: Double
 ```
 
-The implementation today is local and hardcoded. The repository seam exists so the values can move
-to a remote source later without touching a single call site.
+The configuration is server-owned. Its source of truth is the Firestore document `config/xp`, written
+only by the Admin SDK. The `submitStudySession` function scores every session with its current copy
+of that document, and falls back to bundled defaults if the document is missing or invalid.
 
-### A session uses the config as of its start
+The client refreshes its copy best-effort on every sign-in and keeps it on the device, so it can
+preview XP offline with the last rates it saw. It uses `XpConfig`'s bundled defaults only until a
+first fetch succeeds.
 
-The `XpConfig` is fetched alongside the session's Flashcards, captured into the session state when
-the clock starts, and carried in the session result. The Summary screen computes its breakdown from
-that captured snapshot, not from a fresh read.
+### A session is scored with the configuration current at delivery
+
+No configuration snapshot is taken when a session starts. The server scores a session with the
+configuration current when the session is delivered, and stores the rates it used on the session
+document, so a session once scored never changes. The Session Summary's fallback preview and the
+projection of Pending Sessions both score with the device's cached copy. No configuration is
+versioned. See [ADR-0055](0055-pending-sessions-and-local-progress-projection.md).
 
 ## Context
 
@@ -40,10 +47,10 @@ Both facts point the same way. These are balance values, not domain rules. A dom
 them can only be rebalanced by shipping a release, and the numbers most likely to need rebalancing
 are exactly the ones a live user population reveals as wrong.
 
-The snapshot rule is a smaller point with a sharp edge. If the values can change remotely, they can
-change while a session is in progress. Computing a session's XP from values read at the end means a
-config push mid-session silently rewrites the arithmetic for a session already underway, and the
-number the Summary shows is not the number the user was playing for.
+Scoring is server-authoritative ([ADR-0049](0049-server-authoritative-session-commit.md)), so the
+configuration that counts is the one the server holds. A per-session snapshot taken on the device
+would never reach the server, and a preview scored from it could disagree with the server's score for
+the same session.
 
 ## Alternatives considered
 
@@ -53,35 +60,23 @@ would have to be pinned now on no evidence.
 **Firebase Remote Config directly at each call site** — rejected. It puts an Android dependency in
 `core:domain`, which the layering rules forbid, and scatters defaulting logic across every consumer.
 
-**Read the config fresh when the Summary computes XP** — rejected. It is simpler and it is the bug:
-a mid-session change alters a session retroactively.
+**Capture the configuration when a session starts and score the session with it** — rejected. It
+guarantees a session is scored with the numbers the User was playing for, but the server never sees
+the snapshot, so the device's preview and the server's score could disagree. Accepting that a config
+change can affect a session still queued is the simpler trade-off.
 
-**Ship the remote source now** — rejected as premature. The seam is what has to exist early; the
-transport can arrive whenever rebalancing actually becomes necessary.
+**A local, hardcoded configuration with a remote source added later** — rejected. Scoring moved to
+the server, which needs a configuration of its own; a device-only source would leave the server
+without one.
 
 ## Consequences
 
-- The session state carries an immutable `XpConfig` field, and the session result carries it
-  forward, so the Summary needs no repository read to compute its breakdown.
 - The level curve is not pinned in code. Choosing `base` and `exponent` becomes a config change.
-- A future remote source needs a cache and a defaulting story, since XP must be computable offline.
-  The local implementation is that default.
-- Two sessions run either side of a config change compute different XP for identical performance.
-  This is intended, and the session record's stored counts allow a historical session's breakdown to
-  be recomputed under whichever config is current if that is ever wanted.
-
-## Amendments
-
-**2026-09-30 — the configuration is server-owned, and the session-start snapshot is removed.** The
-source of truth is the Firestore document `config/xp`, written only by the Admin SDK. The
-`submitStudySession` function scores every session with its current copy of that document. The
-client refreshes its copy best-effort on every sign-in and keeps it on the device, so it works
-offline with the last rates it saw. It falls back to `XpConfig`'s bundled defaults only until a first
-fetch succeeds. The "local and hardcoded" implementation and the "remote source later" alternative
-above are superseded.
-
-The per-session snapshot rule is removed. The server never saw the snapshot, so a preview scored from
-it could disagree with the server's score for the same session. The Session Summary's fallback
-preview and the projection of Pending Sessions both score with the cached configuration. A session
-queued across a configuration change is scored with the configuration current at delivery, and no
-configuration is versioned. See [ADR-0055](0055-pending-sessions-and-local-progress-projection.md).
+- XP must be computable offline, so the client keeps a cached copy with the bundled defaults as its
+  starting point.
+- A session queued on the device across a configuration change is scored with the configuration
+  current at delivery, not the one in force when it was played. Its preview on the device and the
+  server's score can differ until the device's copy is refreshed.
+- Two sessions delivered either side of a configuration change compute different XP for identical
+  performance. This is intended. Each session document stores the rates it was scored with, so a
+  past Summary never changes.

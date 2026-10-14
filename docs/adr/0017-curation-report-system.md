@@ -3,8 +3,8 @@
 ## Decision
 
 Any user can flag a Flashcard for a content fix via a flag `IconButton` in the study session top
-app bar (Rated and Fast alike), left of the card counter, enabled only while a card is displayed —
-the session's bottom sheet is already crowded with the mic toggle, cog and transport controls.
+app bar (Rated and Fast alike), at the end of the bar opposite the close button, shown only while a
+card is displayed — the session's bottom sheet is already crowded with the mic toggle, cog and transport controls.
 Tapping it opens a **"Report a problem"** dialog listing all 7 Curation Actions the user can toggle
 on for the current card, plus Cancel/Submit.
 
@@ -55,8 +55,10 @@ time; Submit is additive only.
 direction only (`DifficultyTooEasy` / `DifficultyTooHard`) lets the AI agent assign an appropriate
 new value rather than nudging incrementally.
 
-**Auto-resume voice after dialog dismiss** (Fast/voice-answering sessions) — rejected. User paused to
-report a card; auto-resuming overrides that intent. One manual tap to resume is an acceptable UX cost.
+**Pausing a spoken session while the dialog is open** (Fast read-aloud and voice-answering sessions)
+— rejected in favour of the shared dialog hold ([ADR-0013](0013-extended-context-dialog-voice-interaction.md)):
+the current card is read to its end, the session holds at its auto-advance point while the dialog is
+open, and it moves on shortly after the dialog closes. Reporting a card never needs a manual resume.
 
 **Deleting the document on empty vs. never deleting** — the document is deleted once every action on
 it is removed, so empty report docs never linger and pollute the sync script's query results. The app
@@ -66,7 +68,7 @@ admin/sync tooling operating on Firestore directly, not through a `CurationRepos
 ## Consequences
 
 - `users/{uid}/curationRequests/{cardId}` → `{ subcategoryId: String, actions: { "<CurationAction>": { flaggedAt: Timestamp } } }`
-- `CurationAction` values: `DifficultyTooEasy`, `DifficultyTooHard`, `WrongTags`, `NeedsCodeExample`, `BacktickRedo`, `FullRedo`, `Delete`. Presented to users as: "Raise the difficulty," "Lower the difficulty," "Wrong tags," "Needs a code example," "Formatting looks broken," "Needs a full rewrite," "Duplicate or low quality." Every value gets a row in the dialog, enforced by a `check()` against `CurationAction.entries` so a new action can't be added without a row.
+- `CurationAction` values: `DifficultyTooEasy`, `DifficultyTooHard`, `WrongTags`, `NeedsCodeExample`, `BacktickRedo`, `FullRedo`, `Delete`. Presented to users as: "Raise the difficulty," "Lower the difficulty," "Wrong tags," "Needs a code example," "Wrong code formatting," "Needs a full rewrite," "Delete this card." Every value gets a row in the dialog, enforced by a `check()` against `CurationAction.entries` so a new action can't be added without a row.
 - `DifficultyTooEasy` and `DifficultyTooHard` are mutually exclusive — enforced in the draft: checking one clears the other via `CurationAction.difficultyOpposite()`, so contradictory data never reaches Firestore.
 - No report state is fetched to seed the dialog. Writes happen only on Submit: the checked Curation Actions are upserted to Firestore in one write via `SubmitCurationReportUseCase` → `CurationRepository.upsertCurationActions`; Cancel makes no write; a snackbar shows on write failure.
 - Resubmitting a set of actions already on record is a no-op: `DefaultCurationRepository` caches each card's last known flagged actions and skips the Firestore write when the requested set is already a subset of it.

@@ -71,14 +71,6 @@ unlike everything else in that ADR it does not stay inside the Android app: it n
 Firestore document, a `firestore.rules` change, a change to the Python import tooling, and a home
 in app-startup code (`AppStartViewModel`/`AppStartupState` already exist and are the obvious one).
 
-This ADR was produced by a grilling session on 2026-08-29 against
-`docs/temp/seed-versioned-cache-invalidation-context.md` (the decisions-locked capture from the
-original research) and `docs/temp/firestore-offline-cache-research.md` (the primary-source
-Firestore SDK research). The implementation-level detail — exact DTOs, method signatures, rules
-diff, script diff — lives in
-`docs/temp/seed-versioned-cache-invalidation-implementation-spec.md`, gitignored like the rest of
-`docs/temp/`.
-
 Firestore's disk cache outlives the process and the SDK offers no cache-if-fresh-else-server mode
 and no TTL, so freshness policy has to live in app code — this scheme is that policy, for the "who
 tells the app a curation update happened" half specifically.

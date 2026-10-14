@@ -17,7 +17,7 @@ checks the shape. It would not be enough:
   User's earlier documents, so they cannot cap how many reports one User sends.
 - **The revoked-token guard.** A client write is accepted for as long as the ID token is valid,
   even after its User was revoked or deleted. The callable runs the guard of
-  [ADR-0057](0057-callables-that-write-user-data-verify-token-revocation.md) first.
+  [ADR-0064](0064-callables-that-write-user-data-verify-token-revocation.md) first.
 - **Server-set fields.** `uid`, `createdAt` and `status` must not be chosen by the client. Rules can
   check them, but a callable sets them and the client never sends them.
 - **Validation without an app release.** Bounds checked on the server can change with a functions
