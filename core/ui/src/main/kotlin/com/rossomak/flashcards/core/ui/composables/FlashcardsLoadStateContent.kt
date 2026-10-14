@@ -143,7 +143,8 @@ private class SettledSlot<S>(var slot: Content<S>? = null)
 /**
  * Resolves [targetState] to the slot on screen. Loaded states pass straight through, so in-place
  * updates land in the same frame; while loading, the last loaded state stays up until the indicator's
- * delay runs out, and the indicator then holds for its minimum time even if the load finishes first.
+ * delay runs out, and the indicator then holds for its minimum time, counted from when it starts fading
+ * in, even if the load finishes first.
  */
 @Composable
 private fun <S> rememberLoadStateSlot(targetState: S, isLoading: Boolean): LoadStateSlot<S> {
@@ -155,7 +156,9 @@ private fun <S> rememberLoadStateSlot(targetState: S, isLoading: Boolean): LoadS
         if (isLoading) {
             if (!isIndicatorShown) {
                 delay(FlashcardsMotion.LOADING_INDICATOR_DELAY_MS.milliseconds)
-                indicatorShownAt = TimeSource.Monotonic.markNow()
+                // The indicator starts fading in only once the block it replaces has faded out.
+                val replacedSlotFadeOut = (settled.slot ?: Blank).fadeOutDurationMs().milliseconds
+                indicatorShownAt = TimeSource.Monotonic.markNow() + replacedSlotFadeOut
                 isIndicatorShown = true
             }
         } else if (isIndicatorShown) {
