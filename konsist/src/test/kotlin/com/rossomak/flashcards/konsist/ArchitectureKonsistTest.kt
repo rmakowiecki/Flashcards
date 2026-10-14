@@ -345,7 +345,7 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `composables outside the theme package never import Color-kt tokens directly`() {
-        // core/ui SYSTEMDESIGN.md: "Do not read Color.kt tokens directly in composables" —
+        // core/ui ADR-0005: "Do not read Color.kt tokens directly in composables" —
         // go through MaterialTheme.colorScheme / MaterialTheme.brandColors instead.
         projectScope
             .files

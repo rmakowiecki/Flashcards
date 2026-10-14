@@ -86,3 +86,11 @@ and logs an error while the document is missing or invalid.
 - `purge_firestore.py` deletes both `shards` (current) and `flashcards` (legacy,
   pre-ADR-0037) subcollections — safe to run even after no subcategory has the legacy
   one any more.
+
+## Behavior notes
+
+- Supports extending existing structure without wiping *unrelated* subcategories/categories — a run only touches the subcategories present in its fixture, so third-party tools can add new subcategories incrementally. Within a subcategory a fixture *does* touch, the fixture must carry that subcategory's full card set: `shards` are fully rewritten every run (see above), so a partial fixture for an already-seeded subcategory (`--sample N`, or a third-party tool emitting only its own new cards) silently drops any existing card the fixture doesn't repeat.
+- **Card `id` is a map key inside its shard's `flashcards` field** (`flashcards["<cardId>"]`), not a Firestore
+  document key — a shard doc's own id is just its shard index. Card ids must still be globally unique (the
+  capture skill mandates a cryptographically random hex suffix to prevent collisions — 100 historical
+  collisions were repaired pre-import) since a shard doc's `flashcards` map is keyed by them.

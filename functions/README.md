@@ -1,9 +1,11 @@
-# Voice grading Cloud Functions
+# Cloud Functions
 
-Backend for the premium voice-answering pipeline. See `docs/design/premium-voice-grading-pipeline.md`
-for the full pipeline design, `docs/adr/0024-voice-grading-cloud-function-proxy.md` for the original
-proxy shape, and `docs/adr/0029-voice-grading-two-callables-payload-inferred-debug-mode.md` for the
-current shape (two callables, one grade function serving prod + debug via payload-inferred mode).
+The app's server side: five `onCall` callables. Two serve Voice Answering (`entitlement`,
+`transcribeAndGradeSpokenAnswer`; design in `docs/design/voice-answering.md`, shape in
+`docs/adr/0024-voice-grading-cloud-function-proxy.md` and
+`docs/adr/0029-voice-grading-two-callables-payload-inferred-debug-mode.md`). `submitStudySession`
+records a finished session (`docs/design/session-submission.md`), `submitBugReport` stores a Bug
+Report (ADR-0058) and `deleteAccount` runs Account Deletion (ADR-0059).
 This file is the practical "how to set it up / how it works" reference; the ADRs are the "why".
 
 ## Project
@@ -13,7 +15,7 @@ every function (`RUNTIME_OPTIONS.region` in `src/index.ts`).
 
 ## Transport
 
-Both functions are Firebase **`onCall` callables** (ADR-0029) — not REST `onRequest`. The Android
+Every function is a Firebase **`onCall` callable** (ADR-0029) — not REST `onRequest`. The Android
 client talks to them via the Firebase Functions SDK (`FirebaseFunctions.getHttpsCallable(name)`),
 which resolves the endpoint from the initialized `FirebaseApp` (`google-services.json`) and attaches
 the caller's Firebase ID token automatically. There is **no** `VOICE_GRADING_BASE_URL`, no Retrofit,
@@ -31,7 +33,7 @@ functions/
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
   src/lib/httpError.ts              — HttpError(statusCode, message) thrown by elevenlabs/grading libs
   src/lib/xpScoring.ts              — pure XP/level calculation, mirrored by the client's SessionXpCalculation.kt
-  src/lib/authGuard.ts              — requireActiveSession: revoked/deleted-caller guard for writing callables (ADR-0057)
+  src/lib/authGuard.ts              — requireActiveSession: revoked/deleted-caller guard for writing callables (ADR-0064)
   src/lib/submitStudySession.ts     — validation + the session-commit transaction
   src/lib/submitBugReport.ts        — Bug Report validation, per-User rate limit and write (ADR-0058)
   src/lib/deleteAccount.ts          — Account Deletion: Bug Reports, users/{uid} and the Auth user, in a retryable order (ADR-0059)
@@ -45,7 +47,7 @@ the Admin SDK scripts under `scripts/seed/` and one-off setup commands below).
 
 ## Function contract
 
-Mirrors `core/data/.../network/VoiceGradingApi.kt` / `RealVoiceGradingApi.kt`.
+The voice callables are called from `core/data/.../source/FirebaseVoiceGradingRemoteDataSource.kt`.
 
 ### `entitlement`
 
@@ -69,8 +71,9 @@ Rules enforced server-side:
 - `question` + `expected_answer` are **both-or-neither** → exactly one present is `invalid-argument`.
 - Premium entitlement is required → `permission-denied` (mapped client-side to `VoiceGradingEntitlementException`).
 
-`card_id` is accepted but unused server-side — the client includes it and persists results itself
-(`{cardId, sanitizedTranscript, gradePercent, feedback}`), not this function.
+`card_id` is accepted but unused server-side. Neither this function nor the client stores the
+transcript or the grade: the client turns the grade into a Rating, and only the session's Ratings
+reach the server, through `submitStudySession`.
 
 The Android client surfaces the two modes as two intent-revealing methods over this one function
 (ADR-0029 §4): `transcribeAndGradeSpokenAnswer(...)` (production, always grades) and
@@ -94,7 +97,7 @@ result again — safe for the client's own at-least-once retry queue to call
 freely. See `submitStudySession`'s own doc comment in that file for the full read/write shape.
 
 Before anything else it rejects, with `unauthenticated`, a caller whose tokens were revoked or whose
-Auth user was deleted or disabled (ADR-0057). The client's delivery worker treats that code as
+Auth user was deleted or disabled (ADR-0064). The client's delivery worker treats that code as
 transient and keeps the session queued.
 
 ## One-time setup (from a clean checkout)

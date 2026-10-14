@@ -272,7 +272,7 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
                 },
                 onNavigateToCategoryDetails = { route ->
                     // Pushed on top of Main rather than replacing it outright, so back from
-                    // Details returns to Browse instead of exiting the app.
+                    // Details returns to Main's start tab (Home) instead of exiting the app.
                     navController.navigate(Main) {
                         popUpTo<Splash> { inclusive = true }
                     }

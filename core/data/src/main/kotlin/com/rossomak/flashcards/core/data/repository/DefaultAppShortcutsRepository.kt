@@ -28,8 +28,7 @@ import kotlinx.coroutines.withContext
 /**
  * Wires [AppShortcutsRepository] to `ShortcutManagerCompat`. Icon rasterization reuses the same
  * androidsvg pipeline `core:ui`'s on-screen category glyph rendering uses — parse via
- * `SVG.getFromString`, render via `SVG.renderToPicture` (see `FlashcardsVectorIconTile`'s
- * `SvgGlyph`) — rather than a separate image pipeline for shortcuts. This module can't depend on
+ * `SVG.getFromString`, render via `SVG.renderToPicture` (see `core:ui`'s `CategoryGlyphCache`) — rather than a separate image pipeline for shortcuts. This module can't depend on
  * `core:ui` (would invert the Clean Architecture dependency direction: data must not depend on
  * presentation), so the two call sites share the rendering library, not the rendering code.
  */

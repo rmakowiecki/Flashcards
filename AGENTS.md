@@ -102,7 +102,7 @@ For fallible operations, return `kotlin.Result<T>` and consume with `.onSuccess 
 **Statically import sealed variants used in an exhaustive `when`.** `import com.example.VoiceDemoFailureReason.RouteUnavailable` (and its sibling variants) so branches read `RouteUnavailable ->` / `is CaptureError ->`, not `VoiceDemoFailureReason.RouteUnavailable ->`. Cuts repetition without losing exhaustiveness-checking. Applies to any sealed class/interface `when`, not just UI state
 
 ### No ephemeral planning references in persistent text
-Never cite a `spec NN`/`ticket NN`/`docs/temp`/scratch-plan label in KDoc, code comments, commit messages, or any file that isn't itself the ephemeral plan doc. Those numbers/paths are session-local planning scaffolding — meaningless (or actively confusing) to a future reader, since the plan doc they point to is gitignored or long gone. Persistent docs (KDoc, ADRs, `CONTEXT.md`, `SYSTEMDESIGN.md`, README files) describe the *current, standalone* design — reference another persistent doc (an ADR, a class, a file) instead, or drop the citation and just explain the reasoning inline.
+Never cite a `spec NN`/`ticket NN`/`docs/temp`/scratch-plan label in KDoc, code comments, commit messages, or any file that isn't itself the ephemeral plan doc. Those numbers/paths are session-local planning scaffolding — meaningless (or actively confusing) to a future reader, since the plan doc they point to is gitignored or long gone. Persistent docs (KDoc, ADRs, `CONTEXT.md`, design docs, README files) describe the *current, standalone* design — reference another persistent doc (an ADR, a class, a file) instead, or drop the citation and just explain the reasoning inline.
 
 ## Argument Order
 
@@ -163,7 +163,7 @@ Best practices:
 - `contentDescription` on icon buttons and images
 - `remember` for expensive calculations; `derivedStateOf` for computed state
 - `LazyColumn` for lists; `key()` for stable item identity
-- Typography: style text only with a `MaterialTheme.typography` slot, its `*Emphasized` twin, or a theme constant (`typography.code`, `InlineCodeSpanStyle`, `EmphasizedSpanStyle`). Never set `fontWeight`, `fontSize`, `fontFamily`, `letterSpacing` or `lineHeight` at a call site. Konsist enforces it. See [ADR-0061](./docs/adr/0061-typography-is-the-stock-m3-scale-over-bundled-roboto.md).
+- Typography: style text only with a `MaterialTheme.typography` slot, its `*Emphasized` twin, or a theme constant (`typography.code`, `InlineCodeSpanStyle`, `EmphasizedSpanStyle`). Never set `fontWeight`, `fontSize`, `fontFamily`, `letterSpacing` or `lineHeight` at a call site. Konsist enforces it. See [ADR-0063](./docs/adr/0063-typography-is-the-stock-m3-scale-over-bundled-roboto.md).
 
 ## Dependency Injection (Hilt)
 
@@ -188,8 +188,8 @@ Dispatchers:
 
 StateFlow / SharedFlow rules:
 - `StateFlow` for UI state in ViewModels (single source of truth per screen)
-- **A one-shot snackbar/toast message is never screen state — not even as a nullable field nulled out after showing.** It's a transient event, same category as navigation. Shape: ViewModel owns `private val _messages = MutableSharedFlow<XxxMessage>(extraBufferCapacity = 1)` exposed as `val messages: SharedFlow<XxxMessage> = _messages.asSharedFlow()`, sent via `_messages.tryEmit(...)`; a sealed `XxxMessage` interface in its own file, doc'd "one-shot snackbar messages... never screen state"; the Composable consumes it with the same `observeAsEvents` helper navigation uses (`core:ui/navigation/ObserveAsEventsKt.kt` — it's generic over any `Flow<T>`, not nav-only) and calls `snackbarHostState.showSnackbar(...)` inside. See `CategoryDetailsViewModel`/`CategoryDetailsMessage` for the reference implementation. A message emitted while no collector is active (app backgrounded, Activity recreating) is dropped by design: messages are informational, never required, so don't move them to a `Channel`. Navigation stays on a `Channel` because it can't be dropped.
-- **Navigation is a one-time event, not state**: dispatch it through a `Channel<XxxDestination>(Channel.BUFFERED)` exposed via `receiveAsFlow()` and collect it once in the UI with `ObserveAsEvents(viewModel.events) { … }` (`core:ui`). Destinations stay type-safe sealed interfaces implementing `NavigationEvent` (no route strings). Never put navigation in persistent screen state; there is no `onNavigationHandled()` reset. See [docs/navigation-pattern.md](./docs/navigation-pattern.md) and [ADR-0019](./docs/adr/0019-navigation-as-one-time-events.md).
+- **A one-shot snackbar/toast message is never screen state — not even as a nullable field nulled out after showing.** It's a transient event, same category as navigation. Shape: ViewModel owns `private val _messages = MutableSharedFlow<XxxMessage>(extraBufferCapacity = 1)` exposed as `val messages: SharedFlow<XxxMessage> = _messages.asSharedFlow()`, sent via `_messages.tryEmit(...)`; a sealed `XxxMessage` interface in its own file, doc'd "one-shot snackbar messages... never screen state"; the Composable consumes it with the same `observeAsEvents` helper navigation uses (`core:ui/navigation/ObserveAsEvents.kt` — it's generic over any `Flow<T>`, not nav-only) and calls `snackbarHostState.showSnackbar(...)` inside. See `CategoryDetailsViewModel`/`CategoryDetailsMessage` for the reference implementation. A message emitted while no collector is active (app backgrounded, Activity recreating) is dropped by design: messages are informational, never required, so don't move them to a `Channel`. Navigation stays on a `Channel` because it can't be dropped.
+- **Navigation is a one-time event, not state**: dispatch it through a `Channel<XxxDestination>(Channel.BUFFERED)` exposed via `receiveAsFlow()` and collect it once in the UI with `observeAsEvents(viewModel.events) { … }` (`core:ui`). Destinations stay type-safe sealed interfaces implementing `NavigationEvent` (no route strings). Never put navigation in persistent screen state; there is no `onNavigationHandled()` reset. See [ADR-0019](./docs/adr/0019-navigation-as-one-time-events.md).
 - Handle errors with `.catch()` operator on upstream flows
 - Delays use `Duration`, not raw `Long` ms: `delay(NO_SPEECH_TIMEOUT_MS.milliseconds)`, never bare millis.
 
@@ -279,11 +279,27 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 
 ## Project Documentation
 
-- `SYSTEMDESIGN.md` — product design, screens, flows (being split into smaller docs under `docs/design/`)
-- `docs/design/firestore-schema.md` — Firestore data schema. Read this if task needs current Firestore data schema knowledge — single source of truth, don't reconstruct schema from ADRs
+- `docs/design/` — current design of each built feature, one doc per feature; `docs/design/planned/` holds designs for unbuilt ones. Writing rules: [docs/design/README.md](./docs/design/README.md). Index (imported below):
+
+@docs/design/INDEX.md
+
+- `docs/adr/` — architecture decision records: decisions and rejected alternatives. Look up rationale through Graphify.
+- `docs/user-flow/` — per-screen action flows (taps, decisions, entry points) as Mermaid diagrams. Read the matching file when changing a screen's actions or entry points.
 - `CONTEXT.md` — domain vocabulary glossary
 - `TESTING.md` — testing conventions
-- `docs/navigation-pattern.md` — state-based navigation pattern (why no SharedFlow)
+
+### Reading the docs
+Read only the docs that pertain to the change at hand, and keep it small. Match the "Read when" lines in the index above against the area you are changing, then read the **whole** matching doc(s) before using Graft for exact symbols.
+- A bug fix, a UI tweak or any change confined to one screen or subsystem needs only that screen's or subsystem's doc. Do not read docs for unrelated features.
+- If no "Read when" line matches, read no design doc.
+- Read `planned/` docs only when working on that exact feature.
+
+### Keeping the docs current
+When an implementation changes something that a design doc, a user-flow diagram or an ADR describes, update that doc in the same change.
+- **Design docs**: update the doc whose behavior changed. A change that adds, renames, moves or deletes a design doc also updates `docs/design/INDEX.md` and every inbound link.
+- **User flows**: update the diagram when a screen's actions, decisions or entry points change.
+- **ADRs**: amend an ADR in place when the change alters its decision. Record a new decision as a new ADR with the next number.
+- Follow the writing rules in [docs/design/README.md](./docs/design/README.md) when editing design docs.
 
 
 # Codebase Context Policy
@@ -299,9 +315,16 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
   READMEs, schemas, configuration, CI/CD, operational docs, rationale,
   architectural paths, broad impact analysis, and exploratory investigation.
 
+- The design docs (found through `docs/design/INDEX.md`) are the source for
+  the current behavior of a feature. Read only the ones that pertain to the
+  change at hand (see "Reading the docs" under Project Documentation).
+
 ## Retrieval discipline
 
-1. Start every implementation task with Graft.
+1. For a task that touches a documented feature, read the pertaining design
+   doc(s) first (see "Reading the docs" under Project Documentation); then
+   start the implementation with Graft. Skip this for work that touches no
+   documented feature.
 2. Retrieve the smallest useful context first. Do not load whole files,
    module trees, or broad graph reports without a specific question.
 3. Use Graphify only when the task crosses a system boundary, needs
@@ -318,7 +341,7 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 ## Escalation triggers
 
 Use Graphify when any of these apply:
-- An ADR, spec, design document, schema, contract, config, or runbook matters.
+- An ADR, spec, schema, contract, config, or runbook matters.
 - The change spans multiple independently owned modules or repositories.
 - The task changes a public API, persisted data, external protocol,
   security/privacy behavior, build pipeline, or deployment behavior.
@@ -332,21 +355,24 @@ Use Graphify when any of these apply:
 ## Task modes
 
 ### Scoped implementation
-Use Graft only unless an escalation trigger occurs.
+Read the pertaining design doc(s), if any, then use Graft only unless an
+escalation trigger occurs.
 
 ### Cross-cutting implementation
-Use Graft for the initial code map, Graphify for system constraints and
-impact paths, then Graft again for exact edits and tests.
+Read the pertaining design docs, use Graft for the initial code map,
+Graphify for system constraints and impact paths, then Graft again for
+exact edits and tests.
 
 ### Architecture exploration
-Use Graphify first; use Graft only after selecting a concrete code path.
+Read the pertaining design docs, then use Graphify first; use Graft only
+after selecting a concrete code path.
 
 ## Before editing
 
 State:
 - The task mode: scoped implementation, cross-cutting implementation,
   or architecture exploration.
-- The tools used and why.
+- The design docs read (or that none pertained), and the tools used and why.
 - The likely modules/files affected.
 - Any assumptions, unknowns, or documentation/code conflicts.
 

@@ -106,7 +106,7 @@ class SplashViewModel @Inject constructor(
 
     /**
      * Null means [route] didn't parse or its id no longer resolves (stale shortcut, e.g. its
-     * Category/Subcategory was deleted server-side) — caller falls back to the normal Browse
+     * Category/Subcategory was deleted server-side) — caller falls back to the normal Main
      * landing, silently, rather than surfacing an error for what is a launcher shortcut's problem,
      * not the user's. A server-side rename is not a stale case: routes are id-based, and the fetch
      * below always returns the current name.

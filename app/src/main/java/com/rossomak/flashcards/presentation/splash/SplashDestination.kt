@@ -9,7 +9,7 @@ sealed interface SplashDestination : NavigationEvent {
     data object Onboarding : SplashDestination
     data object Login : SplashDestination
 
-    /** A resolved launcher-shortcut target, navigated to directly instead of landing on Browse. */
+    /** A resolved launcher-shortcut target, opened on top of Main instead of landing on Main alone. */
     data class ToCategoryDetails(val route: CategoryDetailsRoute) : SplashDestination
     data class ToSubcategoryDetails(val route: SubcategoryDetailsRoute) : SplashDestination
 }

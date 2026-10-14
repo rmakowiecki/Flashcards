@@ -46,7 +46,7 @@ private val ILLUSTRATED_ATTEMPTS = listOf(
     FlashcardsAttemptSlotState.Future,
 )
 
-/** XP awarded for mastering one card, per docs/design/xp-leveling-system.md. */
+/** XP awarded for mastering one card, per the default XP configuration in testdata/xp-scoring/default-xp-config.json. */
 private const val CARD_MASTERY_XP = 100
 
 /** Difficulty shown on the illustrated card — mid-range, so the badge reads as neither extreme. */

@@ -122,7 +122,7 @@ class PreviewStudySessionViewModel @Inject constructor(
     /**
      * The last drawn set, held so [onDialogConfirm]'s Sort case can reorder it in place instead of
      * redrawing through [selectSessionFlashcards] — a fresh draw there would silently swap which
-     * cards are in the session on a sort-only change (SYSTEMDESIGN.md:107,377). Order doesn't
+     * cards are in the session on a sort-only change (docs/design/flashcard-selection.md). Order doesn't
      * matter here: [resolveSelectedCards] fully re-sorts before use.
      */
     private var lastDrawnCards: List<Flashcard> = emptyList()
@@ -311,7 +311,7 @@ class PreviewStudySessionViewModel @Inject constructor(
     /**
      * Sort is the one dialog that never needs a redraw: it reorders the already-drawn set (see
      * [lastDrawnCards]) instead of going through [selectCards] — a redraw there could silently
-     * swap which cards are in the session on a sort-only change (SYSTEMDESIGN.md:107,377). Cast
+     * swap which cards are in the session on a sort-only change (docs/design/flashcard-selection.md). Cast
      * size and pool are untouched by a sort change, so the Sort branch never needs to touch
      * `isLoading`, `selectedCardCount` or `estimatedMinutes`. Its own function purely to keep
      * [onDialogConfirm]'s cyclomatic complexity under detekt's threshold.

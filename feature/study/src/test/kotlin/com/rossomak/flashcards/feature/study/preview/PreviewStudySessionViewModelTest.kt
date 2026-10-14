@@ -1431,7 +1431,7 @@ class PreviewStudySessionViewModelTest {
      * Regression test for a bug Copilot review flagged on PR #64: with the card draw stateful
      * (ADR-0040, no session seed), confirming Sort used to reselect through
      * [SelectSessionFlashcardsUseCase], which could redraw a different subset of a pool larger
-     * than the session length — see SYSTEMDESIGN.md:107,377. Sort must only reorder the cast
+     * than the session length — see docs/design/flashcard-selection.md. Sort must only reorder the cast
      * already drawn.
      */
     @Test

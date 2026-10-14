@@ -86,7 +86,7 @@ class FirestoreUserFavoritesRemoteDataSource @Inject constructor(
 
     /**
      * Firestore's offline persistence applies a write to the local cache immediately but leaves the
-     * returned Task pending until the server acks (docs/design/onboarding-flow.md:122-123) — an
+     * returned Task pending until the server acks (see docs/design/onboarding-flow.md) — an
      * unbounded `await()` would hang an offline caller forever. Timing out treats the
      * already-applied local write as success; a real failure (e.g. permission-denied) still throws
      * before the timeout elapses and propagates normally.

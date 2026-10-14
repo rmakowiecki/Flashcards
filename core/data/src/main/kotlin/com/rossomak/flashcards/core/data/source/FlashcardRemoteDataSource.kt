@@ -143,9 +143,9 @@ class FlashcardRemoteDataSource @Inject constructor(
         const val PREFIX_RANGE_SENTINEL = "\uF8FF"
 
         /**
-         * Ceiling on a single search query. Must stay at or below 30: the matched ids are destined
-         * for a Firestore `whereIn` progress lookup once card mastery ships, and `whereIn` caps at
-         * 30 values. See docs/design/category-search.md.
+         * Read-cost ceiling on a single live search query, which runs as the user types. Progress
+         * rings for the matches come from the progress summary, not a per-id lookup, so no
+         * `whereIn` limit applies here. See docs/design/category-search.md.
          */
         const val SEARCH_RESULT_LIMIT = 20L
 

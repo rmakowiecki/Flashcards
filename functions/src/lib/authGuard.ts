@@ -13,7 +13,7 @@ const USER_NOT_FOUND_CODE = "auth/user-not-found";
  * `onCall` already decoded: the User must still exist and not be disabled, and the token's
  * `auth_time` must not predate the User's `tokensValidAfterTime`. Every rejection is
  * `unauthenticated`, so a client that queues writes keeps them queued rather than dropping them.
- * See ADR-0057.
+ * See ADR-0064.
  *
  * Takes the Auth instance as a parameter so tests can pass one bound to the Auth emulator.
  */

@@ -360,8 +360,8 @@ private fun LoadFailureContent(
  * up from (see [PreviewStudySessionContent]'s doc), so an expanded sheet — comfortably taller than
  * this row on any real device, being every setting row stacked — fully covers it rather than
  * leaving it floating above the sheet's top edge with daylight in between. [HeroActions] stays put
- * whether the pool is empty or not, so Reshuffle topics remains reachable even from the empty
- * state — a fresh sample can turn an empty result into a match. Otherwise plain top-down [Column]
+ * whether the pool is empty or not, so Start and the settings toggle keep their place in the empty
+ * state; Reshuffle topics is not offered there (see [HeroActions]). Otherwise plain top-down [Column]
  * flow — no adaptive collapsing, no measuring against the sheet's actual height; see
  * [PreviewStudySessionContent]'s doc for why that was dropped.
  */
@@ -437,9 +437,7 @@ private fun HeroTop(modifier: Modifier = Modifier) {
 
 /**
  * The scope sentence and its read-only badges — minutes, cards, then subcategories for a multi-subcategory
- * or Quick session (today's code emitted subcategories before cards; the design calls for this order) —
- * plus [SettingsBadgeRow] on its own line beneath them. This half of the hero always survives
- * [AdaptiveHero]'s adaptation.
+ * or Quick session — plus [SettingsBadgeRow] on its own line beneath them.
  */
 @Composable
 private fun ScopeHeroBody(
@@ -579,8 +577,8 @@ private fun interactionBadgeContent(isRated: Boolean, enabled: Boolean): Interac
 
 /**
  * The nothing-matches state: [FlashcardsEmptyState] replaces the *whole* hero above it (no
- * play circle, no title, no scope sentence, no badges — [AdaptiveHero] never even composes
- * [HeroTop] when [ReadyContent] finds the pool empty), with a single Reset filters action that
+ * play circle, no title, no scope sentence, no badges — [ReadyContent] never composes [HeroTop]
+ * when it finds the pool empty), with a single Reset filters action that
  * restores what the screen was originally handed. Settings remains reachable from an empty pool via
  * [HeroActions]' own settings toggle, which stays put either way below this body (with Start
  * session visible but disabled) so it's never out of reach. Reshuffle is deliberately absent too —
@@ -648,9 +646,8 @@ private fun MicPermissionRejectedHeroBody(
  * not just left off the empty state's own two actions, since a stale sample and a fresh one look
  * identical until reshuffled. Custom never offers it, single- or multi-subcategory alike: its
  * subcategories are hand-picked by the user, not sampled, so there is nothing to reshuffle
- * ([PreviewStudySessionScreenState.canReshuffleSubcategories]). Reshuffle stays enabled independent
- * of [PreviewStudySessionScreenState.canStart] otherwise: a fresh sample can turn an empty result
- * into a match, which is exactly when reshuffling is needed. Start's label never changes with the
+ * ([PreviewStudySessionScreenState.canReshuffleSubcategories]). While cards match, Reshuffle is
+ * enabled whenever no load is running. Start's label never changes with the
  * sheet's open/closed value — the primary action's text must not shift under the user — and it stays
  * visible but disabled whenever nothing is selected, rather than disappearing.
  *
