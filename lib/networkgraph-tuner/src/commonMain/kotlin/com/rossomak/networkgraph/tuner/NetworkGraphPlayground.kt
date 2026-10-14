@@ -76,7 +76,9 @@ import com.rossomak.networkgraph.NetworkGraphMorph
 import com.rossomak.networkgraph.NetworkGraphSpec
 import com.rossomak.networkgraph.networkGraphBackground
 import com.rossomak.networkgraph.rememberNetworkGraphMorphState
+import kotlin.math.roundToInt
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -203,8 +205,14 @@ private fun RecordFrameIntervals(stats: NetworkGraphFrameStats) {
     }
 }
 
-/** One stand-in onboarding pager: its steps' specs, editable in place, and its own pager. */
-private class Deck(val specs: SnapshotStateList<NetworkGraphPreset>, val pagerState: PagerState)
+/**
+ * One stand-in onboarding pager: its steps' specs, editable in place, its own pager, and the
+ * [minMorphMillis] its background follows the pager with.
+ */
+@Stable
+private class Deck(val specs: SnapshotStateList<NetworkGraphPreset>, val pagerState: PagerState) {
+    var minMorphMillis by mutableIntStateOf(0)
+}
 
 @Composable
 private fun rememberDeck(pages: List<NetworkGraphPreset>): Deck {
@@ -254,6 +262,7 @@ private fun specSlotFor(
                 onForward = { coroutineScope.launch { pagerState.animateScrollToPage(step + 1) } },
                 onJump = { coroutineScope.launch { pagerState.scrollToPage(if (step == pagerState.pageCount - 1) 0 else pagerState.pageCount - 1) } },
             ),
+            sheetHeader = { DeckControls(currentDeck) },
         )
     }
 }
@@ -289,6 +298,10 @@ private const val MORPH_DEFAULT_TO_INDEX = 3
 /** How far a deck page's surface shrinks, as a share of the page's height. */
 private const val DECK_SHRUNK_HEIGHT = 0.45f
 private const val DECK_RESIZE_MILLIS = 900
+
+/** The deck's min morph duration slider: up to this, in steps of [DECK_MIN_MORPH_STEP_MILLIS]. */
+private const val DECK_MAX_MIN_MORPH_MILLIS = 1_500
+private const val DECK_MIN_MORPH_STEP_MILLIS = 50
 
 /** How long Start takes to morph from one end to the other. */
 private const val MORPH_PLAY_MILLIS = 1_200
@@ -428,6 +441,21 @@ private fun MorphControls(specs: List<NetworkGraphPreset>, selection: MorphSelec
     }
 }
 
+/** A deck page's part of the tuning sheet: how long the background takes at least to morph one step. */
+@Composable
+private fun DeckControls(deck: Deck) {
+    Column {
+        Text(text = "Min morph duration ${deck.minMorphMillis} ms", style = MaterialTheme.typography.bodySmall)
+        Slider(
+            value = deck.minMorphMillis.toFloat(),
+            onValueChange = { deck.minMorphMillis = it.roundToInt() },
+            valueRange = 0f..DECK_MAX_MIN_MORPH_MILLIS.toFloat(),
+            steps = DECK_MAX_MIN_MORPH_MILLIS / DECK_MIN_MORPH_STEP_MILLIS - 1,
+        )
+        Text(text = "Tuning this step", style = MaterialTheme.typography.labelLarge)
+    }
+}
+
 @Composable
 private fun MorphPicker(label: String, specs: List<NetworkGraphPreset>, selected: Int, onSelect: (Int) -> Unit) {
     FlowRow(
@@ -469,7 +497,9 @@ private fun DeckPage(
         label = "deckSurfaceHeight",
     )
     val morphState = rememberNetworkGraphMorphState(specs[pagerState.currentPage].spec)
-    morphState.Follow(specs.map { it.spec }) { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+    morphState.Follow(specs.map { it.spec }, minMorphDuration = deck.minMorphMillis.milliseconds, target = { pagerState.targetPage }) {
+        pagerState.currentPage + pagerState.currentPageOffsetFraction
+    }
 
     Box(
         modifier = Modifier
