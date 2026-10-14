@@ -22,6 +22,9 @@ internal class MorphFollower(private val state: NetworkGraphMorphState, private 
     /** The morph this follower last showed while following pairs, to notice anyone else moving the state. */
     private var shown: NetworkGraphMorph? = null
 
+    /** The spec [morphToward] runs its morph to, while it does. */
+    private var towards: Int? = null
+
     private sealed interface Mode {
         /** Showing the pair of specs the position lies between. */
         data object Pairs : Mode
@@ -35,6 +38,7 @@ internal class MorphFollower(private val state: NetworkGraphMorphState, private 
 
     suspend fun follow(position: Float, specs: List<NetworkGraphSpec>, animationSpec: AnimationSpec<Float>) {
         if (specs.isEmpty()) return
+        towards = null
         val clamped = position.coerceIn(0f, specs.lastIndex.toFloat())
         val previous = lastPosition
         lastPosition = clamped
@@ -62,6 +66,36 @@ internal class MorphFollower(private val state: NetworkGraphMorphState, private 
             current is Mode.Pairs -> showPair(clamped, specs)
             else -> seek(clamped, specs, animationSpec)
         }
+    }
+
+    /** Runs a timed morph to the spec nearest [position], as a jump to it would. */
+    fun jumpTo(position: Float, specs: List<NetworkGraphSpec>, animationSpec: AnimationSpec<Float>) {
+        if (specs.isEmpty()) return
+        val clamped = position.coerceIn(0f, specs.lastIndex.toFloat())
+        lastPosition = clamped
+        towards = null
+        startTimed(clamped.roundToInt(), specs, animationSpec)
+    }
+
+    /**
+     * Shows the morph from the screen toward the spec at [target] at [fraction], the screen as it was
+     * when [target] became the one to morph to. At 1 it lands there and goes back to following pairs.
+     */
+    suspend fun morphToward(target: Int, fraction: Float, specs: List<NetworkGraphSpec>) {
+        if (specs.isEmpty()) return
+        val clamped = target.coerceIn(0, specs.lastIndex)
+        if (towards != clamped) {
+            timedMorph?.cancel()
+            // Forgets any seek in progress, so the morph below starts from the screen as it is.
+            state.snapTo(state.morph)
+            towards = clamped
+        }
+        state.seekTo(specs[clamped], fraction)
+        if (fraction < 1f) return
+        towards = null
+        lastPosition = clamped.toFloat()
+        mode = Mode.Pairs
+        showPair(lastPosition, specs)
     }
 
     /** [follow] again for [position] in the mode just switched to, as if the previous position had been [previous]. */

@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlin.time.Duration
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.job
@@ -169,22 +170,46 @@ public fun animateNetworkGraphMorph(target: NetworkGraphSpec, animationSpec: Ani
  * run an entrance of its own, such as an [NetworkGraphMorphState.animateTo] from a transparent spec;
  * the position's first move takes over from wherever that has got to. Any other call to the state does
  * the same: the next move continues from the screen.
+ *
+ * With a [minMorphDuration], the background never crosses from one spec to the next faster than that;
+ * slower motion is followed exactly. A quick flick, or a pager's own short scroll to the next page,
+ * leaves the background behind: it catches up at that speed, slowing down to land on the position, and
+ * turns around when the position turns back. Jumps still run over [animationSpec]. Under the system's
+ * "Remove animations" setting the position is followed exactly.
+ *
+ * [target] is the index of the spec the position heads for, such as `PagerState.targetPage`. When it
+ * lies beyond the pair of specs the background shows, as after several quick Next taps, the specs in
+ * between are skipped: the background morphs from the screen straight to it over [minMorphDuration],
+ * starting again from the screen whenever the target changes, and holds it until the position gets
+ * there. Without one, the target is the whole position the position moves toward, so a fast fling
+ * changes course at each page it passes instead.
  */
 @Composable
 public fun NetworkGraphMorphState.Follow(
     specs: List<NetworkGraphSpec>,
     jumpThreshold: Float = 1f,
     animationSpec: AnimationSpec<Float> = NetworkGraphMorphState.DefaultAnimationSpec,
+    minMorphDuration: Duration = Duration.ZERO,
+    target: (() -> Int)? = null,
     position: () -> Float,
 ) {
+    require(minMorphDuration >= Duration.ZERO) { "minMorphDuration must not be negative: $minMorphDuration" }
     val currentSpecs by rememberUpdatedState(specs)
     val currentPosition by rememberUpdatedState(position)
     val currentAnimationSpec by rememberUpdatedState(animationSpec)
+    val currentMinMorphDuration by rememberUpdatedState(minMorphDuration)
+    val currentTarget by rememberUpdatedState(target)
     LaunchedEffect(this, jumpThreshold) {
-        val follower = MorphFollower(this@Follow, jumpThreshold, this)
-        snapshotFlow { currentPosition() to currentSpecs }.collect { (followed, followedSpecs) ->
-            follower.follow(followed, followedSpecs, currentAnimationSpec)
-        }
+        val follower = LimitedMorphFollower(
+            follower = MorphFollower(this@Follow, jumpThreshold, this),
+            jumpThreshold = jumpThreshold,
+            position = { currentPosition() },
+            target = { currentTarget?.invoke() },
+            specs = { currentSpecs },
+            animationSpec = { currentAnimationSpec },
+            minMorphDuration = { currentMinMorphDuration },
+        )
+        snapshotFlow { Triple(currentPosition(), currentTarget?.invoke(), currentSpecs) }.collect { follower.update() }
     }
 }
 
