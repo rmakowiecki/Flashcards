@@ -1,53 +1,44 @@
 # Launcher Shortcuts
 
-## Purpose
+Launcher shortcuts that open a Category or a Subcategory straight from the device's home screen. A User pins one by hand from the Details screens, and the app keeps a dynamic set, shown on a long press of the app icon, that mirrors the User's Favorites.
 
-Home screen shortcuts (both user-pinned and long-press dynamic) that deep-link directly into a specific Category or Subcategory within the app.
+## Targets
 
-## Shortcut types
+A shortcut targets either a Category, opening Category Details, or a Subcategory, opening Subcategory Details. These are the same screens normal navigation reaches.
 
-| Type | Label | Deep-link destination | Created by |
-|---|---|---|---|
-| Category shortcut | Category name | Category Details screen | User (pinned) or auto (dynamic) |
-| Subcategory shortcut | Subcategory name | Subcategory Details screen | User (pinned) or auto (dynamic) |
+- **Label**: the Category or Subcategory name, used as both the long and the short label.
+- **Icon**: the owning Category's icon and color. A Subcategory has neither of its own, so its shortcut uses its parent Category's. The color is baked into the image because the launcher does not tint shortcut icons. If either value is missing, or rendering fails, the shortcut shows the app icon. See [category-icon-color.md](category-icon-color.md).
+- **Identity**: each target has one fixed identity shared by pinned and dynamic shortcuts, so a target that is both pinned and a Favorite is one shortcut, and the dynamic sync refreshes the pinned copy too.
 
-Both **pinned** and **dynamic** shortcuts are in scope for MVP (revised from the original pinned-only plan).
+## Pinned shortcuts
 
-Future: destinations may change to Preview Study Session Screen (with the Category/Subcategory pre-selected) to reduce taps to session start. Not in current scope.
+Category Details and Subcategory Details each carry a top app bar action that pins a shortcut to that screen's Category or Subcategory ([browse.md](browse.md)). The tap first re-reads the target, so the shortcut gets the current name and icon. The system then shows its own placement confirmation, which the app cannot bypass.
 
-## Creation surfaces
+- If the target no longer resolves, a snackbar says the shortcut could not be created.
+- If the launcher does not support pinning, a snackbar says so instead of silently doing nothing.
 
-**Pinned** — the dedicated top app bar icon (`Icons.AutoMirrored.Filled.AddToHomeScreen`, currently stubbed) already shipped on:
-- **Category Details screen** → `ShortcutManagerCompat.requestPinShortcut` for a Category shortcut
-- **Subcategory Details screen** → `ShortcutManagerCompat.requestPinShortcut` for a Subcategory shortcut
+A pinned shortcut keeps the label it was pinned with. Routing is by id, so a renamed target still opens correctly, but the label is only refreshed when the target is also a Favorite and the dynamic sync rewrites it. There is no screen for managing shortcuts; the User removes them from the launcher.
 
-(Supersedes the original overflow-menu (⋮) plan — the dedicated icon is what shipped and is the surface going forward.) The system shows its own placement-confirmation dialog; this is Android-native behavior and cannot be bypassed. Not every launcher supports pinning: `AppShortcutsGateway` checks `ShortcutManagerCompat.isRequestPinShortcutSupported` before requesting, and shows a one-shot snackbar (existing SharedFlow event-channel pattern) when unsupported, rather than silently doing nothing.
+## Dynamic shortcuts
 
-**Dynamic** — no user-facing creation action. The dynamic shortcut set is derived automatically from the user's favorited categories/subcategories, ranked most-recently-favorited first, truncated to `ShortcutManagerCompat.maxShortcutCountPerActivity` (queried at runtime, never hardcoded). Rebuilt on every app start in `AppStartViewModel` by consuming `ObserveFavoriteItemsUseCase` (delivered by `feat/home-favorites-logic`, which resolves favorited ids to full `Category`/`Subcategory` objects with a `favoritedAt: Instant` and returns them already sorted most-recent-first) — shortcuts logic does no ranking or id-resolution of its own, it maps `FavoriteItem`s straight to `ShortcutTarget`s. Since the set is rebuilt fresh every launch, removed/renamed favorites self-heal without any explicit cleanup step. `setDynamicShortcuts` returning `false` (rate-limited or over-limit) is logged and otherwise ignored — no retry — since the next app launch supersedes it anyway.
+The dynamic set has no creation action. It mirrors the signed-in User's Favorites, most recently favorited first, cut to the most the launcher allows per app, a limit read from the platform at run time.
 
-No dedicated shortcut management screen for either type.
+- **Live**: the set follows the Favorites for as long as a User is signed in, so favoriting or unfavoriting updates it straight away, and removed or renamed targets heal on the next update.
+- **Signed out**: signing out clears the set at once. A Guest is not signed in for this purpose and has no dynamic shortcuts.
+- **Failures**: if the Favorites cannot be resolved, the last set stays in place instead of being wiped. If the platform refuses an update, it is logged and the next update supersedes it.
 
-## Deep-link routing
+## Opening a shortcut
 
-No URI scheme, App Links, or `NavDeepLink` infrastructure — there is exactly one internal producer (this feature) and one internal consumer (app startup), so a minimal mechanism is used instead: a custom Intent action plus a typed extra carrying the existing tab-prefixed route string (ADR-0003), read by `MainActivity`/`AppStartViewModel` and resolved to a Compose navigation destination.
+A shortcut carries an id-based route to its target, read by the app at launch. It is resolved at Splash, and only when Splash is going to Main. If the device has not finished onboarding or no User is signed in, the route is dropped and the launch continues through onboarding or Login as usual; it is not applied afterwards. Nothing could check it before sign-in anyway, because Categories and Subcategories are not readable signed out. Where the target opens in the back stack is described in [navigation.md](navigation.md).
 
-- Category: `/study/category/{categoryId}`
-- Subcategory: `/study/category/{categoryId}/subcategory/{subcategoryId}`
+A route that no longer resolves lands on Main as an ordinary launch, with no error. This covers a deleted target, a Subcategory that now sits under a different Category than the route names, and a lookup that does not answer in time. A pinned shortcut to deleted content stays on the launcher until the User removes it, because content deletion is a rare admin action.
 
-These routes resolve to the same `CategoryDetails` and `SubcategoryDetails` composables used in normal navigation.
+A shortcut tapped while the app is already running never discards what the User is doing, a running Study Session included: the target opens on top of the current screen.
 
-**Stale target:** if the id no longer resolves (category/subcategory deleted server-side), fail silently and land on BrowseScreen — no error toast. The dynamic set self-heals on the next rebuild; pinned shortcuts to deleted content are left dangling until the OS/user removes them (no programmatic cleanup planned — content deletion is an admin-driven, rare event).
+## Related
 
-**Rename (id preserved, name changed):** routing is unaffected — routes are id-based, so a renamed Category/Subcategory still resolves correctly. A **pinned** shortcut's label was baked in at pin time and is not refreshed on rename (accepted MVP limitation, no `updateShortcuts` call planned — there's no rename-event source to trigger it from). Dynamic shortcuts get the current name for free since the whole set is rebuilt from live data every launch.
-
-**Auth gate:** if the user is logged out when a shortcut is tapped, the pending route is carried through Splash → Login, and applied once login succeeds. If the user backs out of Login without completing it, the pending route is discarded — no retry, no persistence across later sessions.
-
-## Shortcut metadata
-
-- **Label:** Category name or Subcategory name (displayed under the shortcut icon on the launcher)
-- **Short label:** Truncated version (≤10 chars) for launchers with limited space
-- **Icon:** the owning Category's `iconSvg` + `color` (Subcategory has no icon fields of its own — its shortcut inherits its parent Category's glyph/color unchanged). Rasterized headlessly via Coil's `ImageLoader.execute()` (same decoder used for on-screen rendering) since dynamic-set rebuild happens in a ViewModel with no Composable on screen; `color` is baked into the bitmap by compositing before handing it to `IconCompat.createWithBitmap()`, since launcher-rendered shortcut icons are static and get no runtime tint from the OS.
-
-## Android API
-
-`ShortcutManagerCompat` (API 26+ throughout the app, so no version gating needed): `requestPinShortcut` for user-pinned shortcuts, `setDynamicShortcuts` for the auto-derived favorites-based set.
+- [navigation.md](navigation.md): launch routing through Splash and where a shortcut's target opens.
+- [browse.md](browse.md): the pin action on the Details screens.
+- [home.md](home.md): the Favorites the dynamic set mirrors.
+- [category-icon-color.md](category-icon-color.md): shortcut icons.
+- [ADR-0003](../adr/0003-category-and-subcategory-details-are-root-routes-above-the-tab-shell.md): why Details screens sit above the tab shell.
