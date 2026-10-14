@@ -8,7 +8,7 @@ Onboarding is shown on a device that has not finished it, before Login. When it 
 
 The onboarding flag belongs to the device, not to the User. A second account signing in on the same device skips onboarding, and the same account on a new device sees it again. This is an accepted trade-off: the preferences onboarding captures are device-scoped too ([settings.md](settings.md)).
 
-The debug hub can clear the flag, so the next run behaves exactly like a first run, writes included. That is the only way a signed-in User reaches onboarding, and it is why the flow can end at Main.
+The debug hub can clear the flag, so the next run behaves exactly like a first run, writes included. Splash checks the flag before it checks authentication, and sign-in only happens after onboarding, so clearing the flag is the only way a signed-in User reaches onboarding. That is why the flow can end at Main.
 
 ## The gallery
 

@@ -66,7 +66,7 @@ class SplashViewModel @Inject constructor(
         viewModelScope.launch {
             val hasSeenValue = withTimeoutOrNull(PREFERENCES_TIMEOUT_MS.milliseconds) {
                 observeUserPreferences().first().hasSeenOnboarding
-            } ?: false
+            } ?: true
             _hasSeenOnboarding.value = hasSeenValue
         }
         viewModelScope.launch {

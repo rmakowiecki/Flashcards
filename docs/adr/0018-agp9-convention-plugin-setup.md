@@ -27,8 +27,6 @@ ADR-0011 specified `build-logic/` precompiled script plugins but predates AGP 9.
 
 **`build-logic` catalog + properties wiring.** `build-logic/settings.gradle.kts` must declare its own repositories and re-create the version catalog (`from(files("../gradle/libs.versions.toml"))`), or `libs.*` is unresolved inside build-logic. `build-logic/gradle.properties` only needs `android.useAndroidX=true`.
 
-**Font cert resource must live in `:core:ui`.** *(Obsolete: the app no longer uses downloadable fonts and both `font_certs.xml` files are gone, see [ADR-0065](0065-typography-is-the-stock-m3-scale-over-bundled-roboto.md).)* `Type.kt` references `R.array.com_google_android_gms_fonts_certs`. Library module R classes only include their own resources (not transitive deps). The cert array is declared in `app/src/main/res/values/font_certs.xml` (not bundled in any AAR), so it must be copied to `core/ui/src/main/res/values/font_certs.xml`.
-
 **Hilt plugin requires `hilt-android` dep even with no annotations.** Modules using `android-core-android` must declare `implementation(libs.hilt.android)` + `ksp(libs.hilt.android.compiler)` or Gradle fails at configuration time.
 
 ## Alternatives considered

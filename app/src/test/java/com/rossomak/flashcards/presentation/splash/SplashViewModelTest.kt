@@ -22,6 +22,8 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -101,6 +103,26 @@ class SplashViewModelTest {
                 awaitItem() shouldBe SplashDestination.Login
             }
         }
+
+    @Test
+    fun `signed-in user whose onboarding flag read times out emits Main`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { getCurrentAuthUserUseCase() } returns testUser
+        val neverEmittingPreferences: ObserveUserPreferencesUseCase = mockk()
+        coEvery { neverEmittingPreferences() } returns flow { awaitCancellation() }
+        every { RouteDecoder.decode(any<() -> Splash>()) } returns Splash(pendingRoute = null)
+
+        val viewModel = SplashViewModel(
+            savedStateHandle,
+            getCurrentAuthUserUseCase,
+            neverEmittingPreferences,
+            flashcardRepository,
+        )
+        viewModel.onAnimationCompleted()
+
+        viewModel.events.test {
+            awaitItem() shouldBe SplashDestination.Main
+        }
+    }
 
     @Test
     fun `animation completed before timeout with user emits Main`() = runTest(mainDispatcherRule.testDispatcher) {

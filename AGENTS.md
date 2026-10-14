@@ -281,7 +281,7 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 
 ## Project Documentation
 
-- `docs/design/` — current design of each built feature, one doc per feature; `docs/design/planned/` holds designs for unbuilt ones. Writing rules: [docs/design/README.md](./docs/design/README.md). Index (imported below):
+- `docs/design/` — current design of each built feature, one doc per feature; `docs/design/planned/` holds designs for unbuilt ones, including the unbuilt remainder of a partly built feature under the same name. Writing rules: [docs/design/README.md](./docs/design/README.md). Index (imported below):
 
 @docs/design/INDEX.md
 

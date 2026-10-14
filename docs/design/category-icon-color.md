@@ -39,7 +39,7 @@ Icon and color cannot be derived from a Category's folder name, so they are vers
 
 When the fixture is built, each Category takes whichever of its two files exist. A missing or empty file leaves that field out entirely and prints a warning, but never fails the build.
 
-When the fixture is seeded, Firestore wins once it holds a value. An icon or color that is already present on the Category document, whether seeded earlier or edited by hand in the console, is never overwritten by the checked-in file. Every other Category field is rewritten on each run, and a field left out of the write is never touched. A forced overwrite run replaces whichever of the two the checked-in files supply, and still leaves a field with no file alone. Adding art to a live Category is therefore just a matter of adding its two files and running the seed pipeline.
+When the fixture is seeded, Firestore wins once it holds a value. An icon or color that is already present on the Category document, whether seeded earlier or edited by hand in the console, is never overwritten by the checked-in file. Every other Category field is rewritten on each run, and a field left out of the write is never touched. A forced overwrite run replaces whichever of the two the checked-in files supply, and still leaves a field with no file alone. Adding missing art to a live Category is therefore just a matter of adding its files and running the seed pipeline. Replacing art the Category already holds needs the forced overwrite run (`--overwrite`).
 
 There is no in-app way to edit a Category's icon or color.
 

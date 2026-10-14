@@ -1,0 +1,3 @@
+config:
+  # AGENTS.md uses compact headings with no blank line below them.
+  MD022: false
