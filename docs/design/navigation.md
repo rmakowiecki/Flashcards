@@ -71,11 +71,14 @@ Losing sign-in, at any time, returns to Login and clears Main and everything abo
 
 A screen's decision to go somewhere is a **one-time event**, never part of its screen state. The screen collects each event once and calls the matching navigation callback, so navigation can never fire twice on recomposition or after a configuration change, and nothing needs resetting afterwards. An event sent before the screen starts collecting waits to be delivered rather than being dropped. Snackbar messages are a separate kind of transient event and do not share this path. Rationale and the code shape are in [ADR-0019](../adr/0019-navigation-as-one-time-events.md).
 
+A screen navigates only while it is the one shown. A tap made while it is leaving, or after another screen covers it, goes nowhere, so a double tap never opens a screen twice or goes back twice ([ADR-0067](../adr/0067-destinations-navigate-only-from-their-own-back-stack-entry.md)).
+
 Every screen whose ViewModel decides where to go uses these events, even for a tap with only one destination. Two taps that need no decision call their navigation callback directly: Home's empty-state button switching to the Study tab, and the Settings avatar that opens Account.
 
 ## Related
 
 - [ADR-0019](../adr/0019-navigation-as-one-time-events.md): navigation as one-time events.
+- [ADR-0067](../adr/0067-destinations-navigate-only-from-their-own-back-stack-entry.md): destinations navigate only from their own back-stack entry.
 - [ADR-0004](../adr/0004-preview-study-session-screen-owns-card-selection.md): every session goes through Preview.
 - [ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md): separate Rated and Fast session screens.
 - [preview-study-session.md](preview-study-session.md): what each session entry point sends.
