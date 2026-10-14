@@ -3,14 +3,11 @@
 package com.rossomak.flashcards.core.ui.backdrop
 
 import android.os.Build
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -20,7 +17,6 @@ import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.modifier.modifierLocalProvider
 import androidx.compose.ui.unit.Dp
-import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.ui.theme.AppSizes
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
@@ -28,7 +24,6 @@ import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import java.util.concurrent.atomic.AtomicBoolean
 
 // The only file allowed to import `dev.chrisbanes.haze` (Konsist enforces it), so the library stays swappable.
 
@@ -39,8 +34,6 @@ val LocalBackdropBlurRadius = staticCompositionLocalOf<Dp> { AppSizes.backdropBl
 
 /** Switches every [blurBackdrop] off when `false`; only the debug screen sets it. */
 val LocalBackdropBlurEnabled = staticCompositionLocalOf { true }
-
-private val missingSourceWarned = AtomicBoolean(false)
 
 /**
  * Opens a scope for the [blurBackdropSource]s and [blurBackdrop]s below it; put it on the common
@@ -67,8 +60,7 @@ fun Modifier.blurBackdropSource(): Modifier = composed {
 /**
  * Blurs the nearest [blurBackdropSource] behind this node, clipped to [shape]; the component's own
  * container is drawn over it. When [enabled] is `false`, below API 31, with blur switched off, or
- * outside a [blurBackdropScope] (logged once), it returns the receiver unchanged and attaches no
- * Haze node.
+ * outside a [blurBackdropScope], it returns the receiver unchanged and attaches no Haze node.
  */
 fun Modifier.blurBackdrop(
     shape: Shape,
@@ -87,7 +79,6 @@ fun Modifier.blurBackdrop(
                 noiseFactor(0f)
             }
         }
-        WarnOnMissingSource(sourceFound = { hazeState != null })
 
         val resolvedState = hazeState
         modifierLocalConsumer { hazeState = ModifierLocalBackdropState.current }
@@ -97,15 +88,5 @@ fun Modifier.blurBackdrop(
                     else -> Modifier.clip(shape).hazeBlur(input = HazeInput.Sources(resolvedState), style = style)
                 },
             )
-    }
-}
-
-@Composable
-private fun WarnOnMissingSource(sourceFound: () -> Boolean) {
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        if (!sourceFound() && missingSourceWarned.compareAndSet(false, true)) {
-            logw { "blurBackdrop found no ancestor blurBackdropScope; drawing no blur" }
-        }
     }
 }

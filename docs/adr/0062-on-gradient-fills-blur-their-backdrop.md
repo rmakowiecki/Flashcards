@@ -57,9 +57,9 @@ Box(Modifier.fillMaxSize().blurBackdropScope()) {
 with `blursBackdrop = false`, or outside any scope, `blurBackdrop` returns the modifier unchanged: no
 Haze node is attached, no source records a layer on its behalf, and the component looks exactly as if
 it had never been applied. A source only records while some blurring component is attached to its
-scope, so an idle screen pays nothing. The frame before the scope resolves is the same. A component
-outside any scope is logged once through `AppLog`. A scope that no source ever joins is not detected,
-and an effect then selects nothing. There is no heavier fallback fill: with or without the blur the
+scope, so an idle screen pays nothing. The frame before the scope resolves is the same. Neither a
+component outside any scope nor a scope that no source ever joins is detected; an effect then selects
+nothing. There is no heavier fallback fill: with or without the blur the
 container is the same.
 
 **Blur radius** is one theme token, `sizes.backdropBlurRadius`, read through `LocalBackdropBlurRadius`;
