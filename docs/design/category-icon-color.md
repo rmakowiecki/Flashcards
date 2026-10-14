@@ -27,7 +27,7 @@ Subcategories have no icon or color of their own. A surface that shows a Subcate
 - The small inline glyph that leads the Category line of a Recent on Home and of a Topic search result.
 - The large faded watermark on a Favorite Category card on Home, whose title also takes the Category color.
 
-Other surfaces show only the glyph and ignore the Category color, drawing it in their own tint instead. For example, the onboarding Favorite pick card tints the glyph with its own selected or unselected treatment.
+Other surfaces show only the glyph and ignore the Category color, drawing it in their own tint instead. For example, the onboarding Favorite pick card tints the glyph with its own selected or unselected treatment, and the Preview hero draws it in white on its circle.
 
 **Caching.** An SVG is parsed and rasterized once per size into an untinted mask, off the main thread. The mask is held in a cache shared across the whole process, and the tint is applied when the mask is drawn. One mask therefore serves every tint, so a selection change or a light/dark switch never re-renders it. Returning to Home or Browse draws every glyph already seen in the first frame. While a glyph that is not yet cached loads, a tile shows only its tinted container and an inline glyph keeps its space empty, so the fallback glyph never flashes in its place.
 

@@ -27,6 +27,7 @@ The top bar holds a close button and a title naming the Category with either the
 
 The **hero** describes the session:
 
+- The Category's glyph in a circle, left out until the Category has resolved ([category-icon-color.md](category-icon-color.md)).
 - A sentence giving the card count and naming the Subcategories in scope. A long Custom list is shortened to a count of the rest; a Quick list is capped by its sampling range and is always named in full.
 - Scope badges: the estimated duration, the card count and, for a session with more than one Subcategory, the topic count.
 - A second row of badges for the Study Mode and its delivery. The delivery badge always names what will happen (voice, auto-play or manual), never "off".
@@ -60,7 +61,7 @@ What a confirm does to the drawn cards is in [flashcard-selection.md](flashcard-
 
 ## Hero states
 
-- **Loading**: a spinner while the first draw, a redraw or a Quick pool fetch runs. Start is disabled.
+- **Loading**: a spinner while the first draw, a Retry after a failure or a Quick pool fetch runs. A redraw keeps the hero on screen, describing the previous draw, until the new draw lands. The loaded hero fades in as one block ([ADR-0063](../adr/0063-loaded-content-reveals-as-one-block.md)).
 - **Load failed**: any read failed, including a Quick pool fetch that failed or came back empty. A connection error with **Retry** replaces the screen's body. For a Quick session whose pool never loaded, Retry fetches the pool again before drawing.
 - **Empty draw**: the filters left no Flashcards. An empty state with **Reset filters** replaces the hero, restoring the filters the entry point sent. Start stays visible but disabled, and Reshuffle is hidden. The settings sheet stays reachable.
 - **Microphone blocked**: see below. An empty draw wins over it, since there is no session to fix the microphone for.
@@ -77,7 +78,7 @@ The microphone status is read again every time the screen resumes, so a change m
 
 ## Starting the session
 
-Start is enabled only when cards are drawn and nothing is loading or failed, and a second tap while a start is in flight does nothing. The confirmed Study Mode picks the destination: Rated and Fast each open their own session screen, carrying the drawn cards in Preview's order and only the settings that mode uses ([ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md)). The session's delivery is fixed from then on.
+Start is enabled only when cards are drawn and no load has failed. It stays enabled during a redraw so a quick draw does not make it blink, but a tap while a draw runs does nothing, and neither does a second tap while a start is in flight. The confirmed Study Mode picks the destination: Rated and Fast each open their own session screen, carrying the drawn cards in Preview's order and only the settings that mode uses ([ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md)). The session's delivery is fixed from then on.
 
 Preview stays on the back stack under the session. A session that ends with nothing Studied, or whose cards fail to load, returns here with the same draw and settings, so Start plays the same cards again unless the user changes something. A session that reaches the Summary removes itself and Preview from the back stack.
 

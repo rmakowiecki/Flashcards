@@ -14,7 +14,7 @@ The Study tab opens on a search bar above the list of every Category, in the tax
 
 Tapping a row opens Category Details. A Category row has no play button, because a Category is not a study unit.
 
-While the list loads, a spinner shows. A failed load and an empty list read the same way: an error with Retry. The taxonomy always has Categories, so an empty list can only mean the read went wrong.
+While the list loads, a spinner shows, and loaded content fades in as one block ([ADR-0063](../adr/0063-loaded-content-reveals-as-one-block.md)). A failed load and an empty list read the same way: an error with Retry. The taxonomy always has Categories, so an empty list can only mean the read went wrong.
 
 ## Category Details
 
