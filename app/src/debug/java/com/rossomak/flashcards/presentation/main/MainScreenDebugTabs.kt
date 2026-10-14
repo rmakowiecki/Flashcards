@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import com.rossomak.flashcards.BuildConfig
 import com.rossomak.flashcards.feature.debug.DebugBackdropBlurRoot
@@ -20,6 +19,7 @@ import com.rossomak.flashcards.feature.debug.R as DebugR
 import com.rossomak.flashcards.feature.debug.backdropblur.BackdropBlurDebugScreen
 import com.rossomak.flashcards.feature.debug.voice.VoiceDebugScreen
 import com.rossomak.flashcards.feature.debug.voiceindicator.VoiceIndicatorDebugScreen
+import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 
 @Composable
 internal fun debugTabs(): List<TabItem> = listOf(
@@ -48,23 +48,23 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
     onNavigateToOnboarding: () -> Unit,
 ) {
     navigation<DebugGraph>(startDestination = DebugRoot) {
-        composable<DebugRoot> {
+        guardedNavComposable<DebugRoot>(navController) { navigator ->
             DebugScreen(
                 gitShortSha = BuildConfig.GIT_SHORT_SHA,
                 onNavigateToOnboarding = onNavigateToOnboarding,
-                onNavigateToVoiceDebug = { navController.navigate(DebugVoiceRoot) },
-                onNavigateToVoiceIndicatorDebug = { navController.navigate(DebugVoiceIndicatorRoot) },
-                onNavigateToBackdropBlurDebug = { navController.navigate(DebugBackdropBlurRoot) },
+                onNavigateToVoiceDebug = { navigator.navigate(DebugVoiceRoot) },
+                onNavigateToVoiceIndicatorDebug = { navigator.navigate(DebugVoiceIndicatorRoot) },
+                onNavigateToBackdropBlurDebug = { navigator.navigate(DebugBackdropBlurRoot) },
             )
         }
-        composable<DebugVoiceRoot> {
-            VoiceDebugScreen(onNavigateBack = { navController.popBackStack() })
+        guardedNavComposable<DebugVoiceRoot>(navController) { navigator ->
+            VoiceDebugScreen(onNavigateBack = { navigator.popBackStack() })
         }
-        composable<DebugBackdropBlurRoot> {
-            BackdropBlurDebugScreen(onNavigateBack = { navController.popBackStack() })
+        guardedNavComposable<DebugBackdropBlurRoot>(navController) { navigator ->
+            BackdropBlurDebugScreen(onNavigateBack = { navigator.popBackStack() })
         }
-        composable<DebugVoiceIndicatorRoot> {
-            VoiceIndicatorDebugScreen(onNavigateBack = { navController.popBackStack() })
+        guardedNavComposable<DebugVoiceIndicatorRoot>(navController) { navigator ->
+            VoiceIndicatorDebugScreen(onNavigateBack = { navigator.popBackStack() })
         }
     }
 }
