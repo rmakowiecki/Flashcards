@@ -22,22 +22,22 @@ class RecentDateTextTest {
     }
 
     @Test
-    fun `a date in the current year is day then English month`() {
-        recentDateText(LocalDate.of(2026, 10, 6), includesYear = false) shouldBe "6 Oct"
+    fun `a date in the current year is English month then day`() {
+        recentDateText(LocalDate.of(2026, 10, 6), includesYear = false) shouldBe "Oct 6"
     }
 
     @Test
     fun `a date in another year ends with the year`() {
-        recentDateText(LocalDate.of(2025, 10, 6), includesYear = true) shouldBe "6 Oct 2025"
+        recentDateText(LocalDate.of(2025, 10, 6), includesYear = true) shouldBe "Oct 6, 2025"
     }
 
     @Test
     fun `September keeps its three letter name`() {
-        recentDateText(LocalDate.of(2026, 9, 15), includesYear = false) shouldBe "15 Sep"
+        recentDateText(LocalDate.of(2026, 9, 15), includesYear = false) shouldBe "Sep 15"
     }
 
     @Test
     fun `the day has no leading zero`() {
-        recentDateText(LocalDate.of(2026, 1, 3), includesYear = false) shouldBe "3 Jan"
+        recentDateText(LocalDate.of(2026, 1, 3), includesYear = false) shouldBe "Jan 3"
     }
 }

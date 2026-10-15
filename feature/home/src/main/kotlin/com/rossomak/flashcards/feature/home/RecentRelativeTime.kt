@@ -10,8 +10,8 @@ import java.time.temporal.ChronoUnit
 
 private const val MINUTES_PER_HOUR = 60L
 private const val MAX_DAYS_AGO = 7L
-private const val THIS_YEAR_DATE_PATTERN = "d MMM"
-private const val OTHER_YEAR_DATE_PATTERN = "d MMM y"
+private const val THIS_YEAR_DATE_PATTERN = "MMM d"
+private const val OTHER_YEAR_DATE_PATTERN = "MMM d, y"
 
 /** How long ago a Recent started, as its row words it. */
 internal sealed interface RecentRelativeTime {
@@ -47,7 +47,7 @@ internal fun recentRelativeTime(startedAt: Instant, now: Instant, zoneId: ZoneId
     }
 }
 
-/** E.g. "6 Oct", or "6 Oct 2025" for another year. A fixed pattern, so the device locale never changes the order or month name. */
+/** E.g. "Oct 6", or "Oct 6, 2025" for another year. A fixed pattern, so the device locale never changes the order or month name. */
 internal fun recentDateText(date: LocalDate, includesYear: Boolean): String {
     val pattern = if (includesYear) OTHER_YEAR_DATE_PATTERN else THIS_YEAR_DATE_PATTERN
     return DateTimeFormatter.ofPattern(pattern, AppLocale).format(date)
