@@ -47,6 +47,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SetCapture
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartBlipTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartGateTail
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartManualRatingHold
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartSilenceTimer
@@ -125,6 +126,7 @@ class RatedStudySessionCoordinator @Inject constructor(
     private var listeningJob: Job? = null
     private var gradingJob: Job? = null
     private var noticeTailJob: Job? = null
+    private var manualRatingHoldJob: Job? = null
     private var micRevokedEndJob: Job? = null
     private val releaseLingerTimer = ReleaseLingerTimer { dispatch(RatedSessionInput.ReleaseLingerElapsed) }
     private val interruptionTimers = InterruptionTimers(
@@ -156,13 +158,14 @@ class RatedStudySessionCoordinator @Inject constructor(
     fun stop() {
         stopVoiceStack()
         noticeTailJob?.cancel()
+        manualRatingHoldJob?.cancel()
         releaseLingerTimer.cancel()
         interruptionTimers.cancelAll()
         micRevokedEndJob?.cancel()
     }
 
-    fun rate(rating: FlashcardAttemptRating) {
-        dispatch(RatedSessionInput.AttemptRated(rating))
+    fun submitManualRating(rating: FlashcardAttemptRating) {
+        dispatch(RatedSessionInput.ManualRatingSubmitted(rating))
     }
 
     /** The manual reveal: only a session without voice answering offers it. */
@@ -513,6 +516,15 @@ class RatedStudySessionCoordinator @Inject constructor(
             CancelBlipTimer -> interruptionTimers.cancelBlip()
             StartGateTail -> interruptionTimers.startGateTail(scope)
             CancelGateTail -> interruptionTimers.cancelGateTail()
+            StartManualRatingHold -> startManualRatingHold(scope)
+        }
+    }
+
+    private fun startManualRatingHold(scope: CoroutineScope) {
+        manualRatingHoldJob?.cancel()
+        manualRatingHoldJob = scope.launch {
+            delay(MANUAL_RATING_HOLD)
+            dispatch(RatedSessionInput.ManualRatingHoldElapsed)
         }
     }
 
@@ -538,7 +550,7 @@ class RatedStudySessionCoordinator @Inject constructor(
                 .collect { event ->
                     when (event) {
                         is VoiceAnswerGradingEvent.TranscriptReady -> dispatch(RatedSessionInput.TranscriptReady(event.sanitizedTranscript))
-                        is VoiceAnswerGradingEvent.Graded -> dispatch(RatedSessionInput.Graded(event.grade))
+                        is VoiceAnswerGradingEvent.Graded -> dispatch(RatedSessionInput.VoiceAnswerGraded(event.grade))
                         is VoiceAnswerGradingEvent.Failed -> {
                             logger.error { "Voice answer grading failed: ${event.reason}" }
                             dispatch(RatedSessionInput.GradingFailed(event.reason))

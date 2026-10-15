@@ -40,6 +40,9 @@ val MIC_REVOKED_END_DELAY: Duration = 4.seconds
  */
 val RELEASE_LINGER: Duration = 500.milliseconds
 
+/** How long a manually rated card stays the current card, its Rating recorded, before the queue moves on. */
+val MANUAL_RATING_HOLD: Duration = 150.milliseconds
+
 /** Silence timeouts in a row that pause voice answering. */
 const val CONSECUTIVE_SILENCE_PAUSE_THRESHOLD = 3
 

@@ -15,20 +15,21 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Play
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PresentHeadQuestion
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoiceStack
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartManualRatingHold
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartVoiceAnswering
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldReleased
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AnswerRevealed
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AttemptRated
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AudioEnvironmentChanged
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.BlipElapsed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.FeedbackSkipRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GateTailElapsed
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ManualRatingHoldElapsed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ManualRatingSubmitted
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.MicrophoneOpened
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeTailElapsed
@@ -47,6 +48,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPa
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnswerGraded
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -60,7 +62,8 @@ data class RatedSessionTransition(val state: RatedSessionState, val effects: Lis
  * feeds back what they report.
  *
  * A Rating or requeue is recorded the moment it happens, but the head only moves at a queue sync.
- * A manual Rating syncs at once; a voice round waits until the notice about the head has finished,
+ * A manual Rating syncs once [MANUAL_RATING_HOLD] has passed; a voice round waits until the notice
+ * about the head has finished. Either way the rated card stays on screen with its new Rating first,
  * so the current card is always the card on screen.
  *
  * ADR-0025 invariant: [RatedSessionEffect.OpenListeningWindow] is only ever emitted in response to
@@ -103,7 +106,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random, privat
         val transition = RatedTransitionBuilder(state, random, logger)
         with(transition) {
             when (input) {
-                is AttemptRated -> onAttemptRated(input)
+                is ManualRatingSubmitted -> onManualRatingSubmitted(input)
                 AnswerRevealed -> this.state = this.state.copy(isAnswerRevealed = true)
                 CardSkipped -> onCardSkipped()
                 FeedbackSkipRequested -> if (this.state.isFeedbackPlaying) skipFeedback()
@@ -115,7 +118,7 @@ class RatedSessionReducer @Inject constructor(private val random: Random, privat
                 is UtteranceCaptured -> onUtteranceCaptured(input.obfuscatedWav)
                 SilenceTimedOut -> onSilenceTimedOut()
                 is TranscriptReady -> onTranscriptReady(input.transcript)
-                is Graded -> onGraded(input.grade)
+                is VoiceAnswerGraded -> onVoiceAnswerGraded(input.grade)
                 is GradingFailed -> onGradingFailed(input.reason)
                 is CaptureFailed -> onCaptureFailed()
                 is NoticeFinished -> onNoticeFinished(input.notice)
@@ -133,16 +136,26 @@ class RatedSessionReducer @Inject constructor(private val random: Random, privat
                 is AudioEnvironmentChanged -> onAudioEnvironmentChanged(input)
                 BlipElapsed -> onBlipElapsed()
                 GateTailElapsed -> onGateTailElapsed()
+                ManualRatingHoldElapsed -> onManualRatingHoldElapsed()
             }
             dropStaleReleaseLinger()
         }
         return transition.build()
     }
 
-    /** Ignored while a voice grade or requeue waits for its sync: the head already has its result. */
-    private fun RatedTransitionBuilder.onAttemptRated(input: AttemptRated) {
-        if (state.isComplete || state.isSyncPending) return
+    /**
+     * Records the Rating on the head and holds it on screen; the queue moves at [onManualRatingHoldElapsed].
+     * Ignored in a voice answering session, where only [VoiceAnswerGraded] rates, and while a Rating or
+     * requeue waits for its sync: the head already has its result.
+     */
+    private fun RatedTransitionBuilder.onManualRatingSubmitted(input: ManualRatingSubmitted) {
+        if (state.isVoiceAnsweringSession || state.isComplete || state.isSyncPending) return
         state = recordRating(state, input.rating, random)
+        emit(StartManualRatingHold)
+    }
+
+    private fun RatedTransitionBuilder.onManualRatingHoldElapsed() {
+        if (!state.isSyncPending) return
         syncQueue()
         if (state.isComplete) emit(SessionComplete)
     }

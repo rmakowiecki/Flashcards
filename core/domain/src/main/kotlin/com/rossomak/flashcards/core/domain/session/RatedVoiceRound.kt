@@ -116,7 +116,7 @@ internal fun RatedTransitionBuilder.onTranscriptReady(transcript: String) {
  * its feedback is still spoken. A grade that arrives while paused is recorded all the same, and
  * its feedback waits for the next play.
  */
-internal fun RatedTransitionBuilder.onGraded(grade: VoiceAnswerGrade) {
+internal fun RatedTransitionBuilder.onVoiceAnswerGraded(grade: VoiceAnswerGrade) {
     if (state.round.phase != Grading || !state.round.hasUtterance) return
     val rating = grade.toFlashcardAttemptRating()
     if (state.round.cardId == state.currentCard?.id) {

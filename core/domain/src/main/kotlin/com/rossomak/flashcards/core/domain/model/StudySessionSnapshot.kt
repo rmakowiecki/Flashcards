@@ -18,7 +18,7 @@ sealed interface RatedSessionStateSnapshot {
      *
      * @param cards the queue, current card first. The current card moves only at a queue sync, so a
      * spoken notice about it keeps it on screen until the notice finishes.
-     * @param currentCardRatings the current card's attempt markers; a voice grade shows at once.
+     * @param currentCardRatings the current card's attempt markers; a Rating, manual or voice, shows at once.
      * @param playback the voice player's transport state.
      * @param round the current Voice Answering round.
      * @param isShortNoticeSpeaking a notice other than [SpokenNotice.Feedback] is still being spoken.

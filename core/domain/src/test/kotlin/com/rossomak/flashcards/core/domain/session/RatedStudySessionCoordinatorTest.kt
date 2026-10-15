@@ -146,10 +146,22 @@ class RatedStudySessionCoordinatorTest {
         runCurrent()
     }
 
-    /** Reveals the first card's answer and rates it Correct, so the session has one Studied card. */
-    private fun TestScope.rateFirstCard(coordinator: RatedStudySessionCoordinator) {
+    /** Reveals the first card's answer and rates it Correct, so the session has one Studied card, then lets the rating hold run out. */
+    private fun TestScope.rateFirstCardManually(coordinator: RatedStudySessionCoordinator) {
         coordinator.revealAnswer()
-        coordinator.rate(FlashcardAttemptRating.Correct)
+        coordinator.submitManualRating(FlashcardAttemptRating.Correct)
+        advanceTimeBy(MANUAL_RATING_HOLD)
+        runCurrent()
+    }
+
+    /** Answers the first card by voice, graded Correct, and lets its feedback and tail run out, so the session has one Studied card. */
+    private fun TestScope.rateFirstCardByVoice() {
+        gradingRepository.gradingFlow = gradedFlow()
+        captureAnswer()
+        advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
+        runCurrent()
+        finishNotice()
+        advanceTimeBy(NOTICE_TAIL)
         runCurrent()
     }
 
@@ -199,7 +211,7 @@ class RatedStudySessionCoordinatorTest {
     @Test
     fun `a revoked microphone ends the session as abandoned once the user had time to read why`() = runTest {
         val coordinator = startCoordinator()
-        rateFirstCard(coordinator)
+        rateFirstCardByVoice()
         playbackGateway.emit(PlaybackEvent.EngineUnavailable)
         runCurrent()
         permissionGateway.statuses.value = mapOf(AppPermission.RecordAudio to PermissionStatus.PermanentlyDenied)
@@ -866,7 +878,7 @@ class RatedStudySessionCoordinatorTest {
     @Test
     fun `an unavailable engine pauses the session, and a resume restarts the voice stack at the presented card`() = runTest {
         val coordinator = startCoordinator()
-        coordinator.rate(FlashcardAttemptRating.Correct)
+        rateFirstCardByVoice()
         playbackGateway.emit(PlaybackEvent.EngineUnavailable)
         runCurrent()
 
@@ -1157,9 +1169,41 @@ class RatedStudySessionCoordinatorTest {
     }
 
     @Test
+    fun `a manual rating keeps the rated card on screen until the rating hold runs out`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+
+        coordinator.submitManualRating(FlashcardAttemptRating.Failed)
+        advanceTimeBy(MANUAL_RATING_HOLD - 1.milliseconds)
+        runCurrent()
+
+        with(coordinator.runningSnapshot) {
+            cards.first().id shouldBe "card-1"
+            currentCardRatings shouldBe listOf(FlashcardAttemptRating.Failed)
+        }
+
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+
+        coordinator.runningSnapshot.cards.first().id shouldBe "card-2"
+    }
+
+    @Test
+    fun `a session stopped during the rating hold never moves on`() = runTest {
+        val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
+        coordinator.submitManualRating(FlashcardAttemptRating.Failed)
+        runCurrent()
+
+        coordinator.stop()
+        advanceTimeBy(MANUAL_RATING_HOLD)
+        runCurrent()
+
+        coordinator.runningSnapshot.cards.first().id shouldBe "card-1"
+    }
+
+    @Test
     fun `leaving after one rating ends the session, not discards it`() = runTest {
         val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
-        rateFirstCard(coordinator)
+        rateFirstCardManually(coordinator)
 
         coordinator.end(abandoned = true)
         runCurrent()
@@ -1171,7 +1215,7 @@ class RatedStudySessionCoordinatorTest {
     @Test
     fun `the ended result carries the setup's source type and voice answering setting`() = runTest {
         val coordinator = startCoordinator(setup.copy(sourceType = Quick))
-        rateFirstCard(coordinator)
+        rateFirstCardByVoice()
 
         coordinator.end(abandoned = true)
         runCurrent()
@@ -1184,7 +1228,7 @@ class RatedStudySessionCoordinatorTest {
     @Test
     fun `a manual session's ended result records voice answering as off`() = runTest {
         val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false))
-        rateFirstCard(coordinator)
+        rateFirstCardManually(coordinator)
 
         coordinator.end(abandoned = true)
         runCurrent()
@@ -1197,7 +1241,7 @@ class RatedStudySessionCoordinatorTest {
     fun `the duration runs from the first card shown to the end`() = runTest {
         val clock = MutableClock(START_INSTANT)
         val coordinator = startCoordinator(setup.copy(voiceAnsweringEnabled = false), clock)
-        rateFirstCard(coordinator)
+        rateFirstCardManually(coordinator)
         clock.instant = START_INSTANT.plusSeconds(ELAPSED_SECONDS)
 
         coordinator.end(abandoned = true)
