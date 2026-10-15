@@ -1,14 +1,12 @@
 package com.rossomak.flashcards.core.ui.composables.dialogs
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.composables.icon
 
 /**
  * Picks how cards are answered during the session. Uses option cards rather than plain radio rows
@@ -36,14 +34,14 @@ fun StudyModeDialog(
     ) {
         FlashcardsSingleSelectGroup {
             FlashcardsOptionCard(
-                icon = Icons.Default.Star,
+                icon = StudyMode.Rated.icon,
                 title = stringResource(R.string.study_mode_rated_label),
                 description = stringResource(R.string.study_mode_rated_message),
                 selected = draft == StudyMode.Rated,
                 onSelect = { onDraftChange(StudyMode.Rated) },
             )
             FlashcardsOptionCard(
-                icon = Icons.Default.Bolt,
+                icon = StudyMode.Fast.icon,
                 title = stringResource(R.string.study_mode_fast_label),
                 description = stringResource(R.string.study_mode_fast_message),
                 selected = draft == StudyMode.Fast,
