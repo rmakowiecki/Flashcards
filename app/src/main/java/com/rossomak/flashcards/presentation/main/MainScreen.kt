@@ -1,7 +1,5 @@
 package com.rossomak.flashcards.presentation.main
 
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -76,15 +74,11 @@ private fun mainTabs(): List<TabItem> = buildList {
             SettingsGraph,
         ),
     )
-    // The debug tools hub comes from feature:debug — see app/src/debug vs app/src/release
-    // MainScreenDebugTabs.kt (never present in release builds).
+    // Debug-only: the release source set supplies no tabs.
     addAll(debugTabs())
 }
 
-/**
- * A tab is selected when the current destination sits anywhere under its graph, so a nested
- * destination still keeps its parent tab highlighted.
- */
+/** A tab is selected while the current destination sits anywhere under its graph. */
 @Composable
 private fun MainBottomBar(
     tabs: List<TabItem>,
@@ -118,7 +112,6 @@ private fun MainBottomBar(
     }
 }
 
-// One navigation callback per destination reachable from the tabs; a holder object would only hide them.
 @Suppress("LongParameterList")
 @Composable
 fun MainScreen(
@@ -161,17 +154,11 @@ fun MainScreen(
         launchSingleTop = true
         restoreState = true
     }
-    // The bottom bar has no back-stack entry; launchSingleTop makes a repeated tap harmless.
     val navigateToTab: (route: Any) -> Unit = { route -> tabNavController.navigate(route, tabNavOptions) }
 
     Scaffold(
         modifier = modifier,
-        // No topBar here — each tab root owns its own top app bar and handles the status-bar
-        // inset itself (see e.g. SettingsScreen). Left at the Scaffold default, contentWindowInsets
-        // would reserve the top inset too (Scaffold only excludes an edge once its matching slot is
-        // present), consuming it here and leaving every tab's own top bar with nothing left to pad
-        // by — its container color would then stop short of the status bar instead of painting
-        // behind it.
+        // Top inset excluded: each tab root's own top app bar handles it.
         contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
         bottomBar = {
             MainBottomBar(
@@ -187,16 +174,7 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                // Declares the bottom-bar inset already spent, so any descendant applying a
-                // window-inset padding of its own adds only the part beyond the bar rather than
-                // double-counting it.
                 .consumeWindowInsets(innerPadding),
-            // Tab switches are an instant swap: the default crossfade keeps both tabs composed and
-            // drawing for its whole duration, starving the bottom bar's tint/indicator animations.
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None },
         ) {
             navigation<HomeGraph>(startDestination = HomeRoot) {
                 guardedNavComposable<HomeRoot>(tabNavController) { navigator ->
@@ -206,7 +184,7 @@ fun MainScreen(
                         onNavigateToPreviewStudySession = onNavigateToPreviewStudySession,
                         onNavigateToPreviewQuickSession = onNavigateToPreviewQuickSession,
                         onNavigateToPreviewRecentSession = onNavigateToPreviewRecentSession,
-                        // Guarded, unlike navigateToTab: a tap while Home is leaving is dropped.
+                        // Guarded, unlike navigateToTab.
                         onNavigateToBrowse = { navigator.navigate(StudyGraph, tabNavOptions) },
                     )
                 }
@@ -227,8 +205,7 @@ fun MainScreen(
                     )
                 }
             }
-            // Onboarding replay is a debug affordance, so it hangs off the debug hub rather than
-            // off Settings, which ships in release.
+            // Debug-only onboarding replay.
             debugNavGraphEntries(
                 navController = tabNavController,
                 onNavigateToOnboarding = onNavigateToOnboarding,
