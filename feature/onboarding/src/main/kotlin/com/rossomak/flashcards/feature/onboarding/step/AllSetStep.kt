@@ -6,10 +6,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +21,8 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconCircle
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
+import com.rossomak.flashcards.core.ui.composables.dialogs.label
+import com.rossomak.flashcards.core.ui.composables.icon
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingContentColors
@@ -77,11 +77,8 @@ internal fun AllSetStep(
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
         ) {
             FlashcardsMetadataBadge(
-                label = stringResource(R.string.all_set_mode_badge_label, defaultStudyMode.displayName()),
-                icon = when (defaultStudyMode) {
-                    StudyMode.Rated -> Icons.Default.Grading
-                    StudyMode.Fast -> Icons.Default.Bolt
-                },
+                label = stringResource(R.string.all_set_mode_badge_label, defaultStudyMode.label()),
+                icon = defaultStudyMode.icon,
                 style = FlashcardsComponentStyle.OnGradient,
             )
             FlashcardsMetadataBadge(
@@ -102,10 +99,4 @@ internal fun AllSetStep(
             }
         }
     }
-}
-
-@Composable
-private fun StudyMode.displayName(): String = when (this) {
-    StudyMode.Rated -> stringResource(R.string.session_modes_rated_title)
-    StudyMode.Fast -> stringResource(R.string.session_modes_fast_title)
 }

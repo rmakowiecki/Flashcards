@@ -1,13 +1,17 @@
 package com.rossomak.flashcards.feature.home
 
+import com.rossomak.flashcards.core.ui.format.AppLocale
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 private const val MINUTES_PER_HOUR = 60L
 private const val MAX_DAYS_AGO = 7L
+private const val THIS_YEAR_DATE_PATTERN = "MMM d"
+private const val OTHER_YEAR_DATE_PATTERN = "MMM d, y"
 
 /** How long ago a Recent started, as its row words it. */
 internal sealed interface RecentRelativeTime {
@@ -41,4 +45,10 @@ internal fun recentRelativeTime(startedAt: Instant, now: Instant, zoneId: ZoneId
         startedDate.year == today.year -> RecentRelativeTime.ThisYearDate(startedDate)
         else -> RecentRelativeTime.OtherYearDate(startedDate)
     }
+}
+
+/** E.g. "Oct 6", or "Oct 6, 2025" for another year. A fixed pattern, so the device locale never changes the order or month name. */
+internal fun recentDateText(date: LocalDate, includesYear: Boolean): String {
+    val pattern = if (includesYear) OTHER_YEAR_DATE_PATTERN else THIS_YEAR_DATE_PATTERN
+    return DateTimeFormatter.ofPattern(pattern, AppLocale).format(date)
 }

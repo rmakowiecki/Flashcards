@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,6 +17,7 @@ import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsOptionCard
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleSelectGroup
+import com.rossomak.flashcards.core.ui.composables.icon
 import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
@@ -57,14 +56,14 @@ internal fun SessionModesStep(
                 modifier = Modifier.padding(MaterialTheme.spacing.small),
             ) {
                 FlashcardsOptionCard(
-                    icon = Icons.Default.Grading,
+                    icon = StudyMode.Rated.icon,
                     title = stringResource(R.string.session_modes_rated_title),
                     description = stringResource(R.string.session_modes_rated_message),
                     selected = selectedStudyMode == StudyMode.Rated,
                     onSelect = { onStudyModeSelect(StudyMode.Rated) },
                 )
                 FlashcardsOptionCard(
-                    icon = Icons.Default.Bolt,
+                    icon = StudyMode.Fast.icon,
                     title = stringResource(R.string.session_modes_fast_title),
                     description = stringResource(R.string.session_modes_fast_message),
                     selected = selectedStudyMode == StudyMode.Fast,

@@ -100,7 +100,7 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
-import com.rossomak.flashcards.core.ui.format.currentLocale
+import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.brandColors
@@ -325,8 +325,7 @@ internal fun SummaryLayout(
 /** Announces the total and any new Level once settled, from its own node so the counting total stays silent. */
 @Composable
 private fun SummaryAnnouncement(sequence: SummarySequence, levelsCrossed: List<Int>) {
-    val locale = currentLocale()
-    val totalText = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(sequence.xpTotal, locale))
+    val totalText = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(sequence.xpTotal, AppLocale))
     val levelUpText = levelsCrossed.lastOrNull()?.let { level ->
         stringResource(R.string.study_session_summary_level_up_announcement, level)
     }
@@ -531,7 +530,6 @@ private fun SummaryXpTotal(
     onShowBreakdown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val locale = currentLocale()
     val shownTotal by animateIntAsState(
         targetValue = sequence.runningTotal,
         animationSpec = tween(COUNT_DURATION.toMillisInt(), easing = CountEasing),
@@ -540,7 +538,7 @@ private fun SummaryXpTotal(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.minimumInteractiveComponentSize())
         SummaryXpTotalSlot(
-            text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(shownTotal, locale)),
+            text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(shownTotal, AppLocale)),
             modifier = Modifier.onPlaced { coordinates -> sequence.totalTextCoordinates = coordinates },
         )
         Box(modifier = Modifier.minimumInteractiveComponentSize()) {

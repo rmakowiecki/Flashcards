@@ -33,7 +33,6 @@
     <string name="common_search_clear_cd">Clear search</string>
     <string name="common_search_dismiss_cd">Close search</string>
     <string name="common_mastery_progress_cd">%1$d%% mastered</string>
-    <string name="common_mastery_progress_label">%1$d%%</string>
     <string name="common_rating_prompt_label">How well did you answer it?</string>
     <string name="common_rating_failed_label">Not at all</string>
     <string name="common_rating_partially_correct_label">Somewhat</string>

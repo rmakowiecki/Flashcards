@@ -13,14 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
-import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.format.AppLocale
+import com.rossomak.flashcards.core.ui.format.formatPercent
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.sizes
 import kotlin.math.roundToInt
@@ -89,13 +89,7 @@ fun FlashcardsProgressRing(
         }
         if (fraction != null) {
             Text(
-                // Resource rather than string interpolation: the percent sign's placement and
-                // spacing are locale-dependent (fr-FR renders "58 %"), and `%1$d` formats the
-                // digits for the current locale instead of always emitting ASCII.
-                text = stringResource(
-                    R.string.common_mastery_progress_label,
-                    (fraction * PERCENT_SCALE).roundToInt(),
-                ),
+                text = formatPercent((fraction * PERCENT_SCALE).roundToInt(), AppLocale),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

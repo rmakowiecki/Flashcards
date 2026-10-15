@@ -17,13 +17,12 @@ import androidx.compose.ui.semantics.semantics
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
-import com.rossomak.flashcards.core.ui.format.currentLocale
+import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown
-import java.util.Locale
 
 @Composable
 internal fun StudySessionSummaryDialogHost(
@@ -50,20 +49,19 @@ private fun XpBreakdownDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val locale = currentLocale()
     FlashcardsSingleActionDialog(
         title = stringResource(R.string.study_session_summary_xp_breakdown_title),
         onConfirm = onConfirm,
         onDismiss = onDismiss,
     ) {
-        xpLines.forEach { line -> XpBreakdownDialogRow(line = line, locale = locale) }
+        xpLines.forEach { line -> XpBreakdownDialogRow(line = line) }
         HorizontalDivider()
-        XpBreakdownTotalRow(xpTotal = xpTotal, locale = locale)
+        XpBreakdownTotalRow(xpTotal = xpTotal)
     }
 }
 
 @Composable
-private fun XpBreakdownDialogRow(line: XpBreakdownLine, locale: Locale, modifier: Modifier = Modifier) {
+private fun XpBreakdownDialogRow(line: XpBreakdownLine, modifier: Modifier = Modifier) {
     val labelColor = if (line.isLoss) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     val valueColor = if (line.isLoss) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Row(
@@ -83,7 +81,7 @@ private fun XpBreakdownDialogRow(line: XpBreakdownLine, locale: Locale, modifier
         Column {
             Text(text = xpSourceLabel(line.source), style = MaterialTheme.typography.labelMedium, color = labelColor)
             Text(
-                text = xpLineValue(line, locale),
+                text = xpLineValue(line),
                 style = MaterialTheme.typography.titleSmallEmphasized,
                 color = valueColor,
             )
@@ -92,7 +90,7 @@ private fun XpBreakdownDialogRow(line: XpBreakdownLine, locale: Locale, modifier
 }
 
 @Composable
-private fun XpBreakdownTotalRow(xpTotal: Int, locale: Locale, modifier: Modifier = Modifier) {
+private fun XpBreakdownTotalRow(xpTotal: Int, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -105,7 +103,7 @@ private fun XpBreakdownTotalRow(xpTotal: Int, locale: Locale, modifier: Modifier
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(xpTotal, locale)),
+            text = stringResource(R.string.study_session_summary_xp_row_amount_label, formatSignedXp(xpTotal, AppLocale)),
             style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.primary,
         )

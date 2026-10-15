@@ -17,7 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Mic
@@ -27,7 +26,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
@@ -85,6 +83,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
+import com.rossomak.flashcards.core.ui.composables.icon
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
@@ -558,7 +557,7 @@ private fun SettingsBadgeRow(
     ) {
         FlashcardsMetadataBadge(
             label = state.config.mode.label(),
-            icon = if (isRated) Icons.Default.Star else Icons.Default.Bolt,
+            icon = state.config.mode.icon,
             style = OnGradient,
             onClick = { onOpenSettingsDialog(SessionMode(draftState = state.config.mode)) },
         )
