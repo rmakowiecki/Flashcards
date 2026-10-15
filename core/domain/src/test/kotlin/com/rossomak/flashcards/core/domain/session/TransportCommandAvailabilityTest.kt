@@ -19,7 +19,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeTailElapsed
@@ -31,6 +30,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SilenceTime
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechEnded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.SpeechStarted
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnswerGraded
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -67,7 +67,7 @@ class TransportCommandAvailabilityTest {
 
     private val listening = questionBeingRead.after(QuestionFinished("card-1"))
     private val grading = listening.after(SpeechStarted, SpeechEnded, UtteranceCaptured(byteArrayOf(1)))
-    private val feedback = grading.after(Graded(VoiceAnswerGrade(sanitizedTranscript = "answer", gradePercent = 90, feedback = "Right.")))
+    private val feedback = grading.after(VoiceAnswerGraded(VoiceAnswerGrade(sanitizedTranscript = "answer", gradePercent = 90, feedback = "Right.")))
 
     private fun RatedSessionState.paused(): RatedSessionState = after(PauseRequested, playing(false))
 
@@ -119,7 +119,7 @@ class TransportCommandAvailabilityTest {
     @Test
     fun `paused after the feedback offers play and next`() {
         feedback.paused().availableTransportCommands shouldBe setOf(Play, Next)
-        grading.paused().after(Graded(VoiceAnswerGrade(sanitizedTranscript = "answer", gradePercent = 90, feedback = "Right.")))
+        grading.paused().after(VoiceAnswerGraded(VoiceAnswerGrade(sanitizedTranscript = "answer", gradePercent = 90, feedback = "Right.")))
             .availableTransportCommands shouldBe setOf(Play, Next)
     }
 

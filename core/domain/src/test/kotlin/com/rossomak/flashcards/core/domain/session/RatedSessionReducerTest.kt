@@ -26,6 +26,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.RestartVoi
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.ResumeWithoutReading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SessionComplete
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SpeakNotice
+import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartManualRatingHold
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartNoticeTail
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StartSilenceTimer
@@ -36,12 +37,12 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopVoiceS
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.SyncQueue
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldReleased
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AttemptRated
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CardSkipped
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.FeedbackSkipRequested
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ManualRatingHoldElapsed
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.ManualRatingSubmitted
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.MicrophoneOpened
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeTailElapsed
@@ -60,6 +61,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPa
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnswerGraded
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainInOrder
@@ -109,7 +111,7 @@ class RatedSessionReducerTest {
     private fun RatedSessionState.grading(): RatedSessionState = listening().after(SpeechStarted, SpeechEnded, UtteranceCaptured(WAV))
 
     private fun RatedSessionState.speakingFeedback(gradePercent: Int = CORRECT_PERCENT): RatedSessionState =
-        grading().after(TranscriptReady(TRANSCRIPT), Graded(grade(gradePercent)))
+        grading().after(TranscriptReady(TRANSCRIPT), VoiceAnswerGraded(grade(gradePercent)))
 
     private fun RatedSessionState.silence(): RatedSessionState = listening().after(SilenceTimedOut)
 
@@ -136,19 +138,62 @@ class RatedSessionReducerTest {
     // Manual ratings
 
     @Test
-    fun `a manual rating syncs the queue at once and completes the session when the queue empties`() {
-        val transition = reducer.reduce(manualSession(cardCount = 1), AttemptRated(FlashcardAttemptRating.Correct))
+    fun `a manual rating records the rating on the head and holds it before the sync`() {
+        val revealed = manualSession().after(RatedSessionInput.AnswerRevealed)
+
+        val transition = reducer.reduce(revealed, ManualRatingSubmitted(FlashcardAttemptRating.Failed))
+
+        transition.effects shouldBe listOf(StartManualRatingHold)
+        with(transition.state) {
+            currentCard?.id shouldBe "card-1"
+            currentCardRatings shouldBe listOf(FlashcardAttemptRating.Failed)
+            isAnswerRevealed shouldBe true
+            isSyncPending shouldBe true
+        }
+    }
+
+    @Test
+    fun `the rating hold elapsing syncs the queue and completes the session when the queue empties`() {
+        val held = manualSession(cardCount = 1).after(ManualRatingSubmitted(FlashcardAttemptRating.Correct))
+
+        val transition = reducer.reduce(held, ManualRatingHoldElapsed)
 
         transition.effects shouldBe listOf(SyncQueue(emptyList()), SessionComplete)
         transition.state.remainingCards.shouldBeEmpty()
     }
 
     @Test
-    fun `a manual rating resets the answer reveal with the sync`() {
-        val revealed = manualSession().after(RatedSessionInput.AnswerRevealed)
-        revealed.isAnswerRevealed shouldBe true
+    fun `the rating hold elapsing moves on and resets the answer reveal`() {
+        val held = manualSession().after(RatedSessionInput.AnswerRevealed, ManualRatingSubmitted(FlashcardAttemptRating.Correct))
 
-        revealed.after(AttemptRated(FlashcardAttemptRating.Correct)).isAnswerRevealed shouldBe false
+        val transition = reducer.reduce(held, ManualRatingHoldElapsed)
+
+        transition.effects shouldBe listOf(SyncQueue(transition.state.remainingCards))
+        with(transition.state) {
+            currentCard?.id shouldBe "card-2"
+            isAnswerRevealed shouldBe false
+            isSyncPending shouldBe false
+        }
+    }
+
+    @Test
+    fun `a second manual rating during the hold is ignored`() {
+        val held = manualSession().after(ManualRatingSubmitted(FlashcardAttemptRating.Failed))
+
+        val transition = reducer.reduce(held, ManualRatingSubmitted(FlashcardAttemptRating.Correct))
+
+        transition.effects.shouldBeEmpty()
+        transition.state shouldBe held
+    }
+
+    @Test
+    fun `the rating hold elapsing with no rating waiting changes nothing`() {
+        val session = manualSession()
+
+        val transition = reducer.reduce(session, ManualRatingHoldElapsed)
+
+        transition.effects.shouldBeEmpty()
+        transition.state shouldBe session
     }
 
     // The round
@@ -312,7 +357,7 @@ class RatedSessionReducerTest {
         val grading = voiceSession().grading()
         val gradedCardId = grading.head()
 
-        val transition = reducer.reduce(grading.after(TranscriptReady(TRANSCRIPT)), Graded(grade(PARTIAL_PERCENT)))
+        val transition = reducer.reduce(grading.after(TranscriptReady(TRANSCRIPT)), VoiceAnswerGraded(grade(PARTIAL_PERCENT)))
 
         transition.effects shouldBe listOf(SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.PartiallyCorrect, RATIONALE)))
         with(transition.state) {
@@ -339,13 +384,13 @@ class RatedSessionReducerTest {
     }
 
     @Test
-    fun `a manual rating is ignored while a voice grade waits for its sync`() {
-        val speaking = voiceSession().speakingFeedback(PARTIAL_PERCENT)
+    fun `a manual rating is ignored in a voice answering session`() {
+        val listening = voiceSession().listening()
 
-        val transition = reducer.reduce(speaking, AttemptRated(FlashcardAttemptRating.Correct))
+        val transition = reducer.reduce(listening, ManualRatingSubmitted(FlashcardAttemptRating.Correct))
 
         transition.effects.shouldBeEmpty()
-        transition.state shouldBe speaking
+        transition.state shouldBe listening
     }
 
     @Test
@@ -353,7 +398,7 @@ class RatedSessionReducerTest {
         val grading = voiceSession().grading()
         val stale = grading.copy(queue = grading.queue.drop(1) + grading.queue.first())
 
-        val transition = reducer.reduce(stale, Graded(grade(CORRECT_PERCENT)))
+        val transition = reducer.reduce(stale, VoiceAnswerGraded(grade(CORRECT_PERCENT)))
 
         transition.state.terminalStates shouldBe stale.terminalStates
         transition.state.isSyncPending shouldBe false
@@ -699,7 +744,7 @@ class RatedSessionReducerTest {
 
     @Test
     fun `a grade arriving while paused is recorded without speaking its feedback`() {
-        val transition = reducer.reduce(voiceSession().grading().paused(), Graded(grade(CORRECT_PERCENT)))
+        val transition = reducer.reduce(voiceSession().grading().paused(), VoiceAnswerGraded(grade(CORRECT_PERCENT)))
 
         transition.effects.filterIsInstance<SpeakNotice>().shouldBeEmpty()
         with(transition.state) {
@@ -718,7 +763,7 @@ class RatedSessionReducerTest {
 
         play.effects shouldBe listOf(ResumeWithoutReading)
         play.state.isPausedWhileGrading shouldBe false
-        reducer.reduce(play.state, Graded(grade(CORRECT_PERCENT))).effects shouldContain
+        reducer.reduce(play.state, VoiceAnswerGraded(grade(CORRECT_PERCENT))).effects shouldContain
             SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
     }
 

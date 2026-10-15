@@ -70,4 +70,7 @@ sealed interface RatedSessionEffect {
     /** Wait the capture gate tail, then report [RatedSessionInput.GateTailElapsed]. */
     data object StartGateTail : RatedSessionEffect
     data object CancelGateTail : RatedSessionEffect
+
+    /** Wait the manual rating hold, then report [RatedSessionInput.ManualRatingHoldElapsed]. */
+    data object StartManualRatingHold : RatedSessionEffect
 }

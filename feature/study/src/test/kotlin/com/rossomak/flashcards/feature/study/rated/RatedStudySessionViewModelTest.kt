@@ -37,6 +37,7 @@ import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeStudyVoicePlaybackGateway
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceAnswerGradingRepository
 import com.rossomak.flashcards.core.domain.repository.FakeVoiceCaptureGateway
+import com.rossomak.flashcards.core.domain.session.MANUAL_RATING_HOLD
 import com.rossomak.flashcards.core.domain.session.MIN_TRANSCRIPT_DISPLAY
 import com.rossomak.flashcards.core.domain.session.NOTICE_TAIL
 import com.rossomak.flashcards.core.domain.session.RELEASE_LINGER
@@ -213,17 +214,24 @@ class RatedStudySessionViewModelTest {
         extendedContext = extendedContext,
     )
 
+    /** A manual Rating, then the rating hold run out, so the queue has moved on. */
+    private fun TestScope.rate(viewModel: RatedStudySessionViewModel, rating: FlashcardAttemptRating) {
+        viewModel.onAttemptRating(rating)
+        advanceTimeBy(MANUAL_RATING_HOLD)
+        runCurrent()
+    }
+
     /** Reveals the first card's answer and rates it Correct, so the session has one Studied card. */
-    private fun rateFirstCardCorrect(viewModel: RatedStudySessionViewModel) {
+    private fun TestScope.rateFirstCardCorrect(viewModel: RatedStudySessionViewModel) {
         viewModel.onShowAnswer()
-        viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+        rate(viewModel, FlashcardAttemptRating.Correct)
     }
 
     /** Rates every other head Correct until [cardId] is presented again; fails instead of looping forever. */
-    private fun rateCorrectUntilPresented(viewModel: RatedStudySessionViewModel, cardId: String) {
+    private fun TestScope.rateCorrectUntilPresented(viewModel: RatedStudySessionViewModel, cardId: String) {
         repeat(MAX_CARDS_BEFORE_REAPPEARING) {
             if (viewModel.state.value.currentCard?.id == cardId) return
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+            rate(viewModel, FlashcardAttemptRating.Correct)
         }
         viewModel.state.value.currentCard?.id shouldBe cardId
     }
@@ -336,7 +344,7 @@ class RatedStudySessionViewModelTest {
             advanceUntilIdle()
             // One completed Attempt is enough to make card-1 Studied and force-resolvable on
             // abandon — the seeded flag is carried regardless of what this session itself rates it.
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            rate(viewModel, FlashcardAttemptRating.Failed)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -362,7 +370,7 @@ class RatedStudySessionViewModelTest {
             )
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            rate(viewModel, FlashcardAttemptRating.Failed)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -384,7 +392,7 @@ class RatedStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.isLoading shouldBe false
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            rate(viewModel, FlashcardAttemptRating.Failed)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -414,7 +422,7 @@ class RatedStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
         viewModel.onShowAnswer()
-        viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+        rate(viewModel, FlashcardAttemptRating.Correct)
 
         viewModel.state.value.currentCard?.id shouldBe "card-2"
         viewModel.state.value.isAnswerRevealed shouldBe false
@@ -427,7 +435,7 @@ class RatedStudySessionViewModelTest {
 
         val viewModel = createViewModel()
         advanceUntilIdle()
-        viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+        rate(viewModel, FlashcardAttemptRating.Correct)
 
         viewModel.events.test { awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>() }
     }
@@ -438,7 +446,7 @@ class RatedStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+        rate(viewModel, FlashcardAttemptRating.Failed)
 
         viewModel.state.value.currentCard?.id shouldNotBe "card-1"
         viewModel.state.value.flashcards.map { it.id } shouldContain "card-1"
@@ -454,10 +462,10 @@ class RatedStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            rate(viewModel, FlashcardAttemptRating.Failed)
             viewModel.state.value.completedCount shouldBe 1
 
-            viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
+            rate(viewModel, FlashcardAttemptRating.PartiallyCorrect)
             viewModel.state.value.completedCount shouldBe 2
         }
 
@@ -469,7 +477,7 @@ class RatedStudySessionViewModelTest {
             advanceUntilIdle()
             val distinctCountBefore = viewModel.state.value.distinctCardCount
 
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            rate(viewModel, FlashcardAttemptRating.Failed)
 
             viewModel.state.value.distinctCardCount shouldBe distinctCountBefore
             viewModel.state.value.distinctCardCount shouldBe 3
@@ -482,7 +490,7 @@ class RatedStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
+            rate(viewModel, FlashcardAttemptRating.Failed)
             // The card that just went to the back of the queue is not the head any more, so cycle
             // through the others (Correct finishes them immediately) until it resurfaces.
             rateCorrectUntilPresented(viewModel, "card-1")
@@ -517,11 +525,11 @@ class RatedStudySessionViewModelTest {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+            rate(viewModel, FlashcardAttemptRating.Correct)
+            rate(viewModel, FlashcardAttemptRating.Correct)
 
             viewModel.events.test {
-                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+                rate(viewModel, FlashcardAttemptRating.Correct)
                 awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
             }
         }
@@ -538,7 +546,7 @@ class RatedStudySessionViewModelTest {
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
-                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+                rate(viewModel, FlashcardAttemptRating.Correct)
                 awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
 
                 viewModel.onDialogEvent(Confirm)
@@ -554,7 +562,7 @@ class RatedStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
+            rate(viewModel, FlashcardAttemptRating.PartiallyCorrect)
 
             viewModel.events.test { awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>() }
         }
@@ -565,7 +573,7 @@ class RatedStudySessionViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
+        rate(viewModel, FlashcardAttemptRating.PartiallyCorrect)
 
         viewModel.state.value.currentCard?.id shouldNotBe "card-1"
         viewModel.state.value.flashcards.map { it.id } shouldContain "card-1"
@@ -579,12 +587,12 @@ class RatedStudySessionViewModelTest {
 
             val firstViewModel = createViewModel()
             advanceUntilIdle()
-            ratingSequence.forEach(firstViewModel::onAttemptRating)
+            ratingSequence.forEach { rating -> rate(firstViewModel, rating) }
             val firstOrder = firstViewModel.state.value.flashcards.map { it.id }
 
             val secondViewModel = createViewModel()
             advanceUntilIdle()
-            ratingSequence.forEach(secondViewModel::onAttemptRating)
+            ratingSequence.forEach { rating -> rate(secondViewModel, rating) }
             val secondOrder = secondViewModel.state.value.flashcards.map { it.id }
 
             firstOrder shouldBe secondOrder
@@ -1458,6 +1466,15 @@ class RatedStudySessionViewModelTest {
         finishNotice()
     }
 
+    /** Grades every other head Correct by voice until [cardId] is presented again; fails instead of looping forever. */
+    private fun TestScope.gradeCorrectUntilPresented(viewModel: RatedStudySessionViewModel, cardId: String) {
+        repeat(MAX_CARDS_BEFORE_REAPPEARING) {
+            if (viewModel.state.value.currentCard?.id == cardId) return
+            emitGrade(gradePercent = CORRECT_GRADE_PERCENT)
+        }
+        viewModel.state.value.currentCard?.id shouldBe cardId
+    }
+
     /** Speaks an answer to the presented card, graded by [gradingFlow]. */
     private fun TestScope.answer(gradingFlow: Flow<VoiceAnswerGradingEvent>) {
         gradingRepository.gradingFlow = gradingFlow
@@ -1581,9 +1598,9 @@ class RatedStudySessionViewModelTest {
     fun `a silence timeout or grading failure leaves the attempt markers unchanged during its notice`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val viewModel = createVoiceViewModel()
-            // card-1 fails manually and comes back as the head with one Failed marker.
-            viewModel.onAttemptRating(FlashcardAttemptRating.Failed)
-            repeat(2) { viewModel.onAttemptRating(FlashcardAttemptRating.Correct) }
+            // card-1 is graded Failed and comes back as the head with one Failed marker.
+            emitGrade(gradePercent = FAILED_GRADE_PERCENT)
+            repeat(2) { emitGrade(gradePercent = CORRECT_GRADE_PERCENT) }
             viewModel.state.value.currentCard?.id shouldBe "card-1"
             val markersBefore = listOf(FlashcardAttemptRating.Failed)
             viewModel.state.value.currentCardRatings shouldBe markersBefore
@@ -1594,27 +1611,6 @@ class RatedStudySessionViewModelTest {
 
             startGradingFailureNotice()
             viewModel.state.value.currentCardRatings shouldBe markersBefore
-        }
-
-    @Test
-    fun `a stale voice grade for a card other than the head leaves the attempt markers unchanged`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            val viewModel = createVoiceViewModel()
-            answer(
-                flow {
-                    emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT))
-                    delay(TRANSCRIPT_DELAY)
-                    emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(SPOKEN_TRANSCRIPT, CORRECT_GRADE_PERCENT, GRADE_RATIONALE)))
-                },
-            )
-            // The head moves on while card-1 is still being graded.
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-
-            advanceTimeBy(MIN_TRANSCRIPT_DISPLAY + TRANSCRIPT_DELAY)
-            runCurrent()
-
-            viewModel.state.value.currentCard?.id shouldBe "card-2"
-            viewModel.state.value.currentCardRatings shouldBe emptyList()
         }
 
     @Test
@@ -1644,7 +1640,7 @@ class RatedStudySessionViewModelTest {
 
             viewModel.state.value.currentCard?.id shouldNotBe "card-1"
             viewModel.state.value.flashcards.map { it.id } shouldContain "card-1"
-            rateCorrectUntilPresented(viewModel, "card-1")
+            gradeCorrectUntilPresented(viewModel, "card-1")
 
             viewModel.state.value.currentCardRatings shouldBe emptyList()
         }
@@ -1781,7 +1777,7 @@ class RatedStudySessionViewModelTest {
             viewModel.state.value.currentCard?.id shouldNotBe "card-1"
             val index = viewModel.state.value.flashcards.indexOfFirst { it.id == "card-1" }
             (index in StudySessionConfig.FAILED_REQUEUE_MIN_GAP..StudySessionConfig.FAILED_REQUEUE_MAX_GAP) shouldBe true
-            rateCorrectUntilPresented(viewModel, "card-1")
+            gradeCorrectUntilPresented(viewModel, "card-1")
             viewModel.state.value.currentCardRatings shouldBe emptyList()
         }
 
@@ -2088,11 +2084,11 @@ class RatedStudySessionViewModelTest {
             loadThreeCards()
             val viewModel = createViewModel()
             advanceUntilIdle()
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+            rate(viewModel, FlashcardAttemptRating.Correct)
+            rate(viewModel, FlashcardAttemptRating.Correct)
 
             viewModel.events.test {
-                viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+                rate(viewModel, FlashcardAttemptRating.Correct)
                 val destination = awaitItem().shouldBeInstanceOf<RatedStudySessionDestination.Summary>()
 
                 destination.route.abandoned shouldBe false
@@ -2108,7 +2104,7 @@ class RatedStudySessionViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
             // card-1 resolves Mastered; card-2 becomes current but is never rated; card-3 is never drawn to.
-            viewModel.onAttemptRating(FlashcardAttemptRating.Correct)
+            rate(viewModel, FlashcardAttemptRating.Correct)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {
@@ -2143,7 +2139,7 @@ class RatedStudySessionViewModelTest {
             advanceUntilIdle()
             // Attempts limit defaults to 3: one PartiallyCorrect re-inserts card-1 rather than
             // resolving it — still mid re-insertion, not yet Terminal, when the session is abandoned.
-            viewModel.onAttemptRating(FlashcardAttemptRating.PartiallyCorrect)
+            rate(viewModel, FlashcardAttemptRating.PartiallyCorrect)
             viewModel.onDialogEvent(Open(ExitSession))
 
             viewModel.events.test {

@@ -6,10 +6,10 @@ Rated Study Sessions: how the user answers, how each answer becomes a Rating, ho
 
 A Rated session has one of two deliveries, fixed when it starts on the Preview Study Session Screen.
 
-- **Manual**: the bottom panel offers Show answer. Once the answer shows, the panel offers the three Ratings, Failed, Partial and Correct, and a Rating moves straight on to the next card, with no separate Next. Manual has no skip: the user moves on only by rating.
+- **Manual**: the bottom panel offers Show answer. Once the answer shows, the panel offers the three Ratings, Failed, Partial and Correct, and a Rating moves on to the next card after a brief hold, with no separate Next. Rating taps during the hold are ignored. Manual has no skip: the user moves on only by rating.
 - **Voice Answering**: the question is read aloud, the app listens, and the spoken answer is transcribed and graded. The grade becomes the card's Rating exactly as a manual tap would ([ADR-0026](../adr/0026-voice-grade-unifies-with-rating-reveal-tied-to-speech-end.md)). The card stays on screen while its grading feedback is spoken, and the queue moves only once that feedback has finished. The round itself, its transport controls and its pauses are in [voice-answering.md](voice-answering.md).
 
-Every completed Attempt carries exactly one Rating, and each Rating fills the next of the card's Attempt slots. Moving to another card hides the answer again.
+Every completed Attempt carries exactly one Rating, and each Rating fills the next of the card's Attempt slots, which pulses once as it fills. With manual answering the pulse starts during the hold and finishes as the card leaves. With Voice Answering it plays while the card stays on screen for the spoken feedback. Moving to another card hides the answer again. A Flashcard re-inserted so close to the end that it comes straight back as the next card stays on screen and hides its answer again instead of being replaced ([study-session.md](study-session.md#screen)).
 
 ## The queue
 

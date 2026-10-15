@@ -12,8 +12,8 @@ import kotlin.time.ComparableTimeMark
 /** Everything that can happen to a Rated Study Session, as [RatedSessionReducer] takes it in. */
 sealed interface RatedSessionInput {
 
-    /** A manual self-rating of the presented card. */
-    data class AttemptRated(val rating: FlashcardAttemptRating) : RatedSessionInput
+    /** The user rated the presented card's Attempt by hand. Only a session without voice answering offers it. */
+    data class ManualRatingSubmitted(val rating: FlashcardAttemptRating) : RatedSessionInput
 
     /** The user asked to see the answer. */
     data object AnswerRevealed : RatedSessionInput
@@ -37,7 +37,9 @@ sealed interface RatedSessionInput {
     class UtteranceCaptured(val obfuscatedWav: ByteArray) : RatedSessionInput
     data object SilenceTimedOut : RatedSessionInput
     data class TranscriptReady(val transcript: String) : RatedSessionInput
-    data class Graded(val grade: VoiceAnswerGrade) : RatedSessionInput
+
+    /** The grading service graded the spoken answer; its grade band becomes the Rating. */
+    data class VoiceAnswerGraded(val grade: VoiceAnswerGrade) : RatedSessionInput
     data class GradingFailed(val reason: GradingFailureReason) : RatedSessionInput
     data class CaptureFailed(val reason: VoiceCaptureFailureReason) : RatedSessionInput
     data class NoticeFinished(val notice: SpokenNotice) : RatedSessionInput
@@ -71,4 +73,7 @@ sealed interface RatedSessionInput {
 
     /** The capture gate tail after the end of a blip ran in full. */
     data object GateTailElapsed : RatedSessionInput
+
+    /** The hold after a [ManualRatingSubmitted] ran in full. */
+    data object ManualRatingHoldElapsed : RatedSessionInput
 }

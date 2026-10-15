@@ -189,15 +189,7 @@ fun RatedStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progress = if (state.distinctCardCount > 0) {
-                        StudySessionProgress(
-                            label = stringResource(R.string.rated_study_session_progress_label),
-                            completedCount = state.completedCount,
-                            totalCount = state.distinctCardCount,
-                        )
-                    } else {
-                        null
-                    },
+                    progress = ratedStudySessionProgress(state),
                     onClose = { onDialogEvent(Open(ExitSession)) },
                     onReportProblem = { card ->
                         onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
@@ -240,6 +232,17 @@ fun RatedStudySessionContent(
             )
         }
     }
+}
+
+@Composable
+private fun ratedStudySessionProgress(state: RatedStudySessionScreenState): StudySessionProgress? = if (state.distinctCardCount > 0) {
+    StudySessionProgress(
+        label = stringResource(R.string.rated_study_session_progress_label),
+        completedCount = state.completedCount,
+        totalCount = state.distinctCardCount,
+    )
+} else {
+    null
 }
 
 @Composable

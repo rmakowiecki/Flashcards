@@ -224,7 +224,7 @@ class RatedStudySessionViewModel @Inject constructor(
      * coordinator, the same way.
      */
     fun onAttemptRating(rating: FlashcardAttemptRating) {
-        coordinator.rate(rating)
+        coordinator.submitManualRating(rating)
         showSessionNow()
     }
 

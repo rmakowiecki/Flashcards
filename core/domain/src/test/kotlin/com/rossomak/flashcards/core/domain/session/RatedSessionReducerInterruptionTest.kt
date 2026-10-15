@@ -36,7 +36,6 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.StopListen
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AudioEnvironmentChanged
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.BlipElapsed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GateTailElapsed
-import com.rossomak.flashcards.core.domain.session.RatedSessionInput.Graded
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.MicrophoneOpened
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeFinished
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.NoticeTailElapsed
@@ -53,6 +52,7 @@ import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPa
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TemporaryPauseRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.TranscriptReady
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.UtteranceCaptured
+import com.rossomak.flashcards.core.domain.session.RatedSessionInput.VoiceAnswerGraded
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
@@ -118,7 +118,7 @@ class RatedSessionReducerInterruptionTest {
 
     private fun RatedSessionState.grading(): RatedSessionState = listening().after(SpeechStarted, SpeechEnded, UtteranceCaptured(WAV))
 
-    private fun RatedSessionState.speakingFeedback(): RatedSessionState = grading().after(TranscriptReady(TRANSCRIPT), Graded(grade()))
+    private fun RatedSessionState.speakingFeedback(): RatedSessionState = grading().after(TranscriptReady(TRANSCRIPT), VoiceAnswerGraded(grade()))
 
     private fun RatedSessionState.silenceSkipNotice(): RatedSessionState = listening().after(SilenceTimedOut)
 
@@ -248,7 +248,7 @@ class RatedSessionReducerInterruptionTest {
 
         interruption.state.isPausedWhileGrading shouldBe true
 
-        val graded = interruption.state.reduce(Graded(grade()))
+        val graded = interruption.state.reduce(VoiceAnswerGraded(grade()))
 
         graded.state.isPausedAfterFeedback shouldBe true
         graded.effects.filterIsInstance<SpeakNotice>().shouldBeEmpty()
@@ -720,7 +720,7 @@ class RatedSessionReducerInterruptionTest {
         val marked = grading.reduce(BlipElapsed).state
         marked.episode.isLongBlip shouldBe true
 
-        val graded = marked.after(TranscriptReady(TRANSCRIPT)).reduce(Graded(grade()))
+        val graded = marked.after(TranscriptReady(TRANSCRIPT)).reduce(VoiceAnswerGraded(grade()))
 
         graded.effects.filterIsInstance<SpeakNotice>().shouldBeEmpty()
         graded.state.isPausedAfterFeedback shouldBe true
