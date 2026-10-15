@@ -40,7 +40,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
-import com.rossomak.flashcards.core.ui.format.currentLocale
+import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
@@ -154,13 +154,12 @@ private fun recentTitle(item: RecentItem): String {
 
 @Composable
 private fun RecentStatPills(session: RecentSession) {
-    val locale = currentLocale()
     val durationLabel = if (session.durationSeconds < SECONDS_PER_MINUTE) {
         stringResource(R.string.recents_duration_under_minute_label)
     } else {
         stringResource(R.string.recents_duration_label, session.durationSeconds / SECONDS_PER_MINUTE)
     }
-    val signedXp = remember(session.xpTotal, locale) { formatSignedXp(session.xpTotal, locale) }
+    val signedXp = remember(session.xpTotal) { formatSignedXp(session.xpTotal, AppLocale) }
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
@@ -211,20 +210,17 @@ private fun RecentIcon(icon: ImageVector, contentDescription: String) {
 }
 
 @Composable
-private fun recentRelativeTimeText(relativeTime: RecentRelativeTime): String {
-    val locale = currentLocale()
-    return when (relativeTime) {
-        JustNow -> stringResource(R.string.recents_time_just_now_label)
-        is MinutesAgo -> stringResource(R.string.recents_time_minutes_ago_label, relativeTime.minutes)
-        is HoursAgo -> stringResource(R.string.recents_time_hours_ago_label, relativeTime.hours)
-        Yesterday -> stringResource(R.string.recents_time_yesterday_label)
-        is DaysAgo -> stringResource(R.string.recents_time_days_ago_label, relativeTime.days)
-        is ThisYearDate -> remember(relativeTime.date, locale) {
-            localizedDateFormatter(THIS_YEAR_DATE_SKELETON, locale).format(relativeTime.date)
-        }
-        is OtherYearDate -> remember(relativeTime.date, locale) {
-            localizedDateFormatter(OTHER_YEAR_DATE_SKELETON, locale).format(relativeTime.date)
-        }
+private fun recentRelativeTimeText(relativeTime: RecentRelativeTime): String = when (relativeTime) {
+    JustNow -> stringResource(R.string.recents_time_just_now_label)
+    is MinutesAgo -> stringResource(R.string.recents_time_minutes_ago_label, relativeTime.minutes)
+    is HoursAgo -> stringResource(R.string.recents_time_hours_ago_label, relativeTime.hours)
+    Yesterday -> stringResource(R.string.recents_time_yesterday_label)
+    is DaysAgo -> stringResource(R.string.recents_time_days_ago_label, relativeTime.days)
+    is ThisYearDate -> remember(relativeTime.date) {
+        localizedDateFormatter(THIS_YEAR_DATE_SKELETON, AppLocale).format(relativeTime.date)
+    }
+    is OtherYearDate -> remember(relativeTime.date) {
+        localizedDateFormatter(OTHER_YEAR_DATE_SKELETON, AppLocale).format(relativeTime.date)
     }
 }
 

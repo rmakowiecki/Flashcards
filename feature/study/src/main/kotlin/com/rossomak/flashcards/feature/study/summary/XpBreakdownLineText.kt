@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.format.formatXpFactor
 import com.rossomak.flashcards.feature.study.R
@@ -26,7 +27,6 @@ import com.rossomak.flashcards.feature.study.summary.XpAwardSource.Partial
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.SessionCompleted
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.Streak
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.TimeStudied
-import java.util.Locale
 
 @Composable
 internal fun xpSourceLabel(source: XpAwardSource): String = stringResource(
@@ -57,13 +57,13 @@ internal fun xpSourceIcon(source: XpAwardSource): ImageVector = when (source) {
 
 /** E.g. "3 cards × 20", "8-day streak" or "Session completed". */
 @Composable
-internal fun xpLineFormula(line: XpBreakdownLine, locale: Locale): String {
+internal fun xpLineFormula(line: XpBreakdownLine): String {
     val count = line.count ?: 0
-    val rate = formatXpFactor(line.rate ?: 0, locale)
+    val rate = formatXpFactor(line.rate ?: 0, AppLocale)
     return when (line.source) {
         NewCards, Mastered, Partial, MasteryDefended, MasteryLost ->
             pluralStringResource(R.plurals.study_session_summary_xp_formula_cards_label, count, count, rate)
-        TimeStudied -> stringResource(R.string.study_session_summary_xp_formula_minutes_label, formatXpFactor(count, locale), rate)
+        TimeStudied -> stringResource(R.string.study_session_summary_xp_formula_minutes_label, formatXpFactor(count, AppLocale), rate)
         Streak -> stringResource(R.string.study_session_summary_xp_formula_streak_label, count)
         SessionCompleted -> stringResource(R.string.study_session_summary_xp_formula_session_completed_label)
         DailyGoal -> stringResource(R.string.study_session_summary_xp_formula_daily_goal_label)
@@ -72,5 +72,5 @@ internal fun xpLineFormula(line: XpBreakdownLine, locale: Locale): String {
 
 /** E.g. "3 cards × 20 = +60 XP". */
 @Composable
-internal fun xpLineValue(line: XpBreakdownLine, locale: Locale): String =
-    stringResource(R.string.study_session_summary_xp_row_value_label, xpLineFormula(line, locale), formatSignedXp(line.amount, locale))
+internal fun xpLineValue(line: XpBreakdownLine): String =
+    stringResource(R.string.study_session_summary_xp_row_value_label, xpLineFormula(line), formatSignedXp(line.amount, AppLocale))

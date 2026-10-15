@@ -22,9 +22,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone
-import com.rossomak.flashcards.core.ui.format.currentLocale
 import com.rossomak.flashcards.core.ui.theme.spacing
-import java.util.Locale
 import kotlinx.coroutines.flow.collectLatest
 
 /** Follows the newest tile. Bottom padding keeps the scroll's clip off a tile while it slides in. */
@@ -34,7 +32,6 @@ internal fun SummaryXpTiles(
     visibleCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    val locale = currentLocale()
     val scrollState = rememberScrollState()
     val slideDistance = MaterialTheme.spacing.medium
 
@@ -49,13 +46,13 @@ internal fun SummaryXpTiles(
             .padding(bottom = slideDistance),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
     ) {
-        lines.take(visibleCount).forEach { line -> SummaryXpTile(line = line, locale = locale, slideDistance = slideDistance) }
+        lines.take(visibleCount).forEach { line -> SummaryXpTile(line = line, slideDistance = slideDistance) }
     }
 }
 
 /** Explicit no-op exit: the default shrink would clip the tile during its enter too. */
 @Composable
-private fun SummaryXpTile(line: XpBreakdownLine, locale: Locale, slideDistance: Dp) {
+private fun SummaryXpTile(line: XpBreakdownLine, slideDistance: Dp) {
     val slideDistancePx = with(LocalDensity.current) { slideDistance.roundToPx() }
     // A static preview never runs the enter, so it starts visible there.
     val isInspecting = LocalInspectionMode.current
@@ -63,7 +60,7 @@ private fun SummaryXpTile(line: XpBreakdownLine, locale: Locale, slideDistance: 
     AnimatedVisibility(visibleState = visibility, enter = fadeIn() + slideInVertically { slideDistancePx }, exit = ExitTransition.None) {
         FlashcardsXpBreakdownRow(
             label = xpSourceLabel(line.source),
-            value = xpLineValue(line, locale),
+            value = xpLineValue(line),
             icon = xpSourceIcon(line.source),
             modifier = Modifier.fillMaxWidth(),
             tone = if (line.isLoss) FlashcardsXpBreakdownTone.Loss else FlashcardsXpBreakdownTone.Gain,
