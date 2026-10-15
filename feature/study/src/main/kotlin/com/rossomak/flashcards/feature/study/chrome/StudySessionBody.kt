@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
@@ -17,14 +18,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
+import com.rossomak.flashcards.core.ui.theme.AppSpacing
 import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.spacing
 
-private val CARD_DEFAULT_TOP_PADDING = 64.dp
-
-/** Matches `spacing.normal`: the card's top sits just below the header at most. */
-private val CARD_MIN_TOP_PADDING = 16.dp
-private val CARD_BOTTOM_GAP = 24.dp
 private const val CARD_MIN_HEIGHT_FRACTION = 0.55f
 private val CARD_MIN_HEIGHT_FLOOR = 240.dp
 private val CARD_MIN_HEIGHT_CEILING = 360.dp
@@ -78,7 +75,7 @@ fun StudySessionBody(
                 .padding(horizontal = MaterialTheme.spacing.normal),
         ) {
             val motion = LocalStudySessionCardMotion.current
-            val geometry = studySessionCardGeometry(bodyHeight = maxHeight)
+            val geometry = remember(maxHeight) { studySessionCardGeometry(bodyHeight = maxHeight) }
             AnimatedContent(
                 targetState = presentedCard,
                 modifier = Modifier.fillMaxSize(),
@@ -119,19 +116,21 @@ private data class StudySessionCardGeometry(
     val maxHeight: Dp,
 )
 
+/** The card sits [AppSpacing.xxlarge] below the header by default, rising to at most [AppSpacing.normal] below it. */
 private fun studySessionCardGeometry(bodyHeight: Dp): StudySessionCardGeometry {
-    val bottomLimit = (bodyHeight - CARD_BOTTOM_GAP).coerceAtLeast(0.dp)
-    val defaultTopPadding = CARD_DEFAULT_TOP_PADDING.coerceAtMost((bottomLimit - CARD_MIN_TOP_PADDING).coerceAtLeast(0.dp))
+    val spacing = MaterialTheme.spacing
+    val bottomLimit = (bodyHeight - spacing.medium).coerceAtLeast(0.dp)
+    val defaultTopPadding = spacing.xxlarge.coerceAtMost((bottomLimit - spacing.normal).coerceAtLeast(0.dp))
     val roomBelowDefaultTop = bottomLimit - defaultTopPadding
     val minHeight = (roomBelowDefaultTop * CARD_MIN_HEIGHT_FRACTION)
         .coerceIn(CARD_MIN_HEIGHT_FLOOR, CARD_MIN_HEIGHT_CEILING)
         .coerceAtMost(roomBelowDefaultTop)
     return StudySessionCardGeometry(
         defaultTopPadding = defaultTopPadding,
-        minTopPadding = CARD_MIN_TOP_PADDING.coerceAtMost(defaultTopPadding),
+        minTopPadding = spacing.normal.coerceAtMost(defaultTopPadding),
         bottomLimit = bottomLimit,
         minHeight = minHeight,
-        maxHeight = (bottomLimit - CARD_MIN_TOP_PADDING).coerceAtLeast(minHeight),
+        maxHeight = (bottomLimit - spacing.normal).coerceAtLeast(minHeight),
     )
 }
 

@@ -50,7 +50,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
@@ -69,8 +68,6 @@ import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.takeWhile
-
-private val ANSWER_SLIDE_DISTANCE = 12.dp
 
 /**
  * The white rounded card at the center of every Study Session screen
@@ -100,7 +97,7 @@ fun FlashcardCard(
     val textMeasurer = rememberTextMeasurer()
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.card)
     val scrollState = key(card.id) { rememberScrollState() }
-    val probe = key(card.id) { remember { CardLayoutProbe() } }
+    val layoutMetrics = key(card.id) { remember { CardLayoutMetrics() } }
     val revealTransition = key(card.id) { updateTransition(targetState = isAnswerRevealed, label = "FlashcardReveal") }
     val revealFraction by revealTransition.animateFloat(
         transitionSpec = { motion.revealSpec },
@@ -108,16 +105,16 @@ fun FlashcardCard(
     ) { revealed -> if (revealed) 1f else 0f }
     val answerAlpha by revealTransition.animateAnswerAlpha()
     val isAnswerComposed = revealTransition.currentState || revealTransition.targetState
-    val answerSlideDistancePx = with(LocalDensity.current) { ANSWER_SLIDE_DISTANCE.toPx() }
+    val answerSlideDistancePx = with(LocalDensity.current) { MaterialTheme.spacing.small.toPx() }
     val questionText = card.question.withInlineCode()
-    val (unrevealedQuestionStyle, revealedQuestionStyle) = questionStyles(card)
+    val questionStyles = questionStyles(card)
     RevealScrollEffect(
         cardId = card.id,
         isAnswerRevealed = isAnswerRevealed,
         revealTransition = revealTransition,
         revealFraction = { revealFraction },
         scrollState = scrollState,
-        probe = probe,
+        layoutMetrics = layoutMetrics,
     )
 
     Surface(
@@ -128,41 +125,41 @@ fun FlashcardCard(
         Column(
             modifier = Modifier
                 .padding(MaterialTheme.spacing.normal)
-                .recordsViewportMaxHeight(probe)
+                .recordsViewportMaxHeight(layoutMetrics)
                 .flashcardsScrollFade(
                     scrollState = scrollState,
                     backgroundColor = MaterialTheme.colorScheme.surface,
                 )
                 .verticalScroll(scrollState)
-                .settledHeight(
+                .blendedRevealHeight(
                     isRevealing = { revealTransition.isRunning && isAnswerComposed },
                     fraction = { revealFraction },
-                    probe = probe,
+                    layoutMetrics = layoutMetrics,
                     measureQuestion = { width, style -> textMeasurer.measure(questionText, style, constraints = Constraints(maxWidth = width)).size.height },
-                    questionStyles = unrevealedQuestionStyle to revealedQuestionStyle,
+                    questionStyles = questionStyles,
                 ),
         ) {
             FlashcardQuestionSection(
                 card = card,
                 questionText = questionText,
-                questionStyle = lerp(start = unrevealedQuestionStyle, stop = revealedQuestionStyle, fraction = revealFraction),
+                questionStyle = lerp(start = questionStyles.unrevealed, stop = questionStyles.revealed, fraction = revealFraction),
                 syntaxEngine = syntaxEngine,
                 isAnswerRevealed = isAnswerRevealed,
                 attemptSlots = attemptSlots,
-                probe = probe,
+                layoutMetrics = layoutMetrics,
             )
             if (isAnswerComposed) {
                 FlashcardAnswerSection(
                     modifier = Modifier
-                        .onPlaced { coordinates -> probe.answerSectionTop = coordinates.positionInParent().y }
-                        .revealedHeight(fraction = revealFraction, probe = probe)
+                        .onPlaced { coordinates -> layoutMetrics.answerSectionTop = coordinates.positionInParent().y }
+                        .revealedHeight(fraction = revealFraction, layoutMetrics = layoutMetrics)
                         .graphicsLayer {
                             alpha = answerAlpha
                             translationY = -(1f - revealFraction) * answerSlideDistancePx
                         },
                     card = card,
                     syntaxEngine = syntaxEngine,
-                    probe = probe,
+                    layoutMetrics = layoutMetrics,
                     onExtendedContextClick = onExtendedContextClick,
                 )
             }
@@ -170,11 +167,15 @@ fun FlashcardCard(
     }
 }
 
-/** The question's unrevealed and revealed styles. A question with a code block never starts large. */
+/** The question's style before and after the reveal. */
+private data class QuestionStyles(val unrevealed: TextStyle, val revealed: TextStyle)
+
+/** A question with a code block never starts large. */
 @Composable
-private fun questionStyles(card: Flashcard): Pair<TextStyle, TextStyle> {
+private fun questionStyles(card: Flashcard): QuestionStyles {
     val revealedStyle = MaterialTheme.typography.bodyMediumEmphasized
-    return (if (card.questionCode.isNullOrEmpty()) MaterialTheme.typography.headlineSmallEmphasized else revealedStyle) to revealedStyle
+    val unrevealedStyle = if (card.questionCode.isNullOrEmpty()) MaterialTheme.typography.headlineSmallEmphasized else revealedStyle
+    return QuestionStyles(unrevealed = unrevealedStyle, revealed = revealedStyle)
 }
 
 /** The answer fades in a beat after the reveal starts, and out quickly when it is hidden again. */
@@ -191,7 +192,7 @@ private fun Transition<Boolean>.animateAnswerAlpha(): State<Float> = animateFloa
 ) { revealed -> if (revealed) 1f else 0f }
 
 /** Card part sizes and positions, in pixels from the content top. Written during layout, so plain fields, not state. */
-private class CardLayoutProbe {
+private class CardLayoutMetrics {
     var viewportMaxHeight = 0
     var questionHeight = 0
     var revealedQuestionHeight = 0
@@ -207,8 +208,8 @@ private class CardLayoutProbe {
 }
 
 /** Records the viewport's maximum height, which the reveal scroll aims within. */
-private fun Modifier.recordsViewportMaxHeight(probe: CardLayoutProbe): Modifier = layout { measurable, constraints ->
-    probe.viewportMaxHeight = constraints.maxHeight
+private fun Modifier.recordsViewportMaxHeight(layoutMetrics: CardLayoutMetrics): Modifier = layout { measurable, constraints ->
+    layoutMetrics.viewportMaxHeight = constraints.maxHeight
     val placeable = measurable.measure(constraints)
     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
@@ -217,22 +218,21 @@ private fun Modifier.recordsViewportMaxHeight(probe: CardLayoutProbe): Modifier 
  * While a reveal runs, reports a straight blend between the two settled heights, each raised to the
  * card's minimum, so the card moves in one direction although the question shrinks as the answer grows.
  */
-private fun Modifier.settledHeight(
+private fun Modifier.blendedRevealHeight(
     isRevealing: () -> Boolean,
     fraction: () -> Float,
-    probe: CardLayoutProbe,
+    layoutMetrics: CardLayoutMetrics,
     measureQuestion: (width: Int, style: TextStyle) -> Int,
-    questionStyles: Pair<TextStyle, TextStyle>,
+    questionStyles: QuestionStyles,
 ): Modifier = layout { measurable, constraints ->
     // The card's minimum height applies only to the reported height; measuring under it would pad the content.
     val placeable = measurable.measure(constraints.copy(minHeight = 0))
-    val (unrevealedQuestionStyle, revealedQuestionStyle) = questionStyles
-    val unrevealedQuestionHeight = measureQuestion(placeable.width, unrevealedQuestionStyle)
-    probe.revealedQuestionHeight = measureQuestion(placeable.width, revealedQuestionStyle)
+    val unrevealedQuestionHeight = measureQuestion(placeable.width, questionStyles.unrevealed)
+    layoutMetrics.revealedQuestionHeight = measureQuestion(placeable.width, questionStyles.revealed)
     val height = if (isRevealing()) {
-        val rest = placeable.height - probe.questionHeight - probe.answerShownHeight
-        val hiddenHeight = (rest + unrevealedQuestionHeight).coerceAtLeast(constraints.minHeight)
-        val revealedHeight = (rest + probe.revealedQuestionHeight + probe.answerFullHeight).coerceAtLeast(constraints.minHeight)
+        val heightAroundQuestionAndAnswer = placeable.height - layoutMetrics.questionHeight - layoutMetrics.answerShownHeight
+        val hiddenHeight = (heightAroundQuestionAndAnswer + unrevealedQuestionHeight).coerceAtLeast(constraints.minHeight)
+        val revealedHeight = (heightAroundQuestionAndAnswer + layoutMetrics.revealedQuestionHeight + layoutMetrics.answerFullHeight).coerceAtLeast(constraints.minHeight)
         (hiddenHeight + (revealedHeight - hiddenHeight) * fraction()).roundToInt()
     } else {
         placeable.height.coerceAtLeast(constraints.minHeight)
@@ -251,7 +251,7 @@ private fun RevealScrollEffect(
     revealTransition: Transition<Boolean>,
     revealFraction: () -> Float,
     scrollState: ScrollState,
-    probe: CardLayoutProbe,
+    layoutMetrics: CardLayoutMetrics,
 ) {
     val fadeHeightPx = with(LocalDensity.current) { FlashcardsScrollFadeHeight.toPx() }
     val currentRevealFraction by rememberUpdatedState(revealFraction)
@@ -259,15 +259,15 @@ private fun RevealScrollEffect(
         // The answer section first lays out a frame after the reveal starts.
         withFrameNanos { }
         if (isAnswerRevealed) {
-            while (probe.answerFullHeight == 0) withFrameNanos { }
+            while (layoutMetrics.answerFullHeight == 0) withFrameNanos { }
         }
         val startScroll = scrollState.value
         val startFraction = currentRevealFraction()
         val targetScroll = if (isAnswerRevealed) {
-            val visibleHeight = probe.viewportMaxHeight - fadeHeightPx
-            val badgeTop = probe.settledAnswerSectionTop + probe.answerBadgeTop
+            val visibleHeight = layoutMetrics.viewportMaxHeight - fadeHeightPx
+            val badgeTop = layoutMetrics.settledAnswerSectionTop + layoutMetrics.answerBadgeTop
             if (badgeTop < startScroll + visibleHeight) return@LaunchedEffect
-            (probe.settledAnswerSectionTop + probe.answerTextTop + probe.answerFirstLineBottom - visibleHeight).roundToInt()
+            (layoutMetrics.settledAnswerSectionTop + layoutMetrics.answerTextTop + layoutMetrics.answerFirstLineBottom - visibleHeight).roundToInt()
         } else {
             0
         }
@@ -288,11 +288,11 @@ private fun RevealScrollEffect(
 }
 
 /** Lays the content out at full height but reports only [fraction] of it, without clipping. */
-private fun Modifier.revealedHeight(fraction: Float, probe: CardLayoutProbe): Modifier = layout { measurable, constraints ->
+private fun Modifier.revealedHeight(fraction: Float, layoutMetrics: CardLayoutMetrics): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints.copy(minHeight = 0))
     val shownHeight = (placeable.height * fraction).roundToInt()
-    probe.answerFullHeight = placeable.height
-    probe.answerShownHeight = shownHeight
+    layoutMetrics.answerFullHeight = placeable.height
+    layoutMetrics.answerShownHeight = shownHeight
     layout(placeable.width, shownHeight) { placeable.place(0, 0) }
 }
 
@@ -304,7 +304,7 @@ private fun FlashcardQuestionSection(
     syntaxEngine: SyntaxTokenizer,
     isAnswerRevealed: Boolean,
     attemptSlots: List<FlashcardsAttemptSlotState>,
-    probe: CardLayoutProbe,
+    layoutMetrics: CardLayoutMetrics,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -330,7 +330,7 @@ private fun FlashcardQuestionSection(
         text = questionText,
         modifier = Modifier.layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
-            probe.questionHeight = placeable.height
+            layoutMetrics.questionHeight = placeable.height
             layout(placeable.width, placeable.height) { placeable.place(0, 0) }
         },
         style = questionStyle,
@@ -351,7 +351,7 @@ private fun FlashcardAnswerSection(
     modifier: Modifier,
     card: Flashcard,
     syntaxEngine: SyntaxTokenizer,
-    probe: CardLayoutProbe,
+    layoutMetrics: CardLayoutMetrics,
     onExtendedContextClick: (String) -> Unit,
 ) {
     Column(modifier = modifier) {
@@ -360,7 +360,7 @@ private fun FlashcardAnswerSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .onPlaced { coordinates -> probe.answerBadgeTop = coordinates.positionInParent().y },
+                .onPlaced { coordinates -> layoutMetrics.answerBadgeTop = coordinates.positionInParent().y },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FlashcardsIndicatorBadge(
@@ -375,9 +375,9 @@ private fun FlashcardAnswerSection(
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.xsmall))
         Text(
             text = card.answer.withInlineCode(),
-            modifier = Modifier.onPlaced { coordinates -> probe.answerTextTop = coordinates.positionInParent().y },
+            modifier = Modifier.onPlaced { coordinates -> layoutMetrics.answerTextTop = coordinates.positionInParent().y },
             style = MaterialTheme.typography.bodyMedium,
-            onTextLayout = { layout -> probe.answerFirstLineBottom = if (layout.lineCount > 0) layout.getLineBottom(0) else 0f },
+            onTextLayout = { layout -> layoutMetrics.answerFirstLineBottom = if (layout.lineCount > 0) layout.getLineBottom(0) else 0f },
         )
         card.answerCode?.forEach { codeBlock ->
             Spacer(modifier = Modifier.height(MaterialTheme.spacing.xsmall))
