@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.feature.home
 
-import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,11 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -40,6 +33,8 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
+import com.rossomak.flashcards.core.ui.composables.dialogs.label
+import com.rossomak.flashcards.core.ui.composables.icon
 import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -55,18 +50,10 @@ import com.rossomak.flashcards.feature.home.RecentRelativeTime.ThisYearDate
 import com.rossomak.flashcards.feature.home.RecentRelativeTime.Yesterday
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private const val SECONDS_PER_MINUTE = 60
-private const val THIS_YEAR_DATE_SKELETON = "MMMd"
-private const val OTHER_YEAR_DATE_SKELETON = "MMMdy"
 
-/**
- * The whole row is one button with no play button: a history row has no separate browse target.
- *
- * @param modifier the row modifier from FlashcardsListGroup; it carries the row's width and shape.
- */
+/** No play button: a history row has nothing separate to browse. */
 @Composable
 internal fun RecentSessionRow(
     item: RecentItem,
@@ -80,48 +67,42 @@ internal fun RecentSessionRow(
     val relativeTime by remember(item.session.startedAt, zoneId) {
         derivedStateOf { recentRelativeTime(item.session.startedAt, currentNow(), zoneId) }
     }
-    Row(
+    Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .heightIn(min = MaterialTheme.sizes.listRowMinHeight)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = MaterialTheme.spacing.normal, vertical = MaterialTheme.spacing.small),
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
         ) {
-            RecentCategoryOverline(categoryName = item.session.categoryName, category = item.category)
-            Text(
-                text = recentTitle(item),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            RecentCategoryOverline(
+                categoryName = item.session.categoryName,
+                category = item.category,
+                modifier = Modifier.weight(1f),
             )
-            RecentStatPills(session = item.session)
+            RecentModeAndTime(session = item.session, relativeTime = relativeTime)
         }
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
-        ) {
-            RecentDeliveryIcons(session = item.session)
-            Text(
-                text = recentRelativeTimeText(relativeTime),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
+        Text(
+            text = recentTitle(item),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        RecentStatPills(session = item.session)
     }
 }
 
 /** [category] only styles the overline; without it the name shows in the primary color with no glyph. */
 @Composable
-private fun RecentCategoryOverline(categoryName: String, category: Category?) {
+private fun RecentCategoryOverline(categoryName: String, category: Category?, modifier: Modifier = Modifier) {
     val categoryColor = rememberCategoryColor(hex = category?.color, fallback = MaterialTheme.colorScheme.primary)
     Row(
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
     ) {
@@ -177,36 +158,24 @@ private fun RecentStatPills(session: RecentSession) {
 }
 
 @Composable
-private fun RecentDeliveryIcons(session: RecentSession) {
-    Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall)) {
-        when (session) {
-            is RecentSession.Rated -> {
-                RecentIcon(icon = Icons.Default.Checklist, contentDescription = stringResource(R.string.recents_rated_mode_cd))
-                if (session.voiceAnsweringEnabled) {
-                    RecentIcon(icon = Icons.Default.Mic, contentDescription = stringResource(R.string.recents_voice_answering_cd))
-                }
-            }
-            is RecentSession.Fast -> {
-                RecentIcon(icon = Icons.Default.Bolt, contentDescription = stringResource(R.string.recents_fast_mode_cd))
-                if (session.readAloudEnabled) {
-                    RecentIcon(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
-                        contentDescription = stringResource(R.string.recents_read_aloud_cd),
-                    )
-                }
-            }
-        }
+private fun RecentModeAndTime(session: RecentSession, relativeTime: RecentRelativeTime) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall),
+    ) {
+        Icon(
+            imageVector = session.mode.icon,
+            contentDescription = session.mode.label(),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(MaterialTheme.sizes.metadataBadgeIconCompact),
+        )
+        Text(
+            text = recentRelativeTimeText(relativeTime),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
     }
-}
-
-@Composable
-private fun RecentIcon(icon: ImageVector, contentDescription: String) {
-    Icon(
-        imageVector = icon,
-        contentDescription = contentDescription,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(MaterialTheme.sizes.metadataBadgeIconCompact),
-    )
 }
 
 @Composable
@@ -216,16 +185,9 @@ private fun recentRelativeTimeText(relativeTime: RecentRelativeTime): String = w
     is HoursAgo -> stringResource(R.string.recents_time_hours_ago_label, relativeTime.hours)
     Yesterday -> stringResource(R.string.recents_time_yesterday_label)
     is DaysAgo -> stringResource(R.string.recents_time_days_ago_label, relativeTime.days)
-    is ThisYearDate -> remember(relativeTime.date) {
-        localizedDateFormatter(THIS_YEAR_DATE_SKELETON, AppLocale).format(relativeTime.date)
-    }
-    is OtherYearDate -> remember(relativeTime.date) {
-        localizedDateFormatter(OTHER_YEAR_DATE_SKELETON, AppLocale).format(relativeTime.date)
-    }
+    is ThisYearDate -> recentDateText(relativeTime.date, includesYear = false)
+    is OtherYearDate -> recentDateText(relativeTime.date, includesYear = true)
 }
-
-private fun localizedDateFormatter(skeleton: String, locale: Locale): DateTimeFormatter =
-    DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale)
 
 @PreviewLightDark
 @Composable

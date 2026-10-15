@@ -32,7 +32,8 @@ A vertical list below Favorites that scrolls with the page. It holds the User's 
 
 - the Category, by its stored name, plus its color and icon when the Category can be read;
 - a title: the Subcategory for a single-subcategory session, otherwise the Quick or Custom label with the number of topics;
-- the card count, minutes, XP, the Study Mode with any hands-free delivery, and how long ago the session started.
+- the card count, minutes and XP;
+- the Study Mode as one icon (a star for Rated, a bolt for Fast), then how long ago the session started, on the Category's line at the top right. A session more than seven days old shows its date in English, as "6 Oct" or, for another year, "6 Oct 2025".
 
 Rules for the list:
 

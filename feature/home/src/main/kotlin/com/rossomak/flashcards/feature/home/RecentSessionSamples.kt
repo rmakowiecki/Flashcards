@@ -39,7 +39,7 @@ private val sampleGraphsSubcategory = "graphs" to "Graph traversal, shortest pat
 private val sampleSortingSubcategory = "sorting" to "Sorting"
 
 /**
- * Newest first, covering each source type, Study Mode, hands-free flag and display edge case, including an unread Category.
+ * Newest first, covering each source type, Study Mode and display edge case, including an unread Category.
  * Declared after the samples it reads: file-level properties initialize top to bottom.
  */
 @Suppress("MagicNumber")
