@@ -25,8 +25,10 @@ import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +52,7 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
+import com.rossomak.flashcards.feature.study.chrome.OutgoingCardRating
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.ExitSession
@@ -169,6 +172,7 @@ fun RatedStudySessionContent(
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(skipHiddenState = true),
     )
+    var outgoingCardRating by remember { mutableStateOf<OutgoingCardRating?>(null) }
 
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
         BrandGradientBackdrop()
@@ -189,15 +193,7 @@ fun RatedStudySessionContent(
                         separator = stringResource(CoreUiR.string.common_middle_dot_separator),
                     ),
                     reportableCard = state.currentCard,
-                    progress = if (state.distinctCardCount > 0) {
-                        StudySessionProgress(
-                            label = stringResource(R.string.rated_study_session_progress_label),
-                            completedCount = state.completedCount,
-                            totalCount = state.distinctCardCount,
-                        )
-                    } else {
-                        null
-                    },
+                    progress = ratedStudySessionProgress(state),
                     onClose = { onDialogEvent(Open(ExitSession)) },
                     onReportProblem = { card ->
                         onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
@@ -219,7 +215,10 @@ fun RatedStudySessionContent(
                     RatedManualSheetContent(
                         isAnswerRevealed = state.isAnswerRevealed,
                         onShowAnswer = onShowAnswer,
-                        onAttemptRating = onAttemptRating,
+                        onAttemptRating = { rating ->
+                            outgoingCardRating = state.currentCard?.let { OutgoingCardRating(cardId = it.id, slot = rating.toAttemptSlotState()) }
+                            onAttemptRating(rating)
+                        },
                     )
                 }
             },
@@ -231,6 +230,7 @@ fun RatedStudySessionContent(
                 isAnswerRevealed = state.isAnswerRevealed,
                 innerPadding = innerPadding,
                 attemptSlots = state.attemptSlots,
+                outgoingCardRating = outgoingCardRating,
                 onExtendedContextClick = { onDialogEvent(Open(CurrentCardExtendedContext(it))) },
             )
 
@@ -240,6 +240,17 @@ fun RatedStudySessionContent(
             )
         }
     }
+}
+
+@Composable
+private fun ratedStudySessionProgress(state: RatedStudySessionScreenState): StudySessionProgress? = if (state.distinctCardCount > 0) {
+    StudySessionProgress(
+        label = stringResource(R.string.rated_study_session_progress_label),
+        completedCount = state.completedCount,
+        totalCount = state.distinctCardCount,
+    )
+} else {
+    null
 }
 
 @Composable

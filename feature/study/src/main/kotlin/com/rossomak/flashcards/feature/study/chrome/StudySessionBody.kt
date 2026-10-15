@@ -30,6 +30,15 @@ private val CARD_MIN_HEIGHT_FLOOR = 240.dp
 private val CARD_MIN_HEIGHT_CEILING = 360.dp
 
 /**
+ * The rating a manual tap just gave a Rated card. The tap also advances the queue, so the body fills
+ * it into the leaving card's [FlashcardsAttemptSlotState.Current] slot, letting the slot pulse.
+ */
+data class OutgoingCardRating(
+    val cardId: String,
+    val slot: FlashcardsAttemptSlotState,
+)
+
+/**
  * The non-sheet body shared by every Study Session screen
  * ([ADR-0045](../../../../../../../../docs/adr/0045-separate-fast-and-rated-session-screens.md)):
  * the loading spinner and, once cards exist, [FlashcardCard] for the current card. A session that
@@ -52,6 +61,7 @@ fun StudySessionBody(
     isAnswerRevealed: Boolean,
     innerPadding: PaddingValues,
     attemptSlots: List<FlashcardsAttemptSlotState> = emptyList(),
+    outgoingCardRating: OutgoingCardRating? = null,
     onExtendedContextClick: (String) -> Unit,
 ) {
     // No cards only before the first Running snapshot, or while a failed load returns to Preview.
@@ -87,13 +97,14 @@ fun StudySessionBody(
                 label = "StudySessionCardSwap",
             ) { presented ->
                 if (presented != null) {
+                    val isLeaving = presented.card.id != presentedCard?.card?.id
                     FlashcardCard(
                         modifier = Modifier
                             .placedByGeometry(geometry)
                             .heightIn(min = geometry.minHeight, max = geometry.maxHeight),
                         card = presented.card,
                         isAnswerRevealed = presented.isAnswerRevealed,
-                        attemptSlots = presented.attemptSlots,
+                        attemptSlots = if (isLeaving) presented.attemptSlots.rated(presented.card.id, outgoingCardRating) else presented.attemptSlots,
                         onExtendedContextClick = onExtendedContextClick,
                     )
                 }
@@ -142,6 +153,13 @@ private fun Modifier.placedByGeometry(geometry: StudySessionCardGeometry): Modif
     val top = (geometry.defaultTopPadding.roundToPx() - overflow.coerceAtLeast(0))
         .coerceAtLeast(geometry.minTopPadding.roundToPx())
     layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, top) }
+}
+
+private fun List<FlashcardsAttemptSlotState>.rated(cardId: String, outgoingCardRating: OutgoingCardRating?): List<FlashcardsAttemptSlotState> {
+    if (outgoingCardRating?.cardId != cardId) return this
+    val currentSlotIndex = indexOf(FlashcardsAttemptSlotState.Current)
+    if (currentSlotIndex < 0) return this
+    return toMutableList().also { slots -> slots[currentSlotIndex] = outgoingCardRating.slot }
 }
 
 @Composable

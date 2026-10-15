@@ -103,7 +103,7 @@ data class RatedStudySessionScreenState(
         }
 }
 
-private fun FlashcardAttemptRating.toAttemptSlotState(): FlashcardsAttemptSlotState = when (this) {
+internal fun FlashcardAttemptRating.toAttemptSlotState(): FlashcardsAttemptSlotState = when (this) {
     FlashcardAttemptRating.Failed -> FlashcardsAttemptSlotState.Failed
     FlashcardAttemptRating.PartiallyCorrect -> FlashcardsAttemptSlotState.Partial
     FlashcardAttemptRating.Correct -> FlashcardsAttemptSlotState.Correct
