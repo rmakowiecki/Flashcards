@@ -7,5 +7,11 @@
         <profileable
             android:shell="true"
             tools:targetApi="29" />
+
+        <!-- The debug screen showcase, whose code profiling shares with debug through src/debug/java. -->
+        <activity
+            android:name=".presentation.showcase.ScreenShowcaseActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
     </application>
 </manifest>
