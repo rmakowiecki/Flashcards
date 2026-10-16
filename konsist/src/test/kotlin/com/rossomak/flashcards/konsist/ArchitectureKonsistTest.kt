@@ -209,7 +209,12 @@ class ArchitectureKonsistTest {
 
     private fun isComposeModuleMainSource(path: String) =
         path.contains("/src/main/") &&
-            (path.contains("/feature/") || path.contains("/core/ui/") || path.contains("/app/src/main/"))
+            (
+                path.contains("/feature/") ||
+                    path.contains("/core/ui/") ||
+                    path.contains("/app/src/main/") ||
+                    path.contains("/debug-tools/")
+                )
 
     private fun isMainSource(path: String) = path.contains("/src/main/")
 
@@ -331,6 +336,22 @@ class ArchitectureKonsistTest {
                 }
             }
     }
+
+    @Test
+    fun `only debug-only sources import the debug-tools module`() {
+        // :debug-tools reaches :app only through debugImplementation and profilingImplementation, so an
+        // import of it from any other source set compiles in debug but breaks the release build. This
+        // fails the import in static analysis instead, long before a release build runs.
+        projectScope
+            .files
+            .filter { file -> !isDebugOnlySource(file.path) }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name.startsWith("com.rossomak.flashcards.debugtools.") }
+            }
+    }
+
+    private fun isDebugOnlySource(path: String) =
+        path.contains("/debug-tools/") || path.contains("/app/src/debug/") || path.contains("/app/src/profiling/")
 
     @Test
     fun `DataSource classes reside in a data-layer package`() {

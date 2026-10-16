@@ -9,16 +9,16 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.navigation
 import com.rossomak.flashcards.BuildConfig
-import com.rossomak.flashcards.feature.debug.DebugBackdropBlurRoot
-import com.rossomak.flashcards.feature.debug.DebugGraph
-import com.rossomak.flashcards.feature.debug.DebugRoot
-import com.rossomak.flashcards.feature.debug.DebugScreen
-import com.rossomak.flashcards.feature.debug.DebugVoiceIndicatorRoot
-import com.rossomak.flashcards.feature.debug.DebugVoiceRoot
-import com.rossomak.flashcards.feature.debug.R as DebugR
-import com.rossomak.flashcards.feature.debug.backdropblur.BackdropBlurDebugScreen
-import com.rossomak.flashcards.feature.debug.voice.VoiceDebugScreen
-import com.rossomak.flashcards.feature.debug.voiceindicator.VoiceIndicatorDebugScreen
+import com.rossomak.flashcards.debugtools.DebugBackdropBlurRoot
+import com.rossomak.flashcards.debugtools.DebugGraph
+import com.rossomak.flashcards.debugtools.DebugRoot
+import com.rossomak.flashcards.debugtools.DebugScreen
+import com.rossomak.flashcards.debugtools.DebugVoiceIndicatorRoot
+import com.rossomak.flashcards.debugtools.DebugVoiceRoot
+import com.rossomak.flashcards.debugtools.R as DebugR
+import com.rossomak.flashcards.debugtools.backdropblur.BackdropBlurDebugScreen
+import com.rossomak.flashcards.debugtools.voice.VoiceDebugScreen
+import com.rossomak.flashcards.debugtools.voiceindicator.VoiceIndicatorDebugScreen
 import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 
 @Composable
