@@ -4,7 +4,7 @@
 
 ## Context
 
-The animated network-graph background began as a prototype inside `:feature:debug`. Other modules
+The animated network-graph background began as a prototype inside `:debug-tools`. Other modules
 will draw it soon, and it is meant to become a library of its own, usable outside Android and outside
 this app through Compose Multiplatform. A `:core:*` module would not fit: those modules are Flashcards
 internals, free to use the app's theme, domain and logging.
@@ -34,7 +34,7 @@ come to depend on them by accident.
 
 A lib module never imports `com.rossomak.flashcards..`: no brand colors, no `MaterialTheme` tokens, no
 `AppLog`. Konsist enforces this. A consuming module applies the branding at its call site;
-`:feature:debug`'s `flashcardsPlaygroundStyle` maps `FlashcardsComponentStyle` to an inherited fill. The
+`:debug-tools`'s `flashcardsPlaygroundStyle` maps `FlashcardsComponentStyle` to an inherited fill. The
 lib's presets set no fills for the same reason, and the branded variants stay in the consumer.
 
 ### Color comes from an inherited, lerpable fill

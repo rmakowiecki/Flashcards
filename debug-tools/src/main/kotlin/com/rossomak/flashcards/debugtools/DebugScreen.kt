@@ -88,6 +88,8 @@ fun DebugScreen(
     )
 }
 
+// One callback and one row per debug tool: the hub grows by a parameter and a row with every tool.
+@Suppress("LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DebugContent(
@@ -159,17 +161,11 @@ private fun DebugContent(
                         ),
                     )
                     add(
-                        FlashcardsListGroupItem.Row(
-                            title = stringResource(R.string.debug_network_graph_prototype_label),
+                        debugToolRow(
+                            titleRes = R.string.debug_network_graph_prototype_label,
+                            messageRes = R.string.debug_network_graph_prototype_message,
+                            icon = Icons.Default.Hub,
                             onClick = onNetworkGraphPrototypeClick,
-                            secondaryText = stringResource(R.string.debug_network_graph_prototype_message),
-                            leading = {
-                                FlashcardsIconTile(
-                                    icon = Icons.Default.Hub,
-                                    contentDescription = null,
-                                )
-                            },
-                            trailing = { FlashcardsChevron() },
                         ),
                     )
                     // Absent when Showkase is not on the classpath, which is every non-debug build

@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.feature.debug.networkgraph
+package com.rossomak.flashcards.debugtools.networkgraph
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
