@@ -97,7 +97,7 @@ private const val CHROME_REVEAL_MS = 300
  * rather than passed as individual lambdas so growing the flow by another step's callback doesn't
  * grow either function's own parameter list.
  */
-private data class OnboardingActions(
+data class OnboardingActions(
     val onStudyModeSelect: (StudyMode) -> Unit,
     val onDailyGoalDecrement: () -> Unit,
     val onDailyGoalIncrement: () -> Unit,
@@ -159,7 +159,7 @@ fun OnboardingScreen(
  * save.
  */
 @Composable
-private fun OnboardingContent(
+fun OnboardingContent(
     modifier: Modifier = Modifier,
     state: OnboardingScreenState,
     voiceBarsLevels: StateFlow<ImmutableList<Float>>,
