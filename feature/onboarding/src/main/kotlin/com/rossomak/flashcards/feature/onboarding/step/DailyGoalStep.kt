@@ -20,11 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsStepper
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepHeader

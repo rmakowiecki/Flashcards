@@ -24,12 +24,10 @@ and is supported less well by Compose.
 **The design tokens move into a new KMP library, `:core:designsystem`**, built for Android and
 `wasmJs`. It holds the palette, the light and dark color schemes, the brand gradients, the semantic
 colors, spacing, sizes, corner radii, motion and the Roboto type scale, in the package
-`com.rossomak.flashcards.core.designsystem.theme`. The app moves onto it in a follow-up change:
-`:core:ui` will re-export it through `api`, so feature modules keep depending on `:core:ui` alone,
-and what needs Android or the domain stays in `:core:ui`: `FlashcardsTheme` (dynamic color) and the
-Category, Difficulty and Rating colors. Until then `:core:ui` keeps its own copy of the tokens and
-the website is the module's only user. Components stay in `:core:ui`; only tokens are shared for
-now.
+`com.rossomak.flashcards.core.designsystem.theme`. `:core:ui` re-exports it through `api`, so feature
+modules keep depending on `:core:ui` alone. What needs Android or the domain stays in `:core:ui`:
+`FlashcardsTheme` (dynamic color) and the Category, Difficulty and Rating colors. Components stay in
+`:core:ui` too; only tokens are shared for now.
 
 **Roboto is a Compose resource** in `:core:designsystem`, so both platforms load the same file. See
 the amendment to [ADR-0065](0065-typography-is-the-stock-m3-scale-over-bundled-roboto.md).
@@ -77,7 +75,7 @@ The Bitrise PR check builds the site and runs its tests.
 - Compose Multiplatform's artifacts resolve to the androidx ones on Android, so the app's Compose
   versions still come from the Compose BOM; `material3` for Multiplatform ships only alphas, matching
   the app's own alpha `material3`.
-- Until the app moves onto `:core:designsystem`, the tokens and `roboto.ttf` exist twice, in
-  `:core:ui` and in `:core:designsystem`. Moving the app deletes the `:core:ui` copy and changes
-  about a hundred theme imports from `core.ui.theme` to `core.designsystem.theme`.
-- Amends [ADR-0011](0011-multi-module-architecture.md) (module and convention plugin tables).
+- About a hundred files changed their theme imports from `core.ui.theme` to
+  `core.designsystem.theme`.
+- Amends [ADR-0011](0011-multi-module-architecture.md) (module and convention plugin tables) and
+  [ADR-0065](0065-typography-is-the-stock-m3-scale-over-bundled-roboto.md).

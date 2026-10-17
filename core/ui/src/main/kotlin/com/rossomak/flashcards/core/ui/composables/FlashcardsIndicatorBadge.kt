@@ -11,11 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorEmphasis.Emphasized
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorEmphasis.Neutral
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * A pill badge that reads as one of two states rather than a plain label — [Emphasized] (e.g. a

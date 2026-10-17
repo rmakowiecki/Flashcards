@@ -19,11 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * The frame every list row shares, with nothing inside it: the row background, the minimum height,

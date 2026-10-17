@@ -11,8 +11,8 @@ enum class FlashcardsComponentStyle {
 
     /**
      * For use on a fixed brand gradient (e.g.
-     * [com.rossomak.flashcards.core.ui.theme.BrandColors.topBarGradient],
-     * [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient]). Those gradients
+     * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.topBarGradient],
+     * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.ctaButtonGradient]). Those gradients
      * never flip to a dark variant, so this style's colors are theme-independent too.
      */
     OnGradient,

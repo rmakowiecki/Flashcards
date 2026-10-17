@@ -16,17 +16,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.rossomak.flashcards.core.designsystem.theme.AppSizes
+import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Normal
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Small
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
-import com.rossomak.flashcards.core.ui.theme.AppSizes
-import com.rossomak.flashcards.core.ui.theme.AppSpacing
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * The geometry that varies by [FlashcardsComponentSize], resolved once per composition. Icon size
@@ -67,7 +67,7 @@ private const val DISABLED_CONTENT_ALPHA = 0.38f
 /**
  * Container fill alpha for the disabled state on [FlashcardsComponentStyle.OnGradient]. Same
  * intent as [DISABLED_CONTAINER_ALPHA], based on white instead of `onSurface` since that style
- * sits on the theme-fixed [com.rossomak.flashcards.core.ui.theme.BrandColors.topBarGradient].
+ * sits on the theme-fixed [com.rossomak.flashcards.core.designsystem.theme.BrandColors.topBarGradient].
  */
 private const val ON_GRADIENT_DISABLED_CONTAINER_ALPHA = 0.20f
 
@@ -92,7 +92,7 @@ internal fun disabledButtonContentColorFor(style: FlashcardsComponentStyle): Col
 
 /**
  * Container fill alpha for a disabled filled `Flashcards*Button`: the
- * [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient] of [FlashcardsFilledButton]
+ * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.ctaButtonGradient] of [FlashcardsFilledButton]
  * and [FlashcardsFilledIconButton], and the solid error fill of [FlashcardsDestructiveButton]. M3's
  * `disabledContainerColor` only takes a flat [Color], so the gradient itself keeps painting (via a
  * background modifier behind a transparent container) and is dimmed with this alpha instead of being
@@ -130,7 +130,7 @@ internal fun filledButtonColorsFor(style: FlashcardsComponentStyle): FilledButto
  * Enabled container color for the given [style], shared by every tonal-treatment
  * `Flashcards*Button` ([FlashcardsTonalButton], [FlashcardsTonalIconButton]). [onSurfaceContainer]
  * is the one part that varies per type — each picks its own `OnSurface` token — while the
- * `OnGradient` branch is always [com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContainer].
+ * `OnGradient` branch is always [com.rossomak.flashcards.core.designsystem.theme.BrandColors.onGradientContainer].
  */
 @Composable
 @ReadOnlyComposable

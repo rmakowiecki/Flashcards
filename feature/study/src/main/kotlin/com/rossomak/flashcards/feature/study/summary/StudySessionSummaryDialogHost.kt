@@ -14,13 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown
 

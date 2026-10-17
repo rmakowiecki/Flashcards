@@ -46,6 +46,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onClick
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -55,8 +57,6 @@ import com.rossomak.flashcards.core.ui.composables.rating.labelRes
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceProgressDisc
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Graded
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.GradingWithTranscript

@@ -20,11 +20,11 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.DifficultyColors
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.theme.difficultyColors
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 private val DIFFICULTY_BADGE_SIZE = 24.dp
 

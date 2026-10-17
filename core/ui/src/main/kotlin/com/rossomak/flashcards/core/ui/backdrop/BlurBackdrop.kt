@@ -17,7 +17,7 @@ import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.modifier.modifierLocalProvider
 import androidx.compose.ui.unit.Dp
-import com.rossomak.flashcards.core.ui.theme.AppSizes
+import com.rossomak.flashcards.core.designsystem.theme.AppSizes
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
