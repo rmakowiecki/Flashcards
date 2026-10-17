@@ -23,13 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.VoiceSettings.Companion.MAX_SPEECH_RATE
 import com.rossomak.flashcards.core.domain.model.VoiceSettings.Companion.MIN_SPEECH_RATE
 import com.rossomak.flashcards.core.domain.model.voiceLabel
 import com.rossomak.flashcards.core.ui.R
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Picks the TTS voice and speech rate.

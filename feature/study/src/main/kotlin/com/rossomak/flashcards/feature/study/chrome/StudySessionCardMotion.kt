@@ -13,7 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.TransformOrigin
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import kotlin.math.roundToInt
 
 private const val CARD_SWAP_SCALE = 0.85f

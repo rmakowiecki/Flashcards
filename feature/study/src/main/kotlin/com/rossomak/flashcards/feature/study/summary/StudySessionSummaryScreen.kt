@@ -83,6 +83,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.displaySmallExtraBold
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.animation.rememberAnimationsEnabled
@@ -103,9 +106,6 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.displaySmallExtraBold
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDestination.StudyAgain
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown

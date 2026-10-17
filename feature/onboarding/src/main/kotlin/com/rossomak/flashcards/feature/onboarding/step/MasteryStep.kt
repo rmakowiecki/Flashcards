@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
@@ -28,8 +30,6 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsIndicatorEmphasis.E
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButtonRow
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingHierarchyConnector
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn

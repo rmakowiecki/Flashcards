@@ -33,18 +33,18 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.semanticColors
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState.Correct
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState.Current
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState.Failed
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState.Future
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState.Partial
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.semanticColors
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 private val ATTEMPT_SLOT_SIZE = 20.dp
 private val ATTEMPT_ICON_SIZE = 12.dp

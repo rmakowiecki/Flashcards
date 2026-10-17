@@ -14,13 +14,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListItemPosition.Bottom
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListItemPosition.Middle
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListItemPosition.Single
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListItemPosition.Top
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Where a row sits within a grouped list, so a stack of independent `LazyColumn` items reads

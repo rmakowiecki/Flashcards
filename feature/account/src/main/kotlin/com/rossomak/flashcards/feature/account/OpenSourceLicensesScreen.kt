@@ -46,6 +46,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.aboutlibraries.entity.Library
 import com.mikepenz.aboutlibraries.entity.License
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheetState
@@ -59,8 +61,6 @@ import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.account.OpenSourceLicensesMessage.OpenLinkFailed
 import kotlinx.coroutines.launch
 

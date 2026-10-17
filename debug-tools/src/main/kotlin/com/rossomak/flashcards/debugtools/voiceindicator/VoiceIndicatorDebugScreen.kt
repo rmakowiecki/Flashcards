@@ -28,10 +28,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.debugtools.R
 import kotlin.math.roundToInt
 import kotlinx.collections.immutable.ImmutableList

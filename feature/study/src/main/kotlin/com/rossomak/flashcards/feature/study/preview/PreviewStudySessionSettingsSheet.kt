@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
@@ -25,7 +26,6 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.speechRateLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.voiceAnsweringLabel
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsSettingRow
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
