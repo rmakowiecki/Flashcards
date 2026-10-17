@@ -81,11 +81,11 @@ import com.rossomak.flashcards.feature.onboarding.step.SessionModesStep
 import com.rossomak.flashcards.feature.onboarding.step.StructureStep
 import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
-import com.rossomak.networkgraph.Follow
-import com.rossomak.networkgraph.LocalNetworkGraphFill
-import com.rossomak.networkgraph.NetworkGraphMorphState
-import com.rossomak.networkgraph.networkGraphBackground
-import com.rossomak.networkgraph.rememberNetworkGraphMorphState
+import com.rossomak.morpheus.Follow
+import com.rossomak.morpheus.LocalMorpheusGraphFill
+import com.rossomak.morpheus.MorpheusGraphMorphState
+import com.rossomak.morpheus.morpheusGraphBackground
+import com.rossomak.morpheus.rememberMorpheusGraphMorphState
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -164,7 +164,7 @@ fun OnboardingScreen(
  * outside it as fixed chrome — so a swipe moves only the content, never the frame around it.
  *
  * Behind everything, over the gradient, a network graph follows the pager: each step has its own
- * [OnboardingNetworkGraphs] spec, a swipe scrubs the morph between neighbours, and Skip's jump runs a
+ * [OnboardingMorpheusGraphs] spec, a swipe scrubs the morph between neighbours, and Skip's jump runs a
  * timed morph to the last step's.
  *
  * Skip does not leave the flow: it jumps to the final step, which is the single place preferences
@@ -220,19 +220,19 @@ private fun OnboardingContent(
             return@LaunchedEffect
         }
         delay(SHARED_ELEMENT_DURATION_MS.toLong().milliseconds)
-        launch { graphState.animateTo(OnboardingNetworkGraphs.specFor(entranceStep), tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
+        launch { graphState.animateTo(OnboardingMorpheusGraphs.specFor(entranceStep), tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
         copyReveal.animateTo(1f, tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing))
         chromeReveal.animateTo(1f, tween(durationMillis = CHROME_REVEAL_MS, easing = LinearEasing))
     }
 
-    CompositionLocalProvider(LocalNetworkGraphFill provides OnboardingNetworkGraphs.fill) {
+    CompositionLocalProvider(LocalMorpheusGraphFill provides OnboardingMorpheusGraphs.fill) {
         Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .blurBackdropSource()
                     .background(MaterialTheme.brandColors.screenGradient)
-                    .networkGraphBackground(graphState),
+                    .morpheusGraphBackground(graphState),
             )
             Column(
                 modifier = Modifier
@@ -286,13 +286,13 @@ private fun PagerState.pageAfterTarget(): Int = (targetPage + 1).coerceAtMost(On
 
 /** The background graph: [entranceStep]'s spec, hidden until the entrance unless [isInspecting], then following [pagerState]. */
 @Composable
-private fun rememberOnboardingGraph(pagerState: PagerState, entranceStep: OnboardingStep, isInspecting: Boolean): NetworkGraphMorphState {
-    val graphState = rememberNetworkGraphMorphState(
-        if (isInspecting) OnboardingNetworkGraphs.specFor(entranceStep) else OnboardingNetworkGraphs.hiddenFor(entranceStep),
+private fun rememberOnboardingGraph(pagerState: PagerState, entranceStep: OnboardingStep, isInspecting: Boolean): MorpheusGraphMorphState {
+    val graphState = rememberMorpheusGraphMorphState(
+        if (isInspecting) OnboardingMorpheusGraphs.specFor(entranceStep) else OnboardingMorpheusGraphs.hiddenFor(entranceStep),
     )
     graphState.Follow(
-        OnboardingNetworkGraphs.pages,
-        minMorphDuration = OnboardingNetworkGraphs.minMorphDuration,
+        OnboardingMorpheusGraphs.pages,
+        minMorphDuration = OnboardingMorpheusGraphs.minMorphDuration,
         target = { pagerState.targetPage },
     ) {
         pagerState.currentPage + pagerState.currentPageOffsetFraction

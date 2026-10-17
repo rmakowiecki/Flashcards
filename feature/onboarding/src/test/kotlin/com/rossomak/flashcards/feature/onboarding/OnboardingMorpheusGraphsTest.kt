@@ -1,13 +1,13 @@
 package com.rossomak.flashcards.feature.onboarding
 
-import com.rossomak.networkgraph.EdgeRule
-import com.rossomak.networkgraph.isSameMorphFamily
+import com.rossomak.morpheus.EdgeRule
+import com.rossomak.morpheus.isSameMorphFamily
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 
-class OnboardingNetworkGraphsTest {
+class OnboardingMorpheusGraphsTest {
 
-    private val pages = OnboardingNetworkGraphs.pages
+    private val pages = OnboardingMorpheusGraphs.pages
 
     @Test
     fun `every step's graph is one fixed, strict layer that inherits its fill`() {
