@@ -17,6 +17,10 @@ private val BloomDefaults = ShapePrimitive.Bloom()
 /**
  * The spec as Kotlin source in the style of [NetworkGraphPresets], ready to paste into a preset list. Lists
  * only the layer fields that differ from the defaults.
+ *
+ * The pasted source names `Color`, `Offset`, `GradientStop`, `EdgeRule` and `ShapePrimitive` unqualified,
+ * so the file it lands in needs their imports. A [NetworkGraphFill.Custom] is code of the caller's own and
+ * exports as `null`, which on a layer means it inherits the spec's or the surface's fill instead.
  */
 public fun NetworkGraphSpec.toKotlinSource(): String {
     val defaults = NetworkGraphLayerSpec().sourceArguments()
