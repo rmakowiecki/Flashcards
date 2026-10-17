@@ -107,10 +107,15 @@ internal fun morphLayers(morph: NetworkGraphMorph, inherited: NetworkGraphFill):
     val to = morph.to
     val progress = morph.fraction.coerceIn(0f, 1f)
     val originLayers = morph.origin?.let { origin -> morphLayers(origin, inherited) }.orEmpty()
-    val count = max(from.layers.size, to.layers.size)
+    // An interrupted dissolve between seeds can leave a slot only the origin still draws.
+    val originSlots = (originLayers.maxOfOrNull { it.slotFromFront } ?: -1) + 1
+    val count = max(max(from.layers.size, to.layers.size), originSlots)
     return (count - 1 downTo 0).flatMap { slotFromFront ->
         val fromLayer = from.layers.getOrNull(from.layers.lastIndex - slotFromFront)
         val toLayer = to.layers.getOrNull(to.layers.lastIndex - slotFromFront)
+        if (fromLayer == null && toLayer == null) {
+            return@flatMap originOnlySlot(originLayers.filter { it.slotFromFront == slotFromFront }, progress, slotFromFront)
+        }
         // A layer one side lacks is the other side's, invisible, in that side's mesh and fill.
         val startSeed = layerSeed(if (fromLayer != null) from.seed else to.seed, slotFromFront)
         val endSeed = if (toLayer != null) layerSeed(to.seed, slotFromFront) else startSeed
@@ -124,6 +129,21 @@ internal fun morphLayers(morph: NetworkGraphMorph, inherited: NetworkGraphFill):
         val ends = SlotEnds(start, startSeed, startMeshes.firstOrNull { it.seed == startSeed && it.spec.isSameMorphFamily(start) }?.fill ?: startFill, end, endSeed, endFill)
         slotLayers(startMeshes, ends, progress, slotFromFront)
     }
+}
+
+/**
+ * A slot neither end has but [NetworkGraphMorph.origin] still draws: its meshes fade out where they
+ * stand, as a layer the end lacks would, the one the origin was morphing on leading at its own seed.
+ */
+private fun originOnlySlot(meshes: List<MorphLayer>, progress: Float, slot: Int): List<MorphLayer> {
+    val lead = meshes.firstOrNull { (it.shape as? LayerShape.Morph)?.to is LayerShape.Of } ?: meshes.last()
+    val end = lead.spec.copy(alpha = 0f)
+    // The fill the origin was heading to, so the fading mesh keeps its colors rather than turning to another end's.
+    val endFill = when (val fill = lead.fill) {
+        is FillState.Of -> fill
+        is FillState.Crossfade -> fill.to
+    }
+    return slotLayers(meshes, SlotEnds(lead.spec, lead.seed, lead.fill, end, lead.seed, endFill), progress, slot)
 }
 
 /** One slot's two ends, as [morphLayers] resolved them. */

@@ -191,6 +191,30 @@ class NetworkGraphMorphTest {
     }
 
     @Test
+    fun `a back layer only the interrupted morph still drew fades out from where it stood instead of vanishing`() {
+        // Different seeds, so the frozen screen's specs are the nearer end alone, without the back layer.
+        val twoLayers = family.first { it.layers.size == 2 }.copy(seed = 1)
+        val oneLayer = family.first { it.layers.size == 1 }.copy(seed = 2)
+        val next = oneLayer.copy(seed = 3)
+        val interrupted = NetworkGraphMorph(twoLayers, oneLayer, LATE_INTERRUPT_FRACTION)
+        val frozen = lerp(twoLayers, oneLayer, LATE_INTERRUPT_FRACTION)
+        val drawnBack = morphLayers(interrupted, TestFill).single { it.slotFromFront == 1 }
+
+        val restarted = morphLayers(NetworkGraphMorph(frozen, next, 0f, origin = interrupted), TestFill)
+        val halfwayBack = morphLayers(NetworkGraphMorph(frozen, next, 0.5f, origin = interrupted), TestFill).single { it.slotFromFront == 1 }
+        val arrivedBack = morphLayers(NetworkGraphMorph(frozen, next, 1f, origin = interrupted), TestFill).single { it.slotFromFront == 1 }
+
+        frozen.layers shouldHaveSize 1
+        restarted.map { it.seed to it.slotFromFront } shouldBe morphLayers(interrupted, TestFill).map { it.seed to it.slotFromFront }
+        halfwayBack.seed shouldBe drawnBack.seed
+        halfwayBack.spec.alpha shouldBe (drawnBack.spec.alpha * 0.5f plusOrMinus 1e-4f)
+        arrivedBack.spec.alpha shouldBe 0f
+        MorphRun(NetworkGraphMorph(frozen, next, 0f, origin = interrupted), TALL_HERO_WIDTH, TALL_HERO_HEIGHT)
+            .frames("back layer fading out half way", 0.5f, frameCount = 1)
+            .shouldBeEmpty()
+    }
+
+    @Test
     fun `resizing the surface keeps every existing node in place and the invariants on every frame`() {
         val layer = family[3].layers.single()
         val field = LayerField(layer, family[3].seed, TALL_HERO_HEIGHT, PX_PER_DP)
@@ -549,6 +573,7 @@ class NetworkGraphMorphTest {
         const val JITTER_CENTER = 0.5f
         const val JITTER_AMPLITUDE = 0.01f
         const val INTERRUPT_FRACTION = 0.4f
+        const val LATE_INTERRUPT_FRACTION = 0.6f
         const val MAX_PLACE_BY_PLACE_GAP = 0.12
     }
 }
