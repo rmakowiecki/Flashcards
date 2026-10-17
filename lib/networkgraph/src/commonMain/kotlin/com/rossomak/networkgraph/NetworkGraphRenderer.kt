@@ -136,6 +136,7 @@ private fun Modifier.drawNetworkGraph(
                 field.draw(this, layerFill, holder.halosFor(layerFill.maskColor), timeSeconds, showViolations)
             }
         }
+        holder.endFrame()
         stats?.recordDraw(drawStart.elapsedNow().inWholeNanoseconds)
         layerStats?.record(fields)
     }
@@ -244,7 +245,8 @@ private class NetworkGraphHolder {
     private var builtReferenceSize = 0f
     private var builtPxPerDp = 0f
     private var fieldsByFamily = HashMap<LayerFamily, LayerField>()
-    private val halosByColor = HashMap<Color, HaloBrushCache>()
+    private var halosByColor = HashMap<Color, HaloBrushCache>()
+    private var halosThisFrame = HashMap<Color, HaloBrushCache>()
     private var lastMorph: NetworkGraphMorph? = null
     private var lastFill: NetworkGraphFill? = null
     private var lastLayers: List<MorphLayer> = emptyList()
@@ -278,7 +280,13 @@ private class NetworkGraphHolder {
         return fields
     }
 
-    fun halosFor(color: Color): HaloBrushCache = halosByColor.getOrPut(color) { HaloBrushCache(color) }
+    fun halosFor(color: Color): HaloBrushCache = halosThisFrame.getOrPut(color) { halosByColor[color] ?: HaloBrushCache(color) }
+
+    /** Drops every halo cache the frame just drawn didn't use: a crossfade or an animated fill passes a new color each frame. */
+    fun endFrame() {
+        halosByColor = halosThisFrame
+        halosThisFrame = HashMap()
+    }
 }
 
 /** What a [LayerField] can't change after it is built. */
