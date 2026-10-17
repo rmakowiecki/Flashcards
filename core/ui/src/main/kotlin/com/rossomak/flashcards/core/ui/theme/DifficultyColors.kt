@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Fixed 10-step difficulty ramp (1 easiest – 10 hardest), green to red. Deliberately identical in
- * both themes — like [BrandColors], it encodes card difficulty rather than a themed surface, so
+ * both themes — like [com.rossomak.flashcards.core.designsystem.theme.BrandColors], it encodes card difficulty rather than a themed surface, so
  * it never flips light/dark.
  */
 object DifficultyColors {

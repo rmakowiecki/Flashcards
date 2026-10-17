@@ -15,11 +15,11 @@ import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.gallatinapps.syntaxmp.compose.SyntaxTheme
 import com.gallatinapps.syntaxmp.compose.rememberSyntaxAnnotatedString
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
-import com.rossomak.flashcards.core.ui.theme.CodeBlockColors
+import com.rossomak.flashcards.core.designsystem.theme.CodeBlockColors
+import com.rossomak.flashcards.core.designsystem.theme.code
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.code
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 @Composable
 fun SyntaxCodeBlock(

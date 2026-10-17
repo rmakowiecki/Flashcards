@@ -28,12 +28,12 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.designsystem.theme.EmphasizedSpanStyle
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.AuthProvider
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.theme.EmphasizedSpanStyle
-import com.rossomak.flashcards.core.ui.theme.spacing
 import kotlin.math.roundToInt
 
 private const val MANAGE_LINK_TAG = "manage"
