@@ -64,3 +64,13 @@ avatar's diameter, which no fixed slot can do.
   a weight change on selection.
 - Amends [ADR-0018](0018-agp9-convention-plugin-setup.md), whose font-certificate note no longer
   applies.
+
+## Amendment: the type scale moved to `:core:designsystem`
+
+The type scale, its theme constants and `roboto.ttf` now live in the Kotlin Multiplatform
+`:core:designsystem` module, so the website draws the same Roboto scale as the app
+([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md)). The font is a Compose resource
+(`src/commonMain/composeResources/font/roboto.ttf`) instead of an Android `res/font` file. A resource
+font resolves inside composition, so `AppTypography` became the composable `appTypography()`; the
+scale itself is unchanged. The Konsist rule also covers `:web` and exempts `:core:designsystem`
+alongside `core/ui/theme/`.

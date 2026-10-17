@@ -18,10 +18,14 @@ these components are held to; the checklist at the bottom is the definition of d
 ## 1. What lives here
 
 ```text
-core/ui/src/main/…/theme/        Tokens: Spacing, Sizes, CornerRadius, Motion, Color, Type, BrandColors
+core/ui/src/main/…/theme/        FlashcardsTheme (dynamic color) and the domain-tied Category, Difficulty and Rating colors
 core/ui/src/main/…/composables/  Reusable Flashcards* components (the design system)
 core/ui/src/debug/…/showcase/    Showkase root + sample data / PreviewParameterProviders
 ```
+
+The design tokens themselves (Spacing, Sizes, CornerRadius, Motion, Color, Type, BrandColors,
+SemanticColors) live in [`:core:designsystem`](../designsystem/README.md), which this module
+re-exports through `api`.
 
 - **`composables/` is the governed package.** The Konsist rule and `check-arg-order.py`
   exemption both key off this package. Dialogs, navigation, theme, and showcase code are
