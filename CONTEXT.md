@@ -64,7 +64,7 @@ as authenticated.
 _Avoid_: Anonymous user, Temp user
 
 **Premium**:
-A User's standing entitlement to paid features, held per User on the server and changed only by the backend or a project admin, never by the app. Granted and revocable User by User. Any feature may be made a Premium feature; today only **Voice Answering** is. A **Guest** is never Premium: only a User signed in with Google or GitHub can hold it.
+A User's standing entitlement to paid features, held per User on the server and changed only by the backend or a project admin, never by the app. Granted and revocable User by User. Any feature may be made a Premium feature; today only **Voice Answering** is. A **Guest** is never Premium: a Guest may already carry a grant, but it counts only once the Guest has linked Google or GitHub and become a User.
 _Avoid_: Pro, Subscriber, Paid user, Premium status / Premium entitlement (just Premium)
 
 **User**:
