@@ -7,10 +7,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.debugtools.R
 import com.rossomak.networkgraph.tuner.NetworkGraphPlayground
 
 /**
@@ -36,7 +38,7 @@ fun NetworkGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: (
         onSpecExport = { source -> logd { "Network graph spec:\n$source" } },
         navigationIcon = {
             IconButton(onClick = onNavigateBack) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.debug_voice_harness_back_cd))
             }
         },
     )
