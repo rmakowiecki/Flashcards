@@ -1,9 +1,11 @@
 package com.rossomak.flashcards.presentation.main
 
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -21,6 +23,7 @@ import com.rossomak.flashcards.debugtools.backdropblur.BackdropBlurDebugScreen
 import com.rossomak.flashcards.debugtools.morpheus.MorpheusGraphPrototypeScreen
 import com.rossomak.flashcards.debugtools.voice.VoiceDebugScreen
 import com.rossomak.flashcards.debugtools.voiceindicator.VoiceIndicatorDebugScreen
+import com.rossomak.flashcards.presentation.debug.CardAnimationsDebugActivity
 import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 
 @Composable
@@ -52,6 +55,7 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
 ) {
     navigation<DebugGraph>(startDestination = DebugRoot) {
         guardedNavComposable<DebugRoot>(navController) { navigator ->
+            val context = LocalContext.current
             DebugScreen(
                 gitShortSha = BuildConfig.GIT_SHORT_SHA,
                 onNavigateToOnboarding = onNavigateToOnboarding,
@@ -59,6 +63,9 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 onNavigateToVoiceIndicatorDebug = { navigator.navigate(DebugVoiceIndicatorRoot) },
                 onNavigateToMorpheusGraphPrototype = { onNavigateToDebugTool(DebugMorpheusGraphRoot) },
                 onNavigateToBackdropBlurDebug = { navigator.navigate(DebugBackdropBlurRoot) },
+                onNavigateToCardAnimationsDebug = {
+                    context.startActivity(Intent(context, CardAnimationsDebugActivity::class.java))
+                },
             )
         }
         guardedNavComposable<DebugVoiceRoot>(navController) { navigator ->

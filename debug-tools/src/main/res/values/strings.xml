@@ -8,6 +8,8 @@
     <string name="debug_voice_indicator_message">Mic level animation from a synthetic stream</string>
     <string name="debug_backdrop_blur_label">Backdrop blur</string>
     <string name="debug_backdrop_blur_message">OnGradient blur over moving content, live blur radius</string>
+    <string name="debug_card_animations_label">Session card animations</string>
+    <string name="debug_card_animations_message">Fast session over a mock deck of card layout edge cases</string>
     <string name="debug_replay_onboarding_label">Replay onboarding</string>
     <string name="debug_replay_onboarding_message">Clears the flag and runs the real flow</string>
     <string name="debug_showcase_label">UI component showcase</string>

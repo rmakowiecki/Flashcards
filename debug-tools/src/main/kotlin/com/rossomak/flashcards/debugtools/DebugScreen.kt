@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
@@ -63,6 +64,7 @@ fun DebugScreen(
     onNavigateToVoiceIndicatorDebug: () -> Unit,
     onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
+    onNavigateToCardAnimationsDebug: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -83,6 +85,7 @@ fun DebugScreen(
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
+        onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
         onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
     )
@@ -100,6 +103,7 @@ private fun DebugContent(
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
+    onCardAnimationsDebugClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
     onMorpheusGraphPrototypeClick: () -> Unit,
 ) {
@@ -150,6 +154,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_backdrop_blur_message,
                             icon = Icons.Default.BlurOn,
                             onClick = onBackdropBlurDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_card_animations_label,
+                            messageRes = R.string.debug_card_animations_message,
+                            icon = Icons.Default.Animation,
+                            onClick = onCardAnimationsDebugClick,
                         ),
                     )
                     add(
@@ -241,6 +253,7 @@ private fun DebugContentPreview() {
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
+            onCardAnimationsDebugClick = {},
             onReplayOnboardingClick = {},
             onMorpheusGraphPrototypeClick = {},
         )
