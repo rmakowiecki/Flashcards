@@ -15,7 +15,8 @@ import org.junit.Test
  */
 class ArchitectureKonsistTest {
 
-    private val projectScope = Konsist.scopeFromProject()
+    // The `morpheus` submodule is a separate project with rules of its own, so these never read it.
+    private val projectScope = Konsist.scopeFromProject().slice { !it.projectPath.removePrefix("/").startsWith("morpheus/") }
 
     @Test
     fun `domain module has no Android framework imports`() {
