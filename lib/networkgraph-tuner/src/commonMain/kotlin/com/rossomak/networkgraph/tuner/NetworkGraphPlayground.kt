@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -230,11 +231,13 @@ private fun specSlotFor(
     coroutineScope: CoroutineScope,
 ): SpecSlot = when {
     page < specs.size -> SpecSlot(
+        key = page,
         preset = specs[page],
         onSpecChange = { specs[page] = specs[page].copy(spec = it) },
         onReseed = { specs[page] = specs[page].let { preset -> preset.copy(spec = preset.spec.copy(seed = Random.nextInt())) } },
     )
     page == specs.size -> SpecSlot(
+        key = page to morphSelection.toIndex,
         preset = morphSpecs[morphSelection.toIndex],
         onSpecChange = { morphSpecs[morphSelection.toIndex] = morphSpecs[morphSelection.toIndex].copy(spec = it) },
         onReseed = { morphSpecs.reseedTogether() },
@@ -252,6 +255,7 @@ private fun specSlotFor(
         val pagerState = currentDeck.pagerState
         val step = pagerState.currentPage
         SpecSlot(
+            key = page to step,
             preset = currentDeck.specs[step],
             onSpecChange = { currentDeck.specs[step] = currentDeck.specs[step].copy(spec = it) },
             onReseed = { currentDeck.specs.reseedTogether() },
@@ -282,13 +286,16 @@ private fun TuningSheet(slot: SpecSlot, showViolations: Boolean, onShowViolation
         // No scrim: the whole point of tuning is watching the graph change above the sheet.
         scrimColor = Color.Transparent,
     ) {
-        NetworkGraphTuningSheetContent(
-            spec = slot.spec,
-            showViolations = showViolations,
-            onSpecChange = slot.onSpecChange,
-            onShowViolationsChange = onShowViolationsChange,
-            header = slot.sheetHeader ?: {},
-        )
+        // The morph page's "To" picker swaps the spec under an open sheet, which then opens the new one afresh, on its front layer.
+        key(slot.key) {
+            NetworkGraphTuningSheetContent(
+                spec = slot.spec,
+                showViolations = showViolations,
+                onSpecChange = slot.onSpecChange,
+                onShowViolationsChange = onShowViolationsChange,
+                header = slot.sheetHeader ?: {},
+            )
+        }
     }
 }
 
@@ -329,9 +336,10 @@ private class MorphSelection(defaultToIndex: Int) {
 /**
  * The spec the overlay and the tuning sheet act on for the current page, with its label, plus the morph page's
  * extras: [onStart] for the overlay's Start button and [sheetHeader] above the tuning sliders, and a
- * deck page's [deckStep] for the overlay's step buttons.
+ * deck page's [deckStep] for the overlay's step buttons. [key] tells the spec's place apart from every other one.
  */
 private class SpecSlot(
+    val key: Any,
     val preset: NetworkGraphPreset,
     val onSpecChange: (NetworkGraphSpec) -> Unit,
     val onReseed: () -> Unit,
