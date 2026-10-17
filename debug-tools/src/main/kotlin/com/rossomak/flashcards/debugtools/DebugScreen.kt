@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,7 @@ fun DebugScreen(
     onNavigateToVoiceIndicatorDebug: () -> Unit,
     onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
+    onNavigateToScreenShowcase: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -83,6 +85,7 @@ fun DebugScreen(
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
+        onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
         onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
     )
@@ -100,6 +103,7 @@ private fun DebugContent(
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
+    onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
     onMorpheusGraphPrototypeClick: () -> Unit,
 ) {
@@ -150,6 +154,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_backdrop_blur_message,
                             icon = Icons.Default.BlurOn,
                             onClick = onBackdropBlurDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_screen_showcase_label,
+                            messageRes = R.string.debug_screen_showcase_message,
+                            icon = Icons.Default.Smartphone,
+                            onClick = onScreenShowcaseClick,
                         ),
                     )
                     add(
@@ -241,6 +253,7 @@ private fun DebugContentPreview() {
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
+            onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},
             onMorpheusGraphPrototypeClick = {},
         )

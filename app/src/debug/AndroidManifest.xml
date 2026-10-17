@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug-only screen showcase, opened from the debug hub. The profiling manifest declares it too. -->
+        <activity
+            android:name=".presentation.showcase.ScreenShowcaseActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+    </application>
+</manifest>

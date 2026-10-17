@@ -11,6 +11,11 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
     implementation(project(":core:voice"))
+    // The screen showcase renders these features' real Content composables.
+    implementation(project(":feature:onboarding"))
+    implementation(project(":feature:home"))
+    implementation(project(":feature:browse"))
+    implementation(project(":feature:study"))
     // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts).
     implementation("com.rossomak:morpheus-tuner")
     implementation(libs.hilt.android)
