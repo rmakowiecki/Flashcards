@@ -8,6 +8,11 @@
             android:shell="true"
             tools:targetApi="29" />
 
+        <!-- Profiling compiles src/debug/java, so the debug hub's activities are registered here too. -->
+        <activity
+            android:name=".presentation.debug.CardAnimationsDebugActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Flashcards" />
         <activity
             android:name=".presentation.showcase.ScreenShowcaseActivity"
             android:exported="false"

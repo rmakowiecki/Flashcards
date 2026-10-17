@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.presentation.main
 
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.outlined.BugReport
@@ -22,6 +23,7 @@ import com.rossomak.flashcards.debugtools.backdropblur.BackdropBlurDebugScreen
 import com.rossomak.flashcards.debugtools.morpheus.MorpheusGraphPrototypeScreen
 import com.rossomak.flashcards.debugtools.voice.VoiceDebugScreen
 import com.rossomak.flashcards.debugtools.voiceindicator.VoiceIndicatorDebugScreen
+import com.rossomak.flashcards.presentation.debug.CardAnimationsDebugActivity
 import com.rossomak.flashcards.presentation.showcase.ScreenShowcaseActivity
 import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 
@@ -62,6 +64,9 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 onNavigateToVoiceIndicatorDebug = { navigator.navigate(DebugVoiceIndicatorRoot) },
                 onNavigateToMorpheusGraphPrototype = { onNavigateToDebugTool(DebugMorpheusGraphRoot) },
                 onNavigateToBackdropBlurDebug = { navigator.navigate(DebugBackdropBlurRoot) },
+                onNavigateToCardAnimationsDebug = {
+                    context.startActivity(Intent(context, CardAnimationsDebugActivity::class.java))
+                },
                 onNavigateToScreenShowcase = { context.startActivity(ScreenShowcaseActivity.intent(context)) },
             )
         }

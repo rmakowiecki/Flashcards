@@ -3,6 +3,10 @@
 
     <application>
         <activity
+            android:name=".presentation.debug.CardAnimationsDebugActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Flashcards" />
+        <activity
             android:name=".presentation.showcase.ScreenShowcaseActivity"
             android:exported="false"
             android:launchMode="singleTop" />

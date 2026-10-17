@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
@@ -54,6 +55,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
  * entry points by dropping one `debugImplementation`, and Settings stops carrying rows a user must
  * never see.
  */
+@Suppress("LongParameterList")
 @Composable
 fun DebugScreen(
     modifier: Modifier = Modifier,
@@ -64,6 +66,7 @@ fun DebugScreen(
     onNavigateToVoiceIndicatorDebug: () -> Unit,
     onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
+    onNavigateToCardAnimationsDebug: () -> Unit,
     onNavigateToScreenShowcase: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -85,6 +88,7 @@ fun DebugScreen(
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
+        onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
         onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
         onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
@@ -103,6 +107,7 @@ private fun DebugContent(
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
+    onCardAnimationsDebugClick: () -> Unit,
     onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
     onMorpheusGraphPrototypeClick: () -> Unit,
@@ -154,6 +159,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_backdrop_blur_message,
                             icon = Icons.Default.BlurOn,
                             onClick = onBackdropBlurDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_card_animations_label,
+                            messageRes = R.string.debug_card_animations_message,
+                            icon = Icons.Default.Animation,
+                            onClick = onCardAnimationsDebugClick,
                         ),
                     )
                     add(
@@ -253,6 +266,7 @@ private fun DebugContentPreview() {
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
+            onCardAnimationsDebugClick = {},
             onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},
             onMorpheusGraphPrototypeClick = {},
