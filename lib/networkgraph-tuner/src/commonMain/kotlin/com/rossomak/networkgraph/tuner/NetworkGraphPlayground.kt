@@ -112,9 +112,10 @@ public fun NetworkGraphPlayground(
     navigationIcon: @Composable () -> Unit = {},
 ) {
     require(styles.isNotEmpty()) { "The playground needs at least one style" }
+    require(morphFamily.isNotEmpty()) { "The playground needs at least one morph family spec" }
     val specs = remember { presets.toMutableStateList() }
     val morphSpecs = remember { morphFamily.toMutableStateList() }
-    val deckStates = decks.map { pages -> rememberDeck(pages) }
+    val deckStates = decks.mapIndexed { index, pages -> key(index) { rememberDeck(pages) } }
     val morphSelection = remember { MorphSelection(defaultToIndex = MORPH_DEFAULT_TO_INDEX.coerceAtMost(morphFamily.lastIndex)) }
     var styleIndex by remember { mutableIntStateOf(0) }
     val style = styles[styleIndex.coerceIn(styles.indices)]
