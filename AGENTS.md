@@ -23,6 +23,9 @@ data/           → Repository Implementations, Data Sources (Remote/Local), DTO
 - Domain has NO dependencies (pure Kotlin)
 - Data depends on Domain (implements repository interfaces)
 
+### Morpheus (external library)
+The animated graph background and its tuner come from [Morpheus](https://github.com/rmakowiecki/Morpheus), checked out as the `morpheus` git submodule and included as a composite build in `settings.gradle.kts`. Depend on `com.rossomak:morpheus` or `com.rossomak:morpheus-tuner`, never on a project path, and change the library in its own repository, then bump the submodule. Run `git submodule update --init` after cloning. See [ADR-0069](./docs/adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md).
+
 ### MVVM Pattern (Presentation Layer)
 - **ViewModel**: Holds UI state, orchestrates use cases, survives configuration changes
 - **UI State**: Single data class representing screen state

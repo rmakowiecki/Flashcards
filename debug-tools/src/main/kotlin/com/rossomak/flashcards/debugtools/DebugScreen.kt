@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Widgets
@@ -61,6 +62,7 @@ fun DebugScreen(
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
     onNavigateToVoiceIndicatorDebug: () -> Unit,
+    onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
     onNavigateToCardAnimationsDebug: () -> Unit,
 ) {
@@ -85,10 +87,12 @@ fun DebugScreen(
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
         onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
+        onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
     )
 }
 
-@Suppress("LongParameterList", "LongMethod") // one row and one callback per debug tool; the hub grows by design.
+// One callback and one row per debug tool: the hub grows by a parameter and a row with every tool.
+@Suppress("LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DebugContent(
@@ -101,6 +105,7 @@ private fun DebugContent(
     onBackdropBlurDebugClick: () -> Unit,
     onCardAnimationsDebugClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
+    onMorpheusGraphPrototypeClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -165,6 +170,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_replay_onboarding_message,
                             icon = Icons.Default.Refresh,
                             onClick = onReplayOnboardingClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_morpheus_graph_prototype_label,
+                            messageRes = R.string.debug_morpheus_graph_prototype_message,
+                            icon = Icons.Default.Hub,
+                            onClick = onMorpheusGraphPrototypeClick,
                         ),
                     )
                     // Absent when Showkase is not on the classpath, which is every non-debug build
@@ -242,6 +255,7 @@ private fun DebugContentPreview() {
             onBackdropBlurDebugClick = {},
             onCardAnimationsDebugClick = {},
             onReplayOnboardingClick = {},
+            onMorpheusGraphPrototypeClick = {},
         )
     }
 }
