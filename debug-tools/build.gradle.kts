@@ -11,8 +11,13 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
     implementation(project(":core:voice"))
+    implementation(project(":feature:onboarding"))
+    implementation(project(":feature:home"))
+    implementation(project(":feature:browse"))
+    implementation(project(":feature:study"))
     // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts).
     implementation("com.rossomak:morpheus-tuner")
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
