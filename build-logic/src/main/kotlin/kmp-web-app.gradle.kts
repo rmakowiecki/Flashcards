@@ -15,10 +15,10 @@ kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser {
-            // Unit tests run on Node (below), so CI needs no headless browser.
-            testTask { enabled = false }
+            // Tests run in headless Chrome, not Node: Compose's renderer (Skiko) loads its own wasm
+            // module at startup, which only a browser can fetch.
+            testTask { useKarma { useChromeHeadless() } }
         }
-        nodejs()
         binaries.executable()
     }
 }

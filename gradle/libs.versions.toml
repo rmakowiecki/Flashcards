@@ -42,6 +42,8 @@ composeShimmer = "1.5.0"
 composeMultiplatform = "1.12.2"
 composeMultiplatformMaterial3 = "1.12.0-alpha03"
 kotlinxBrowser = "0.5.0"
+# npm package, not a Maven artifact: the Chromium the :web unit tests run in (see web/karma.config.d).
+puppeteer = "25.12.0"
 haze = "2.0.1"
 leakcanary = "2.14"
 androidxWork = "2.12.0"
