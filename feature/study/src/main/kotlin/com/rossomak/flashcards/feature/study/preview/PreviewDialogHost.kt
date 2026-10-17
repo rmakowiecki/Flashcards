@@ -8,8 +8,8 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig.Companion.LENGTH_STEP
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig.Companion.RATED_ATTEMPTS_STEP
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFiltersDialog
-import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsDecisionDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardSortOrderDialog
+import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsDecisionDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.PartialRatingCardRequeueingDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.RatedAttemptsDialog
