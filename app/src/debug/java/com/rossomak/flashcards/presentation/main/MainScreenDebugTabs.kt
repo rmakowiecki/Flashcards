@@ -24,6 +24,7 @@ import com.rossomak.flashcards.debugtools.morpheus.MorpheusGraphPrototypeScreen
 import com.rossomak.flashcards.debugtools.voice.VoiceDebugScreen
 import com.rossomak.flashcards.debugtools.voiceindicator.VoiceIndicatorDebugScreen
 import com.rossomak.flashcards.presentation.debug.CardAnimationsDebugActivity
+import com.rossomak.flashcards.presentation.showcase.ScreenShowcaseActivity
 import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 
 @Composable
@@ -66,6 +67,7 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 onNavigateToCardAnimationsDebug = {
                     context.startActivity(Intent(context, CardAnimationsDebugActivity::class.java))
                 },
+                onNavigateToScreenShowcase = { context.startActivity(ScreenShowcaseActivity.intent(context)) },
             )
         }
         guardedNavComposable<DebugVoiceRoot>(navController) { navigator ->

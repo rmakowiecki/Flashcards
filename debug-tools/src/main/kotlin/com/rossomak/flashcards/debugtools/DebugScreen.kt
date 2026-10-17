@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +55,7 @@ import com.rossomak.flashcards.core.ui.theme.spacing
  * entry points by dropping one `debugImplementation`, and Settings stops carrying rows a user must
  * never see.
  */
+@Suppress("LongParameterList")
 @Composable
 fun DebugScreen(
     modifier: Modifier = Modifier,
@@ -65,6 +67,7 @@ fun DebugScreen(
     onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
     onNavigateToCardAnimationsDebug: () -> Unit,
+    onNavigateToScreenShowcase: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,6 +89,7 @@ fun DebugScreen(
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
         onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
+        onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
         onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
     )
@@ -104,6 +108,7 @@ private fun DebugContent(
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
     onCardAnimationsDebugClick: () -> Unit,
+    onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
     onMorpheusGraphPrototypeClick: () -> Unit,
 ) {
@@ -162,6 +167,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_card_animations_message,
                             icon = Icons.Default.Animation,
                             onClick = onCardAnimationsDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_screen_showcase_label,
+                            messageRes = R.string.debug_screen_showcase_message,
+                            icon = Icons.Default.Smartphone,
+                            onClick = onScreenShowcaseClick,
                         ),
                     )
                     add(
@@ -254,6 +267,7 @@ private fun DebugContentPreview() {
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
             onCardAnimationsDebugClick = {},
+            onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},
             onMorpheusGraphPrototypeClick = {},
         )

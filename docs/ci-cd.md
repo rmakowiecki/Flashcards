@@ -58,7 +58,7 @@ No instrumented (`androidTest`) tests exist yet, so no emulator step is configur
 - **No obfuscation** (`app/proguard-rules-profiling.pro`: `-dontobfuscate`) so stack traces and traces stay readable.
 - **Profileable by shell** (`app/src/profiling/AndroidManifest.xml`) so Android Studio's profiler and Perfetto attach.
 - **Logging on** (`BuildConfig.LOGGING_ENABLED`: true for debug and profiling, false for release).
-- **Debug hub included**: `:debug-tools` via `profilingImplementation`, and the Debug-tab wiring in `app/src/debug/java` is added to the profiling source set. LeakCanary, Compose UI tooling and Showkase stay debug-only.
+- **Debug hub included**: `:debug-tools` via `profilingImplementation`, and the Debug-tab wiring in `app/src/debug/java` is added to the profiling source set. The screen showcase's activity lives there too, so `app/src/profiling/AndroidManifest.xml` declares it alongside `app/src/debug/AndroidManifest.xml`. LeakCanary, the Compose UI tooling runtime and the Showkase browser stay debug-only.
 - Library modules have no profiling variant; `matchingFallbacks` resolves them to release.
 - Not built by Bitrise; ship one with the WIP script below (`--variant profiling`).
 
