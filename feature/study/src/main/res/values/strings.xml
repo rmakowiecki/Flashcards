@@ -125,6 +125,12 @@
     <string name="preview_session_mic_permission_empty_state_message">Voice answering needs the microphone. Allow it in system settings, then tap Start, or study this session with manual rating.</string>
     <string name="preview_session_mic_permission_open_settings_button">Open settings</string>
     <string name="preview_session_mic_permission_switch_to_manual_button">Switch to manual</string>
+    <string name="preview_session_premium_coming_soon_message">Sorry, this is a premium feature and it\'s coming soon!</string>
+    <string name="preview_session_voice_offline_title">No connection</string>
+    <string name="preview_session_voice_offline_message">Rated Voice sessions need a stable internet connection. Try again once you\'re connected, or study this session with manual rating.</string>
+    <string name="preview_session_voice_offline_try_again_button">Try again</string>
+    <string name="preview_session_voice_offline_switch_to_manual_button">Switch to manual</string>
+    <string name="preview_session_voice_offline_hint_message">Voice answering needs an internet connection.</string>
     <string name="preview_session_scope_quick_session_message">" auto-selected across "</string>
     <string name="preview_session_scope_single_subcategory_prefix_message">" from your "</string>
     <string name="preview_session_scope_single_subcategory_suffix_message">" deck."</string>

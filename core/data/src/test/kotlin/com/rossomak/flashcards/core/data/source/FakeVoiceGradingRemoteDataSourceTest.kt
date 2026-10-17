@@ -44,15 +44,6 @@ class FakeVoiceGradingRemoteDataSourceTest {
     }
 
     @Test
-    fun `checkEntitlement reflects the simulated premium record`() = runTest {
-        fakeApi.simulatePremiumEntitlement = false
-        fakeApi.checkEntitlement().isPremium shouldBe false
-
-        fakeApi.simulatePremiumEntitlement = true
-        fakeApi.checkEntitlement().isPremium shouldBe true
-    }
-
-    @Test
     fun `transcribeAndGradeSpokenAnswer streams a transcript chunk derived from the expected answer, then a grade`() = runTest {
         val longExpectedAnswer = "a foreground service keeps running with a persistent notification " +
             "shown to the user even when the app itself is no longer visible on screen"

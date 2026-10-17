@@ -13,9 +13,12 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
+import com.rossomak.flashcards.core.domain.usecase.FetchPremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -30,9 +33,11 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.decodeRoute
 import com.rossomak.flashcards.core.ui.voice.VoiceSettingsController
 import com.rossomak.flashcards.feature.study.PreviewStudySessionRoute
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsSortingOrder
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringOffline
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -62,6 +67,9 @@ class PreviewStudySessionViewModel @Inject constructor(
     private val saveUserPreference: SaveUserPreferenceUseCase,
     private val observePermissionStatus: ObservePermissionStatusUseCase,
     private val requestPermission: RequestPermissionUseCase,
+    private val observePremium: ObservePremiumUseCase,
+    private val fetchPremium: FetchPremiumUseCase,
+    private val observeInternetAvailability: ObserveInternetAvailabilityUseCase,
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
 
@@ -171,6 +179,12 @@ class PreviewStudySessionViewModel @Inject constructor(
             }
             selectCards(resampleQuickSession = route.sourceType == Quick)
         }
+        viewModelScope.launch {
+            observePremium().collect { isPremium -> _state.update { it.copy(isPremium = isPremium) } }
+        }
+        viewModelScope.launch {
+            observeInternetAvailability().collect { isOnline -> _state.update { it.copy(isOnline = isOnline) } }
+        }
         // Warms the process-wide voice cache so the voice dialogs, here and in the session, open complete.
         voiceSettingsController.loadVoices(viewModelScope, ::onVoicesLoaded)
     }
@@ -191,10 +205,16 @@ class PreviewStudySessionViewModel @Inject constructor(
 
     /**
      * Turns voice answering off for this session only — the saved default is left alone, and the
-     * card draw is unaffected, so there is nothing to reselect.
+     * card draw is unaffected, so there is nothing to reselect. Closes the
+     * offline dialog it was chosen from, and starts nothing: the user sees the change, then Starts.
      */
     fun onSwitchToManualAnswering() {
-        _state.update { it.copy(config = it.config.copy(voiceAnsweringEnabled = false)) }
+        _state.update { state ->
+            state.copy(
+                config = state.config.copy(voiceAnsweringEnabled = false),
+                activeDialog = if (state.activeDialog == VoiceAnsweringOffline) null else state.activeDialog,
+            )
+        }
     }
 
     /**
@@ -301,10 +321,22 @@ class PreviewStudySessionViewModel @Inject constructor(
      */
     private fun onDialogConfirm() {
         val dialog = _state.value.activeDialog ?: return
-        if (dialog == VoiceAnsweringInfo) {
-            markVoiceAnsweringInfoSeen()
-            onStartSession()
-            return
+        when {
+            dialog == VoiceAnsweringInfo -> {
+                markVoiceAnsweringInfoSeen()
+                onStartSession()
+                return
+            }
+            dialog == VoiceAnsweringOffline -> {
+                _state.update { it.copy(activeDialog = null) }
+                onStartSession()
+                return
+            }
+            dialog.turnsOnVoiceAnsweringWithoutPremium() -> {
+                _state.update { it.copy(activeDialog = null) }
+                _messages.tryEmit(PreviewStudySessionMessage.PremiumFeatureComingSoon)
+                return
+            }
         }
         val updatedConfig = _state.value.config.foldInDialog(dialog)
         dialog.toStudySessionPreferenceIfKept()?.let { preference ->
@@ -316,6 +348,14 @@ class PreviewStudySessionViewModel @Inject constructor(
         _state.update { it.copy(config = updatedConfig, activeDialog = null) }
         resolveSelectedCards(dialog)
     }
+
+    /**
+     * Turning voice answering on while known not Premium closes the dialog, leaves the session
+     * manual and says the feature is coming soon. An unknown Premium lets it through; Start asks the
+     * server.
+     */
+    private fun PreviewDialog.turnsOnVoiceAnsweringWithoutPremium(): Boolean =
+        this is RatedSessionVoiceAnswering && draftState && _state.value.isPremium == false
 
     /**
      * Sort is the one dialog that never needs a redraw: it reorders the already-drawn set (see
@@ -371,8 +411,10 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * A Rated session with voice answering only leaves this screen with the microphone granted —
-     * anything else keeps the user here with voice answering still selected.
+     * A Rated session with voice answering only leaves this screen online, with Premium confirmed
+     * by the server and the microphone granted, in that order, so no one is asked for the
+     * microphone for a session they can't start. Anything else keeps the user here with voice
+     * answering still selected.
      *
      * Ignored while a draw runs: [selectedCardIds] hasn't caught up with the latest edit yet, and
      * the button stays enabled so a draw served from cache doesn't blink it.
@@ -380,9 +422,38 @@ class PreviewStudySessionViewModel @Inject constructor(
     fun onStartSession() {
         if (selectedCardIds.isEmpty() || sessionStartJob?.isActive == true || _state.value.isLoading) return
         sessionStartJob = viewModelScope.launch {
-            if (_state.value.isMicPermissionNeeded && !ensureMicPermission()) return@launch
+            if (_state.value.isMicPermissionNeeded) {
+                if (!ensurePremium()) return@launch
+                if (!ensureMicPermission()) return@launch
+            }
             eventChannel.send(_state.value.toSessionDestination(categoryId = route.categoryId, cardIds = selectedCardIds))
         }
+    }
+
+    /**
+     * Asks the server, never the followed value, which may be stale or unknown. Offline or unreachable
+     * opens the offline dialog; not Premium turns voice answering off for this session and says the
+     * feature is coming soon.
+     */
+    private suspend fun ensurePremium(): Boolean {
+        if (!_state.value.isOnline) {
+            _state.update { it.copy(activeDialog = VoiceAnsweringOffline) }
+            return false
+        }
+        _state.update { it.copy(isCheckingPremium = true) }
+        val result = fetchPremium()
+        val isPremium = result.getOrDefault(false)
+        val revertsToManual = result.isSuccess && !isPremium
+        _state.update { state ->
+            state.copy(
+                isCheckingPremium = false,
+                isPremium = result.getOrNull() ?: state.isPremium,
+                config = if (revertsToManual) state.config.copy(voiceAnsweringEnabled = false) else state.config,
+                activeDialog = if (result.isFailure) VoiceAnsweringOffline else state.activeDialog,
+            )
+        }
+        if (revertsToManual) _messages.tryEmit(PreviewStudySessionMessage.PremiumFeatureComingSoon)
+        return isPremium
     }
 
     /**

@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.media.AudioDeviceInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rossomak.flashcards.core.domain.usecase.CheckVoiceGradingEntitlementUseCase
 import com.rossomak.flashcards.core.domain.usecase.TranscribeAndSanitizeUseCase
 import com.rossomak.flashcards.core.ui.composables.voice.stateInVoiceBarsLevels
 import com.rossomak.flashcards.core.voice.AudioRouteManager
@@ -30,7 +29,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 /**
  * Debug-only harness exposing every voice pipeline stage as an independently testable block
@@ -40,7 +38,6 @@ import org.json.JSONObject
 @HiltViewModel
 class VoiceDebugViewModel @Inject constructor(
     private val transcribeAndSanitize: TranscribeAndSanitizeUseCase,
-    private val checkVoiceGradingEntitlement: CheckVoiceGradingEntitlementUseCase,
     private val voiceCaptureEngine: VoiceCaptureEngine,
     private val audioRouteManager: AudioRouteManager,
     private val voiceActivityDetector: SileroVoiceActivityDetector,
@@ -215,26 +212,6 @@ class VoiceDebugViewModel @Inject constructor(
                     }
             } finally {
                 _state.update { it.copy(isTranscribing = false) }
-            }
-        }
-    }
-
-    fun onCheckEntitlement() {
-        if (_state.value.isCheckingEntitlement) return
-        _state.update { it.copy(isCheckingEntitlement = true) }
-        viewModelScope.launch {
-            try {
-                checkVoiceGradingEntitlement()
-                    .onSuccess { isPremium ->
-                        _state.update {
-                            it.copy(entitlementResult = JSONObject().put("is_premium", isPremium).toString())
-                        }
-                    }
-                    .onFailure { error ->
-                        _state.update { it.copy(entitlementResult = "ERROR: ${error.message}") }
-                    }
-            } finally {
-                _state.update { it.copy(isCheckingEntitlement = false) }
             }
         }
     }

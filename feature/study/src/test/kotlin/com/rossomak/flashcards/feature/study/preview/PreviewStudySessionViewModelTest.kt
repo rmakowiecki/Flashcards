@@ -20,14 +20,19 @@ import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.VoiceLabel
 import com.rossomak.flashcards.core.domain.model.VoiceSettings as SavedVoiceSettings
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeNetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
+import com.rossomak.flashcards.core.domain.repository.FakePremiumRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
+import com.rossomak.flashcards.core.domain.usecase.FetchPremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -55,6 +60,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringOffline
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -90,6 +96,8 @@ class PreviewStudySessionViewModelTest {
     private val studySessionPreferencesRepository = FakeStudySessionPreferencesRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val permissionGateway = FakePermissionGateway()
+    private val premiumRepository = FakePremiumRepository()
+    private val networkAvailabilityGateway = FakeNetworkAvailabilityGateway()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     /** Anything but [StudySessionConfig.DEFAULT_RATED_ATTEMPTS], so a commit is visible. */
@@ -188,6 +196,9 @@ class PreviewStudySessionViewModelTest {
         SaveUserPreferenceUseCase(userPreferencesRepository),
         ObservePermissionStatusUseCase(permissionGateway),
         RequestPermissionUseCase(permissionGateway),
+        ObservePremiumUseCase(premiumRepository),
+        FetchPremiumUseCase(premiumRepository),
+        ObserveInternetAvailabilityUseCase(networkAvailabilityGateway),
         voiceSettingsController,
     )
 
@@ -1963,6 +1974,166 @@ class PreviewStudySessionViewModelTest {
 
             studySessionPreferencesRepository.preferences.value.voiceAnsweringEnabled shouldBe true
             viewModel.state.value.isMicPermissionRejected shouldBe true
+        }
+
+    @Test
+    fun `Start with voice answering while offline opens the offline dialog and neither checks Premium nor navigates`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            networkAvailabilityGateway.internetAvailable.value = false
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.state.value.isVoiceAnsweringOffline shouldBe true
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe VoiceAnsweringOffline
+            premiumRepository.fetchCallCount shouldBe 0
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Try again on the offline dialog starts once the connection is back`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            networkAvailabilityGateway.internetAvailable.value = false
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            networkAvailabilityGateway.internetAvailable.value = true
+            advanceUntilIdle()
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
+        }
+
+    @Test
+    fun `dismissing the offline dialog keeps voice answering on`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            networkAvailabilityGateway.internetAvailable.value = false
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.onDialogEvent(Dismiss)
+
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe true
+        }
+
+    @Test
+    fun `a failed Premium check opens the offline dialog`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            premiumRepository.fetchResult = Result.failure(IllegalStateException("unreachable"))
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe VoiceAnsweringOffline
+            viewModel.state.value.isCheckingPremium shouldBe false
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Start with voice answering when not Premium turns it off with a coming soon message before any microphone prompt`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            premiumRepository.fetchResult = Result.success(false)
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.messages.test {
+                viewModel.onStartSession()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe PreviewStudySessionMessage.PremiumFeatureComingSoon
+            }
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe false
+            viewModel.state.value.isPremium shouldBe false
+            studySessionPreferencesRepository.preferences.value.voiceAnsweringEnabled shouldBe true
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `Start checks Premium with the server even when the followed value says Premium`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            premiumRepository.premium.value = true
+            premiumRepository.fetchResult = Result.success(false)
+            val viewModel = createVoiceAnsweringViewModel()
+
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            premiumRepository.fetchCallCount shouldBe 1
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe false
+        }
+
+    @Test
+    fun `turning voice answering on when known not Premium closes the dialog, says coming soon and changes nothing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            premiumRepository.premium.value = false
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = true, keepAsDefault = true)))
+                viewModel.onDialogEvent(Confirm)
+                advanceUntilIdle()
+
+                awaitItem() shouldBe PreviewStudySessionMessage.PremiumFeatureComingSoon
+            }
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe false
+            studySessionPreferencesRepository.preferences.value.voiceAnsweringEnabled shouldBe false
+        }
+
+    @Test
+    fun `turning voice answering on while Premium is unknown applies it and leaves the check to Start`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            premiumRepository.premium.value = null
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.onDialogEvent(Open(RatedSessionVoiceAnswering(draftState = true)))
+            viewModel.onDialogEvent(Confirm)
+            advanceUntilIdle()
+
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.config.voiceAnsweringEnabled shouldBe true
+        }
+
+    @Test
+    fun `Start without voice answering needs neither a connection nor Premium`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            networkAvailabilityGateway.internetAvailable.value = false
+            premiumRepository.fetchResult = Result.success(false)
+            stubRoute(singleSubcategoryRoute)
+            flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.isVoiceAnsweringOffline shouldBe false
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            premiumRepository.fetchCallCount shouldBe 0
+            viewModel.events.test {
+                awaitItem() as PreviewStudySessionDestination.RatedStudySession
+            }
         }
 
     private companion object {

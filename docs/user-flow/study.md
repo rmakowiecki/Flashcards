@@ -88,7 +88,16 @@ flowchart TD
     ModeChoice -->|Rated| RatedDelivery{Voice answering?}
     ModeChoice -->|Fast| FastDelivery{Read aloud?}
     RatedDelivery -->|off| RatedManual
-    RatedDelivery -->|on| RatedVoice
+    RatedDelivery -->|on| VoiceOnline{Online?}
+    VoiceOnline -->|no| NoConnection[No-connection dialog\nTry again · Switch to manual]
+    NoConnection -->|Try again| VoiceOnline
+    NoConnection -->|Switch to manual| PreviewStudySession
+    VoiceOnline -->|yes| VoicePremium{Premium?\nasked from the server}
+    VoicePremium -->|can't reach the server| NoConnection
+    VoicePremium -->|no| ComingSoon[Voice off for this session\nSnackbar: premium feature, coming soon]
+    ComingSoon --> PreviewStudySession
+    VoicePremium -->|yes| MicHandshake[/Privacy notice once · microphone request/]
+    MicHandshake -->|granted| RatedVoice
     FastDelivery -->|off| FastManual
     FastDelivery -->|on| FastReadAloud
 

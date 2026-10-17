@@ -16,8 +16,7 @@ Voice grading costs money on every answer, for transcription and two model calls
 ## Open questions
 
 - Which Play subscription products grant the entitlement.
-- Whether the app should check entitlement before offering Voice Answering on the Preview Study Session Screen, and what it shows a User without it. Today it offers it to everyone, and every answer from a User without entitlement fails.
-- How a User who loses entitlement mid-session is treated.
+- Where a User who is not Premium can buy Premium, and how buying it updates the record the app follows.
 
 ## Related
 

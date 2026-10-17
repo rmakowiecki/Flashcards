@@ -31,11 +31,4 @@ interface VoiceAnswerGradingRepository {
      * so the grade step is skipped server-side (ADR-0029 §3–4).
      */
     suspend fun transcribeAndSanitize(obfuscatedAnswerWav: ByteArray): Result<String>
-
-    /**
-     * Asks the backend whether the current user holds a premium entitlement. The check itself
-     * is server-side per request; this only surfaces the verdict (used by the debug screen's
-     * entitlement test block).
-     */
-    suspend fun checkEntitlement(): Result<Boolean>
 }
