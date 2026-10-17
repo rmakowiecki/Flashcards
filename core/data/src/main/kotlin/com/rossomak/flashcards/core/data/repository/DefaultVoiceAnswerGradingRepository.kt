@@ -108,16 +108,6 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
             }
         }
 
-    override suspend fun checkEntitlement(): Result<Boolean> = withContext(ioDispatcher) {
-        try {
-            Result.success(voiceGradingRemoteDataSource.checkEntitlement().isPremium)
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: Exception) {
-            Result.failure(exception)
-        }
-    }
-
     companion object {
         /** How long the whole streamed call may take before it fails as [GradingFailureReason.NoConnection]. */
         val GRADING_TIME_BUDGET: Duration = 20.seconds

@@ -57,7 +57,4 @@
     <string name="voice_debug_transcription_send_button">Transcribe captured clip</string>
     <string name="voice_debug_transcription_running_label">Transcribing…</string>
 
-    <string name="voice_debug_entitlement_title">5. Entitlement check test</string>
-    <string name="voice_debug_entitlement_check_button">Check entitlement</string>
-    <string name="voice_debug_entitlement_checking_label">Checking…</string>
 </resources>

@@ -76,6 +76,8 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.FlashcardsRevealContent
+import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
+import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
@@ -85,6 +87,7 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.icon
 import com.rossomak.flashcards.core.ui.composables.rememberFlashcardsBottomSheetState
+import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Dismiss
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.EmphasizedSpanStyle
@@ -94,6 +97,7 @@ import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.PremiumOffer
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
@@ -214,6 +218,7 @@ fun PreviewStudySessionContent(
     PreviewDialogHost(
         activeDialog = state.activeDialog,
         onDialogEvent = onDialogEvent,
+        onSwitchToManualAnswering = onSwitchToManualAnswering,
     )
 
     var settingsSheetOpen by rememberSaveable { mutableStateOf(initiallySettingsSheetOpen) }
@@ -332,6 +337,13 @@ fun PreviewStudySessionContent(
                 onDialogEvent = onDialogEvent,
             )
         }
+        // After the settings sheet, so it docks over it when opened from the voice answering row.
+        if (state.activeDialog == PremiumOffer) {
+            PremiumOfferSheet(
+                onSwitchToManualAnswering = onSwitchToManualAnswering,
+                onDismiss = { onDialogEvent(Dismiss) },
+            )
+        }
     }
 }
 
@@ -419,6 +431,17 @@ private fun ReadyContent(
             }
         }
         Spacer(modifier = Modifier.weight(1f))
+        if (state.isVoiceAnsweringOffline) {
+            FlashcardsInfoBanner(
+                text = stringResource(R.string.preview_session_voice_offline_hint_message),
+                icon = Icons.Default.CloudOff,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = MaterialTheme.spacing.small),
+                tone = FlashcardsInfoBannerTone.Warning,
+                style = OnGradient,
+            )
+        }
         HeroActions(
             state = state,
             settingsSheetOpen = settingsSheetOpen,
@@ -747,7 +770,8 @@ private fun StartSessionButton(
     FlashcardsFilledButton(
         text = stringResource(CoreUiR.string.common_start_session_button),
         onClick = onStartSession,
-        enabled = state.canStart,
+        // Disabled while Start waits on the server's Premium answer, so it reads as busy.
+        enabled = state.canStart && !state.isCheckingPremium,
         icon = Icons.Default.PlayArrow,
         style = OnGradient,
         modifier = modifier,

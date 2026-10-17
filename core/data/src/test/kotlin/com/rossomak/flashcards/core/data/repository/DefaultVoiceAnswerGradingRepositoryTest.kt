@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.core.data.repository
 
 import app.cash.turbine.test
-import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import com.rossomak.flashcards.core.data.source.VoiceGradingRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
@@ -150,27 +149,5 @@ class DefaultVoiceAnswerGradingRepositoryTest {
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { voiceGradingRemoteDataSource.transcribeAndSanitize(wavBytes) }
-    }
-
-    @Test
-    fun `checkEntitlement returns the premium verdict`() = runTest {
-        coEvery { voiceGradingRemoteDataSource.checkEntitlement() } returns EntitlementDto(isPremium = true)
-
-        val result = createRepository().checkEntitlement()
-
-        result.getOrThrow() shouldBe true
-        coVerify(exactly = 1) { voiceGradingRemoteDataSource.checkEntitlement() }
-    }
-
-    @Test
-    fun `checkEntitlement wraps api failure in failure result`() = runTest {
-        val error = IllegalStateException("boom")
-        coEvery { voiceGradingRemoteDataSource.checkEntitlement() } throws error
-
-        val result = createRepository().checkEntitlement()
-
-        result.isFailure shouldBe true
-        result.exceptionOrNull() shouldBe error
-        coVerify(exactly = 1) { voiceGradingRemoteDataSource.checkEntitlement() }
     }
 }

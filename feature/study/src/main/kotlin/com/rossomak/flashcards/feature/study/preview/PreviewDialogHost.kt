@@ -1,11 +1,14 @@
 package com.rossomak.flashcards.feature.study.preview
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig.Companion.LENGTH_STEP
 import com.rossomak.flashcards.core.domain.model.StudySessionConfig.Companion.RATED_ATTEMPTS_STEP
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFiltersDialog
+import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsDecisionDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardSortOrderDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.composables.dialogs.PartialRatingCardRequeueingDialog
@@ -22,6 +25,7 @@ import com.rossomak.flashcards.core.ui.dialog.DialogEvent.DraftChange
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.PremiumOffer
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
@@ -31,6 +35,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringOffline
 
 private val SESSION_CARD_COUNT_RANGE = StudySessionConfig.MIN_LENGTH..StudySessionConfig.MAX_LENGTH
 private val RATED_ATTEMPTS_RANGE = StudySessionConfig.MIN_RATED_ATTEMPTS..StudySessionConfig.MAX_RATED_ATTEMPTS
@@ -38,11 +43,13 @@ private val SUBCATEGORY_COUNT_RANGE =
     StudySessionConfig.MIN_SUBCATEGORY_COUNT..StudySessionConfig.MAX_SUBCATEGORY_COUNT
 private val DIFFICULTY_RANGE = StudySessionConfig.MIN_DIFFICULTY..StudySessionConfig.MAX_DIFFICULTY
 
+/** [PremiumOffer] is a sheet, not a dialog, so the screen docks it and this host draws nothing for it. */
 @Suppress("LongMethod")
 @Composable
 internal fun PreviewDialogHost(
     activeDialog: PreviewDialog?,
     onDialogEvent: (PreviewDialogEvent) -> Unit,
+    onSwitchToManualAnswering: () -> Unit,
 ) {
     val onConfirm = { onDialogEvent(Confirm) }
     val onDismiss = { onDialogEvent(Dismiss) }
@@ -149,5 +156,17 @@ internal fun PreviewDialogHost(
             supportingText = stringResource(R.string.preview_session_voice_answering_info_message),
             actionLabel = stringResource(R.string.preview_session_voice_answering_info_ok_button),
         )
+        VoiceAnsweringOffline -> FlashcardsDecisionDialog(
+            title = stringResource(R.string.preview_session_voice_offline_title),
+            confirmLabel = stringResource(R.string.preview_session_voice_offline_try_again_button),
+            onConfirm = onConfirm,
+            onCancel = onSwitchToManualAnswering,
+            icon = Icons.Default.CloudOff,
+            supportingText = stringResource(R.string.preview_session_voice_offline_message),
+            cancelLabel = stringResource(R.string.preview_session_voice_offline_switch_to_manual_button),
+            // Back closes the dialog and keeps voice answering on.
+            onDismissRequest = onDismiss,
+        )
+        PremiumOffer -> Unit
     }
 }

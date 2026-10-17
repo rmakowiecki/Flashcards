@@ -15,6 +15,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionPreference.VoicePla
 import com.rossomak.flashcards.core.ui.voice.toVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.Filters
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.PremiumOffer
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionMaxCardAttempts
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionPartialRatingCardRequeueing
@@ -24,6 +25,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringOffline
 
 /**
  * Pure [StudySessionConfig]/[PreviewDialog] mapping helpers pulled out of
@@ -50,7 +52,7 @@ internal fun StudySessionConfig.foldInDialog(dialog: PreviewDialog): StudySessio
         tagIds = dialog.draftState.selectedTags,
         difficultyRange = dialog.draftState.difficultyRange,
     )
-    VoiceAnsweringInfo -> this
+    VoiceAnsweringInfo, PremiumOffer, VoiceAnsweringOffline -> this
 }
 
 /**
@@ -78,7 +80,7 @@ internal fun PreviewDialog.toStudySessionPreferenceIfKept(): StudySessionPrefere
     is SessionCardsSortingOrder -> SortOrder(draftState).takeIf { keepAsDefault }
     is QuickSessionSubcategoryCountRange -> SubcategoryCountRangePreference(draftState).takeIf { keepAsDefault }
     is SessionVoiceSettings -> VoicePlayback(draftState.toVoiceSettings()).takeIf { keepAsDefault }
-    is Filters, VoiceAnsweringInfo -> null
+    is Filters, VoiceAnsweringInfo, PremiumOffer, VoiceAnsweringOffline -> null
 }
 
 /**

@@ -164,6 +164,10 @@ _Avoid_: Category search, Topic search (Subcategory is the canonical term outsid
 A full-screen preview shown before every Study Session begins. A read-only hero shows session scope (card count, topic count, estimated duration) and the Study Mode and delivery as tappable badges. The adjustable session settings live in a settings sheet, hidden until opened, as summary rows that each show their current value and open a focused **dialog**. There is a Start session button, and a Reshuffle button for Quick sessions only. Only place in the app where Study Mode (and, up front, Voice answering) is chosen for a concrete session — onboarding and the Settings screen only set the persisted default, they don't start a session. Each Preview setting popup (except Filters) also carries a "keep as default" checkbox to update that persisted default from here. It also owns the microphone handshake for Voice Answering, on the Start tap; the Study Mode and Voice answering choice never change on their own ([docs/design/preview-study-session.md](docs/design/preview-study-session.md)).
 _Avoid_: Pre-start Screen (retired name), Pre-session screen, Session config, Mode picker
 
+**Premium offer**:
+The bottom sheet the Preview Study Session Screen shows when a User who is not Premium tries to use **Voice Answering**: on Start, or when turning it on. It explains the feature is Premium and offers switching the session to manual rating. Part of the path to buying Premium; it gains an Upgrade action once there is a screen to buy it on.
+_Avoid_: Paywall, Upsell, Premium dialog
+
 **Persistent Mastery**:
 The set of Flashcards a User currently holds mastery on: those whose **Card Progress** state is `Mastered`. Mastery is removed (de-mastered) when a Flashcard reaches a **Failed** Terminal State in a subsequent Rated Study Session — a **Partial** Terminal State leaves it intact. De-mastery moves the Card Progress state down; it never deletes the record, so the Flashcard stays **Studied**. Applies to global Flashcards only; Private Flashcards are excluded.
 _Avoid_: Permanent mastery, Long-term mastery, Mastered set
