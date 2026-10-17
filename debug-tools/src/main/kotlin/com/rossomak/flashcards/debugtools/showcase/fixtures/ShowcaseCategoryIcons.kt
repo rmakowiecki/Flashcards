@@ -44,3 +44,42 @@ internal val PYTHON_ICON_SVG: String = """
 """.trimIndent()
 
 internal const val PYTHON_COLOR = "#3776AB"
+
+internal val SWIFT_ICON_SVG: String = """
+    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"> <path d="M138.43,21.09c91.47,62.27 61.92,131.23
+    61.92,131.23s25.42,29.04 15.02,54.5c0,0 -10.82,-17.68 -28.44,-17.68 -17.67,0 -28.25,17.68 -62.69,17.68 -78.42,0 -114.24,-65.38 -114.24,-65.38
+    69.56,47.34 118.16,13.77 118.16,13.77C96.28,136.76 42.46,63.73 42.46,63.73c58.61,49.2 83.53,62.24 83.53,62.24 -14.73,-11.71 -56.68,-72.51
+    -56.68,-72.51 34.17,33.94 101.19,82.03 101.19,82.03 18.45,-53.35 -18.06,-100.39 -18.06,-100.39z" fill-rule="nonzero"/> </svg>
+""".trimIndent()
+
+internal const val SWIFT_COLOR = "#F05138"
+
+internal val APPLE_PLATFORMS_ICON_SVG: String = """
+    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"> <path d="M207.27,86.91C206.06,87.85 184.76,99.85
+    184.76,126.54C184.76,157.41 211.86,168.33 212.67,168.6C212.55,169.27 208.37,183.56 198.38,198.12C189.48,210.94 180.18,223.73
+    166.04,223.73C151.89,223.73 148.25,215.51 131.92,215.51C116.01,215.51 110.35,224 97.41,224C84.47,224 75.44,212.14 65.06,197.58C53.04,180.48
+    43.33,153.92 43.33,128.71C43.33,88.27 69.62,66.82 95.5,66.82C109.25,66.82 120.71,75.85 129.34,75.85C137.56,75.85 150.37,66.28
+    166.02,66.28C171.94,66.28 193.25,66.82 207.27,86.91L207.27,86.91ZM158.59,49.16C165.06,41.48 169.64,30.83 169.64,20.18C169.64,18.7
+    169.51,17.21 169.24,16C158.71,16.4 146.19,23.01 138.64,31.77C132.71,38.51 127.18,49.16 127.18,59.95C127.18,61.58 127.45,63.2
+    127.57,63.72C128.24,63.84 129.32,63.99 130.4,63.99C139.85,63.99 151.72,57.67 158.59,49.16Z"/> </svg>
+""".trimIndent()
+
+internal const val APPLE_PLATFORMS_COLOR = "#A2AAAD"
+
+internal val DATA_SCIENCE_PYTHON_ICON_SVG: String = """
+    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"> <path
+    d="M40,40L54,40L54,202L216,202L216,216L40,216ZM72,132L104,132L104,190L72,190ZM122,92L154,92L154,190L122,190ZM172,52L204,52L204,190L172,190Z"/>
+    </svg>
+""".trimIndent()
+
+internal const val DATA_SCIENCE_PYTHON_COLOR = "#4DABCF"
+
+internal val MACHINE_LEARNING_ICON_SVG: String = """
+    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"> <path
+    d="M60,64L128,96M60,64L128,160M60,128L128,96M60,128L128,160M60,192L128,96M60,192L128,160M128,96L196,64M128,96L196,128M128,96L196,192M128,160L196,64M128,160L196,128M128,160L196,192"
+    fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/> <circle cx="60" cy="64" r="16"/><circle cx="60" cy="128"
+    r="16"/><circle cx="60" cy="192" r="16"/><circle cx="128" cy="96" r="16"/><circle cx="128" cy="160" r="16"/><circle cx="196" cy="64"
+    r="16"/><circle cx="196" cy="128" r="16"/><circle cx="196" cy="192" r="16"/> </svg>
+""".trimIndent()
+
+internal const val MACHINE_LEARNING_COLOR = "#F5A623"

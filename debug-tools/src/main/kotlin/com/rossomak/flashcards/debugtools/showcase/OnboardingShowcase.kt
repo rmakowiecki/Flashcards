@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 private val favoriteOptions: ImmutableList<FavoriteSubcategoryOption> = with(ShowcaseTaxonomy) {
-    listOf(coroutines, flows, compose, navigation, asyncio, generators, caching, loadBalancing, kubernetes, docker)
+    listOf(coroutines, functions, compose, navigation, typingAndInterfaces, coreTypes, swiftConcurrency, memoryManagement, connectivity, testing)
         .map { subcategory ->
             FavoriteSubcategoryOption(
                 id = subcategory.id,
@@ -32,7 +32,7 @@ private val favoriteOptions: ImmutableList<FavoriteSubcategoryOption> = with(Sho
         .toImmutableList()
 }
 
-/** Alex mid-flow: microphone granted, so the voice test shows its normal card, and two Topics picked. */
+/** Ross mid-flow: microphone granted, so the voice test shows its normal card, and two Topics picked. */
 private val onboardingState = OnboardingScreenState(
     userName = ShowcaseUser.DISPLAY_NAME,
     favoriteSubcategories = FavoriteSubcategoriesState.Content(favoriteOptions),

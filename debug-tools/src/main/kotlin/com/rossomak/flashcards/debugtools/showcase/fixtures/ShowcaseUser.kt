@@ -7,13 +7,13 @@ import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardStat
 /** The made-up User every showcase screen belongs to. No photo, so the avatar shows initials. */
 internal object ShowcaseUser {
 
-    const val DISPLAY_NAME = "Alex"
+    const val DISPLAY_NAME = "Ross"
 
-    const val LEVEL = 12
+    const val LEVEL = 14
 
-    const val XP_INTO_LEVEL = 4_180L
+    const val XP_INTO_LEVEL = 14_080L
 
-    const val XP_FOR_NEXT_LEVEL = 9_500L
+    const val XP_FOR_NEXT_LEVEL = 32_000L
 
     const val CURRENT_STREAK = 6
 

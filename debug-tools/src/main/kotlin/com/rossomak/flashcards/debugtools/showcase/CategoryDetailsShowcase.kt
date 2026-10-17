@@ -18,7 +18,7 @@ private val categoryDetailsState = with(ShowcaseTaxonomy) {
 }
 
 private val selectionModeState = categoryDetailsState.copy(
-    selectedSubcategoryIds = setOf(ShowcaseTaxonomy.coroutines.id, ShowcaseTaxonomy.flows.id),
+    selectedSubcategoryIds = setOf(ShowcaseTaxonomy.coroutines.id, ShowcaseTaxonomy.functions.id),
 )
 
 /**

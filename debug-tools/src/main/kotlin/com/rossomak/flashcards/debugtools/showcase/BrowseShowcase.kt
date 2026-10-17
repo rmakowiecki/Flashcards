@@ -12,7 +12,11 @@ import com.rossomak.flashcards.feature.browse.BrowseScreenState
 import com.rossomak.flashcards.feature.browse.BrowseSearchActions
 import com.rossomak.flashcards.feature.browse.SearchStatus
 
-private const val SEARCH_QUERY = "co"
+private const val SEARCH_QUERY = "con"
+
+// Left out of the search results so the showcase reads cleanly: Apple Platforms entirely, and every Concurrency but Swift's.
+private val hiddenSearchCategoryIds = setOf("apple-platforms")
+private val hiddenSearchSubcategoryIds = setOf("android-concurrency", "python-concurrency")
 
 /**
  * The Category list, with search results already in place: the expanded bar shows them for whatever
@@ -28,16 +32,17 @@ private val browseState = BrowseScreenState(
 )
 
 /**
- * What a search for [SEARCH_QUERY] would return: every Topic whose name starts with it, then their parent
- * Categories, each with the matched Topics first in its chip line.
+ * What a search for [SEARCH_QUERY] returns, less the hidden Categories and Topics: every Topic whose name starts
+ * with it, alphabetically, then their parent Categories in stored order, each chip line led by its matched Topics,
+ * most cards first.
  */
 private fun searchResults(): CategorySearchResults = with(ShowcaseTaxonomy) {
     val matchedSubcategories = subcategoriesByCategoryId.values.flatten()
         .filter { it.name.startsWith(SEARCH_QUERY, ignoreCase = true) }
+        .filterNot { it.categoryId in hiddenSearchCategoryIds || it.id in hiddenSearchSubcategoryIds }
         .sortedBy { it.name }
-    val matchedCategories = matchedSubcategories.map { it.categoryId }.distinct().map { categoryId ->
-        val category = categoryById(categoryId)
-        val matchedNames = matchedSubcategories.filter { it.categoryId == categoryId }.map { it.name }
+    val matchedCategories = matchedSubcategories.map { categoryById(it.categoryId) }.distinct().sortedBy { it.order }.map { category ->
+        val matchedNames = matchedSubcategories.filter { it.categoryId == category.id }.sortedByDescending { it.cardCount }.map { it.name }
         CategoryWithSubcategorySummary(category, (matchedNames + category.featuredSubcategoryNames).distinct())
     }
     CategorySearchResults(

@@ -22,8 +22,8 @@ The list groups its rows by where each screen sits in the app: Onboarding, Home,
 
 Every entry shares one made-up User and one made-up taxonomy:
 
-- **The User** is Alex, with no photo, so the avatar shows initials, at a mid-curve Level with a Streak running.
-- **Categories** cover developer topics: Kotlin, Android, Python, System Design and DevOps, each with realistic Topics. Kotlin, Android and Python carry the real Categories' glyphs and colors. System Design has a color but no glyph, and DevOps has neither, so both fallbacks are on show ([category-icon-color.md](category-icon-color.md)).
+- **The User** is Ross, with no photo, so the avatar shows initials, at a mid-curve Level with a Streak running.
+- **Categories** are the real taxonomy: every seeded Category with all of its Topics, named, ordered and sized as the seed pipeline writes them, with the real glyphs and colors ([category-icon-color.md](category-icon-color.md)). The Study tab's search results show a search for "con", less Apple Platforms and every Concurrency Topic but Swift's.
 - **Flashcards** read like the real corpus: inline code, code blocks with real code, Difficulty across the range, and Extended Context on the harder cards.
 - **Progress, Favorites and Recents** are filled in, so rings, bookmark badges, the Favorites carousel and the Recently studied list all show content. Recents are timed relative to when the entry opens.
 
@@ -54,6 +54,6 @@ The showcase adds nothing to production screens. Its only change there is visibi
 - [navigation.md](navigation.md): the tab shell the showcase stays out of, and the debug hub.
 - [onboarding-flow.md](onboarding-flow.md), [home.md](home.md), [browse.md](browse.md), [category-search.md](category-search.md): the onboarding, Home and Browse screens shown.
 - [preview-study-session.md](preview-study-session.md), [rated-mode.md](rated-mode.md), [fast-mode.md](fast-mode.md), [study-session.md](study-session.md), [session-summary.md](session-summary.md): the session screens shown.
-- [category-icon-color.md](category-icon-color.md): the glyph and color fallbacks the sample Categories show.
+- [category-icon-color.md](category-icon-color.md): the glyphs and colors the sample Categories carry.
 - [ADR-0011](../adr/0011-multi-module-architecture.md): `:debug-tools` as an aggregator beside `:app`.
 - [ADR-0067](../adr/0067-destinations-navigate-only-from-their-own-back-stack-entry.md): how the showcase's own screens navigate.

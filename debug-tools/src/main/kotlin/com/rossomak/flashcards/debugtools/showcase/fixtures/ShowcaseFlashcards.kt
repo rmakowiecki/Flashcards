@@ -171,62 +171,6 @@ internal object ShowcaseFlashcards {
         ),
     )
 
-    val python: List<Flashcard> = listOf(
-        card(
-            id = "python-gather",
-            subcategory = ShowcaseTaxonomy.asyncio,
-            tags = listOf("Concurrency"),
-            difficulty = 4,
-            question = "How do you run several coroutines concurrently in `asyncio` and collect their results?",
-            answer = "Pass them to `asyncio.gather`, which runs them concurrently and returns their results in the order given.",
-            answerCode = listOf(
-                CodeBlock(
-                    language = "python",
-                    code = """
-                        async def load_all(ids):
-                            return await asyncio.gather(*(fetch(i) for i in ids))
-                    """.trimIndent(),
-                ),
-            ),
-        ),
-    )
-
-    val systemDesign: List<Flashcard> = listOf(
-        card(
-            id = "system-design-cache-aside",
-            subcategory = ShowcaseTaxonomy.caching,
-            tags = listOf("Patterns"),
-            difficulty = 5,
-            question = "How does a cache-aside read work, and what happens on a cache miss?",
-            answer = "The application reads the cache first. On a miss it reads the database, writes the value into the " +
-                "cache with a TTL and returns it. The cache never talks to the database itself.",
-        ),
-    )
-
-    val devOps: List<Flashcard> = listOf(
-        card(
-            id = "devops-readiness-probe",
-            subcategory = ShowcaseTaxonomy.kubernetes,
-            tags = listOf("Health checks"),
-            difficulty = 5,
-            question = "What is the difference between a Kubernetes liveness probe and a readiness probe?",
-            answer = "A failing liveness probe restarts the container. A failing readiness probe only removes the pod " +
-                "from its Service's endpoints until it passes again.",
-            answerCode = listOf(
-                CodeBlock(
-                    language = "yaml",
-                    code = """
-                        readinessProbe:
-                          httpGet:
-                            path: /ready
-                            port: 8080
-                          periodSeconds: 5
-                    """.trimIndent(),
-                ),
-            ),
-        ),
-    )
-
     private fun kotlin(code: String): List<CodeBlock> = listOf(CodeBlock(language = "kotlin", code = code.trimIndent()))
 
     @Suppress("LongParameterList") // mirrors the Flashcard constructor, with defaults for the optional parts

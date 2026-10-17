@@ -15,7 +15,7 @@ private const val SESSION_ESTIMATED_MINUTES = 14
 
 /** A Quick Session in Android, drawn and ready: Rated with Voice Answering, microphone already granted. */
 private val previewState = with(ShowcaseTaxonomy) {
-    val sampledSubcategories = listOf(compose, navigation, lifecycle)
+    val sampledSubcategories = listOf(compose, navigation, backgroundWork)
     PreviewStudySessionScreenState(
         categoryName = android.name,
         categoryIconSvg = android.iconSvg,

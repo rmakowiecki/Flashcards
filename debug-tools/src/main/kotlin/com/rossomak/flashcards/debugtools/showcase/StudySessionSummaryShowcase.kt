@@ -23,7 +23,7 @@ private val xpLines = listOf(
 )
 
 /**
- * A finished Rated session that carried Alex into the Level the showcase User holds. Scored on the first
+ * A finished Rated session that carried Ross into the Level the showcase User holds. Scored on the first
  * composition, so the Summary treats it as restored and shows its settled screen without the sequence.
  */
 private val summaryState = StudySessionSummaryScreenState(
@@ -40,8 +40,8 @@ private val summaryState = StudySessionSummaryScreenState(
     xpForNextLevel = ShowcaseUser.XP_FOR_NEXT_LEVEL,
     levelsCrossed = listOf(ShowcaseUser.LEVEL),
     levelBefore = ShowcaseUser.LEVEL - 1,
-    xpIntoCurrentLevelBefore = 7_600,
-    xpForNextLevelBefore = 8_800,
+    xpIntoCurrentLevelBefore = 26_400,
+    xpForNextLevelBefore = 28_000,
     currentStreak = ShowcaseUser.CURRENT_STREAK,
     hasAuthUserResolved = true,
     displayName = ShowcaseUser.DISPLAY_NAME,
