@@ -11,6 +11,7 @@ const FIELD_SOURCE = "source";
 const FIELD_GRANTED_AT = "grantedAt";
 const SOURCE_AUTO_GRANT = "auto-grant";
 const ALREADY_EXISTS_CODE = 6;
+const USER_NOT_FOUND_CODE = "auth/user-not-found";
 
 function entitlementDocument(firestore: Firestore, uid: string) {
   return firestore.collection(USERS_COLLECTION).doc(uid).collection(ENTITLEMENT_COLLECTION).doc(ENTITLEMENT_DOCUMENT);
@@ -33,8 +34,9 @@ export async function isPremiumUser(firestore: Firestore, uid: string): Promise<
  * A Guest is refused whatever its record says: the auto-grant gives every new Auth user Premium, a
  * Guest included, so the grant survives the Guest linking Google or GitHub, which creates no new Auth
  * user (ADR-0069). The provider is read from the Auth user record, not the ID token, so a token minted
- * before the Guest linked cannot misreport it. A Guest's user record has no provider data. Every
- * refusal is `permission-denied`.
+ * before the Guest linked cannot misreport it. A Guest's user record has no provider data. A caller
+ * whose session is no longer active is refused as `unauthenticated` (`requireActiveUser`); the Guest
+ * and Premium refusals are `permission-denied`.
  */
 export async function requirePremiumCaller(auth: Auth, firestore: Firestore, request: Pick<CallableRequest<unknown>, "auth">): Promise<string> {
   const user = await requireActiveUser(auth, request);
@@ -47,11 +49,26 @@ export async function requirePremiumCaller(auth: Auth, firestore: Firestore, req
   return user.uid;
 }
 
+/** Whether `uid` still has an Auth user. */
+async function authUserExists(auth: Auth, uid: string): Promise<boolean> {
+  return auth.getUser(uid).then(
+    () => true,
+    (error: unknown) => {
+      if ((error as { code?: string }).code === USER_NOT_FOUND_CODE) return false;
+      throw error;
+    },
+  );
+}
+
 /**
  * The temporary auto-grant (ADR-0069): gives a newly created Auth user Premium. Creates the record only
  * when none exists, so a record an admin already wrote is never overwritten. Safe to run twice.
+ *
+ * Skips a user whose Auth user is already gone: the trigger runs in the background and is retried on
+ * failure, so it can run after Account Deletion, which must leave nothing under `users/{uid}`.
  */
-export async function grantPremiumToNewUser(firestore: Firestore, uid: string): Promise<void> {
+export async function grantPremiumToNewUser(auth: Auth, firestore: Firestore, uid: string): Promise<void> {
+  if (!(await authUserExists(auth, uid))) return;
   try {
     await entitlementDocument(firestore, uid).create({
       [FIELD_IS_PREMIUM]: true,

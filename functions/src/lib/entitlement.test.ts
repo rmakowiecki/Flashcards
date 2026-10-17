@@ -42,7 +42,7 @@ describe("grantPremiumToNewUser", () => {
   it("grants Premium to a user with no record", async () => {
     const uid = await createGoogleUser();
 
-    await grantPremiumToNewUser(admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
 
     const record = await entitlementRecord(uid).get();
     assert.equal(record.get("isPremium"), true);
@@ -53,7 +53,7 @@ describe("grantPremiumToNewUser", () => {
     const uid = await createGoogleUser();
     await entitlementRecord(uid).set({ isPremium: false, source: "admin" });
 
-    await grantPremiumToNewUser(admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
 
     const record = await entitlementRecord(uid).get();
     assert.equal(record.get("isPremium"), false);
@@ -63,31 +63,40 @@ describe("grantPremiumToNewUser", () => {
   it("is safe to run twice", async () => {
     const uid = await createGoogleUser();
 
-    await grantPremiumToNewUser(admin.firestore(), uid);
-    await grantPremiumToNewUser(admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
 
     assert.equal(await isPremiumUser(admin.firestore(), uid), true);
+  });
+
+  it("writes nothing for a user deleted before the grant ran", async () => {
+    const uid = await createGoogleUser();
+    await admin.auth().deleteUser(uid);
+
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
+
+    assert.equal((await entitlementRecord(uid).get()).exists, false);
   });
 });
 
 describe("requirePremiumCaller", () => {
   it("returns the uid of a signed-in user whose record grants Premium", async () => {
     const uid = await createGoogleUser();
-    await grantPremiumToNewUser(admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
 
     assert.equal(await requirePremiumCaller(admin.auth(), admin.firestore(), requestFrom(uid)), uid);
   });
 
   it("refuses a Guest even when its record grants Premium", async () => {
     const uid = await createGuest();
-    await grantPremiumToNewUser(admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
 
     await assert.rejects(requirePremiumCaller(admin.auth(), admin.firestore(), requestFrom(uid)), { code: "permission-denied" });
   });
 
   it("accepts a Guest once it has linked Google, keeping the grant it got as a Guest", async () => {
     const uid = await createGuest();
-    await grantPremiumToNewUser(admin.firestore(), uid);
+    await grantPremiumToNewUser(admin.auth(), admin.firestore(), uid);
     await admin.auth().updateUser(uid, { providerToLink: { uid: `google-${uid}`, providerId: "google.com" } });
 
     assert.equal(await requirePremiumCaller(admin.auth(), admin.firestore(), requestFrom(uid)), uid);
