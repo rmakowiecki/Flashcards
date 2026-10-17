@@ -43,7 +43,7 @@ The adjustable settings live in a bottom sheet with no scrim, hidden when the sc
 | Row | Shown |
 |---|---|
 | Mode: Rated or Fast | always |
-| Voice answering | Rated |
+| Voice answering, marked Premium | Rated |
 | Attempts per card | Rated |
 | Partial re-queueing | Rated |
 | Read aloud | Fast |
@@ -55,7 +55,7 @@ The adjustable settings live in a bottom sheet with no scrim, hidden when the sc
 
 The Rated-only and Fast-only rows are not offered outside their mode, rather than offered and ignored ([ADR-0025](../adr/0025-voice-answering-rated-mode-only.md)). Switching to Fast turns Voice Answering off for the session. The Filters row summarizes the Tags (all, or how many) beside the Difficulty range.
 
-Confirming a dialog applies its value to this session; dismissing it discards the edit. Each dialog except Filters carries a **keep as default** checkbox that also saves the value as the user's default, the same value the Settings tab edits. Filters are always session-scoped: a Tag set belongs to one Subcategory and cannot carry to another. Each edit in the Voice dialog plays a sample, and dismissing the dialog stops it.
+Confirming a dialog applies its value to this session; dismissing it discards the edit. The one exception is turning Voice Answering on while the User is known not to be **Premium**: that opens the **Premium offer** instead (see [Premium and connection](#premium-and-connection)), and neither this session nor the saved default changes. Each dialog except Filters carries a **keep as default** checkbox that also saves the value as the user's default, the same value the Settings tab edits. Filters are always session-scoped: a Tag set belongs to one Subcategory and cannot carry to another. Each edit in the Voice dialog plays a sample, and dismissing the dialog stops it.
 
 What a confirm does to the drawn cards is in [flashcard-selection.md](flashcard-selection.md#when-the-draw-runs-again). A new topic count range takes effect at the next Reshuffle or the next time the screen opens, not on confirm, so confirming it never changes the Subcategories on screen ([ADR-0040](../adr/0040-quick-session-subcategory-sampling.md)).
 
@@ -66,9 +66,23 @@ What a confirm does to the drawn cards is in [flashcard-selection.md](flashcard-
 - **Empty draw**: the filters left no Flashcards. An empty state with **Reset filters** replaces the hero, restoring the filters the entry point sent. Start stays visible but disabled, and Reshuffle is hidden. The settings sheet stays reachable.
 - **Microphone blocked**: see below. An empty draw wins over it, since there is no session to fix the microphone for.
 
+While Voice Answering is on and the device has no internet connection, a warning above Start says Voice Answering needs one. It goes away as soon as the connection is back.
+
+## Premium and connection
+
+Voice Answering is a **Premium** feature, and it needs an internet connection, both to confirm Premium and to grade each answer. A Rated session with Voice Answering checks both on the Start tap, before anything about the microphone:
+
+1. With no connection, a dialog says so and offers **Try again**, which runs Start again, and **Switch to manual**. Back closes it and leaves Voice Answering on.
+2. Otherwise Start asks the server whether the User is Premium. It never relies on a cached answer, and Start is disabled until the answer arrives. If the server can't be reached, the same no-connection dialog opens.
+3. A User who is not Premium gets the **Premium offer**: a bottom sheet explaining that Voice Answering is a Premium feature, with **Switch to manual rating** and **Not now**. Not now, a swipe or back closes it and leaves Voice Answering on. It offers no way to buy Premium yet; an Upgrade action joins it once there is a screen for that.
+
+Switching to manual from either one turns Voice Answering off for this session only and leaves the saved default alone. It starts nothing: the user sees the change and taps Start. A manual Rated session and a Fast session need neither a connection nor Premium.
+
+The screen follows the User's Premium live while open, from their own read-only record ([ADR-0068](../adr/0068-client-observes-premium-from-the-entitlement-record.md)). That value only decides whether turning Voice Answering on opens the Premium offer straight away; while it is not known yet, the toggle goes through and Start decides. A Guest never reaches this screen, and the app reads a Guest as not Premium. The Settings tab, onboarding and a replay can still turn Voice Answering on as a default; the gate applies only at Start.
+
 ## Microphone
 
-A Rated session with Voice Answering needs the microphone, and this screen secures it on the Start tap, before the session opens:
+Once Premium and the connection are confirmed, a Rated session with Voice Answering needs the microphone, and this screen secures it on the Start tap, before the session opens:
 
 1. The first time ever, a privacy notice explains Voice Answering. Confirming it continues the Start; dismissing it does not, but either way it is not shown again.
 2. The system microphone request follows. When it is already granted, nothing is shown.
@@ -78,7 +92,7 @@ The microphone status is read again every time the screen resumes, so a change m
 
 ## Starting the session
 
-Start is enabled only when cards are drawn and no load has failed. It stays enabled during a redraw so a quick draw does not make it blink, but a tap while a draw runs does nothing. A second tap does nothing either, while the microphone request is open or once the session is opening, so coming back from a session never starts another one on its own. The confirmed Study Mode picks the destination: Rated and Fast each open their own session screen, carrying the drawn cards in Preview's order and only the settings that mode uses ([ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md)). The session's delivery is fixed from then on.
+Start is enabled only when cards are drawn and no load has failed. It stays enabled during a redraw so a quick draw does not make it blink, but a tap while a draw runs does nothing. A second tap does nothing either, while the Premium check or the microphone request is open or once the session is opening, so coming back from a session never starts another one on its own. The confirmed Study Mode picks the destination: Rated and Fast each open their own session screen, carrying the drawn cards in Preview's order and only the settings that mode uses ([ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md)). The session's delivery is fixed from then on.
 
 Preview stays on the back stack under the session. A session that ends with nothing Studied, or whose cards fail to load, returns here with the same draw and settings, so Start plays the same cards again unless the user changes something. A session that reaches the Summary removes itself and Preview from the back stack.
 

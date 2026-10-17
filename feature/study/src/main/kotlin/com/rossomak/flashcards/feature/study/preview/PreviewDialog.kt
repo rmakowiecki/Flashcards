@@ -48,4 +48,19 @@ sealed interface PreviewDialog {
      * nothing and it shows again next time. Never opened from a settings row.
      */
     data object VoiceAnsweringInfo : PreviewDialog
+
+    /**
+     * The Premium offer: Voice Answering is a Premium feature and this User isn't Premium. Opened by
+     * Start with voice answering on, or by turning voice answering on. Shown as a bottom sheet, not
+     * a dialog, and never opened from a settings row. Its only way forward today is switching this
+     * session to manual answering.
+     */
+    data object PremiumOffer : PreviewDialog
+
+    /**
+     * Start with voice answering on found no connection, or couldn't confirm Premium with the
+     * server. Confirm tries Start again; the other way out switches this session to manual
+     * answering. Never opened from a settings row.
+     */
+    data object VoiceAnsweringOffline : PreviewDialog
 }

@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -12,11 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsDifficultyRangePill
+import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.dialogs.partialRatingCardRequeueingLabel
@@ -97,7 +102,7 @@ private fun SessionSettingRows(
         if (state.config.mode == StudyMode.Rated) {
             FlashcardsSettingRow(
                 label = stringResource(R.string.preview_session_voice_answering_label),
-                valueText = voiceAnsweringLabel(state.config.voiceAnsweringEnabled),
+                value = { PremiumFeatureValue(valueText = voiceAnsweringLabel(state.config.voiceAnsweringEnabled)) },
                 onClick = {
                     onDialogEvent(
                         Open(RatedSessionVoiceAnswering(draftState = state.config.voiceAnsweringEnabled))
@@ -248,6 +253,28 @@ private fun FiltersSettingValue(state: PreviewStudySessionScreenState) {
         FlashcardsDifficultyRangePill(
             lowLevel = config.difficultyRange.first,
             highLevel = config.difficultyRange.last,
+        )
+    }
+}
+
+/** A Premium feature row's value: the Premium badge, then the value as the row would show it. */
+@Composable
+private fun PremiumFeatureValue(valueText: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FlashcardsMetadataBadge(
+            label = stringResource(R.string.preview_session_premium_badge_label),
+            icon = Icons.Default.WorkspacePremium,
+            size = FlashcardsComponentSize.Small,
+        )
+        Text(
+            text = valueText,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

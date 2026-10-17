@@ -80,7 +80,7 @@ Both model steps use Gemini on Vertex AI. The app maps the percentage to a Ratin
 
 The whole call runs within one time budget, with no retry, because a retry would upload the answer again inside the same budget. A call that runs out of time, or fails for lack of a connection, is a no-connection failure. The server gives up just before the app does, with its own error, so a slow service reads as a service problem. Every other failure, including a missing entitlement, is a service problem.
 
-Called without a question and an expected answer, the same function only transcribes and cleans. The debug build's voice tab uses this mode. That tab tests each stage separately: voice activity detection, raw capture, obfuscation, transcription, grading and the entitlement check.
+Called without a question and an expected answer, the same function only transcribes and cleans. The debug build's voice tab uses this mode. That tab tests each stage separately: voice activity detection, raw capture, obfuscation, transcription and grading.
 
 ## Entitlement
 
@@ -88,7 +88,7 @@ Voice Answering is a **Premium** feature. The server checks Premium on every cal
 
 For now every new account gets Premium as soon as it is created, Guests included, so a Guest keeps it after linking Google or GitHub ([ADR-0069](../adr/0069-premium-auto-granted-on-auth-user-creation.md)). Admins revoke or grant it by hand. Syncing it from purchases is planned ([planned/voice-answering.md](planned/voice-answering.md)).
 
-The app does not check entitlement before offering Voice Answering. A User without it can start a session, but every answer then fails as a service problem. Each failure re-inserts the card, and the third in a row pauses voice answering.
+The app checks Premium too, but only to decide what to offer: the Preview Study Session Screen asks the server on Start and shows the Premium offer to a User who is not Premium, or a no-connection dialog when it can't ask ([preview-study-session.md](preview-study-session.md#premium-and-connection)). A User who loses Premium mid-session is not told so: every answer then fails as a service problem, each failure re-inserts the card, and the third in a row pauses voice answering.
 
 ## Related
 

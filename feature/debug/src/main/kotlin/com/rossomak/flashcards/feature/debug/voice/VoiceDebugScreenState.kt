@@ -15,6 +15,4 @@ data class VoiceDebugScreenState(
     val hasRawClip: Boolean = false,
     val isTranscribing: Boolean = false,
     val transcriptionResult: String? = null,
-    val isCheckingEntitlement: Boolean = false,
-    val entitlementResult: String? = null,
 )

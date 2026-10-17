@@ -48,12 +48,17 @@ class DefaultSessionSubmissionRepositoryTest {
     private val drainScheduler: SessionSubmissionDrainScheduler = mockk()
     private val authRepository = FakeAuthRepository().apply { userToReturn = SIGNED_IN_USER }
     private var internetAvailable = true
+    private val networkAvailabilityGateway = object : NetworkAvailabilityGateway {
+        override fun isInternetAvailable(): Boolean = internetAvailable
+
+        override fun observeInternetAvailability(): Flow<Boolean> = flowOf(internetAvailable)
+    }
     private val drainWorkInfo = MutableStateFlow<WorkInfo?>(workInfo(WorkInfo.State.ENQUEUED))
 
     private fun createRepository(
         pendingLocalDataSource: PendingSessionSubmissionLocalDataSource = localDataSource,
     ): DefaultSessionSubmissionRepository =
-        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, NetworkAvailabilityGateway { internetAvailable })
+        DefaultSessionSubmissionRepository(pendingLocalDataSource, drainScheduler, authRepository, networkAvailabilityGateway)
 
     @Before
     fun setUp() {
