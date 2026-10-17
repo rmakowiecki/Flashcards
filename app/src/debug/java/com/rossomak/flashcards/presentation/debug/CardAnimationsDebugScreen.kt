@@ -152,8 +152,10 @@ private fun FastHarness(harness: CardAnimationsDebugHarness, isReadAloud: Boolea
         harness.onJumpHandled()
     }
 
+    // A reload asked for before this harness mounted is not this harness's to replay.
+    val mountedReloadRequest = remember { harness.reloadRequest }
     LaunchedEffect(harness.reloadRequest) {
-        if (harness.reloadRequest == 0) return@LaunchedEffect
+        if (harness.reloadRequest == mountedReloadRequest) return@LaunchedEffect
         state = state.copy(isLoading = true, currentCardIndex = 0, isAnswerRevealed = false, isVoicePlaying = false)
         delay(SIMULATED_LOADING_MS.milliseconds)
         state = state.copy(isLoading = false)

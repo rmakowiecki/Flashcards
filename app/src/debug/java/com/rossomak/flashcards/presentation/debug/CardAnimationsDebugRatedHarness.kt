@@ -16,6 +16,7 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionScreenState
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -31,16 +32,16 @@ internal fun RatedManualHarness(harness: CardAnimationsDebugHarness) {
     var ratingsByCardId by remember { mutableStateOf(emptyMap<String, List<FlashcardAttemptRating>>()) }
     val voiceBarsLevels = remember { MutableStateFlow<ImmutableList<Float>>(persistentListOf()) }
     val holdScope = rememberCoroutineScope()
-    var isHoldingRating by remember { mutableStateOf(false) }
+    var ratingHold by remember { mutableStateOf<Job?>(null) }
 
     fun restartFrom(index: Int) {
+        ratingHold?.cancel()
+        ratingHold = null
         ratingsByCardId = emptyMap()
         state = ratedStateFrom(debugCards.drop(index) + debugCards.take(index)).copy(activeDialog = state.activeDialog)
     }
 
     fun moveOn(card: Flashcard, rating: FlashcardAttemptRating, ratings: List<FlashcardAttemptRating>) {
-        // A jump or reload during the hold already replaced the deck.
-        if (state.currentCard?.id != card.id) return
         val isFinished = rating == FlashcardAttemptRating.Correct || ratings.size >= state.attemptsLimit
         val queue = state.flashcards.drop(1).toMutableList()
         if (!isFinished) {
@@ -62,14 +63,13 @@ internal fun RatedManualHarness(harness: CardAnimationsDebugHarness) {
     // Mirrors the session: the Rating shows on the card for the hold, then the queue moves on.
     fun rate(rating: FlashcardAttemptRating) {
         val card = state.currentCard ?: return
-        if (isHoldingRating) return
+        if (ratingHold != null) return
         val ratings = ratingsByCardId[card.id].orEmpty() + rating
         ratingsByCardId = ratingsByCardId + (card.id to ratings)
         state = state.copy(currentCardRatings = ratings)
-        isHoldingRating = true
-        holdScope.launch {
+        ratingHold = holdScope.launch {
             delay(MANUAL_RATING_HOLD)
-            isHoldingRating = false
+            ratingHold = null
             moveOn(card, rating, ratings)
         }
     }
@@ -85,8 +85,10 @@ internal fun RatedManualHarness(harness: CardAnimationsDebugHarness) {
         harness.onJumpHandled()
     }
 
+    // A reload asked for before this harness mounted is not this harness's to replay.
+    val mountedReloadRequest = remember { harness.reloadRequest }
     LaunchedEffect(harness.reloadRequest) {
-        if (harness.reloadRequest == 0) return@LaunchedEffect
+        if (harness.reloadRequest == mountedReloadRequest) return@LaunchedEffect
         restartFrom(0)
         state = state.copy(isLoading = true)
         delay(SIMULATED_LOADING_MS.milliseconds)
