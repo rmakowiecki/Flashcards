@@ -34,6 +34,9 @@ private const val BORDER_FADE_END_CELLS = 1.5f
 /** A frame gap longer than this (a pause, a page swipe) advances fades and drift by this much only. */
 private const val MAX_STEP_SECONDS = 0.1f
 
+/** How many spec values [LayerField] settles a fixed triangulation with: four edge filters and four rest-alpha inputs. */
+private const val SETTLED_FILTER_COUNT = 8
+
 // Drift: three sine octaves per axis at non-rational ratios, so a node's path wanders instead of
 // tracing a closed Lissajous loop.
 private const val DRIFT_FREQUENCY_BASE_PRIMARY = 0.115f
@@ -284,8 +287,8 @@ internal class LayerField(
     private var triangleCache = IntArray(0)
     private var triangleCacheKeys = LongArray(0)
 
-    /** The edge-filter values [EdgeRule.FixedTriangulation] last settled with; a change re-settles it. */
-    private val settledFilters = FloatArray(4)
+    /** The edge-filter and rest-alpha values [EdgeRule.FixedTriangulation] last settled with; a change re-settles it. */
+    private val settledFilters = FloatArray(SETTLED_FILTER_COUNT)
 
     /** Drift and wave time, each already multiplied by its speed, so a speed change never jumps a node. */
     private var driftClock = 0f
@@ -721,9 +724,19 @@ internal class LayerField(
         return shapeScratch[position]
     }
 
-    /** True if any value the edge filters use changed since the last settle. */
+    /** True if any value the edge filters or [restEdgeAlpha] use changed since the last settle. */
     private fun updateSettledFilters(): Boolean {
-        val filters = floatArrayOf(spec.maxEdgeFactor, spec.minAngleDegrees, spec.edgeKeepChance, spec.repairReach)
+        val filters = floatArrayOf(
+            spec.maxEdgeFactor,
+            spec.minAngleDegrees,
+            spec.edgeKeepChance,
+            spec.repairReach,
+            // Which edges count as visible at rest, and so which ones the settle may lean on.
+            spec.edgeAlpha,
+            spec.alpha,
+            spec.lengthFalloff,
+            spec.depthDimming,
+        )
         if (filters.contentEquals(settledFilters)) return false
         filters.copyInto(settledFilters)
         return true
