@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -24,6 +26,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -54,8 +57,8 @@ import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.RouteUna
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
-import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdropSource
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
@@ -64,6 +67,7 @@ import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsSegmentedP
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.MicPermissionStillDenied
@@ -77,6 +81,11 @@ import com.rossomak.flashcards.feature.onboarding.step.SessionModesStep
 import com.rossomak.flashcards.feature.onboarding.step.StructureStep
 import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
+import com.rossomak.morpheus.Follow
+import com.rossomak.morpheus.LocalMorpheusGraphFill
+import com.rossomak.morpheus.MorpheusGraphMorphState
+import com.rossomak.morpheus.morpheusGraphBackground
+import com.rossomak.morpheus.rememberMorpheusGraphMorphState
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -154,6 +163,10 @@ fun OnboardingScreen(
  * All eight steps in one [HorizontalPager], with the gradient, progress bar, Skip and the CTA held
  * outside it as fixed chrome — so a swipe moves only the content, never the frame around it.
  *
+ * Behind everything, over the gradient, a network graph follows the pager: each step has its own
+ * [OnboardingMorpheusGraphs] spec, a swipe scrubs the morph between neighbours, and Skip's jump runs a
+ * timed morph to the last step's.
+ *
  * Skip does not leave the flow: it jumps to the final step, which is the single place preferences
  * are committed. That keeps one exit door instead of two code paths that both have to remember to
  * save.
@@ -196,6 +209,9 @@ private fun OnboardingContent(
     // Read once it flips, not on every frame of the reveal.
     val hasChromeStartedRevealing by remember { derivedStateOf { chromeReveal.value > 0f } }
     val isInspecting = LocalInspectionMode.current
+    // The graph fades in with the copy, on whichever step the pager restored to, then follows the pager.
+    val entranceStep = currentStep
+    val graphState = rememberOnboardingGraph(pagerState, entranceStep, isInspecting)
     LaunchedEffect(Unit) {
         if (isInspecting) {
             // A static @Preview renders the first frame only, which would be an empty screen.
@@ -204,56 +220,89 @@ private fun OnboardingContent(
             return@LaunchedEffect
         }
         delay(SHARED_ELEMENT_DURATION_MS.toLong().milliseconds)
+        launch { graphState.animateTo(OnboardingMorpheusGraphs.specFor(entranceStep), tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
         copyReveal.animateTo(1f, tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing))
         chromeReveal.animateTo(1f, tween(durationMillis = CHROME_REVEAL_MS, easing = LinearEasing))
     }
 
-    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop()
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .padding(vertical = MaterialTheme.spacing.small),
-        ) {
-            OnboardingTopBar(
-                step = currentStep,
-                revealProgress = chromeReveal.value,
-                // Instant rather than animated: animating a jump of up to seven pages would fling
-                // the user through every screen they just chose to skip.
-                onSkip = { coroutineScope.launch { pagerState.scrollToPage(OnboardingStep.entries.lastIndex) } },
-            )
-            HorizontalPager(
-                state = pagerState,
+    CompositionLocalProvider(LocalMorpheusGraphFill provides OnboardingMorpheusGraphs.fill) {
+        Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
+            OnboardingBackground(graphState = graphState, modifier = Modifier.matchParentSize())
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            ) { page ->
-                OnboardingStepPage(
-                    step = OnboardingStep.atPage(page),
-                    state = state,
-                    voiceBarsLevels = voiceBarsLevels,
-                    copyRevealProgress = copyReveal.value,
-                    actions = actions,
-                    messages = messages,
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(vertical = MaterialTheme.spacing.small),
+            ) {
+                OnboardingTopBar(
+                    step = currentStep,
+                    revealProgress = chromeReveal.value,
+                    // Instant rather than animated: animating a jump of up to seven pages would fling
+                    // the user through every screen they just chose to skip.
+                    onSkip = { coroutineScope.launch { pagerState.scrollToPage(OnboardingStep.entries.lastIndex) } },
+                )
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) { page ->
+                    OnboardingStepPage(
+                        step = OnboardingStep.atPage(page),
+                        state = state,
+                        voiceBarsLevels = voiceBarsLevels,
+                        copyRevealProgress = copyReveal.value,
+                        actions = actions,
+                        messages = messages,
+                    )
+                }
+                OnboardingCta(
+                    step = currentStep,
+                    revealProgress = chromeReveal.value,
+                    // Invisible while the entrance is still running, so it cannot be tapped before it
+                    // has been shown.
+                    enabled = !state.isCommitting && hasChromeStartedRevealing,
+                    onClick = {
+                        if (currentStep == OnboardingStep.LAST) {
+                            actions.onFinish()
+                        } else {
+                            coroutineScope.launch { pagerState.animateScrollToPage(pagerState.pageAfterTarget()) }
+                        }
+                    },
                 )
             }
-            OnboardingCta(
-                step = currentStep,
-                revealProgress = chromeReveal.value,
-                // Invisible while the entrance is still running, so it cannot be tapped before it
-                // has been shown.
-                enabled = !state.isCommitting && hasChromeStartedRevealing,
-                onClick = {
-                    if (currentStep == OnboardingStep.LAST) {
-                        actions.onFinish()
-                    } else {
-                        coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    }
-                },
-            )
         }
     }
+}
+
+/** The page after the one the pager heads for, so quick Next taps add up instead of repeating the same page. */
+private fun PagerState.pageAfterTarget(): Int = (targetPage + 1).coerceAtMost(OnboardingStep.entries.lastIndex)
+
+/** The brand gradient with the morphing graph drawn over it, both blurred behind the onboarding chrome. */
+@Composable
+private fun OnboardingBackground(graphState: MorpheusGraphMorphState, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .blurBackdropSource()
+            .background(MaterialTheme.brandColors.screenGradient)
+            .morpheusGraphBackground(graphState),
+    )
+}
+
+/** The background graph: [entranceStep]'s spec, hidden until the entrance unless [isInspecting], then following [pagerState]. */
+@Composable
+private fun rememberOnboardingGraph(pagerState: PagerState, entranceStep: OnboardingStep, isInspecting: Boolean): MorpheusGraphMorphState {
+    val graphState = rememberMorpheusGraphMorphState(
+        if (isInspecting) OnboardingMorpheusGraphs.specFor(entranceStep) else OnboardingMorpheusGraphs.hiddenFor(entranceStep),
+    )
+    graphState.Follow(
+        OnboardingMorpheusGraphs.pages,
+        minMorphDuration = OnboardingMorpheusGraphs.minMorphDuration,
+        target = { pagerState.targetPage },
+    ) {
+        pagerState.currentPage + pagerState.currentPageOffsetFraction
+    }
+    return graphState
 }
 
 @Composable
