@@ -1,5 +1,6 @@
 // Firestore Security Rules tests, covering the server-authoritative client-read-only rules (ADR-0049),
-// the recents projection, the server-owned XP configuration and the callable-only Bug Reports.
+// the recents projection, the server-owned XP configuration, the callable-only Bug Reports and the
+// owner-read-only Premium record.
 // Small and standalone on purpose — this is a guard against a specific class of production-only failure
 // (there is no other way to verify a rule without deploying it), not a second test framework for the
 // project. Run via `npm test` in this directory, which starts the Firestore emulator (see
@@ -36,6 +37,9 @@ const BUG_REPORT_PATH = 'bugReports/report-1';
 
 /** A minimal Bug Report document — rules don't inspect its shape. */
 const bugReportDoc = { uid: OWNER_UID, description: 'The study session froze.', severity: 'minor', status: 'new' };
+
+/** A minimal Premium record — rules don't inspect its shape. */
+const premiumDoc = { isPremium: true, source: 'auto-grant' };
 
 /** A minimal recents document — rules don't inspect its shape. */
 const recentsStateDoc = { entries: {} };
@@ -318,5 +322,45 @@ describe('bugReports/{reportId} (written only by submitBugReport, no client acce
     await assertFails(getDoc(unauthRef));
     await assertFails(setDoc(unauthRef, bugReportDoc));
     await assertFails(deleteDoc(unauthRef));
+  });
+});
+
+describe('users/{uid}/entitlement/premium (owner-read-only Premium record, ADR-0068)', () => {
+  const premiumPath = (uid) => `users/${uid}/entitlement/premium`;
+
+  it('the owning user can read their own Premium record', async () => {
+    await seedAsAdmin(premiumPath(OWNER_UID), premiumDoc);
+    const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
+
+    await assertSucceeds(getDoc(doc(ownerDb, premiumPath(OWNER_UID))));
+  });
+
+  it('the owning user cannot create, update or delete their own Premium record', async () => {
+    const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
+    const ownRef = doc(ownerDb, premiumPath(OWNER_UID));
+
+    await assertFails(setDoc(ownRef, premiumDoc));
+
+    await seedAsAdmin(premiumPath(OWNER_UID), { isPremium: false, source: 'admin' });
+    await assertFails(setDoc(ownRef, premiumDoc));
+    await assertFails(deleteDoc(ownRef));
+  });
+
+  it('a different authenticated user cannot read or write it', async () => {
+    await seedAsAdmin(premiumPath(OWNER_UID), premiumDoc);
+    const otherDb = testEnv.authenticatedContext(OTHER_UID).firestore();
+    const foreignRef = doc(otherDb, premiumPath(OWNER_UID));
+
+    await assertFails(getDoc(foreignRef));
+    await assertFails(setDoc(foreignRef, premiumDoc));
+  });
+
+  it('an unauthenticated request cannot read or write it', async () => {
+    await seedAsAdmin(premiumPath(OWNER_UID), premiumDoc);
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    const anonRef = doc(anonDb, premiumPath(OWNER_UID));
+
+    await assertFails(getDoc(anonRef));
+    await assertFails(setDoc(anonRef, premiumDoc));
   });
 });
