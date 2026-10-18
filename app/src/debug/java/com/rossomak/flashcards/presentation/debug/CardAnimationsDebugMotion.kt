@@ -14,7 +14,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.graphics.TransformOrigin
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.feature.study.chrome.StudySessionCardMotion
 import kotlin.math.roundToInt
 

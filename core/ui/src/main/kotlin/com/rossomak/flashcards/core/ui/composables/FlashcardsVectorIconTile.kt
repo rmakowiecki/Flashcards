@@ -23,14 +23,14 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.AppSizes
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.ui.glyph.CachedGlyph.Ready
 import com.rossomak.flashcards.core.ui.glyph.CachedGlyph.Unavailable
 import com.rossomak.flashcards.core.ui.glyph.rememberCategoryGlyph
-import com.rossomak.flashcards.core.ui.theme.AppSizes
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
 import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
-import com.rossomak.flashcards.core.ui.theme.sizes
 
 /**
  * Glyph shown when [iconSvg] is absent (not yet curated) or malformed (invalid SVG) — both cases

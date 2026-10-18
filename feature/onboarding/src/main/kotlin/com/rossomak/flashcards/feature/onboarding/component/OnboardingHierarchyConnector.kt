@@ -8,7 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 
 /**
  * Decorative chevron linking one stacked example card to the next. Shared by any step that breaks

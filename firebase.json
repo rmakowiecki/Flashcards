@@ -4,10 +4,12 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "hosting/public",
+    "public": "web/build/dist/wasmJs/productionExecutable",
+    "predeploy": ["./gradlew :web:wasmJsBrowserDistribution"],
     "cleanUrls": true,
     "trailingSlash": false,
-    "ignore": ["**/.*"]
+    "ignore": ["**/.*"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
   },
   "functions": [
     {

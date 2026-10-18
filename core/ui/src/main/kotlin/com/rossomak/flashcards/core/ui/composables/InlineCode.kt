@@ -6,7 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import com.rossomak.flashcards.core.ui.theme.InlineCodeSpanStyle
+import com.rossomak.flashcards.core.designsystem.theme.InlineCodeSpanStyle
 
 /** Pads the code background on each side; a full monospace space makes the span look bulky. */
 private const val THIN_SPACE = ' '

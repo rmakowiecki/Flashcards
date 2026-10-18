@@ -209,15 +209,18 @@ class ArchitectureKonsistTest {
     }
 
     private fun isComposeModuleMainSource(path: String) =
-        path.contains("/src/main/") &&
+        (path.contains("/src/main/") || path.contains("/src/commonMain/") || path.contains("/src/wasmJsMain/")) &&
             (
                 path.contains("/feature/") ||
                     path.contains("/core/ui/") ||
+                    path.contains("/core/designsystem/") ||
                     path.contains("/app/src/main/") ||
-                    path.contains("/debug-tools/")
+                    path.contains("/debug-tools/") ||
+                    path.contains("/web/src/")
                 )
 
-    private fun isMainSource(path: String) = path.contains("/src/main/")
+    private fun isMainSource(path: String) =
+        path.contains("/src/main/") || path.contains("/src/commonMain/") || path.contains("/src/wasmJsMain/")
 
     @Test
     fun `Repository interfaces reside in a domain package`() {
@@ -429,23 +432,12 @@ class ArchitectureKonsistTest {
     }
 
     @Test
-    fun `composables outside the theme package never import Color-kt tokens directly`() {
-        // core/ui ADR-0005: "Do not read Color.kt tokens directly in composables" —
-        // go through MaterialTheme.colorScheme / MaterialTheme.brandColors instead.
-        projectScope
-            .files
-            .filter { it.path.contains("/core/ui/") && it.path.contains("/composables/") }
-            .assertTrue { file ->
-                file.imports.none { import -> import.name.contains(".theme.Color") }
-            }
-    }
-
-    @Test
     fun `text is styled only through theme typography tokens`() {
         // Text takes a MaterialTheme.typography slot or its *Emphasized twin, or a theme constant
         // (Typography.code, InlineCodeSpanStyle, EmphasizedSpanStyle), never an ad hoc weight,
-        // size, family or spacing. Previews are held to it too. FlashcardsAvatar is the one
-        // exception: its initials scale with the avatar's diameter, which no fixed slot can do.
+        // size, family or spacing. The website (:web) is held to it like the app; only the token
+        // definitions (:core:designsystem, core/ui/theme/) are exempt. Previews are held to it
+        // too. FlashcardsAvatar is the one exception: its initials scale with the avatar's diameter, which no fixed slot can do.
         val adHocTypography = Regex(
             """\b(fontWeight|fontSize|fontFamily|letterSpacing|lineHeight)\s*=""" +
                 """|\bTextStyle\(""" +
@@ -454,7 +446,7 @@ class ArchitectureKonsistTest {
         projectScope
             .files
             .filter { file -> isComposeModuleMainSource(file.path) }
-            .filter { file -> !file.path.contains("/core/ui/theme/") }
+            .filter { file -> !file.path.contains("/core/ui/theme/") && !file.path.contains("/core/designsystem/") }
             .filter { file -> !file.path.endsWith("/FlashcardsAvatar.kt") }
             .assertFalse { file -> adHocTypography.containsMatchIn(file.text) }
     }

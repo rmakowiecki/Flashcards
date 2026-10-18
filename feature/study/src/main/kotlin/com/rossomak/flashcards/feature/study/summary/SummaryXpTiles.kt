@@ -20,9 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone
-import com.rossomak.flashcards.core.ui.theme.spacing
 import kotlinx.coroutines.flow.collectLatest
 
 /** Follows the newest tile. Bottom padding keeps the scroll's clip off a tile while it slides in. */

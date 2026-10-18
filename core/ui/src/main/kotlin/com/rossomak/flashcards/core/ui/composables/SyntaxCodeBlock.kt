@@ -15,11 +15,11 @@ import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.gallatinapps.syntaxmp.compose.SyntaxTheme
 import com.gallatinapps.syntaxmp.compose.rememberSyntaxAnnotatedString
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
-import com.rossomak.flashcards.core.ui.theme.CodeBlockColors
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.code
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.code
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 @Composable
 fun SyntaxCodeBlock(
@@ -28,6 +28,7 @@ fun SyntaxCodeBlock(
     engine: SyntaxTokenizer,
     modifier: Modifier = Modifier,
 ) {
+    val brandColors = MaterialTheme.brandColors
     BasicText(
         text = rememberSyntaxAnnotatedString(
             code = code,
@@ -36,13 +37,13 @@ fun SyntaxCodeBlock(
             theme = SyntaxTheme.DefaultDark,
         ),
         style = MaterialTheme.typography.code,
-        color = { CodeBlockColors.foreground },
+        color = { brandColors.onCodeBlock },
         modifier = modifier
             .fillMaxWidth()
             .background(
                 // Fixed dark surface: this block always renders SyntaxTheme.DefaultDark,
-                // independent of the app light/dark theme (see CodeBlockColors).
-                color = CodeBlockColors.background,
+                // independent of the app light/dark theme (see BrandColors.codeBlockBackground).
+                color = brandColors.codeBlockBackground,
                 shape = RoundedCornerShape(MaterialTheme.cornerRadius.small),
             )
             .padding(MaterialTheme.spacing.small),

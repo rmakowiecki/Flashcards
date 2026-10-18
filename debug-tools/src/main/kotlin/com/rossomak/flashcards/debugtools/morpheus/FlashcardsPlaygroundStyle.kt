@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
-import com.rossomak.flashcards.core.ui.theme.brandColors
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.tuner.MorpheusGraphPlaygroundStyle
 

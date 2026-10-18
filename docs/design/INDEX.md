@@ -57,6 +57,8 @@ Entry format:
   Read when: changing the microphone indicator, the input level, or where the indicator shows.
 - [voice-obfuscation.md](voice-obfuscation.md): The on-device voice transform applied to every spoken answer: the random pitch and formant shift, the time-stretch and resample math, what leaves the device, and the limits of the protection.
   Read when: changing `core:voice` obfuscation, the privacy claims about voice, or what audio is sent for grading.
+- [website.md](website.md): The public website on Firebase Hosting: its three pages and their addresses, how links and history move between them, the brand-gradient look, the loading fallback and the limits of a canvas-drawn site.
+  Read when: changing `:web`, the hosted pages, their addresses or Firebase Hosting.
 - [xp-leveling-system.md](xp-leveling-system.md): XP sources and their rules, the XP configuration, the Level curve, and how XP and Level are stored.
   Read when: changing XP awards, the XP configuration, the Level curve or Level-floor clamping.
 

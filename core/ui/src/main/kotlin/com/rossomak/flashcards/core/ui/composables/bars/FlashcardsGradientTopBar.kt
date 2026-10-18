@@ -26,15 +26,15 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
 
 /**
- * The small centred-title top bar for screens painted with [com.rossomak.flashcards.core.ui.theme.BrandColors.screenGradient],
+ * The small centred-title top bar for screens painted with [com.rossomak.flashcards.core.designsystem.theme.BrandColors.screenGradient],
  * full-bleed. Unlike [FlashcardsTopAppBar], this bar paints nothing itself — both its container and
  * scrolled-container colours are [Color.Transparent] — so the screen's own gradient shows through it,
  * and bleeds up behind the status bar, for free. Content colours come from the fixed
- * [com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContent] token rather than the theme,
+ * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.onGradientContent] token rather than the theme,
  * same as every other on-gradient component.
  *
  * [navigationIcon] is a caller-supplied slot, not a fixed control: the Preview screen wants a close

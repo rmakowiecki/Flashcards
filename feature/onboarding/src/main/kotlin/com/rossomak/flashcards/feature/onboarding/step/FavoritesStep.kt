@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
@@ -25,7 +26,6 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsScrollFadeHeight
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.flashcardsGridScrollFade
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState
 import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Content
 import com.rossomak.flashcards.feature.onboarding.FavoriteSubcategoriesState.Failed

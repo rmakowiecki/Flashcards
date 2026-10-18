@@ -41,6 +41,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
+import com.rossomak.flashcards.core.designsystem.theme.titleLargeExtraBold
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.animation.rememberAnimationsEnabled
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
@@ -54,11 +59,6 @@ import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardStat
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Unavailable
 import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsLinearProgressBar
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
-import com.rossomak.flashcards.core.ui.theme.titleLargeExtraBold
 import com.valentinilk.shimmer.LocalShimmerTheme
 import com.valentinilk.shimmer.defaultShimmerTheme
 import com.valentinilk.shimmer.shimmer
@@ -91,9 +91,9 @@ private val LEVEL_CARD_SKELETON_XP_WIDTH = 80.dp
  * Only the container differs between the two [FlashcardsComponentStyle] values; the content is always
  * white and drawn in the `OnGradient` style, because both containers are brand gradient:
  * - [OnSurface]: the card is on a plain surface, so it paints its own
- *   [com.rossomak.flashcards.core.ui.theme.BrandColors.screenGradient], with no border.
+ *   [com.rossomak.flashcards.core.designsystem.theme.BrandColors.screenGradient], with no border.
  * - [OnGradient]: the card is on that same gradient already, so it is the translucent white
- *   [com.rossomak.flashcards.core.ui.theme.BrandColors.onGradientContainer] plus a hairline border
+ *   [com.rossomak.flashcards.core.designsystem.theme.BrandColors.onGradientContainer] plus a hairline border
  *   that gives it an edge.
  *
  * [blursBackdrop] only adds the backdrop blur and is independent of [style].

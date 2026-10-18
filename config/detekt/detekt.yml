@@ -46,6 +46,8 @@ naming:
   FunctionNaming:
     # @Composable functions are PascalCase by convention.
     ignoreAnnotated: ['Composable']
+    # detekt's default test source sets, plus wasmJsTest, which the default list predates.
+    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**', '**/wasmJsTest/**']
   TopLevelPropertyNaming:
     active: true
   EnumNaming:

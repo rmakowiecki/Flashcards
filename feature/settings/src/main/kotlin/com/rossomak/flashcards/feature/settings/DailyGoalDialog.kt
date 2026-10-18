@@ -11,10 +11,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.ui.composables.FlashcardsStepper
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Picks the daily study-time goal. Settings-only — nothing session-scoped reads

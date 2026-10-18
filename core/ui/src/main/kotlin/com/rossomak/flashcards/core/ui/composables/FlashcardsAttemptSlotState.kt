@@ -6,13 +6,13 @@ package com.rossomak.flashcards.core.ui.composables
  * if the palette changes.
  */
 enum class FlashcardsAttemptSlotState {
-    /** Rated "Not at all" — filled with [com.rossomak.flashcards.core.ui.theme.SemanticColors.negativeContainer]. */
+    /** Rated "Not at all" — filled with [com.rossomak.flashcards.core.designsystem.theme.SemanticColors.negativeContainer]. */
     Failed,
 
-    /** Rated "Somewhat" — filled with [com.rossomak.flashcards.core.ui.theme.SemanticColors.neutralContainer]. */
+    /** Rated "Somewhat" — filled with [com.rossomak.flashcards.core.designsystem.theme.SemanticColors.neutralContainer]. */
     Partial,
 
-    /** Rated "Very well" — filled with [com.rossomak.flashcards.core.ui.theme.SemanticColors.positiveContainer]. */
+    /** Rated "Very well" — filled with [com.rossomak.flashcards.core.designsystem.theme.SemanticColors.positiveContainer]. */
     Correct,
 
     /** The attempt in progress — shown up to but not answered yet, so there is no rating to fill it with. */

@@ -30,7 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import kotlin.math.roundToInt
 
 private const val MAX_DURATION_MS = 2000f

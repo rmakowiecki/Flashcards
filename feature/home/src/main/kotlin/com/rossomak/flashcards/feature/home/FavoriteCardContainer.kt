@@ -9,7 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 
 internal val FavoriteCardWidth = 210.dp
 internal val FavoriteCardHeight = 140.dp
