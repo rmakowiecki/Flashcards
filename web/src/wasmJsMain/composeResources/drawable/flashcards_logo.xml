@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The final frame of the app's splash animation (app/src/main/res/drawable/ic_flashcards_logo_anim.xml):
+     the same paths as ic_flashcards_logo.xml without its first-frame group transforms and clip.
+     A logo change goes into both files. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:width="360dp"
