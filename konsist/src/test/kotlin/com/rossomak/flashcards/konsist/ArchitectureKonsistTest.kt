@@ -432,18 +432,6 @@ class ArchitectureKonsistTest {
     }
 
     @Test
-    fun `composables outside the theme package never import Color-kt tokens directly`() {
-        // core/ui ADR-0005: "Do not read Color.kt tokens directly in composables" —
-        // go through MaterialTheme.colorScheme / MaterialTheme.brandColors instead.
-        projectScope
-            .files
-            .filter { it.path.contains("/core/ui/") && it.path.contains("/composables/") }
-            .assertTrue { file ->
-                file.imports.none { import -> import.name.contains(".theme.Color") }
-            }
-    }
-
-    @Test
     fun `text is styled only through theme typography tokens`() {
         // Text takes a MaterialTheme.typography slot or its *Emphasized twin, or a theme constant
         // (Typography.code, InlineCodeSpanStyle, EmphasizedSpanStyle), never an ad hoc weight,

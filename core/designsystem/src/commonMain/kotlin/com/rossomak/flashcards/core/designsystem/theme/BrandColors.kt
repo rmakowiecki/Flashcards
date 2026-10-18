@@ -25,6 +25,8 @@ data class BrandColors(
     val onGradientBorder: Color,
     val onGradientContent: Color,
     val onGradientLoss: Color,
+    val codeBlockBackground: Color,
+    val onCodeBlock: Color,
 )
 
 /**
@@ -154,6 +156,14 @@ private val onGradientBorderColor = Color.White.copy(alpha = ON_GRADIENT_BORDER_
  */
 private val onGradientLossColor = errorDark
 
+/**
+ * Fixed palette for [com.rossomak.flashcards.core.ui.composables.SyntaxCodeBlock]. The code
+ * block always renders `SyntaxTheme.DefaultDark` regardless of the app's light/dark theme,
+ * so both themes pin the same theme-independent values.
+ */
+private val codeBlockBackgroundColor = Color(0xFF1E1E1E)
+private val onCodeBlockColor = Color(0xFFFFFFFF)
+
 val lightBrandColors = BrandColors(
     screenGradient = brandScreenGradient,
     screenGradientBase = brandScreenGradientBase,
@@ -171,6 +181,8 @@ val lightBrandColors = BrandColors(
     onGradientBorder = onGradientBorderColor,
     onGradientContent = onBrandTopBarGradient,
     onGradientLoss = onGradientLossColor,
+    codeBlockBackground = codeBlockBackgroundColor,
+    onCodeBlock = onCodeBlockColor,
 )
 
 // Dark uses a neutral elevated-surface container (surfaceContainerHighDark) with primaryDark as
@@ -197,6 +209,8 @@ val darkBrandColors = BrandColors(
     onGradientBorder = onGradientBorderColor,
     onGradientContent = onBrandTopBarGradient,
     onGradientLoss = onGradientLossColor,
+    codeBlockBackground = codeBlockBackgroundColor,
+    onCodeBlock = onCodeBlockColor,
 )
 
 val LocalBrandColors = staticCompositionLocalOf { lightBrandColors }
