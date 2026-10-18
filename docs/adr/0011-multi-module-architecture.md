@@ -11,6 +11,7 @@ Portfolio project designed to demonstrate enterprise-grade Android development. 
 | Module | Contents | Depends on |
 |---|---|---|
 | `:app` | `MainActivity`, `NavGraph`, splash/startup, `@HiltAndroidApp` | all modules |
+| `:debug-tools` | the debug hub and its tools, including the screen showcase; debug and profiling builds only | `:core:*`, and the `:feature:*` modules whose screens the showcase renders |
 | `:feature:auth` | `LoginScreen` + VM | `:core:domain`, `:core:ui` |
 | `:feature:home` | `HomeScreen` + VM | `:core:domain`, `:core:ui` |
 | `:feature:browse` | `BrowseScreen` (bottom-nav "Study" tab root; category/subcategory browse + search), `CategoryDetailsScreen`, `SubcategoryDetailsScreen` + VMs | `:core:domain`, `:core:ui` |
@@ -20,9 +21,13 @@ Portfolio project designed to demonstrate enterprise-grade Android development. 
 | `:feature:account` | `AccountScreen` + VM (reached from Settings through a navigation callback wired in `:app`) | `:core:domain`, `:core:ui` |
 | `:core:domain` | models, repository interfaces, use cases — pure Kotlin, no Android deps | nothing |
 | `:core:data` | repository impls, DTOs, mappers, Firestore sources, Hilt bindings | `:core:domain` |
-| `:core:ui` | theme, colors, typography, spacing tokens, shared composables (buttons, cards, chips, etc.) | `:core:domain` |
+| `:core:ui` | `FlashcardsTheme`, shared composables (buttons, cards, chips, etc.); re-exports `:core:designsystem` | `:core:domain`, `:core:designsystem` |
+| `:core:designsystem` | design tokens (colors, color schemes, brand gradients, typography, spacing, sizes, motion) as a Kotlin Multiplatform library for Android and wasmJs ([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md)) | nothing |
+| `:web` | the hosted website, a Compose Multiplatform wasmJs app ([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md)) | `:core:designsystem` |
 
 **Strict rule:** no `:feature:*` may depend on another `:feature:*`. No `:core:*` may depend on `:app` or any `:feature:*`. Features import `:core:ui` for theme and shared composables.
+
+`:debug-tools` is an aggregator beside `:app`, not a feature, so the feature-isolation rule does not apply to it: it may depend on feature modules. In return only debug-only sources (`app/src/debug`, `app/src/profiling`) may import it, which Konsist enforces, so release never depends on it.
 
 ## Build convention plugins
 
@@ -35,6 +40,8 @@ A `build-logic/` included build holds precompiled script plugins:
 | `android-core-data.gradle.kts` | `:core:data` |
 | `android-core-android.gradle.kts` | `:core:ui` |
 | `android-app.gradle.kts` | `:app` |
+| `kmp-library.gradle.kts` | `:core:designsystem` (Kotlin Multiplatform: Android + wasmJs) |
+| `kmp-web-app.gradle.kts` | `:web` (Kotlin Multiplatform: wasmJs browser app) |
 
 Each plugin sets `compileSdk`, `minSdk`, Kotlin options, and Compose compiler config in one place. Individual `build.gradle.kts` files only declare dependencies and apply the matching plugin — ~5 lines each.
 

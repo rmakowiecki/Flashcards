@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.rossomak.flashcards.core.ui.theme.spacing
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 
 /**
  * The vertical rhythm every step shares: one scrollable column, so a step whose content outgrows a

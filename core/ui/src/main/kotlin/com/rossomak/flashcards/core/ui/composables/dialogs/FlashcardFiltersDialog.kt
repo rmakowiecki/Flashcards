@@ -13,13 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.composables.FlashcardsDifficultyRangePill
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIntRangeSlider
 import com.rossomak.flashcards.core.ui.composables.FlashcardsTagChip
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Narrows a session's card pool by tag and difficulty.

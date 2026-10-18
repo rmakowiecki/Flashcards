@@ -1,4 +1,6 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
+import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin
+import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
@@ -45,4 +47,11 @@ gradle.projectsEvaluated {
         dependsOn(tasks.matching { task -> task.name == "spotlessApply" })
         dependsOn(subprojects.flatMap { it.tasks.matching { task -> task.name == "spotlessApply" } })
     }
+}
+
+// :web's unit tests run in the Chromium that the puppeteer npm package downloads from its install
+// script. Kotlin's wasm toolchain installs npm packages with scripts off by default; the lock file
+// in kotlin-js-store/ pins every package that could run one.
+plugins.withType<WasmYarnPlugin> {
+    the<WasmYarnRootEnvSpec>().ignoreScripts.set(false)
 }

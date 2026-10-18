@@ -51,6 +51,9 @@ import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptIndicator
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
@@ -62,9 +65,6 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsScrollFadeHeight
 import com.rossomak.flashcards.core.ui.composables.SyntaxCodeBlock
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.withInlineCode
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
-import com.rossomak.flashcards.core.ui.theme.cornerRadius
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.takeWhile

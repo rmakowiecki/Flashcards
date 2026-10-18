@@ -30,13 +30,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
 
 /**
  * The app's detail-screen top bar: a [LargeFlexibleTopAppBar] painted with
- * [com.rossomak.flashcards.core.ui.theme.BrandColors.topBarGradient].
+ * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.topBarGradient].
  *
  * The gradient is drawn via [modifier] rather than as a container color — `colors` is forced
  * transparent below so the bar's own container paint doesn't cover it — so it sizes to the bar and

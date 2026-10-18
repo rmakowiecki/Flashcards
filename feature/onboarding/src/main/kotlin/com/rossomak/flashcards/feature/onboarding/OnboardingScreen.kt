@@ -44,6 +44,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason.AudioRecordInitFailed
@@ -67,9 +70,6 @@ import com.rossomak.flashcards.core.ui.composables.progress.FlashcardsSegmentedP
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.MicPermissionStillDenied
 import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.NothingCaptured
 import com.rossomak.flashcards.feature.onboarding.OnboardingMessage.VoiceDemoFailed
@@ -106,7 +106,7 @@ private const val CHROME_REVEAL_MS = 300
  * rather than passed as individual lambdas so growing the flow by another step's callback doesn't
  * grow either function's own parameter list.
  */
-private data class OnboardingActions(
+data class OnboardingActions(
     val onStudyModeSelect: (StudyMode) -> Unit,
     val onDailyGoalDecrement: () -> Unit,
     val onDailyGoalIncrement: () -> Unit,
@@ -172,7 +172,7 @@ fun OnboardingScreen(
  * save.
  */
 @Composable
-private fun OnboardingContent(
+fun OnboardingContent(
     modifier: Modifier = Modifier,
     state: OnboardingScreenState,
     voiceBarsLevels: StateFlow<ImmutableList<Float>>,

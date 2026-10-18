@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.util.lerp
-import com.rossomak.flashcards.core.ui.theme.AppSpacing
+import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
 import kotlin.math.max
 import kotlin.math.roundToInt
 

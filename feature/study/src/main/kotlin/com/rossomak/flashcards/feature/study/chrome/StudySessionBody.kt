@@ -16,11 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAttemptSlotState
-import com.rossomak.flashcards.core.ui.theme.AppSpacing
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 private const val CARD_MIN_HEIGHT_FRACTION = 0.55f
 private val CARD_MIN_HEIGHT_FLOOR = 240.dp

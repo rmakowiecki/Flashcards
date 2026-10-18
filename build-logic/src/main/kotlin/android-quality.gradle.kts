@@ -85,6 +85,12 @@ val moduleStaticAnalysis = tasks.register("staticAnalysis") {
     description = "Runs Spotless, detekt and (Android modules) Lint for this module, plus Konsist."
     dependsOn("spotlessCheck", "detekt", ":konsist:test")
 }
-// Lint only exists on Android modules — pure-Kotlin modules (android-core-kotlin) have no such task.
+// Lint only exists on Android modules — pure-Kotlin (android-core-kotlin) and wasmJs-only (kmp-web-app)
+// modules have no such task.
 pluginManager.withPlugin("com.android.library") { moduleStaticAnalysis.configure { dependsOn("lint") } }
 pluginManager.withPlugin("com.android.application") { moduleStaticAnalysis.configure { dependsOn("lint") } }
+// The KMP Android library plugin names its Lint task differently across AGP versions, so match by
+// name rather than assume one exists; a wasmJs-only module has none and skips Lint.
+pluginManager.withPlugin("com.android.kotlin.multiplatform.library") {
+    moduleStaticAnalysis.configure { dependsOn(tasks.matching { task -> task.name == "lint" }) }
+}
