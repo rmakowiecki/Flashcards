@@ -48,7 +48,7 @@ A launcher shortcut tapped while the app is not running is resolved at Splash, a
 
 Main shows a bottom navigation bar with three tabs: Home, Study and Settings. Debug builds add a fourth, the debug hub, which never exists in release builds. Home is the first tab.
 
-- **Each tab is its own small graph** with one root screen. The debug hub's tools open inside its tab, above the bottom bar.
+- **Each tab is its own small graph** with one root screen. The debug hub's tools open inside its tab, above the bottom bar, except the screen showcase, which opens full screen outside the tab shell ([screen-showcase.md](screen-showcase.md)).
 - **Switching tabs saves and restores each tab's state**, and tapping the current tab does not stack it again. A switch swaps instantly, with no transition.
 - **A tab stays selected while any screen in its graph is shown.**
 - **Home's empty state switches to the Study tab.** This is a plain tab switch, the same as tapping the tab; nothing is pushed.

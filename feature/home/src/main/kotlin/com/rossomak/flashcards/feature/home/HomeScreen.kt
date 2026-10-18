@@ -170,7 +170,7 @@ fun HomeScreen(
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
-internal fun HomeContent(
+fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeScreenState,
     now: () -> Instant,

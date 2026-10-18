@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +55,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * entry points by dropping one `debugImplementation`, and Settings stops carrying rows a user must
  * never see.
  */
+@Suppress("LongParameterList")
 @Composable
 fun DebugScreen(
     modifier: Modifier = Modifier,
@@ -60,7 +64,10 @@ fun DebugScreen(
     onNavigateToOnboarding: () -> Unit,
     onNavigateToVoiceDebug: () -> Unit,
     onNavigateToVoiceIndicatorDebug: () -> Unit,
+    onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
+    onNavigateToCardAnimationsDebug: () -> Unit,
+    onNavigateToScreenShowcase: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -81,10 +88,15 @@ fun DebugScreen(
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
+        onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
+        onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
+        onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
     )
 }
 
+// One callback and one row per debug tool: the hub grows by a parameter and a row with every tool.
+@Suppress("LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DebugContent(
@@ -95,7 +107,10 @@ private fun DebugContent(
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
+    onCardAnimationsDebugClick: () -> Unit,
+    onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
+    onMorpheusGraphPrototypeClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -148,10 +163,34 @@ private fun DebugContent(
                     )
                     add(
                         debugToolRow(
+                            titleRes = R.string.debug_card_animations_label,
+                            messageRes = R.string.debug_card_animations_message,
+                            icon = Icons.Default.Animation,
+                            onClick = onCardAnimationsDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_screen_showcase_label,
+                            messageRes = R.string.debug_screen_showcase_message,
+                            icon = Icons.Default.Smartphone,
+                            onClick = onScreenShowcaseClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
                             titleRes = R.string.debug_replay_onboarding_label,
                             messageRes = R.string.debug_replay_onboarding_message,
                             icon = Icons.Default.Refresh,
                             onClick = onReplayOnboardingClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_morpheus_graph_prototype_label,
+                            messageRes = R.string.debug_morpheus_graph_prototype_message,
+                            icon = Icons.Default.Hub,
+                            onClick = onMorpheusGraphPrototypeClick,
                         ),
                     )
                     // Absent when Showkase is not on the classpath, which is every non-debug build
@@ -227,7 +266,10 @@ private fun DebugContentPreview() {
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
+            onCardAnimationsDebugClick = {},
+            onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},
+            onMorpheusGraphPrototypeClick = {},
         )
     }
 }

@@ -13,5 +13,8 @@ import kotlinx.serialization.Serializable
 /** The voice capture indicator preview, animated from a synthetic level stream — no audio involved. */
 @Serializable object DebugVoiceIndicatorRoot
 
+/** PROTOTYPE, throwaway — see [com.rossomak.flashcards.debugtools.morpheus.MorpheusGraphPrototypeScreen]. */
+@Serializable object DebugMorpheusGraphRoot
+
 /** Backdrop blur harness with a live radius slider. */
 @Serializable object DebugBackdropBlurRoot

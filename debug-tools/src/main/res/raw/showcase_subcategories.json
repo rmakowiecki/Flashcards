@@ -1,0 +1,858 @@
+[
+  {
+    "id": "android-compose",
+    "name": "Compose",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 0,
+    "cardCount": 1180
+  },
+  {
+    "id": "android-media",
+    "name": "Media",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 1,
+    "cardCount": 392
+  },
+  {
+    "id": "android-performance",
+    "name": "Performance",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 2,
+    "cardCount": 387
+  },
+  {
+    "id": "android-background-work",
+    "name": "Background Work",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 3,
+    "cardCount": 349
+  },
+  {
+    "id": "android-testing",
+    "name": "Testing",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 4,
+    "cardCount": 341
+  },
+  {
+    "id": "android-security",
+    "name": "Security",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 5,
+    "cardCount": 336
+  },
+  {
+    "id": "android-firebase",
+    "name": "Firebase",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 6,
+    "cardCount": 309
+  },
+  {
+    "id": "android-connectivity",
+    "name": "Connectivity",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 7,
+    "cardCount": 294
+  },
+  {
+    "id": "android-architecture",
+    "name": "Architecture",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 8,
+    "cardCount": 285
+  },
+  {
+    "id": "android-build-system",
+    "name": "Build System",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 9,
+    "cardCount": 271
+  },
+  {
+    "id": "android-app-fundamentals",
+    "name": "App Fundamentals",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 10,
+    "cardCount": 253
+  },
+  {
+    "id": "android-android-tv",
+    "name": "Android Tv",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 11,
+    "cardCount": 243
+  },
+  {
+    "id": "android-advanced-features",
+    "name": "Advanced Features",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 12,
+    "cardCount": 236
+  },
+  {
+    "id": "android-automotive",
+    "name": "Automotive",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 13,
+    "cardCount": 230
+  },
+  {
+    "id": "android-notifications",
+    "name": "Notifications",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 14,
+    "cardCount": 208
+  },
+  {
+    "id": "android-persistence",
+    "name": "Persistence",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 15,
+    "cardCount": 198
+  },
+  {
+    "id": "android-location-and-sensors",
+    "name": "Location And Sensors",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 16,
+    "cardCount": 193
+  },
+  {
+    "id": "android-android-features",
+    "name": "Android Features",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 17,
+    "cardCount": 192
+  },
+  {
+    "id": "android-app-distribution",
+    "name": "App Distribution",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 18,
+    "cardCount": 172
+  },
+  {
+    "id": "android-system-ui",
+    "name": "System Ui",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 19,
+    "cardCount": 172
+  },
+  {
+    "id": "android-networking",
+    "name": "Networking",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 20,
+    "cardCount": 166
+  },
+  {
+    "id": "android-graphics",
+    "name": "Graphics",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 21,
+    "cardCount": 164
+  },
+  {
+    "id": "android-wear-os",
+    "name": "Wear Os",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 22,
+    "cardCount": 160
+  },
+  {
+    "id": "android-permissions",
+    "name": "Permissions",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 23,
+    "cardCount": 158
+  },
+  {
+    "id": "android-views",
+    "name": "Views",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 24,
+    "cardCount": 127
+  },
+  {
+    "id": "android-dependency-injection",
+    "name": "Dependency Injection",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 25,
+    "cardCount": 121
+  },
+  {
+    "id": "android-localization",
+    "name": "Localization",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 26,
+    "cardCount": 118
+  },
+  {
+    "id": "android-adaptive-ui",
+    "name": "Adaptive Ui",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 27,
+    "cardCount": 116
+  },
+  {
+    "id": "android-navigation",
+    "name": "Navigation",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 28,
+    "cardCount": 115
+  },
+  {
+    "id": "android-accessibility",
+    "name": "Accessibility",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 29,
+    "cardCount": 105
+  },
+  {
+    "id": "android-concurrency",
+    "name": "Concurrency",
+    "categoryId": "android",
+    "categoryName": "Android",
+    "order": 30,
+    "cardCount": 70
+  },
+  {
+    "id": "apple-platforms-human-interface-guidelines",
+    "name": "Human Interface Guidelines",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 0,
+    "cardCount": 1997
+  },
+  {
+    "id": "apple-platforms-swiftui",
+    "name": "Swiftui",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 1,
+    "cardCount": 1300
+  },
+  {
+    "id": "apple-platforms-appkit",
+    "name": "Appkit",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 2,
+    "cardCount": 697
+  },
+  {
+    "id": "apple-platforms-uikit",
+    "name": "Uikit",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 3,
+    "cardCount": 651
+  },
+  {
+    "id": "apple-platforms-app-distribution",
+    "name": "App Distribution",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 4,
+    "cardCount": 621
+  },
+  {
+    "id": "apple-platforms-testing",
+    "name": "Testing",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 5,
+    "cardCount": 429
+  },
+  {
+    "id": "apple-platforms-visionos",
+    "name": "Visionos",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 6,
+    "cardCount": 335
+  },
+  {
+    "id": "apple-platforms-concurrency-combine",
+    "name": "Concurrency Combine",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 7,
+    "cardCount": 326
+  },
+  {
+    "id": "apple-platforms-macos",
+    "name": "Macos",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 8,
+    "cardCount": 227
+  },
+  {
+    "id": "apple-platforms-watchos",
+    "name": "Watchos",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 9,
+    "cardCount": 193
+  },
+  {
+    "id": "apple-platforms-tvos",
+    "name": "Tvos",
+    "categoryId": "apple-platforms",
+    "categoryName": "Apple Platforms",
+    "order": 10,
+    "cardCount": 109
+  },
+  {
+    "id": "python-networking-and-web",
+    "name": "Networking And Web",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 0,
+    "cardCount": 336
+  },
+  {
+    "id": "python-collections-and-structured-data",
+    "name": "Collections And Structured Data",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 1,
+    "cardCount": 286
+  },
+  {
+    "id": "python-syntax-and-idioms",
+    "name": "Syntax And Idioms",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 2,
+    "cardCount": 279
+  },
+  {
+    "id": "python-core-types",
+    "name": "Core Types",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 3,
+    "cardCount": 258
+  },
+  {
+    "id": "python-data-persistence-and-serialization",
+    "name": "Data Persistence And Serialization",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 4,
+    "cardCount": 239
+  },
+  {
+    "id": "python-concurrency",
+    "name": "Concurrency",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 5,
+    "cardCount": 216
+  },
+  {
+    "id": "python-cli-and-os-services",
+    "name": "Cli And Os Services",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 6,
+    "cardCount": 192
+  },
+  {
+    "id": "python-stdlib-misc",
+    "name": "Stdlib Misc",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 7,
+    "cardCount": 185
+  },
+  {
+    "id": "python-modules-and-packaging",
+    "name": "Modules And Packaging",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 8,
+    "cardCount": 166
+  },
+  {
+    "id": "python-runtime-internals",
+    "name": "Runtime Internals",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 9,
+    "cardCount": 159
+  },
+  {
+    "id": "python-testing-and-debugging",
+    "name": "Testing And Debugging",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 10,
+    "cardCount": 144
+  },
+  {
+    "id": "python-numeric-and-math",
+    "name": "Numeric And Math",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 11,
+    "cardCount": 141
+  },
+  {
+    "id": "python-oop-and-classes",
+    "name": "Oop And Classes",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 12,
+    "cardCount": 133
+  },
+  {
+    "id": "python-text-processing",
+    "name": "Text Processing",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 13,
+    "cardCount": 123
+  },
+  {
+    "id": "python-typing-and-interfaces",
+    "name": "Typing And Interfaces",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 14,
+    "cardCount": 123
+  },
+  {
+    "id": "python-files-and-io",
+    "name": "Files And Io",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 15,
+    "cardCount": 115
+  },
+  {
+    "id": "python-gui",
+    "name": "Gui",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 16,
+    "cardCount": 104
+  },
+  {
+    "id": "python-functions-and-scope",
+    "name": "Functions And Scope",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 17,
+    "cardCount": 90
+  },
+  {
+    "id": "python-exceptions-and-context-managers",
+    "name": "Exceptions And Context Managers",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 18,
+    "cardCount": 75
+  },
+  {
+    "id": "python-dates-and-times",
+    "name": "Dates And Times",
+    "categoryId": "python",
+    "categoryName": "Python",
+    "order": 19,
+    "cardCount": 45
+  },
+  {
+    "id": "data-science-python-pandas",
+    "name": "Pandas",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 0,
+    "cardCount": 541
+  },
+  {
+    "id": "data-science-python-statsmodels",
+    "name": "Statsmodels",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 1,
+    "cardCount": 375
+  },
+  {
+    "id": "data-science-python-polars",
+    "name": "Polars",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 2,
+    "cardCount": 373
+  },
+  {
+    "id": "data-science-python-scipy",
+    "name": "Scipy",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 3,
+    "cardCount": 340
+  },
+  {
+    "id": "data-science-python-matplotlib",
+    "name": "Matplotlib",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 4,
+    "cardCount": 289
+  },
+  {
+    "id": "data-science-python-plotly",
+    "name": "Plotly",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 5,
+    "cardCount": 286
+  },
+  {
+    "id": "data-science-python-numpy",
+    "name": "Numpy",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 6,
+    "cardCount": 274
+  },
+  {
+    "id": "data-science-python-jupyter",
+    "name": "Jupyter",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 7,
+    "cardCount": 223
+  },
+  {
+    "id": "data-science-python-dask",
+    "name": "Dask",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 8,
+    "cardCount": 200
+  },
+  {
+    "id": "data-science-python-numba",
+    "name": "Numba",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 9,
+    "cardCount": 193
+  },
+  {
+    "id": "data-science-python-seaborn",
+    "name": "Seaborn",
+    "categoryId": "data-science-python",
+    "categoryName": "Data Science Python",
+    "order": 10,
+    "cardCount": 175
+  },
+  {
+    "id": "machine-learning-scikit-learn",
+    "name": "Scikit Learn",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 0,
+    "cardCount": 704
+  },
+  {
+    "id": "machine-learning-tensorflow",
+    "name": "Tensorflow",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 1,
+    "cardCount": 343
+  },
+  {
+    "id": "machine-learning-hugging-face-transformers",
+    "name": "Hugging Face Transformers",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 2,
+    "cardCount": 313
+  },
+  {
+    "id": "machine-learning-pytorch",
+    "name": "Pytorch",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 3,
+    "cardCount": 298
+  },
+  {
+    "id": "machine-learning-keras",
+    "name": "Keras",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 4,
+    "cardCount": 273
+  },
+  {
+    "id": "machine-learning-gradient-boosting",
+    "name": "Gradient Boosting",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 5,
+    "cardCount": 225
+  },
+  {
+    "id": "machine-learning-math-foundations",
+    "name": "Math Foundations",
+    "categoryId": "machine-learning",
+    "categoryName": "Machine Learning",
+    "order": 6,
+    "cardCount": 94
+  },
+  {
+    "id": "swift-object-model",
+    "name": "Object Model",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 0,
+    "cardCount": 244
+  },
+  {
+    "id": "swift-collections",
+    "name": "Collections",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 1,
+    "cardCount": 192
+  },
+  {
+    "id": "swift-concurrency",
+    "name": "Concurrency",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 2,
+    "cardCount": 180
+  },
+  {
+    "id": "swift-numbers-and-values",
+    "name": "Numbers And Values",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 3,
+    "cardCount": 177
+  },
+  {
+    "id": "swift-generics-and-metaprogramming",
+    "name": "Generics And Metaprogramming",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 4,
+    "cardCount": 167
+  },
+  {
+    "id": "swift-control-flow-and-functions",
+    "name": "Control Flow And Functions",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 5,
+    "cardCount": 158
+  },
+  {
+    "id": "swift-strings-and-text",
+    "name": "Strings And Text",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 6,
+    "cardCount": 149
+  },
+  {
+    "id": "swift-fundamentals",
+    "name": "Fundamentals",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 7,
+    "cardCount": 148
+  },
+  {
+    "id": "swift-memory-management",
+    "name": "Memory Management",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 8,
+    "cardCount": 117
+  },
+  {
+    "id": "swift-formatting-and-units",
+    "name": "Formatting And Units",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 9,
+    "cardCount": 107
+  },
+  {
+    "id": "swift-common-protocols",
+    "name": "Common Protocols",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 10,
+    "cardCount": 74
+  },
+  {
+    "id": "swift-serialization",
+    "name": "Serialization",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 11,
+    "cardCount": 72
+  },
+  {
+    "id": "swift-reflection-and-diagnostics",
+    "name": "Reflection And Diagnostics",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 12,
+    "cardCount": 57
+  },
+  {
+    "id": "swift-dates-and-time",
+    "name": "Dates And Time",
+    "categoryId": "swift",
+    "categoryName": "Swift",
+    "order": 13,
+    "cardCount": 54
+  },
+  {
+    "id": "kotlin-coroutines",
+    "name": "Coroutines",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 0,
+    "cardCount": 194
+  },
+  {
+    "id": "kotlin-classes-and-oop",
+    "name": "Classes And Oop",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 1,
+    "cardCount": 170
+  },
+  {
+    "id": "kotlin-serialization",
+    "name": "Serialization",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 2,
+    "cardCount": 167
+  },
+  {
+    "id": "kotlin-functions",
+    "name": "Functions",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 3,
+    "cardCount": 166
+  },
+  {
+    "id": "kotlin-syntax-and-idioms",
+    "name": "Syntax And Idioms",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 4,
+    "cardCount": 128
+  },
+  {
+    "id": "kotlin-collections-fundamentals",
+    "name": "Collections Fundamentals",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 5,
+    "cardCount": 125
+  },
+  {
+    "id": "kotlin-collections-operations",
+    "name": "Collections Operations",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 6,
+    "cardCount": 100
+  },
+  {
+    "id": "kotlin-core-types",
+    "name": "Core Types",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 7,
+    "cardCount": 79
+  },
+  {
+    "id": "kotlin-control-flow-and-exceptions",
+    "name": "Control Flow And Exceptions",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 8,
+    "cardCount": 66
+  },
+  {
+    "id": "kotlin-properties-and-delegation",
+    "name": "Properties And Delegation",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 9,
+    "cardCount": 65
+  },
+  {
+    "id": "kotlin-null-safety-and-equality",
+    "name": "Null Safety And Equality",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 10,
+    "cardCount": 64
+  },
+  {
+    "id": "kotlin-stdlib-misc",
+    "name": "Stdlib Misc",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 11,
+    "cardCount": 60
+  },
+  {
+    "id": "kotlin-generics-and-reflection",
+    "name": "Generics And Reflection",
+    "categoryId": "kotlin",
+    "categoryName": "Kotlin",
+    "order": 12,
+    "cardCount": 53
+  }
+]

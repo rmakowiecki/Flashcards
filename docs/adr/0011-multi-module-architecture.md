@@ -11,6 +11,7 @@ Portfolio project designed to demonstrate enterprise-grade Android development. 
 | Module | Contents | Depends on |
 |---|---|---|
 | `:app` | `MainActivity`, `NavGraph`, splash/startup, `@HiltAndroidApp` | all modules |
+| `:debug-tools` | the debug hub and its tools, including the screen showcase; debug and profiling builds only | `:core:*`, and the `:feature:*` modules whose screens the showcase renders |
 | `:feature:auth` | `LoginScreen` + VM | `:core:domain`, `:core:ui` |
 | `:feature:home` | `HomeScreen` + VM | `:core:domain`, `:core:ui` |
 | `:feature:browse` | `BrowseScreen` (bottom-nav "Study" tab root; category/subcategory browse + search), `CategoryDetailsScreen`, `SubcategoryDetailsScreen` + VMs | `:core:domain`, `:core:ui` |
@@ -25,6 +26,8 @@ Portfolio project designed to demonstrate enterprise-grade Android development. 
 | `:web` | the hosted website, a Compose Multiplatform wasmJs app ([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md)) | `:core:designsystem` |
 
 **Strict rule:** no `:feature:*` may depend on another `:feature:*`. No `:core:*` may depend on `:app` or any `:feature:*`. Features import `:core:ui` for theme and shared composables.
+
+`:debug-tools` is an aggregator beside `:app`, not a feature, so the feature-isolation rule does not apply to it: it may depend on feature modules. In return only debug-only sources (`app/src/debug`, `app/src/profiling`) may import it, which Konsist enforces, so release never depends on it.
 
 ## Build convention plugins
 

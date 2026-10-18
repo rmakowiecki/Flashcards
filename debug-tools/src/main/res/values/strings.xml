@@ -8,10 +8,16 @@
     <string name="debug_voice_indicator_message">Mic level animation from a synthetic stream</string>
     <string name="debug_backdrop_blur_label">Backdrop blur</string>
     <string name="debug_backdrop_blur_message">OnGradient blur over moving content, live blur radius</string>
+    <string name="debug_card_animations_label">Session card animations</string>
+    <string name="debug_card_animations_message">Fast session over a mock deck of card layout edge cases</string>
     <string name="debug_replay_onboarding_label">Replay onboarding</string>
     <string name="debug_replay_onboarding_message">Clears the flag and runs the real flow</string>
     <string name="debug_showcase_label">UI component showcase</string>
     <string name="debug_showcase_message">Browse the design system in Showkase</string>
+    <string name="debug_screen_showcase_label">Screen showcase</string>
+    <string name="debug_screen_showcase_message">Real screens with sample data, full screen</string>
+    <string name="debug_morpheus_graph_prototype_label">Morpheus graph prototype</string>
+    <string name="debug_morpheus_graph_prototype_message">PROTOTYPE — animated Morpheus graph canvas background, OnSurface/OnGradient</string>
     <string name="debug_voice_harness_back_cd">Back to debug tools</string>
     <string name="debug_build_info_label">%1$s (%2$d) · %3$s</string>
 
@@ -60,4 +66,23 @@
     <string name="voice_debug_entitlement_title">5. Entitlement check test</string>
     <string name="voice_debug_entitlement_check_button">Check entitlement</string>
     <string name="voice_debug_entitlement_checking_label">Checking…</string>
+
+    <string name="screen_showcase_title">Screen showcase</string>
+    <string name="screen_showcase_onboarding_title">Onboarding</string>
+    <string name="screen_showcase_home_title">Home</string>
+    <string name="screen_showcase_browse_title">Browse</string>
+    <string name="screen_showcase_session_title">Study session</string>
+    <string name="screen_showcase_onboarding_label">Onboarding gallery</string>
+    <string name="screen_showcase_home_label">Home</string>
+    <string name="screen_showcase_browse_label">Category list and search</string>
+    <string name="screen_showcase_category_details_label">Category Details</string>
+    <string name="screen_showcase_category_details_selection_mode_label">Category Details, Selection Mode</string>
+    <string name="screen_showcase_subcategory_details_label">Subcategory Details</string>
+    <string name="screen_showcase_preview_label">Preview Study Session</string>
+    <string name="screen_showcase_rated_question_label">Rated, question</string>
+    <string name="screen_showcase_rated_answer_revealed_label">Rated, answer revealed</string>
+    <string name="screen_showcase_rated_voice_answering_label">Rated, voice answering</string>
+    <string name="screen_showcase_fast_tap_through_label">Fast, tap-through</string>
+    <string name="screen_showcase_fast_read_aloud_label">Fast, read-aloud</string>
+    <string name="screen_showcase_summary_label">Session Summary</string>
 </resources>
