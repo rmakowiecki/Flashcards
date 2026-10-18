@@ -4,7 +4,5 @@
   <CurrentIssues>
     <ID>LongMethod:VoiceSettingsDialog.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun VoiceSettingsDialog( availableVoices: List&lt;VoiceOption&gt;, selectedVoiceId: String?, speechRate: Float, onVoiceSelected: (String?) -&gt; Unit, onSpeedChanged: (Float) -&gt; Unit, onSave: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>LoopWithTooManyJumpStatements:InlineCode.kt$while</ID>
-    <ID>MatchingDeclarationName:CornerRadius.kt$AppCornerRadius</ID>
-    <ID>MatchingDeclarationName:Spacing.kt$AppSpacing</ID>
   </CurrentIssues>
 </SmellBaseline>

@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -29,7 +30,6 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * Collapse fraction by which the email, the "Signed in with …" line and Sign out's label have faded out.

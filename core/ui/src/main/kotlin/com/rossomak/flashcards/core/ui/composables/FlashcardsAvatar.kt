@@ -38,14 +38,14 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /** Share of the avatar's diameter taken by the generic person icon. */
 private const val AVATAR_ICON_FRACTION = 0.6f
@@ -67,7 +67,7 @@ private val AVATAR_NAME_WORD_SEPARATOR = Regex("[\\p{Z}\\s]+")
  *
  * [style] follows the shared on-surface/on-gradient axis (ADR-0034): [OnSurface] is the tonal
  * container with no border, [OnGradient] is the translucent container with the
- * [com.rossomak.flashcards.core.ui.theme.AppSizes.hairline] border drawn over every variant, the
+ * [com.rossomak.flashcards.core.designsystem.theme.AppSizes.hairline] border drawn over every variant, the
  * photo included, so the edge stays crisp on the brand gradient. [blursBackdrop] only adds the
  * backdrop blur and is independent of [style].
  *

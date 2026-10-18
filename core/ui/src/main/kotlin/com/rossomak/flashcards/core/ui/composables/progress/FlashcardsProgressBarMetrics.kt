@@ -7,14 +7,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
+import com.rossomak.flashcards.core.designsystem.theme.AppSizes
+import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.sizes
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
-import com.rossomak.flashcards.core.ui.theme.AppSizes
-import com.rossomak.flashcards.core.ui.theme.AppSpacing
-import com.rossomak.flashcards.core.ui.theme.FlashcardsMotion
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.sizes
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /** Geometry for [FlashcardsLinearProgressBar]: just the track/fill height. */
 internal data class FlashcardsLinearProgressBarMetrics(

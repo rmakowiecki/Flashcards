@@ -18,13 +18,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.sizes
 
 private val ICON_CIRCLE_SIZE = 72.dp
 
@@ -36,7 +36,7 @@ private val ICON_CIRCLE_SIZE = 72.dp
  * - [OnSurface] is a flat tinted fill, matching [FlashcardsIconTile]'s default tint.
  * - [OnGradient] is the translucent white fill plus hairline border every on-gradient component
  *   shares (same tokens as [FlashcardsMetadataBadge]'s `OnGradient` style), for a screen painted with
- *   [com.rossomak.flashcards.core.ui.theme.BrandColors.screenGradient].
+ *   [com.rossomak.flashcards.core.designsystem.theme.BrandColors.screenGradient].
  */
 @Composable
 fun FlashcardsIconCircle(

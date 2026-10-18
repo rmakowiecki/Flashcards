@@ -10,11 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.gallatinapps.syntaxmp.tokenizer.SyntaxTokenizer
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.CodeBlock
 import com.rossomak.flashcards.core.ui.composables.SyntaxCodeBlock
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsSingleActionDialog
 import com.rossomak.flashcards.core.ui.composables.withInlineCode
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.study.R
 
 /**

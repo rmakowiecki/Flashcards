@@ -20,16 +20,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.brandColors
-import com.rossomak.flashcards.core.ui.theme.spacing
 
 /**
  * The family's gradient-filled icon-only type — a circular affordance filled with
- * [com.rossomak.flashcards.core.ui.theme.BrandColors.ctaButtonGradient], for icon-only actions that
+ * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.ctaButtonGradient], for icon-only actions that
  * carry the same visual weight as [FlashcardsFilledButton] (e.g. a session's voice play/pause
  * transport control). Color scheme mirrors [FlashcardsFilledButton] exactly via the shared
  * [filledButtonColorsFor] helper. See [FlashcardsTonalIconButton] for the tonal counterpart.

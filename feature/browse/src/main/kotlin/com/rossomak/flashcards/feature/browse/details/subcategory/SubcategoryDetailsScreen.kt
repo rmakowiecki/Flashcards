@@ -47,6 +47,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.R as CoreUiR
@@ -66,7 +67,6 @@ import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.composables.withInlineCode
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.browse.R
 import com.rossomak.flashcards.feature.browse.details.DetailsMessagesEffect
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState.Error

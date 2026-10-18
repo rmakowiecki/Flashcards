@@ -1,0 +1,23 @@
+/* The page is one Compose canvas. The brand screen gradient (BrandColors.screenGradient) shows
+   while the app loads, so the first paint already matches the Compose background. */
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #2A2E8F 25%, #6B2FA0 99%);
+  color: #FFFFFF;
+  font: 16px/1.6 Roboto, system-ui, sans-serif;
+}
+
+noscript main {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+
+noscript a {
+  color: inherit;
+}

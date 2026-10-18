@@ -2,7 +2,7 @@ package com.rossomak.flashcards.core.ui.composables.banners
 
 /**
  * Color coding of a [FlashcardsInfoBanner] drawn on a themed surface. Each tone maps onto a
- * valence pair in [com.rossomak.flashcards.core.ui.theme.SemanticColors] — the same pairs the
+ * valence pair in [com.rossomak.flashcards.core.designsystem.theme.SemanticColors] — the same pairs the
  * study screen's rating buttons use — but keeps banner vocabulary so a call site reads as intent
  * ("this tip is a caveat") rather than as a color.
  *

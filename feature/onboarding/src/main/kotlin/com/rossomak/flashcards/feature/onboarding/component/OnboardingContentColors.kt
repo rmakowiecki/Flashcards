@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Content colours for onboarding steps. Fixed rather than themed: every step is drawn on
- * [com.rossomak.flashcards.core.ui.theme.BrandColors.screenGradient], which is itself identical in
+ * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.screenGradient], which is itself identical in
  * light and dark, so its content must be too.
  */
 internal object OnboardingContentColors {

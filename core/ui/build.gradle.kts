@@ -15,6 +15,9 @@ dependencies {
     ksp(libs.hilt.android.compiler)
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
+    // api: the theme tokens (spacing, brandColors, typography, …) are part of every component's
+    // contract, so feature modules see them through :core:ui without declaring the module.
+    api(project(":core:designsystem"))
     api(libs.kotlinx.collections.immutable)
     implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.androidx.compose.bom))
