@@ -8,7 +8,7 @@ For the first release every User gets **Premium**, but that must stay a backend 
 
 ## Decision
 
-- A 1st-gen Auth `onCreate` function grants Premium to every new Auth user, a Guest included: it creates `users/{uid}/entitlement/premium` with `isPremium: true` and `source: "auto-grant"`. It uses `create()`, so it never overwrites an existing record. No app code calls or names it.
+- A 1st-gen Auth `onCreate` function grants Premium to every new Auth user, a Guest included: it creates `users/{uid}/entitlement/premium` with `isPremium: true` and `source: "auto-grant"`. It uses `create()`, so it never overwrites an existing record. A failed run is retried, and a run whose Auth user is already gone writes nothing, so a late grant never recreates data after Account Deletion. No app code calls or names it.
 - Every paid function refuses an anonymous caller before its Premium check, whatever the record says. The provider is read from the Auth user record (`getUser`), not the ID token, so a token minted before the Guest linked cannot misreport it. A Guest's grant therefore unlocks nothing until it links.
 - The app applies the same rule when it decides what to offer: a Guest is never shown as Premium.
 - Admins grant and revoke by editing the record in the Firebase console. Revoking sets `isPremium: false` and never deletes the record. Users created before this function are not backfilled.

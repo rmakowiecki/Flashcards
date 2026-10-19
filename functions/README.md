@@ -58,12 +58,15 @@ Premium reads the record directly.
 
 - **`requirePremiumCaller`** (`lib/entitlement.ts`) guards every paid callable: the revoked-token
   guard, then a refusal of any Guest (an Auth user with no provider data, read from the user record,
-  not the ID token), then the record's `isPremium`. Every refusal is `permission-denied`.
+  not the ID token), then the record's `isPremium`. A caller whose session is no longer active is
+  refused as `unauthenticated`; the Guest and Premium refusals are `permission-denied`.
 - **`grantPremiumOnUserCreate`** is a 1st-gen Auth `onCreate` trigger (2nd gen has no non-blocking
   Auth triggers, and blocking ones need Identity Platform). It creates the record with
   `{ isPremium: true, source: "auto-grant", grantedAt }` for every new Auth user, a Guest included,
   so the grant survives the Guest linking Google or GitHub. It uses `create()`, so an existing record
-  is never overwritten. Temporary (ADR-0069): deleting it needs no app release.
+  is never overwritten. A failed grant is retried, and a grant that runs after its Auth user is gone
+  writes nothing, so it never recreates data for a deleted account. Temporary (ADR-0069): deleting it
+  needs no app release.
 
 ### `transcribeAndGradeSpokenAnswer`
 
@@ -151,8 +154,8 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
    in-place rename), so explicitly delete the retired functions from the previous shape first:
    ```
    npx firebase-tools functions:delete gradeVoiceAnswer transcribe sanitizeAndGrade --force
-   cd functions && npm run build && cd .. && npx firebase-tools deploy --only functions
    npx firebase-tools functions:delete entitlement --force   # retired by ADR-0068
+   cd functions && npm run build && cd .. && npx firebase-tools deploy --only functions
    npx firebase-tools functions:list   # expect: transcribeAndGradeSpokenAnswer, submitStudySession,
                                        # submitBugReport, deleteAccount, grantPremiumOnUserCreate
    ```
