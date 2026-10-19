@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.rossomak.flashcards.core.ui.theme.brandColors
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
 
 /** The brand gradient as a [blurBackdropSource]; the first child of a `Box` carrying [blurBackdropScope]. */
 @Composable

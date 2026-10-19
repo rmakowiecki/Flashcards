@@ -26,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.ProgressSummary
 import com.rossomak.flashcards.core.domain.model.RecentItem
@@ -41,7 +42,6 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButto
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
 import com.rossomak.flashcards.feature.home.HomeBody.LoadError
 import com.rossomak.flashcards.feature.home.HomeBody.Resolving
@@ -170,7 +170,7 @@ fun HomeScreen(
  */
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
 @Composable
-internal fun HomeContent(
+fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeScreenState,
     now: () -> Instant,

@@ -46,6 +46,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.NoConnection
 import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.ServiceError
 import com.rossomak.flashcards.core.domain.model.AppVersion
@@ -60,7 +61,6 @@ import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.spacing
 import com.rossomak.flashcards.feature.account.AccountDestination.ContactSupport
 import com.rossomak.flashcards.feature.account.AccountDestination.Login
 import com.rossomak.flashcards.feature.account.AccountDestination.OpenSourceLicenses
