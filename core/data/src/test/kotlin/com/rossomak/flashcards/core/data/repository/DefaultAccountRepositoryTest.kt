@@ -17,6 +17,7 @@ import com.rossomak.flashcards.core.domain.model.AccountDeletionFailureReason.Se
 import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Deleted
 import com.rossomak.flashcards.core.domain.model.AccountDeletionResult.Failed
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -30,6 +31,8 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -47,13 +50,18 @@ class DefaultAccountRepositoryTest {
     private val pendingSessions = FakePendingSessionSubmissionLocalDataSource()
     private val deadLetters = FakeDeadLetteredSessionSubmissionLocalDataSource()
     private var isInternetAvailable = true
+    private val networkAvailabilityGateway = object : NetworkAvailabilityGateway {
+        override fun isInternetAvailable(): Boolean = isInternetAvailable
+
+        override fun observeInternetAvailability(): Flow<Boolean> = flowOf(isInternetAvailable)
+    }
 
     private fun createRepository(pendingSessionSubmissionLocalDataSource: PendingSessionSubmissionLocalDataSource = pendingSessions) = DefaultAccountRepository(
         accountDeletionRemoteDataSource = accountDeletionRemoteDataSource,
         authRemoteDataSource = authRemoteDataSource,
         accountDeletionMarkerLocalDataSource = accountDeletionMarkerLocalDataSource,
         deletedAccountQueuePurger = DeletedAccountQueuePurger(pendingSessionSubmissionLocalDataSource, deadLetters),
-        networkAvailabilityGateway = { isInternetAvailable },
+        networkAvailabilityGateway = networkAvailabilityGateway,
     )
 
     @Test
