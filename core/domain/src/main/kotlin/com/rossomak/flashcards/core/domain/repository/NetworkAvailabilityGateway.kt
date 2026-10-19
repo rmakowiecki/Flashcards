@@ -5,9 +5,8 @@ import kotlinx.coroutines.flow.Flow
 /** Whether there is a network that can reach the internet. */
 interface NetworkAvailabilityGateway {
 
-    /** A one-off answer for right now. */
     fun isInternetAvailable(): Boolean
 
-    /** The current answer, then every change to it. */
+    /** Emits the current answer first, then every change. */
     fun observeInternetAvailability(): Flow<Boolean>
 }

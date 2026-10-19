@@ -42,13 +42,9 @@ data class PreviewStudySessionScreenState(
     val activeDialog: PreviewDialog? = null,
     /** Re-read on every resume; only consulted when [isMicPermissionNeeded]. */
     val micPermissionStatus: PermissionStatus = PermissionStatus.Denied,
-    /**
-     * Followed live, so turning voice answering on can offer Premium straight away. Null until it is
-     * known. Start never trusts it: it asks the server again.
-     */
+    /** Followed live, null until known. Start never trusts it and asks the server again. */
     val isPremium: Boolean? = null,
     val isOnline: Boolean = true,
-    /** Start is waiting on the server's Premium answer, so the button shows it is busy. */
     val isCheckingPremium: Boolean = false,
 ) {
     val isSingleSubcategory: Boolean get() = subcategoryNames.size == 1
@@ -70,7 +66,6 @@ data class PreviewStudySessionScreenState(
      */
     val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
 
-    /** Voice answering needs a connection, so the hero says so while there is none. */
     val isVoiceAnsweringOffline: Boolean get() = isMicPermissionNeeded && !isOnline
 
     /**

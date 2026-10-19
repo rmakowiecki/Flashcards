@@ -17,10 +17,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 
-/**
- * Follows the record of whoever is signed in, restarting on every change of User. A Guest reads as not
- * Premium without a listener, since paid functions refuse a Guest even when a grant exists.
- */
+/** A Guest reads as not Premium with no listener: paid functions refuse a Guest even when a grant exists. */
 class DefaultPremiumRepository @Inject constructor(
     private val authRepository: AuthRepository,
     private val remoteDataSource: PremiumRemoteDataSource,
@@ -52,7 +49,6 @@ class DefaultPremiumRepository @Inject constructor(
             emit(null)
         }
 
-    /** The uid whose record counts, or null for a Guest or when signed out. */
     private fun AuthUser?.premiumUid(): String? = this?.takeIf { user -> user.provider != null }?.uid
 
     private companion object {

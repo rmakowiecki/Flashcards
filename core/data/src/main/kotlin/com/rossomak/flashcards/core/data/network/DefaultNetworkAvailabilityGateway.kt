@@ -29,7 +29,6 @@ class DefaultNetworkAvailabilityGateway @Inject constructor(
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    /** Follows the default network, the one [isInternetAvailable] reads, with the same rule. */
     override fun observeInternetAvailability(): Flow<Boolean> = callbackFlow {
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
         if (connectivityManager == null) {

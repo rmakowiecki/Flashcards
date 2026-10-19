@@ -25,10 +25,9 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * [onConfirm].
  *
  * **Dismissal:** a tap outside is **inert** (`dismissOnClickOutside = false`), because the choice
- * is deliberate and shouldn't be resolved by a stray tap. A back press *does* dismiss, and by default it is
- * wired to [onCancel], the same path as the Cancel button. Back is not made inert: an unswipeable
- * modal reads as a bug, and discard is the safe side of the fork. When the cancel action is not a
- * plain discard (it changes something), [onDismissRequest] gives back its own handler.
+ * is deliberate and shouldn't be resolved by a stray tap. A back press *does* dismiss, through
+ * [onDismissRequest], which defaults to the Cancel path. Back is not made inert: an unswipeable
+ * modal reads as a bug, and discard is the safe side of the fork.
  *
  * [confirmLabel] has no default on purpose. The design language uses a specific verb ("Exit",
  * "Submit"); a default would quietly invite "OK".
@@ -37,8 +36,8 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * exception is [isDestructive], for actions that permanently delete the User's data, such as deleting
  * the account: its confirm is a [FlashcardsDestructiveButton].
  *
- * @param onDismissRequest handles a back press. Defaults to [onCancel]; pass a separate handler
- * when the cancel action changes something, so backing out changes nothing.
+ * @param onDismissRequest handles a back press. Pass one when the cancel action changes something,
+ * so backing out changes nothing.
  * @param confirmEnabled gates the commit action only. Compute it in the ViewModel from the draft
  * (e.g. "at least one row checked"), where it is unit-testable.
  */

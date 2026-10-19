@@ -50,9 +50,8 @@ sealed interface PreviewDialog {
     data object VoiceAnsweringInfo : PreviewDialog
 
     /**
-     * Start with voice answering on found no connection, or couldn't confirm Premium with the
-     * server. Confirm tries Start again; the other way out switches this session to manual
-     * answering. Never opened from a settings row.
+     * Start with voice answering on found no connection or couldn't confirm Premium. Confirm retries
+     * Start; the other way out switches this session to manual answering. Never opened from a settings row.
      */
     data object VoiceAnsweringOffline : PreviewDialog
 }

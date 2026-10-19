@@ -16,9 +16,8 @@ class FirestorePremiumRemoteDataSource @Inject constructor(
         firestore.collection(USERS_COLLECTION).document(uid).collection(ENTITLEMENT_COLLECTION).document(PREMIUM_DOCUMENT)
 
     /**
-     * Metadata changes are included so the server's answer arrives even when it matches the cache. A
-     * cached snapshot of a missing record is skipped: with no record cached yet, offline would otherwise
-     * read as not Premium before the server has said so.
+     * Metadata changes are included so the server's answer arrives even when it matches the cache. A cached
+     * miss is skipped, or offline would read as not Premium before the server has spoken.
      */
     override fun observePremium(uid: String): Flow<Boolean> = document(uid).snapshotFlow(
         metadataChanges = MetadataChanges.INCLUDE,

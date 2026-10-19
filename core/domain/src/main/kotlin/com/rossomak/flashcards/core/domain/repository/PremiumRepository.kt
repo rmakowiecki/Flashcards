@@ -2,17 +2,10 @@ package com.rossomak.flashcards.core.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 
-/**
- * The signed-in User's Premium, read from their entitlement record. The app only reads it: the backend
- * or a project admin changes it. A missing record means not Premium, and a Guest or a signed-out app is
- * never Premium, whatever the record says.
- */
+/** The signed-in User's Premium, read-only. A missing record, a Guest or no User all mean not Premium. */
 interface PremiumRepository {
 
-    /**
-     * Premium for whoever is signed in, then every change to it, including a change of User. Null while
-     * it is not known yet: before the server has answered once, or after the listener failed.
-     */
+    /** Follows the signed-in User's Premium. Null while unknown: before the server first answers, or after the listener fails. */
     fun observePremium(): Flow<Boolean?>
 
     /** Reads Premium from the server, never the cache. Fails only when the server is unreachable; a refused read means not Premium. */

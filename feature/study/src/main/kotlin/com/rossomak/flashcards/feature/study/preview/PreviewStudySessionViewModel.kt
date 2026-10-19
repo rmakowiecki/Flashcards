@@ -13,8 +13,8 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
-import com.rossomak.flashcards.core.domain.usecase.GetPremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetPremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
@@ -204,9 +204,8 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * Turns voice answering off for this session only — the saved default is left alone, and the
-     * card draw is unaffected, so there is nothing to reselect. Closes the
-     * offline dialog it was chosen from, and starts nothing: the user sees the change, then Starts.
+     * Turns voice answering off for this session only: the saved default and the card draw are left
+     * alone. Closes the offline dialog it was chosen from, and starts nothing.
      */
     fun onSwitchToManualAnswering() {
         _state.update { state ->
@@ -411,10 +410,9 @@ class PreviewStudySessionViewModel @Inject constructor(
     }
 
     /**
-     * A Rated session with voice answering only leaves this screen online, with Premium confirmed
-     * by the server and the microphone granted, in that order, so no one is asked for the
-     * microphone for a session they can't start. Anything else keeps the user here with voice
-     * answering still selected.
+     * A Rated session with voice answering leaves this screen only online, with Premium confirmed by
+     * the server and then the microphone granted, so no one is asked for the microphone for a
+     * session they can't start. Anything else keeps the user here with voice answering selected.
      *
      * Ignored while a draw runs: [selectedCardIds] hasn't caught up with the latest edit yet, and
      * the button stays enabled so a draw served from cache doesn't blink it.

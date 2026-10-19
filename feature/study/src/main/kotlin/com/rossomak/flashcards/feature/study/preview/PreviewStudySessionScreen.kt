@@ -777,7 +777,6 @@ private fun StartSessionButton(
     FlashcardsFilledButton(
         text = stringResource(CoreUiR.string.common_start_session_button),
         onClick = onStartSession,
-        // Disabled while Start waits on the server's Premium answer, so it reads as busy.
         enabled = state.canStart && !state.isCheckingPremium,
         icon = Icons.Default.PlayArrow,
         style = OnGradient,
