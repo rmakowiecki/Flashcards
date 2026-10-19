@@ -24,6 +24,7 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardsS
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionVoiceSettings
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringInfo
+import com.rossomak.flashcards.feature.study.preview.PreviewDialog.VoiceAnsweringOffline
 
 /**
  * Pure [StudySessionConfig]/[PreviewDialog] mapping helpers pulled out of
@@ -50,7 +51,7 @@ internal fun StudySessionConfig.foldInDialog(dialog: PreviewDialog): StudySessio
         tagIds = dialog.draftState.selectedTags,
         difficultyRange = dialog.draftState.difficultyRange,
     )
-    VoiceAnsweringInfo -> this
+    VoiceAnsweringInfo, VoiceAnsweringOffline -> this
 }
 
 /**
@@ -78,7 +79,7 @@ internal fun PreviewDialog.toStudySessionPreferenceIfKept(): StudySessionPrefere
     is SessionCardsSortingOrder -> SortOrder(draftState).takeIf { keepAsDefault }
     is QuickSessionSubcategoryCountRange -> SubcategoryCountRangePreference(draftState).takeIf { keepAsDefault }
     is SessionVoiceSettings -> VoicePlayback(draftState.toVoiceSettings()).takeIf { keepAsDefault }
-    is Filters, VoiceAnsweringInfo -> null
+    is Filters, VoiceAnsweringInfo, VoiceAnsweringOffline -> null
 }
 
 /**

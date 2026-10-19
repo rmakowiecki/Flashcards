@@ -42,6 +42,10 @@ data class PreviewStudySessionScreenState(
     val activeDialog: PreviewDialog? = null,
     /** Re-read on every resume; only consulted when [isMicPermissionNeeded]. */
     val micPermissionStatus: PermissionStatus = PermissionStatus.Denied,
+    /** Followed live, null until known. Start never trusts it and asks the server again. */
+    val isPremium: Boolean? = null,
+    val isOnline: Boolean = true,
+    val isCheckingPremium: Boolean = false,
 ) {
     val isSingleSubcategory: Boolean get() = subcategoryNames.size == 1
     val subcategoryCount: Int get() = subcategoryNames.size
@@ -61,6 +65,8 @@ data class PreviewStudySessionScreenState(
      * that request either shows the real prompt (and clears this) or confirms the refusal.
      */
     val isMicPermissionRejected: Boolean get() = isMicPermissionNeeded && micPermissionStatus == PermissionStatus.PermanentlyDenied
+
+    val isVoiceAnsweringOffline: Boolean get() = isMicPermissionNeeded && !isOnline
 
     /**
      * Not gated on [isLoading], so a redraw served from cache doesn't blink Start disabled; a tap

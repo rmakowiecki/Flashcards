@@ -104,7 +104,6 @@ fun VoiceDebugScreen(
         onPlayObfuscatedClip = viewModel::onPlayObfuscatedClip,
         onRerandomizeObfuscation = viewModel::onRerandomizeObfuscation,
         onTranscribeClip = viewModel::onTranscribeClip,
-        onCheckEntitlement = viewModel::onCheckEntitlement,
     )
 }
 
@@ -122,7 +121,6 @@ fun VoiceDebugContent(
     onPlayObfuscatedClip: () -> Unit,
     onRerandomizeObfuscation: () -> Unit,
     onTranscribeClip: () -> Unit,
-    onCheckEntitlement: () -> Unit,
 ) {
     Scaffold(
         modifier = modifier,
@@ -256,21 +254,6 @@ fun VoiceDebugContent(
                     )
                 }
                 state.transcriptionResult?.let { RawDataText(it) }
-            }
-
-            DebugBlock(title = stringResource(R.string.voice_debug_entitlement_title)) {
-                Button(onClick = onCheckEntitlement, enabled = !state.isCheckingEntitlement) {
-                    Text(
-                        stringResource(
-                            if (state.isCheckingEntitlement) {
-                                R.string.voice_debug_entitlement_checking_label
-                            } else {
-                                R.string.voice_debug_entitlement_check_button
-                            }
-                        )
-                    )
-                }
-                state.entitlementResult?.let { RawDataText(it) }
             }
         }
     }

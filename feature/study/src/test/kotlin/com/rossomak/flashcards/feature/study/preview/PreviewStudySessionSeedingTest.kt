@@ -6,14 +6,19 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionPreferences
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
+import com.rossomak.flashcards.core.domain.repository.FakeNetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.FakePermissionGateway
+import com.rossomak.flashcards.core.domain.repository.FakePremiumRepository
 import com.rossomak.flashcards.core.domain.repository.FakeStudySessionPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.FilterFlashcardsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetFlashcardsUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetPremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObservePermissionStatusUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObservePremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveStudySessionPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.RequestPermissionUseCase
@@ -60,6 +65,8 @@ class PreviewStudySessionSeedingTest {
     private val preferencesRepository = FakeStudySessionPreferencesRepository()
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val permissionGateway = FakePermissionGateway()
+    private val premiumRepository = FakePremiumRepository()
+    private val networkAvailabilityGateway = FakeNetworkAvailabilityGateway()
     private val voiceSettingsController: VoiceSettingsController = mockk(relaxed = true)
 
     private val route = PreviewStudySessionRoute(
@@ -108,6 +115,9 @@ class PreviewStudySessionSeedingTest {
         SaveUserPreferenceUseCase(userPreferencesRepository),
         ObservePermissionStatusUseCase(permissionGateway),
         RequestPermissionUseCase(permissionGateway),
+        ObservePremiumUseCase(premiumRepository),
+        GetPremiumUseCase(premiumRepository),
+        ObserveInternetAvailabilityUseCase(networkAvailabilityGateway),
         voiceSettingsController,
     )
 

@@ -25,6 +25,4 @@ class FakeVoiceAnswerGradingRepository : VoiceAnswerGradingRepository {
     }
 
     override suspend fun transcribeAndSanitize(obfuscatedAnswerWav: ByteArray): Result<String> = Result.success("")
-
-    override suspend fun checkEntitlement(): Result<Boolean> = Result.success(true)
 }

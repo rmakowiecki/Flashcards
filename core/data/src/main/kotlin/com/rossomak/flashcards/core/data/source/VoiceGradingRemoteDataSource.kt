@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.data.source
 
-import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import kotlinx.coroutines.flow.Flow
 
@@ -35,7 +34,4 @@ interface VoiceGradingRemoteDataSource {
      * streamed chunk and ignores the empty terminal result.
      */
     suspend fun transcribeAndSanitize(wavBytes: ByteArray): Result<String>
-
-    /** Server-side premium entitlement verdict for the calling user. */
-    suspend fun checkEntitlement(): EntitlementDto
 }
