@@ -8,10 +8,10 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class FetchPremiumUseCaseTest {
+class GetPremiumUseCaseTest {
 
     private val premiumRepository = mockk<PremiumRepository>()
-    private val useCase = FetchPremiumUseCase(premiumRepository)
+    private val useCase = GetPremiumUseCase(premiumRepository)
 
     @Test
     fun `passes on the repository's fetch result`() = runTest {

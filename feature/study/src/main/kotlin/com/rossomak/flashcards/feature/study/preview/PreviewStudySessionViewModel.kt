@@ -13,7 +13,7 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasSeenVoiceAnsweringInfo
 import com.rossomak.flashcards.core.domain.model.VoiceOption
 import com.rossomak.flashcards.core.domain.model.orderedBy
-import com.rossomak.flashcards.core.domain.usecase.FetchPremiumUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetPremiumUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCategoryUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetSubcategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveInternetAvailabilityUseCase
@@ -68,7 +68,7 @@ class PreviewStudySessionViewModel @Inject constructor(
     private val observePermissionStatus: ObservePermissionStatusUseCase,
     private val requestPermission: RequestPermissionUseCase,
     private val observePremium: ObservePremiumUseCase,
-    private val fetchPremium: FetchPremiumUseCase,
+    private val getPremium: GetPremiumUseCase,
     private val observeInternetAvailability: ObserveInternetAvailabilityUseCase,
     private val voiceSettingsController: VoiceSettingsController,
 ) : ViewModel() {
@@ -441,7 +441,7 @@ class PreviewStudySessionViewModel @Inject constructor(
             return false
         }
         _state.update { it.copy(isCheckingPremium = true) }
-        val result = fetchPremium()
+        val result = getPremium()
         val isPremium = result.getOrDefault(false)
         val revertsToManual = result.isSuccess && !isPremium
         _state.update { state ->

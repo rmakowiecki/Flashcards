@@ -4,7 +4,7 @@ import com.rossomak.flashcards.core.domain.repository.PremiumRepository
 import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
 
-class FetchPremiumUseCase @Inject constructor(
+class GetPremiumUseCase @Inject constructor(
     private val premiumRepository: PremiumRepository,
 ) : NoParamUseCase<Result<Boolean>> {
 
