@@ -421,7 +421,7 @@ class PreviewStudySessionViewModel @Inject constructor(
         if (selectedCardIds.isEmpty() || sessionStartJob?.isActive == true || _state.value.isLoading) return
         sessionStartJob = viewModelScope.launch {
             if (_state.value.isMicPermissionNeeded) {
-                if (!ensurePremium()) return@launch
+                if (!ensurePremiumStatus()) return@launch
                 if (!ensureMicPermission()) return@launch
             }
             eventChannel.send(_state.value.toSessionDestination(categoryId = route.categoryId, cardIds = selectedCardIds))
@@ -431,9 +431,10 @@ class PreviewStudySessionViewModel @Inject constructor(
     /**
      * Asks the server, never the followed value, which may be stale or unknown. Offline or unreachable
      * opens the offline dialog; not Premium turns voice answering off for this session and says the
-     * feature is coming soon.
+     * feature is coming soon. Returns false, with no dialog or message, when the settings changed
+     * during the check so the session no longer needs the microphone.
      */
-    private suspend fun ensurePremium(): Boolean {
+    private suspend fun ensurePremiumStatus(): Boolean {
         if (!_state.value.isOnline) {
             _state.update { it.copy(activeDialog = VoiceAnsweringOffline) }
             return false
@@ -441,17 +442,18 @@ class PreviewStudySessionViewModel @Inject constructor(
         _state.update { it.copy(isCheckingPremium = true) }
         val result = getPremium()
         val isPremium = result.getOrDefault(false)
-        val revertsToManual = result.isSuccess && !isPremium
+        val needsMicrophone = _state.value.isMicPermissionNeeded
+        val revertsToManual = needsMicrophone && result.isSuccess && !isPremium
         _state.update { state ->
             state.copy(
                 isCheckingPremium = false,
                 isPremium = result.getOrNull() ?: state.isPremium,
                 config = if (revertsToManual) state.config.copy(voiceAnsweringEnabled = false) else state.config,
-                activeDialog = if (result.isFailure) VoiceAnsweringOffline else state.activeDialog,
+                activeDialog = if (needsMicrophone && result.isFailure) VoiceAnsweringOffline else state.activeDialog,
             )
         }
         if (revertsToManual) _messages.tryEmit(PreviewStudySessionMessage.PremiumFeatureComingSoon)
-        return isPremium
+        return isPremium && needsMicrophone
     }
 
     /**

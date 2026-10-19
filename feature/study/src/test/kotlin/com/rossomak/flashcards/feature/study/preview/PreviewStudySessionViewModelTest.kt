@@ -2065,6 +2065,47 @@ class PreviewStudySessionViewModelTest {
         }
 
     @Test
+    fun `switching to manual answering during the Premium check shows no message, no prompt and starts nothing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            premiumRepository.fetchResult = Result.success(false)
+            premiumRepository.fetchGate = CompletableDeferred()
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onSwitchToManualAnswering()
+                premiumRepository.fetchGate?.complete(Unit)
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.activeDialog shouldBe null
+            viewModel.state.value.isCheckingPremium shouldBe false
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
+    fun `switching to manual answering during a Premium check that succeeds asks for no microphone`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            markVoiceAnsweringInfoSeen()
+            premiumRepository.fetchResult = Result.success(true)
+            premiumRepository.fetchGate = CompletableDeferred()
+            val viewModel = createVoiceAnsweringViewModel()
+            viewModel.onStartSession()
+            advanceUntilIdle()
+
+            viewModel.onSwitchToManualAnswering()
+            premiumRepository.fetchGate?.complete(Unit)
+            advanceUntilIdle()
+
+            permissionGateway.launchedRequests shouldBe emptyList()
+            viewModel.events.test { expectNoEvents() }
+        }
+
+    @Test
     fun `Start checks Premium with the server even when the followed value says Premium`() =
         runTest(mainDispatcherRule.testDispatcher) {
             premiumRepository.premium.value = true
