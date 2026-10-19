@@ -10,7 +10,7 @@ import com.rossomak.flashcards.core.domain.model.SignInFailureReason
 import com.rossomak.flashcards.core.domain.model.SignInResult
 import com.rossomak.flashcards.core.domain.model.SignInResult.Cancelled
 import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
-import com.rossomak.flashcards.core.domain.usecase.CheckInternetAvailabilityUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGitHubUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
@@ -39,7 +39,7 @@ class LoginViewModel @Inject constructor(
     private val signInWithGoogle: SignInWithGoogleUseCase,
     private val signInWithGitHub: SignInWithGitHubUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
-    private val checkInternetAvailability: CheckInternetAvailabilityUseCase,
+    private val getInternetAvailability: GetInternetAvailabilityUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginScreenState())
@@ -101,7 +101,7 @@ class LoginViewModel @Inject constructor(
         _state.update { it.copy(phase = Idle) }
         viewModelScope.launch {
             // The data layer already logged the throwable behind this reason.
-            val isInternetAvailable = checkInternetAvailability()
+            val isInternetAvailable = getInternetAvailability()
             _messages.tryEmit(SignInFailed(reason.toLoginFailureReason(isInternetAvailable, attemptedProvider)))
         }
     }
@@ -113,7 +113,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             // Read after the failure, not before the picker opens, so a wrong "offline" reading can
             // never block the picker.
-            val isInternetAvailable = checkInternetAvailability()
+            val isInternetAvailable = getInternetAvailability()
             loge(error) { "Sign-in failed, internet available: $isInternetAvailable" }
             _messages.tryEmit(SignInFailed(error.toLoginFailureReason(isInternetAvailable)))
         }

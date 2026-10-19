@@ -4,7 +4,7 @@ import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
 
-class CheckInternetAvailabilityUseCase @Inject constructor(
+class GetInternetAvailabilityUseCase @Inject constructor(
     private val networkAvailabilityGateway: NetworkAvailabilityGateway,
 ) : NoParamUseCase<Boolean> {
 

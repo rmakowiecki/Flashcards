@@ -8,10 +8,10 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class CheckInternetAvailabilityUseCaseTest {
+class GetInternetAvailabilityUseCaseTest {
 
     private val networkAvailabilityGateway = mockk<NetworkAvailabilityGateway>()
-    private val useCase = CheckInternetAvailabilityUseCase(networkAvailabilityGateway)
+    private val useCase = GetInternetAvailabilityUseCase(networkAvailabilityGateway)
 
     @Test
     fun `returns true when the gateway reports internet`() = runTest {
