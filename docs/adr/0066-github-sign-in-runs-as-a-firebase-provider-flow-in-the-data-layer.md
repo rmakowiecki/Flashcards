@@ -33,6 +33,13 @@ The domain sees only `AuthRepository.signInWithGitHub(): SignInResult` and `Sign
 The flow requests only the `user:email` scope, so Firebase sees the User's primary email even when it
 is private on GitHub. The GitHub access token Firebase returns is never read or stored.
 
+Firebase fills the User's `displayName` from GitHub's optional Name field only, so a User who never
+set one would have no name. The GitHub username (`login`) reaches the app only on the sign-in's own
+`AuthResult` (`additionalUserInfo`), never on the stored `FirebaseUser`. So every GitHub sign-in writes
+the name into the Firebase profile: GitHub's Name when set, otherwise the username. Rewriting it on
+each sign-in keeps it following renames on GitHub. A failed write is logged and keeps the sign-in; the
+name stays as it was until the next GitHub sign-in. No scope is needed for either field.
+
 ### Rejected
 
 - **`:feature:auth` calls Firebase directly**, as the Google launcher calls Credential Manager. This

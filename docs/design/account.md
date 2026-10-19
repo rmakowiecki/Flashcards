@@ -9,6 +9,7 @@ The top of the screen is a collapsing header built like a large app bar.
 - **Expanded**, it shows the User's avatar (their profile photo or, without one, their initials) beside their name and email. Under both is a line naming the sign-in provider, Google or GitHub, with a Manage link that opens that provider's account page in the browser. For Google, the page opens on the signed-in account even when the device holds several.
 - **Collapsed**, a smaller avatar and the name sit in the pinned row between the back arrow and Sign out. The email and the provider line fade out and stop being announced on the way, which also takes the Manage link out of reach.
 - The header collapses as the list scrolls, and it can also be dragged directly. Released part-way, it settles on whichever end is nearer.
+- A GitHub User's name is their GitHub Name, or their GitHub username when they have not set one ([ADR-0066](../adr/0066-github-sign-in-runs-as-a-firebase-provider-flow-in-the-data-layer.md)).
 - A name, email or provider the User does not have leaves its line out rather than showing a blank. While the screen leaves after signing out, the header keeps showing the last User instead of emptying.
 - Sign out sits in the pinned row in the error color. Expanded it has a label; collapsed only its icon remains, and a screen reader announces it the same way in both states.
 

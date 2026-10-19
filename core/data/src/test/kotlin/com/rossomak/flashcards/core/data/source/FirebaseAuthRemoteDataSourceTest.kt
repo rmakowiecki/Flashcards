@@ -2,8 +2,10 @@ package com.rossomak.flashcards.core.data.source
 
 import android.app.Activity
 import android.net.Uri
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.AdditionalUserInfo
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
@@ -14,6 +16,7 @@ import com.google.firebase.auth.GithubAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.UserInfo
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
@@ -25,6 +28,8 @@ import com.rossomak.flashcards.core.domain.model.SignInResult.Cancelled
 import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
 import com.rossomak.flashcards.core.domain.model.SignInResult.SignedIn
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
+import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -61,7 +66,30 @@ class FirebaseAuthRemoteDataSourceTest {
         every { builder.build() } returns gitHubProvider
     }
 
-    private fun authResultFor(user: FirebaseUser): AuthResult = mockk { every { this@mockk.user } returns user }
+    private fun authResultFor(user: FirebaseUser, additionalUserInfo: AdditionalUserInfo? = null): AuthResult = mockk {
+        every { this@mockk.user } returns user
+        every { this@mockk.additionalUserInfo } returns additionalUserInfo
+    }
+
+    /** What Firebase reports from GitHub on the sign-in itself: the profile's Name and the username. */
+    private fun gitHubSignInInfo(name: String?, username: String?): AdditionalUserInfo = mockk {
+        every { profile } returns mapOf("login" to username, "name" to name)
+        every { this@mockk.username } returns username
+    }
+
+    /** Stubs the profile write on [user] and returns the slot holding the request it was sent. */
+    private fun stubProfileWrite(user: FirebaseUser, result: Task<Void> = Tasks.forResult<Void>(null)): CapturingSlot<UserProfileChangeRequest> {
+        val request = slot<UserProfileChangeRequest>()
+        every { user.updateProfile(capture(request)) } returns result
+        return request
+    }
+
+    /** Signs in a signed-out User through a fresh GitHub flow that reports [signInInfo]. */
+    private fun stubGitHubFlow(user: FirebaseUser, signInInfo: AdditionalUserInfo) {
+        prepareGitHubSignIn()
+        every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
+            Tasks.forResult(authResultFor(user, signInInfo))
+    }
 
     /** A mock, since the real constructor cannot attach the updated credential a provider collision carries. */
     private fun collision(errorCode: String, updatedCredential: AuthCredential?): FirebaseAuthUserCollisionException =
@@ -601,6 +629,102 @@ class FirebaseAuthRemoteDataSourceTest {
     }
 
     @Test
+    fun `signInWithGitHub writes the github name to the profile when it is set`() = runTest {
+        val user = firebaseUser(displayName = null)
+        val request = stubProfileWrite(user)
+        stubGitHubFlow(user, gitHubSignInInfo(name = GITHUB_NAME, username = GITHUB_USERNAME))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result.shouldBeInstanceOf<SignedIn>()
+        request.captured.displayName shouldBe GITHUB_NAME
+    }
+
+    @Test
+    fun `signInWithGitHub writes the github username to the profile when the github name is missing`() = runTest {
+        val user = firebaseUser(displayName = null)
+        val request = stubProfileWrite(user)
+        stubGitHubFlow(user, gitHubSignInInfo(name = null, username = GITHUB_USERNAME))
+
+        createDataSource().signInWithGitHub()
+
+        request.captured.displayName shouldBe GITHUB_USERNAME
+    }
+
+    @Test
+    fun `signInWithGitHub writes the github username to the profile when the github name is blank`() = runTest {
+        val user = firebaseUser(displayName = null)
+        val request = stubProfileWrite(user)
+        stubGitHubFlow(user, gitHubSignInInfo(name = " ", username = GITHUB_USERNAME))
+
+        createDataSource().signInWithGitHub()
+
+        request.captured.displayName shouldBe GITHUB_USERNAME
+    }
+
+    @Test
+    fun `signInWithGitHub replaces a stale profile name with the current github name`() = runTest {
+        val user = firebaseUser(displayName = GITHUB_USERNAME)
+        val request = stubProfileWrite(user)
+        stubGitHubFlow(user, gitHubSignInInfo(name = GITHUB_NAME, username = GITHUB_USERNAME))
+
+        createDataSource().signInWithGitHub()
+
+        request.captured.displayName shouldBe GITHUB_NAME
+    }
+
+    @Test
+    fun `signInWithGitHub leaves the profile alone when it already has the github name`() = runTest {
+        val user = firebaseUser(displayName = GITHUB_NAME)
+        stubProfileWrite(user)
+        stubGitHubFlow(user, gitHubSignInInfo(name = GITHUB_NAME, username = GITHUB_USERNAME))
+
+        createDataSource().signInWithGitHub()
+
+        verify(exactly = 0) { user.updateProfile(any()) }
+    }
+
+    @Test
+    fun `signInWithGitHub leaves the profile alone when github reports no name and no username`() = runTest {
+        val user = firebaseUser(displayName = null)
+        stubProfileWrite(user)
+        stubGitHubFlow(user, gitHubSignInInfo(name = null, username = null))
+
+        val result = createDataSource().signInWithGitHub()
+
+        result.shouldBeInstanceOf<SignedIn>()
+        verify(exactly = 0) { user.updateProfile(any()) }
+    }
+
+    @Test
+    fun `signInWithGitHub keeps the sign-in when the profile write fails`() = runTest {
+        val user = firebaseUser(uid = SIGNED_IN_UID, displayName = null)
+        stubProfileWrite(user, result = Tasks.forException(FirebaseNetworkException(NETWORK_DOWN_MESSAGE)))
+        stubGitHubFlow(user, gitHubSignInInfo(name = null, username = GITHUB_USERNAME))
+
+        val result = createDataSource().signInWithGitHub()
+
+        (result as SignedIn).user.uid shouldBe SIGNED_IN_UID
+    }
+
+    @Test
+    fun `signInWithGitHub writes the github name after signing in with the updated credential`() = runTest {
+        val guest = firebaseUser(uid = GUEST_UID, isAnonymous = true)
+        val existingUser = firebaseUser(uid = EXISTING_UID, displayName = null)
+        val updatedCredential: AuthCredential = mockk()
+        val request = stubProfileWrite(existingUser)
+        prepareGitHubSignIn(guest)
+        every { guest.startActivityForLinkWithProvider(activity, gitHubProvider) } returns
+            Tasks.forException(collision(ERROR_CREDENTIAL_ALREADY_IN_USE, updatedCredential))
+        every { firebaseAuth.signInWithCredential(updatedCredential) } returns
+            Tasks.forResult(authResultFor(existingUser, gitHubSignInInfo(name = null, username = GITHUB_USERNAME)))
+
+        createDataSource().signInWithGitHub()
+
+        request.captured.displayName shouldBe GITHUB_USERNAME
+    }
+
+    @Test
     fun `signInWithGitHub maps an account that exists with a different credential to the email clash`() = runTest {
         prepareGitHubSignIn()
         every { firebaseAuth.startActivityForSignInWithProvider(activity, gitHubProvider) } returns
@@ -702,6 +826,7 @@ class FirebaseAuthRemoteDataSourceTest {
         const val SIGNED_IN_NAME = "Sam"
         const val GITHUB_EMAIL = "gh@example.com"
         const val GITHUB_NAME = "Gus"
+        const val GITHUB_USERNAME = "gus-dev"
         const val GITHUB_AVATAR = "https://avatars.githubusercontent.com/u/1?v=4"
         const val ERROR_CREDENTIAL_ALREADY_IN_USE = "ERROR_CREDENTIAL_ALREADY_IN_USE"
         const val ERROR_EMAIL_ALREADY_IN_USE = "ERROR_EMAIL_ALREADY_IN_USE"
