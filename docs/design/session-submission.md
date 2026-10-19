@@ -20,11 +20,11 @@ The client writes none of these documents. The server decides from its own store
 
 ## Abandoned sessions
 
-A session the User exits before the deck end is recorded exactly like a finished one and marked abandoned. It counts toward the Streak, toward the day's minutes for the Daily Goal, toward time-studied XP, and toward Card Progress for every Flashcard that reached the User. It earns no session-completion XP and never counts toward **Sessions Completed**.
+A session the User exits before the deck end is recorded exactly like a finished one and marked abandoned. It counts toward the Streak, toward the day's minutes for the Daily Goal, and toward Card Progress for every Flashcard that reached the User. It earns no session-completion XP and never counts toward **Sessions Completed**.
 
 ## Duration
 
-A session's duration runs from the moment its first Flashcard is on screen to its termination. The clock never pauses: backgrounding the app or pausing playback does not stop it. Time on the Session Summary screen is excluded, and a session whose Flashcards never loaded has a duration of zero. Time-studied XP counts whole minutes only.
+A session's duration runs from the moment its first Flashcard is on screen to its termination. The clock never pauses: backgrounding the app or pausing playback does not stop it. Time on the Session Summary screen is excluded, and a session whose Flashcards never loaded has a duration of zero. The Daily Goal counts whole minutes only. Duration earns no XP of its own.
 
 ## Study day
 

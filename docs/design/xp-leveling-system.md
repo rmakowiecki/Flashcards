@@ -11,7 +11,6 @@ The progression layer over studying: how a User earns and loses **XP**, how XP t
 | Card Partial | Each Flashcard ending **Partial**, including one that was already Mastered. | Rated |
 | Mastery defended | Each previously Mastered Flashcard ending Mastered again. It earns this instead of the mastery award, not on top of it. | Rated |
 | Card de-mastered | A loss for each previously Mastered Flashcard ending **Failed**. | Rated |
-| Time studied | Each whole minute of the session's duration ([session-submission.md](session-submission.md)). | Both |
 | Session completed | Reaching the end of the deck. Abandoned sessions earn nothing here. | Both |
 | Streak | Once per calendar day, on the first session that extends or restarts the **Streak**. The award grows with the Streak's length up to a cap. | Both |
 | Daily Goal met | Once per calendar day, on the session that brings the day's studied minutes up to the **Daily Goal**. | Both |
@@ -22,13 +21,21 @@ Each per-card award is a flat amount, whatever the Flashcard's Difficulty, so ev
 
 ## XP configuration
 
-Every XP amount, and both level-curve parameters, come from the XP configuration rather than from fixed rules, so the balance can be tuned without shipping a release ([ADR-0047](../adr/0047-xp-values-behind-a-config-repository.md)). The server scores each session with the configuration current when the session is delivered and stores the rates it used on the session, so a later change never rewrites a session already scored. If the server's configuration is missing or invalid, it scores with the bundled defaults. The app and the server each bundle the same defaults, and both test suites check them against one shared default configuration file.
+Every XP amount, and the level-curve parameters, come from the XP configuration rather than from fixed rules, so the balance can be tuned without shipping a release ([ADR-0047](../adr/0047-xp-values-behind-a-config-repository.md)). The server scores each session with the configuration current when the session is delivered and stores the rates it used on the session, so a later change never rewrites a session already scored. If the server's configuration is missing or invalid, it scores with the bundled defaults. The app and the server each bundle the same defaults, and both test suites check them against one shared default configuration file.
 
 The device fetches the server's configuration on every sign-in and keeps the last valid copy, so it can preview a session's XP offline. Until a first fetch succeeds it uses the bundled defaults. A failed or invalid fetch leaves the kept copy unchanged.
 
 ## Level curve
 
-The XP needed to complete a Level grows super-linearly with the Level number: a base amount times the Level raised to an exponent, rounded up to the nearest thousand. The base and the exponent come from the XP configuration, and they are tuned so that early Levels come within a session or two while later ones take sustained effort.
+The XP needed to complete a Level rises in steps. Level 1 costs a base amount, and every later Level costs the previous Level's cost plus a step, so consecutive Levels always cost more than the one before. The step grows with the Level in tiers of a fixed number of Levels, and the last step in the list is the cap that applies to every Level after it. The base, the list of steps and the tier length come from the XP configuration.
+
+With the default configuration the base is 1,000 XP, the steps are 250, 500, 750, 1,000, 1,500 and 2,000 XP, and a tier is 5 Levels. Level 1 costs 1,000 XP, Levels 2 to 5 each cost 250 XP more than the one before, Levels 6 to 10 cost 500 XP more, and so on up to a 2,000 XP step from Level 26 on. The cost of completing a Level is the XP for that Level alone, not a running total:
+
+| Level | 1 | 2 | 3 | 4 | 5 | 6 | 10 | 11 | 15 | 20 | 25 | 26 | 30 | 50 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| XP to complete | 1,000 | 1,250 | 1,500 | 1,750 | 2,000 | 2,500 | 4,500 | 5,250 | 8,250 | 13,250 | 20,750 | 22,750 | 30,750 | 70,750 |
+
+The tiers are tuned so that a first serious session lands within a Level or two of the start, a regular User reaches Level 10 within about a week, and the high Levels take sustained effort.
 
 A Level-up awards no XP of its own. On the Session Summary and on Home, the Level card's bar fills, resets and pulses the Level number for every Level crossed ([session-summary.md](session-summary.md#animation-sequence)).
 

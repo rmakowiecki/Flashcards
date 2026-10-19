@@ -52,9 +52,9 @@ class DataStoreXpConfigLocalDataSourceTest {
             dailyGoalMet = 29,
             streakPerDay = 31,
             streakMaxPerDay = 37,
-            minuteStudied = 23,
-            levelCurveBase = 1234.5,
-            levelCurveExponent = 1.75,
+            levelBaseCost = 1234,
+            levelCostSteps = listOf(41, 43, 47),
+            levelsPerCostStep = 3,
         )
 
         localDataSource.save(config)

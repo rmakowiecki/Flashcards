@@ -14,7 +14,6 @@ fun SessionScore.toDto(): SessionScoreDto = SessionScoreDto(
     partial = breakdown.partial,
     masteryDefenseBonus = breakdown.masteryDefenseBonus,
     demastered = breakdown.demastered,
-    timeStudied = breakdown.timeStudied,
     sessionCompletionBonus = breakdown.sessionCompletionBonus,
     dailyGoalBonus = breakdown.dailyGoalBonus,
     streakBonus = breakdown.streakBonus,
@@ -39,7 +38,6 @@ fun SessionScore.toDto(): SessionScoreDto = SessionScoreDto(
         cardPartial = rates.cardPartial,
         masteryDefended = rates.masteryDefended,
         cardDemastered = rates.cardDemastered,
-        minuteStudied = rates.minuteStudied,
         sessionCompleted = rates.sessionCompleted,
     ),
 )
@@ -51,7 +49,6 @@ fun SessionScoreDto.toDomain(): SessionScore = SessionScore(
         partial = partial,
         masteryDefenseBonus = masteryDefenseBonus,
         demastered = demastered,
-        timeStudied = timeStudied,
         sessionCompletionBonus = sessionCompletionBonus,
         dailyGoalBonus = dailyGoalBonus,
         streakBonus = streakBonus,
@@ -77,7 +74,6 @@ fun SessionScoreDto.toDomain(): SessionScore = SessionScore(
         cardPartial = rates.cardPartial,
         masteryDefended = rates.masteryDefended,
         cardDemastered = rates.cardDemastered,
-        minuteStudied = rates.minuteStudied,
         sessionCompleted = rates.sessionCompleted,
     ),
 )

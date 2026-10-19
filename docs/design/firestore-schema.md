@@ -87,12 +87,12 @@ users/{uid}/sessions/{sessionId}                → {
         attemptsUsed?, wasPreviouslyMastered?                           // Rated only
     }, ... },
     newCards, mastered, partial, masteryDefenseBonus, demastered,
-    timeStudied, sessionCompletionBonus, dailyGoalBonus, streakBonus, xpTotal,
+    sessionCompletionBonus, dailyGoalBonus, streakBonus, xpTotal,
     levelBefore, xpIntoCurrentLevelBefore, xpForNextLevelBefore,
     levelAfter, xpIntoCurrentLevelAfter, xpForNextLevelAfter, levelsCrossed[],
     currentStreakAfter,
     xpRates: { newCardStudied, cardMastered, cardPartial, masteryDefended,
-               cardDemastered, minuteStudied, sessionCompleted }
+               cardDemastered, sessionCompleted }
 }
 ```
 
@@ -170,8 +170,8 @@ config/xp                                       → { newCardStudied, cardMaster
                                                     masteryDefended, cardDemastered,
                                                     sessionCompleted, dailyGoalMet,
                                                     streakPerDay, streakMaxPerDay,
-                                                    minuteStudied,
-                                                    levelCurveBase, levelCurveExponent }
+                                                    levelBaseCost, levelCostSteps[],
+                                                    levelsPerCostStep }
 ```
 
 - **The one server-owned XP configuration**: every XP amount and the level curve's parameters ([ADR-0047](../adr/0047-xp-values-behind-a-config-repository.md)). `submitStudySession` scores each session with its current copy, falling back to the bundled defaults if the document is missing or invalid. How the client keeps its own copy is in [xp-leveling-system.md](xp-leveling-system.md).

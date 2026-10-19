@@ -549,7 +549,6 @@ class SessionSubmissionDeliveryWorkerTest {
                 cardPartial = 25,
                 masteryDefended = 50,
                 cardDemastered = -80,
-                minuteStudied = 10,
                 sessionCompleted = 500,
             ),
         )

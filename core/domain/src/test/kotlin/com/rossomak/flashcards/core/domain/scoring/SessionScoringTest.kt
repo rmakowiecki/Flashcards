@@ -83,7 +83,6 @@ class SessionScoringTest {
         rates.cardPartial shouldBe CONFIG.cardPartial
         rates.masteryDefended shouldBe CONFIG.masteryDefended
         rates.cardDemastered shouldBe CONFIG.cardDemastered
-        rates.minuteStudied shouldBe CONFIG.minuteStudied
         rates.sessionCompleted shouldBe CONFIG.sessionCompleted
     }
 
@@ -281,7 +280,8 @@ class SessionScoringTest {
         val STARTED_AT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
         // Distinct rates, so a line scored with the wrong rate cannot pass by coincidence, and a flat
-        // curve (1000 per Level) so one session from STARTING_XP crosses exactly one Level.
+        // curve (1000 for the first Level, 1000 more for each next one) so one session from STARTING_XP
+        // crosses exactly one Level.
         val CONFIG = XpConfig(
             newCardStudied = 11,
             cardMastered = 101,
@@ -289,11 +289,11 @@ class SessionScoringTest {
             masteryDefended = 47,
             cardDemastered = -79,
             sessionCompleted = 503,
-            minuteStudied = 7,
             dailyGoalMet = 31,
             streakPerDay = 29,
-            levelCurveBase = 400.0,
-            levelCurveExponent = 1.0,
+            levelBaseCost = 1000,
+            levelCostSteps = listOf(1000),
+            levelsPerCostStep = 1,
         )
     }
 }

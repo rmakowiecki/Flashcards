@@ -218,8 +218,6 @@ class StudySessionSummaryViewModel @Inject constructor(
     }
 }
 
-private const val SECONDS_PER_MINUTE = 60
-
 /** [scoredXpTotal] is `null` until the score exists. */
 private fun resolveHeadline(
     mode: StudyMode,
@@ -235,7 +233,6 @@ private fun resolveHeadline(
 
 /** Amounts are [score]'s own totals, never recomputed; zero amounts are dropped. */
 private fun buildXpBreakdownLines(route: StudySessionSummaryRoute, score: SessionScore): List<XpBreakdownLine> {
-    val minutesStudied = route.durationSeconds / SECONDS_PER_MINUTE
     val lines = mutableListOf<XpBreakdownLine>()
     fun addMultiplied(source: XpAwardSource, amount: Int, count: Int, rate: Int) {
         lines += XpBreakdownLine(source, count = count, rate = rate, amount = amount)
@@ -248,7 +245,6 @@ private fun buildXpBreakdownLines(route: StudySessionSummaryRoute, score: Sessio
             addMultiplied(XpAwardSource.MasteryDefended, breakdown.masteryDefenseBonus, counts.defended ?: 0, rates.masteryDefended)
             addMultiplied(XpAwardSource.MasteryLost, breakdown.demastered, counts.demastered ?: 0, rates.cardDemastered)
         }
-        addMultiplied(XpAwardSource.TimeStudied, breakdown.timeStudied, minutesStudied, rates.minuteStudied)
         lines += XpBreakdownLine(XpAwardSource.Streak, count = currentStreak, rate = null, amount = breakdown.streakBonus)
         lines += XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = breakdown.sessionCompletionBonus)
         lines += XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = breakdown.dailyGoalBonus)

@@ -3,12 +3,12 @@
   "cardMastered": 100,
   "cardPartial": 25,
   "masteryDefended": 50,
-  "cardDemastered": -80,
-  "sessionCompleted": 500,
-  "dailyGoalMet": 1000,
+  "cardDemastered": -100,
+  "sessionCompleted": 100,
+  "dailyGoalMet": 500,
   "streakPerDay": 250,
-  "streakMaxPerDay": 2500,
-  "minuteStudied": 10,
-  "levelCurveBase": 1000.0,
-  "levelCurveExponent": 2.5
+  "streakMaxPerDay": 1000,
+  "levelBaseCost": 1000,
+  "levelCostSteps": [250, 500, 750, 1000, 1500, 2000],
+  "levelsPerCostStep": 5
 }

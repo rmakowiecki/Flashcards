@@ -69,9 +69,10 @@ python3 seed_xp_config.py                # overwrite config/xp (same credentials
 ```
 
 To change live XP rates without an app release or a function deploy, edit `config/xp` in the Firebase
-console. Every field must stay present and numeric, award fields must be integers, `cardDemastered` must
-be zero or negative, and `levelCurveBase` must be positive. The function scores with its bundled default
-and logs an error while the document is missing or invalid.
+console. Every field must stay present, award fields must be integers, `cardDemastered` must be zero or
+negative, `levelBaseCost` and `levelsPerCostStep` must be positive integers, and `levelCostSteps` must be a
+nonempty list of positive integers. The function scores with its bundled default and logs an error while the
+document is missing or invalid.
 
 ## Notes
 
