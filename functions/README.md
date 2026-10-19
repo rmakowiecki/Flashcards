@@ -1,11 +1,12 @@
 # Cloud Functions
 
-The app's server side: five `onCall` callables. Two serve Voice Answering (`entitlement`,
-`transcribeAndGradeSpokenAnswer`; design in `docs/design/voice-answering.md`, shape in
+The app's server side: four `onCall` callables and one Auth trigger. `transcribeAndGradeSpokenAnswer`
+serves Voice Answering (design in `docs/design/voice-answering.md`, shape in
 `docs/adr/0024-voice-grading-cloud-function-proxy.md` and
 `docs/adr/0029-voice-grading-two-callables-payload-inferred-debug-mode.md`). `submitStudySession`
 records a finished session (`docs/design/session-submission.md`), `submitBugReport` stores a Bug
-Report (ADR-0058) and `deleteAccount` runs Account Deletion (ADR-0059).
+Report (ADR-0058) and `deleteAccount` runs Account Deletion (ADR-0059). `grantPremiumOnUserCreate`
+is the temporary Premium auto-grant (ADR-0069); no app code calls it.
 This file is the practical "how to set it up / how it works" reference; the ADRs are the "why".
 
 ## Project
@@ -27,8 +28,8 @@ callable runtime, or the call is rejected `unauthenticated` before any code runs
 ```
 functions/
   package.json / tsconfig.json      — Node 22, TypeScript, strict
-  src/index.ts                      — the 5 exported onCall functions
-  src/lib/entitlement.ts            — Firestore entitlement read (isPremiumUser)
+  src/index.ts                      — the 4 exported onCall functions and the Auth trigger
+  src/lib/entitlement.ts            — Premium: the record read, the paid-callable guard (requirePremiumCaller) and the auto-grant
   src/lib/elevenlabs.ts             — ElevenLabs Scribe STT call
   src/lib/grading.ts                — Vertex AI Gemini sanitize + grade calls
   src/lib/httpError.ts              — HttpError(statusCode, message) thrown by elevenlabs/grading libs
@@ -49,11 +50,23 @@ the Admin SDK scripts under `scripts/seed/` and one-off setup commands below).
 
 The voice callables are called from `core/data/.../source/FirebaseVoiceGradingRemoteDataSource.kt`.
 
-### `entitlement`
+### Premium
 
-Server-authoritative premium check. No request payload. Returns `{ "is_premium": bool }` by reading
-`users/{uid}/entitlement/premium`. Rejects `unauthenticated` if no ID token. Its only current caller
-is the debug screen; kept as the seam a future proactive paywall gate hangs off (ADR-0029 §6).
+There is no entitlement callable: the app reads its own `users/{uid}/entitlement/premium` record
+through a Firestore listener (owner-read-only rule, ADR-0068), and every server function that needs
+Premium reads the record directly.
+
+- **`requirePremiumCaller`** (`lib/entitlement.ts`) guards every paid callable: the revoked-token
+  guard, then a refusal of any Guest (an Auth user with no provider data, read from the user record,
+  not the ID token), then the record's `isPremium`. A caller whose session is no longer active is
+  refused as `unauthenticated`; the Guest and Premium refusals are `permission-denied`.
+- **`grantPremiumOnUserCreate`** is a 1st-gen Auth `onCreate` trigger (2nd gen has no non-blocking
+  Auth triggers, and blocking ones need Identity Platform). It creates the record with
+  `{ isPremium: true, source: "auto-grant", grantedAt }` for every new Auth user, a Guest included,
+  so the grant survives the Guest linking Google or GitHub. It uses `create()`, so an existing record
+  is never overwritten. A failed grant is retried, and a grant that runs after its Auth user is gone
+  writes nothing, so it never recreates data for a deleted account. Temporary (ADR-0069): deleting it
+  needs no app release.
 
 ### `transcribeAndGradeSpokenAnswer`
 
@@ -69,7 +82,7 @@ not a flag** (ADR-0029 §3):
 Rules enforced server-side:
 - `audio_base64` is **always** required → `invalid-argument` if missing.
 - `question` + `expected_answer` are **both-or-neither** → exactly one present is `invalid-argument`.
-- Premium entitlement is required → `permission-denied` (mapped client-side to `VoiceGradingEntitlementException`).
+- The caller must be Premium and not a Guest (`requirePremiumCaller`) → `permission-denied` (mapped client-side to `VoiceGradingEntitlementException`).
 
 `card_id` is accepted but unused server-side. Neither this function nor the client stores the
 transcript or the grade: the client turns the grade into a Rating, and only the session's Ratings
@@ -141,8 +154,10 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
    in-place rename), so explicitly delete the retired functions from the previous shape first:
    ```
    npx firebase-tools functions:delete gradeVoiceAnswer transcribe sanitizeAndGrade --force
+   npx firebase-tools functions:delete entitlement --force   # retired by ADR-0068
    cd functions && npm run build && cd .. && npx firebase-tools deploy --only functions
-   npx firebase-tools functions:list   # expect only: entitlement, transcribeAndGradeSpokenAnswer
+   npx firebase-tools functions:list   # expect: transcribeAndGradeSpokenAnswer, submitStudySession,
+                                       # submitBugReport, deleteAccount, grantPremiumOnUserCreate
    ```
    (On a truly fresh project the `functions:delete` is a harmless no-op.)
 
@@ -164,31 +179,16 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
    needs its own explicit `match` block or it default-denies. Confirm real Firestore paths by
    grepping `core/data/.../source/*.kt` for `.collection(...)` before writing a rule.
 
-9. **Entitlement doc for a test account.** Play Billing → Firestore sync is deferred; until it
-   exists, populate the doc by hand. Find the UID in
-   `https://console.firebase.google.com/project/flashcards-8ad6d/authentication/users`, then create
-   `users/{uid}/entitlement/premium` with field `isPremium: true` (boolean) via the console, or:
-   ```js
-   node -e '
-   const admin = require("./functions/node_modules/firebase-admin");
-   admin.initializeApp({ credential: admin.credential.cert(require("./firebase-service-account.json")) });
-   const uid = "PASTE_UID_HERE";
-   admin.firestore().collection("users").doc(uid).collection("entitlement").doc("premium")
-     .set({ isPremium: true })
-     .then(() => process.exit(0));
-   '
-   ```
-   **Credential handling.** Prefer Application Default Credentials
-   (`gcloud auth application-default login`, then drop the `credential:` arg) over a downloaded
-   `firebase-service-account.json`. If you must use a key file, keep it **outside the repo** or
-   ensure it is gitignored, never commit it, and delete/rotate it once the manual entitlement edit
-   is done — it grants full Admin SDK access to the project.
+9. **Premium for an account created before the auto-grant.** `grantPremiumOnUserCreate` only
+   covers users created after it is deployed, and there is no backfill. For an older account, find
+   the UID in `https://console.firebase.google.com/project/flashcards-8ad6d/authentication/users`,
+   then create `users/{uid}/entitlement/premium` in the console with `isPremium: true` (boolean) and
+   `source: "admin"`. To revoke Premium, set `isPremium` to `false`; never delete the record.
 
 10. **Point the app at the backend.** Nothing to configure — the app resolves the backend from
     `google-services.json` (already load-bearing for Auth + Firestore). Confirm it points at
     `flashcards-8ad6d` (project number 1044553396320). Rebuild (`./gradlew assembleDebug`), open the
-    debug-only 🛠️ Voice Debug tab, and test in order: entitlement (no third-party cost) →
-    transcribe + sanitize → a real study-session voice answer for the full streaming path.
+    debug-only 🛠️ Voice Debug tab, and test in order: transcribe + sanitize → a real study-session voice answer for the full streaming path.
 
 ### `submitBugReport`
 
@@ -213,8 +213,9 @@ with the uid and the failed step.
 ## Local iteration
 
 - `npm run build:watch` inside `functions/` for a standing `tsc --watch`.
-- `entitlement` and `transcribeAndGradeSpokenAnswer` have no local emulator setup (deferred,
-  ADR-0029) — every test against them goes through the real deployed callables via the debug screen.
+- `transcribeAndGradeSpokenAnswer` has no local emulator setup (deferred, ADR-0029) — every test
+  against it goes through the real deployed callable via the debug screen. Its Premium guard and the
+  auto-grant are tested against the emulators in `lib/entitlement.test.ts`.
   The in-app fake/real toggles are gone — the fake now only exists as a unit-test double
   (`core/data/src/test`).
 - `submitStudySession` and `submitBugReport` have real local test suites: `npm test`

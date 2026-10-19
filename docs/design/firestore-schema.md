@@ -52,10 +52,12 @@ meta/seed                                       → { value }
 ## Entitlement
 
 ```
-users/{uid}/entitlement/premium                 → { isPremium }
+users/{uid}/entitlement/premium                 → { isPremium, source, grantedAt }
 ```
 
-- **No client access.** No security rule matches it, so every client read and write is denied. Only Cloud Functions read it: the premium voice grading call checks it, and an entitlement call reports it to the app ([voice-answering.md](voice-answering.md)). It is set with the Admin SDK.
+- **The User's Premium record.** `isPremium` is the only field any reader acts on. `source` says who wrote it (`auto-grant`, or `admin` for a console edit) and `grantedAt` when the auto-grant created it; both are for admins only.
+- **Owner-read-only.** The User may read their own record, so the app can follow Premium as it changes ([ADR-0068](../adr/0068-client-observes-premium-from-the-entitlement-record.md)). No client may write it. The paid Cloud Functions read it on every call ([voice-answering.md](voice-answering.md#entitlement)).
+- **Written only with the Admin SDK.** A function creates it when an Auth user is created, Guests included, and never overwrites an existing record ([ADR-0069](../adr/0069-premium-auto-granted-on-auth-user-creation.md)). An admin grants or revokes Premium by editing it in the console. Revoking sets `isPremium` to false and keeps the record, so the auto-grant cannot restore it.
 - The `users/{uid}` document itself has no fields and no client access. Every per-User document lives in a subcollection below it: identity and entitlement are kept apart from the scoring state in `progress`, which is the only state a session commit changes.
 
 ## Favorites

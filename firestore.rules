@@ -103,8 +103,12 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == uid;
       }
 
-      // entitlement: intentionally no rule here -> default deny.
-      // Only the Cloud Function (Admin SDK) may read/write it.
+      // entitlement/premium (ADR-0068): the User's Premium record. Owner-read-only so the app can
+      // observe Premium live; written only by the Admin SDK (the auto-grant function of ADR-0069, or an
+      // admin in the console), never by a client. The server still checks it before every paid call.
+      match /entitlement/premium {
+        allow read: if request.auth != null && request.auth.uid == uid;
+      }
     }
   }
 }
