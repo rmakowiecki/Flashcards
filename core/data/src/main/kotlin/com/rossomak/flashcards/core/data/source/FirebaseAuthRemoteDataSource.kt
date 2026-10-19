@@ -9,7 +9,9 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GithubAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
 import com.rossomak.flashcards.core.domain.model.AuthProvider
 import com.rossomak.flashcards.core.domain.model.AuthUser
@@ -51,7 +53,8 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
     /**
      * Firebase runs GitHub's OAuth flow in a Custom Tab and signs in directly, so no token comes back
      * first. Only the `user:email` scope is requested, so the primary email is known even when it is
-     * private on GitHub. The GitHub access token Firebase returns is never read.
+     * private on GitHub. The GitHub access token Firebase returns is never read. Each sign-in also
+     * syncs the User's name from GitHub (see [syncGitHubDisplayName]).
      *
      * The flow backgrounds the app, so the system can kill the process while the Custom Tab is open.
      * Firebase keeps the result of such a flow in [FirebaseAuth.getPendingAuthResult], which is
@@ -65,9 +68,35 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
         }
         val gitHubFlow = firebaseAuth.pendingAuthResult ?: startGitHubFlow(activity)
         return completeSignIn(
-            attempt = { gitHubFlow.await() },
-            signInAfterCredentialInUse = ::signInWithUpdatedCredential,
+            attempt = { gitHubFlow.await().also { result -> syncGitHubDisplayName(result) } },
+            signInAfterCredentialInUse = { collision ->
+                signInWithUpdatedCredential(collision).also { result -> syncGitHubDisplayName(result) }
+            },
         )
+    }
+
+    /**
+     * Firebase fills `displayName` from GitHub's optional Name field only, so a User who never set one
+     * would have no name. The username (`login`) is exposed only on the [AuthResult] of the sign-in that
+     * returned it, so it is written into the profile here: GitHub's Name when set, otherwise the
+     * username. Rewriting it on every sign-in keeps it following renames on GitHub.
+     *
+     * A failed write keeps the sign-in: the name stays as it was until the next GitHub sign-in.
+     */
+    private suspend fun syncGitHubDisplayName(result: AuthResult) {
+        val user = result.user ?: return
+        val gitHubProfile = result.additionalUserInfo
+        val gitHubName = (gitHubProfile?.profile?.get(GITHUB_NAME_KEY) as? String)?.takeUnless(String::isBlank)
+            ?: gitHubProfile?.username?.takeUnless(String::isBlank)
+            ?: return
+        if (user.displayName == gitHubName) return
+        try {
+            user.updateProfile(UserProfileChangeRequest.Builder().setDisplayName(gitHubName).build()).await()
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            logw(exception) { "Writing the GitHub name to the profile failed, keeping the sign-in" }
+        }
     }
 
     /**
@@ -201,6 +230,7 @@ class FirebaseAuthRemoteDataSource @Inject constructor(
         const val PHOTO_SIZE_PX = 256
         const val ERROR_CREDENTIAL_ALREADY_IN_USE = "ERROR_CREDENTIAL_ALREADY_IN_USE"
         const val GITHUB_EMAIL_SCOPE = "user:email"
+        const val GITHUB_NAME_KEY = "name"
         val SIGN_IN_PROVIDERS = mapOf(
             GoogleAuthProvider.PROVIDER_ID to AuthProvider.Google,
             GithubAuthProvider.PROVIDER_ID to AuthProvider.GitHub,
