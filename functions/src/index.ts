@@ -1,7 +1,8 @@
 import * as admin from "firebase-admin";
+import * as functionsV1 from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
-import { isPremiumUser } from "./lib/entitlement";
+import { grantPremiumToNewUser, requirePremiumCaller } from "./lib/entitlement";
 import { transcribeWithElevenLabsScribe } from "./lib/elevenlabs";
 import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
 import { handleDeleteAccountCall } from "./lib/deleteAccount";
@@ -34,24 +35,6 @@ const TRANSCRIPTION_TIMEOUT_MS = 15_000;
 const LLM_CALL_TIMEOUT_MS = 15_000;
 const VOICE_GRADING_DEADLINE_MS = 19_000;
 const VOICE_GRADING_TIMEOUT_SECONDS = 20;
-
-interface EntitlementResult {
-  is_premium: boolean;
-}
-
-/**
- * Server-authoritative premium check (ADR-0029 §1). `onCall` verifies the Firebase ID token
- * automatically (`request.auth`); no manual bearer parsing. Sole caller today is the debug
- * screen, kept as the seam a future proactive paywall gate hangs off (ADR-0029 §6).
- */
-export const entitlement = onCall<void, Promise<EntitlementResult>>(
-  RUNTIME_OPTIONS,
-  async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Missing Firebase ID token");
-    return { is_premium: await isPremiumUser(uid) };
-  },
-);
 
 interface TranscribeAndGradeRequest {
   card_id?: string;
@@ -93,11 +76,7 @@ export const transcribeAndGradeSpokenAnswer = onCall<
   { ...RUNTIME_OPTIONS, timeoutSeconds: VOICE_GRADING_TIMEOUT_SECONDS, secrets: [elevenLabsApiKey] },
   async (request, response) => {
     const deadline = new RequestDeadline(VOICE_GRADING_DEADLINE_MS);
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Missing Firebase ID token");
-    if (!(await isPremiumUser(uid))) {
-      throw new HttpsError("permission-denied", "No active premium entitlement");
-    }
+    await requirePremiumCaller(admin.auth(), admin.firestore(), request);
 
     const { question, expected_answer: expectedAnswer, audio_base64: audioBase64 } = request.data;
     if (typeof audioBase64 !== "string" || audioBase64.length === 0) {
@@ -185,3 +164,16 @@ export const submitBugReport = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (
 export const deleteAccount = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
   handleDeleteAccountCall(admin.auth(), admin.firestore(), request),
 );
+
+/**
+ * The temporary Premium auto-grant (ADR-0069): every new Auth user, a Guest included, gets Premium.
+ * A 1st-gen Auth trigger, because 2nd gen has no non-blocking Auth triggers and the blocking ones need
+ * Identity Platform. No app code calls or names it, so deleting it needs no app release. A Guest's
+ * grant unlocks nothing until it links Google or GitHub (`requirePremiumCaller`). A failed grant is
+ * retried, so a transient Firestore error never leaves a new user without Premium.
+ */
+export const grantPremiumOnUserCreate = functionsV1
+  .runWith({ failurePolicy: true })
+  .region(RUNTIME_OPTIONS.region)
+  .auth.user()
+  .onCreate((user) => grantPremiumToNewUser(admin.auth(), admin.firestore(), user.uid));

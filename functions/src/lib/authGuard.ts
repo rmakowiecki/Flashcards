@@ -1,4 +1,4 @@
-import { Auth } from "firebase-admin/auth";
+import { Auth, UserRecord } from "firebase-admin/auth";
 import { CallableRequest, HttpsError } from "firebase-functions/v2/https";
 
 const USER_NOT_FOUND_CODE = "auth/user-not-found";
@@ -18,6 +18,11 @@ const USER_NOT_FOUND_CODE = "auth/user-not-found";
  * Takes the Auth instance as a parameter so tests can pass one bound to the Auth emulator.
  */
 export async function requireActiveSession(auth: Auth, request: Pick<CallableRequest<unknown>, "auth">): Promise<string> {
+  return (await requireActiveUser(auth, request)).uid;
+}
+
+/** The same guard as `requireActiveSession`, returning the caller's whole Auth user record for a caller that needs more than the uid. */
+export async function requireActiveUser(auth: Auth, request: Pick<CallableRequest<unknown>, "auth">): Promise<UserRecord> {
   const callerAuth = request.auth;
   if (!callerAuth?.uid) throw new HttpsError("unauthenticated", "Missing Firebase ID token");
 
@@ -36,5 +41,5 @@ export async function requireActiveSession(auth: Auth, request: Pick<CallableReq
       throw new HttpsError("unauthenticated", "The ID token has been revoked");
     }
   }
-  return callerAuth.uid;
+  return user;
 }
