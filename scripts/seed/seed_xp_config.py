@@ -2,9 +2,11 @@
 
 `testdata/xp-scoring/default-xp-config.json` at the repo root holds every XpConfig field with its
 bundled default; both the Cloud Functions and the Android client test that their own bundled defaults
-equal it. This script copies that file into Firestore as-is, validated first with the same rules the
+equal it. This script copies that file into Firestore as-is, validated first with the rules the
 `submitStudySession` function applies when it reads the document (`functions/src/lib/xpConfig.ts`), so
-a bad file never reaches Firestore.
+a bad file never reaches Firestore. It is stricter in one way: it also rejects fields outside the
+schema, where the server ignores them, so a misspelled field fails here instead of leaving the server
+silently on its bundled defaults.
 
 Idempotent: every run overwrites the whole document. After a console edit to the live rates, rerunning
 this script resets them to the file's defaults.

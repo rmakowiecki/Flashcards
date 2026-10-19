@@ -6,7 +6,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.di.UserPreferencesDataStore
+import com.rossomak.flashcards.core.data.mapper.toDomain
+import com.rossomak.flashcards.core.data.model.XpConfigDto
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import java.io.IOException
 import javax.inject.Inject
@@ -15,8 +18,9 @@ import kotlinx.coroutines.flow.first
 
 /**
  * Keeps the last fetched XP configuration under its own `xp_config_` keys in the app's one
- * preferences file. All eleven values are written in one edit, so a read sees either a whole
- * configuration or none.
+ * preferences file. All twelve values are written in one edit, so a read sees either a whole
+ * configuration or none. A stored copy that no longer passes the same validation as a fetched one reads
+ * as none, so the caller falls back to the bundled defaults instead of failing.
  */
 class DataStoreXpConfigLocalDataSource @Inject constructor(
     @param:UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
@@ -27,7 +31,7 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
             .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
             .first()
         if (ALL_KEYS.any { key -> key !in prefs }) return null
-        return XpConfig(
+        val storedDto = XpConfigDto(
             newCardStudied = prefs.requireValue(NEW_CARD_STUDIED_KEY),
             cardMastered = prefs.requireValue(CARD_MASTERED_KEY),
             cardPartial = prefs.requireValue(CARD_PARTIAL_KEY),
@@ -38,9 +42,15 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
             streakPerDay = prefs.requireValue(STREAK_PER_DAY_KEY),
             streakMaxPerDay = prefs.requireValue(STREAK_MAX_PER_DAY_KEY),
             levelBaseCost = prefs.requireValue(LEVEL_BASE_COST_KEY),
-            levelCostSteps = prefs.requireValue(LEVEL_COST_STEPS_KEY).split(STEP_SEPARATOR).map { step -> step.toInt() },
+            levelCostSteps = prefs.requireValue(LEVEL_COST_STEPS_KEY).split(STEP_SEPARATOR).map { step -> step.trim().toIntOrNull() },
             levelsPerCostStep = prefs.requireValue(LEVELS_PER_COST_STEP_KEY),
         )
+        return try {
+            storedDto.toDomain()
+        } catch (exception: IllegalArgumentException) {
+            logw(exception) { "Stored XP configuration is invalid; using the bundled defaults" }
+            null
+        }
     }
 
     override suspend fun save(config: XpConfig) {

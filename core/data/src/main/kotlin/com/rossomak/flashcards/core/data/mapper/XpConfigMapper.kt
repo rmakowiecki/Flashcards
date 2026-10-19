@@ -8,7 +8,7 @@ import com.rossomak.flashcards.core.domain.model.XpConfig
  * present and finite, every award a whole number, the de-mastery penalty at most zero, the level
  * curve's base cost and tier length positive whole numbers, and its step list nonempty with every step
  * a positive whole number (a zero or negative step makes a level no more expensive than the one before
- * it, and a tier length of zero divides by zero). Every value is an `Int`, which keeps every threshold
+ * it, and a tier length of zero divides by zero; [XpConfig] itself rejects both). Every value is an `Int`, which keeps every threshold
  * within a `Long` for any level a User could reach.
  *
  * @throws IllegalArgumentException naming the first invalid field.
@@ -30,7 +30,6 @@ fun XpConfigDto.toDomain(): XpConfig {
     )
     require(config.cardDemastered <= 0) { "cardDemastered must be zero or negative, got ${config.cardDemastered}" }
     require(config.levelBaseCost > 0) { "levelBaseCost must be positive, got ${config.levelBaseCost}" }
-    require(config.levelsPerCostStep > 0) { "levelsPerCostStep must be positive, got ${config.levelsPerCostStep}" }
     return config
 }
 

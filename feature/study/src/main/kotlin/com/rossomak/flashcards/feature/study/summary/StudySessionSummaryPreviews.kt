@@ -21,7 +21,7 @@ private val FastScoredLines = listOf(
 
 private val EveryLine = listOf(
     XpBreakdownLine(XpAwardSource.NewCards, count = 1, rate = 20, amount = 20),
-    XpBreakdownLine(XpAwardSource.Mastered, count = 8, rate = 200, amount = 1_600),
+    XpBreakdownLine(XpAwardSource.Mastered, count = 8, rate = 100, amount = 800),
     XpBreakdownLine(XpAwardSource.Partial, count = 2, rate = 25, amount = 50),
     XpBreakdownLine(XpAwardSource.MasteryDefended, count = 3, rate = 50, amount = 150),
     XpBreakdownLine(XpAwardSource.MasteryLost, count = 2, rate = -100, amount = -200),

@@ -35,7 +35,7 @@ With the default configuration the base is 1,000 XP, the steps are 250, 500, 750
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | XP to complete | 1,000 | 1,250 | 1,500 | 1,750 | 2,000 | 2,500 | 4,500 | 5,250 | 8,250 | 13,250 | 20,750 | 22,750 | 30,750 | 70,750 |
 
-The tiers are tuned so that a first serious session lands within a Level or two of the start, a regular User reaches Level 10 within about a week, and the high Levels take sustained effort.
+The tiers are tuned so that a first serious session lands within a Level or two of the start and the high Levels take sustained effort.
 
 A Level-up awards no XP of its own. On the Session Summary and on Home, the Level card's bar fills, resets and pulses the Level number for every Level crossed ([session-summary.md](session-summary.md#animation-sequence)).
 

@@ -14,7 +14,7 @@ import com.rossomak.flashcards.feature.study.summary.XpBreakdownLine
 
 private val xpLines = listOf(
     XpBreakdownLine(XpAwardSource.NewCards, count = 6, rate = 20, amount = 120),
-    XpBreakdownLine(XpAwardSource.Mastered, count = 11, rate = 200, amount = 2_200),
+    XpBreakdownLine(XpAwardSource.Mastered, count = 11, rate = 100, amount = 1_100),
     XpBreakdownLine(XpAwardSource.Partial, count = 3, rate = 25, amount = 75),
     XpBreakdownLine(XpAwardSource.MasteryDefended, count = 2, rate = 50, amount = 100),
     XpBreakdownLine(XpAwardSource.Streak, count = ShowcaseUser.CURRENT_STREAK, rate = null, amount = 250),

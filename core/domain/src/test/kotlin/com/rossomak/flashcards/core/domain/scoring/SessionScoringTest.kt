@@ -279,7 +279,7 @@ class SessionScoringTest {
         const val PRIOR_XP_INTO_LEVEL = 250L
         val STARTED_AT: Instant = Instant.parse("2026-09-06T10:00:00Z")
 
-        // Distinct rates, so a line scored with the wrong rate cannot pass by coincidence, and a flat
+        // Distinct rates, so a line scored with the wrong rate cannot pass by coincidence, and a linear
         // curve (1000 for the first Level, 1000 more for each next one) so one session from STARTING_XP
         // crosses exactly one Level.
         val CONFIG = XpConfig(

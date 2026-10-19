@@ -37,6 +37,8 @@ package com.rossomak.flashcards.core.domain.model
  * starting from the first tier. The last entry applies to every later tier too, so it is the cap on how
  * much more a level costs than the one before it. Never empty, every entry positive.
  * @param levelsPerCostStep how many levels share one entry of [levelCostSteps]. Positive.
+ * @throws IllegalArgumentException when [levelCostSteps] is empty or holds a non-positive step, or
+ * [levelsPerCostStep] is not positive: [levelThreshold] cannot be computed for such a curve.
  */
 data class XpConfig(
     val newCardStudied: Int = 10,
@@ -52,6 +54,12 @@ data class XpConfig(
     val levelCostSteps: List<Int> = DEFAULT_LEVEL_COST_STEPS,
     val levelsPerCostStep: Int = 5,
 ) {
+    init {
+        require(levelCostSteps.isNotEmpty()) { "levelCostSteps must be a nonempty list, got $levelCostSteps" }
+        require(levelCostSteps.all { step -> step > 0 }) { "levelCostSteps must hold positive integers, got $levelCostSteps" }
+        require(levelsPerCostStep > 0) { "levelsPerCostStep must be positive, got $levelsPerCostStep" }
+    }
+
     private companion object {
         // Named rather than inlined as a bare -100 default above — detekt's MagicNumber check does
         // not see through the unary minus on a raw literal default value the way it does a plain one.
@@ -62,7 +70,8 @@ data class XpConfig(
 }
 
 /**
- * The total points needed to complete [level] and advance to the next one. The starting level costs
+ * The points needed to complete [level] alone, not a running total across levels, and advance to the
+ * next one. The starting level costs
  * [XpConfig.levelBaseCost], and every later level costs the previous level's cost plus the step of its
  * tier: level `n` belongs to tier `(n - 1) / levelsPerCostStep`, a tier past the end of
  * [XpConfig.levelCostSteps] reuses the last step, so consecutive levels always cost more than the one

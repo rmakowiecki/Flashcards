@@ -32,6 +32,13 @@ describe("parseXpConfig", () => {
     assert.match(problemOf(withoutCardPartial) ?? "", /cardPartial/);
   });
 
+  it("rejects a document still on the old level curve schema, naming the first new field", () => {
+    const { levelBaseCost, levelCostSteps, levelsPerCostStep, ...withoutCurve } = DEFAULT_XP_CONFIG;
+    const oldSchemaDocument = { ...withoutCurve, levelCurveBase: 1000, levelCurveExponent: 2, minuteStudied: 5 };
+
+    assert.match(problemOf(oldSchemaDocument) ?? "", /levelBaseCost/);
+  });
+
   it("rejects a non-numeric field", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, cardPartial: "25" }) ?? "", /cardPartial/);
   });
