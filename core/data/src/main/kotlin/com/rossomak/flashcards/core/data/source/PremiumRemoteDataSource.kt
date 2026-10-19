@@ -9,5 +9,5 @@ interface PremiumRemoteDataSource {
     fun observePremium(uid: String): Flow<Boolean>
 
     /** Skips the cache. Throws when the server is unreachable. */
-    suspend fun fetchPremium(uid: String): Boolean
+    suspend fun getPremium(uid: String): Boolean
 }

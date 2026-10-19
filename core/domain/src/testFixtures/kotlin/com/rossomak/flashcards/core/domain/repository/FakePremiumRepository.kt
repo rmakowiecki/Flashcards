@@ -6,15 +6,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakePremiumRepository : PremiumRepository {
     val premium = MutableStateFlow<Boolean?>(true)
-    var fetchResult: Result<Boolean> = Result.success(true)
-    var fetchCallCount: Int = 0
-    var fetchGate: CompletableDeferred<Unit>? = null
+    var getPremiumResult: Result<Boolean> = Result.success(true)
+    var getPremiumCallCount: Int = 0
+    var getPremiumGate: CompletableDeferred<Unit>? = null
 
     override fun observePremium(): Flow<Boolean?> = premium
 
-    override suspend fun fetchPremium(): Result<Boolean> {
-        fetchCallCount++
-        fetchGate?.await()
-        return fetchResult
+    override suspend fun getPremium(): Result<Boolean> {
+        getPremiumCallCount++
+        getPremiumGate?.await()
+        return getPremiumResult
     }
 }

@@ -25,7 +25,7 @@ class FirestorePremiumRemoteDataSource @Inject constructor(
         mapSnapshot = { snapshot -> snapshot.isPremium() },
     )
 
-    override suspend fun fetchPremium(uid: String): Boolean = document(uid).get(Source.SERVER).await().isPremium()
+    override suspend fun getPremium(uid: String): Boolean = document(uid).get(Source.SERVER).await().isPremium()
 
     private fun DocumentSnapshot?.isPremium(): Boolean = this?.getBoolean(FIELD_IS_PREMIUM) == true
 

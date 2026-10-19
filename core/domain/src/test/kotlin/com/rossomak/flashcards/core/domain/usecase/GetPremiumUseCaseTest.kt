@@ -15,10 +15,10 @@ class GetPremiumUseCaseTest {
 
     @Test
     fun `passes on the repository's fetch result`() = runTest {
-        coEvery { premiumRepository.fetchPremium() } returns Result.success(false)
+        coEvery { premiumRepository.getPremium() } returns Result.success(false)
 
         useCase() shouldBe Result.success(false)
 
-        coVerify(exactly = 1) { premiumRepository.fetchPremium() }
+        coVerify(exactly = 1) { premiumRepository.getPremium() }
     }
 }

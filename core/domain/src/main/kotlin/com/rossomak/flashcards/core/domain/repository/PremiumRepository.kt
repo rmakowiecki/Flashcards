@@ -9,5 +9,5 @@ interface PremiumRepository {
     fun observePremium(): Flow<Boolean?>
 
     /** Reads Premium from the server, never the cache. Fails only when the server is unreachable; a refused read means not Premium. */
-    suspend fun fetchPremium(): Result<Boolean>
+    suspend fun getPremium(): Result<Boolean>
 }

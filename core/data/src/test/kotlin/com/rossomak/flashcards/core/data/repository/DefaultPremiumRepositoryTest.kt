@@ -86,42 +86,42 @@ class DefaultPremiumRepositoryTest {
     }
 
     @Test
-    fun `fetchPremium returns the server's answer`() = runTest {
-        coEvery { remoteDataSource.fetchPremium(USER_ID) } returns false
+    fun `getPremium returns the server's answer`() = runTest {
+        coEvery { remoteDataSource.getPremium(USER_ID) } returns false
 
-        createRepository().fetchPremium() shouldBe Result.success(false)
+        createRepository().getPremium() shouldBe Result.success(false)
     }
 
     @Test
-    fun `fetchPremium fails when the server can't be reached`() = runTest {
+    fun `getPremium fails when the server can't be reached`() = runTest {
         val error = IOException("offline")
-        coEvery { remoteDataSource.fetchPremium(USER_ID) } throws error
+        coEvery { remoteDataSource.getPremium(USER_ID) } throws error
 
-        createRepository().fetchPremium().exceptionOrNull() shouldBe error
+        createRepository().getPremium().exceptionOrNull() shouldBe error
     }
 
     @Test
-    fun `fetchPremium fails when Firestore is unavailable`() = runTest {
+    fun `getPremium fails when Firestore is unavailable`() = runTest {
         val error = FirebaseFirestoreException("unavailable", FirebaseFirestoreException.Code.UNAVAILABLE)
-        coEvery { remoteDataSource.fetchPremium(USER_ID) } throws error
+        coEvery { remoteDataSource.getPremium(USER_ID) } throws error
 
-        createRepository().fetchPremium().exceptionOrNull() shouldBe error
+        createRepository().getPremium().exceptionOrNull() shouldBe error
     }
 
     @Test
-    fun `fetchPremium reads a refused read as not Premium`() = runTest {
-        coEvery { remoteDataSource.fetchPremium(USER_ID) } throws
+    fun `getPremium reads a refused read as not Premium`() = runTest {
+        coEvery { remoteDataSource.getPremium(USER_ID) } throws
             FirebaseFirestoreException("denied", FirebaseFirestoreException.Code.PERMISSION_DENIED)
 
-        createRepository().fetchPremium() shouldBe Result.success(false)
+        createRepository().getPremium() shouldBe Result.success(false)
     }
 
     @Test
-    fun `fetchPremium reads a Guest as not Premium without a server read`() = runTest {
+    fun `getPremium reads a Guest as not Premium without a server read`() = runTest {
         authRepository.userToReturn = GUEST
 
-        createRepository().fetchPremium() shouldBe Result.success(false)
-        coVerify(exactly = 0) { remoteDataSource.fetchPremium(any()) }
+        createRepository().getPremium() shouldBe Result.success(false)
+        coVerify(exactly = 0) { remoteDataSource.getPremium(any()) }
     }
 
     private companion object {

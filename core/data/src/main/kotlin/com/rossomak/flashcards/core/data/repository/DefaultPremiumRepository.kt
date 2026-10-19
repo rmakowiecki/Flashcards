@@ -30,9 +30,9 @@ class DefaultPremiumRepository @Inject constructor(
         .flatMapLatest { uid -> if (uid == null) flowOf(false) else observeRecord(uid) }
         .distinctUntilChanged()
 
-    override suspend fun fetchPremium(): Result<Boolean> {
+    override suspend fun getPremium(): Result<Boolean> {
         val uid = authRepository.getCurrentUser().premiumUid() ?: return Result.success(false)
-        return runCatchingFirestore { remoteDataSource.fetchPremium(uid) }
+        return runCatchingFirestore { remoteDataSource.getPremium(uid) }
             .onFailure { exception -> logw(exception) { "Premium fetch failed" } }
             .recoverCatching { exception -> if (exception.isUnreachable()) throw exception else false }
     }

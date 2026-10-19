@@ -8,5 +8,5 @@ class GetPremiumUseCase @Inject constructor(
     private val premiumRepository: PremiumRepository,
 ) : NoParamUseCase<Result<Boolean>> {
 
-    override suspend fun invoke(): Result<Boolean> = premiumRepository.fetchPremium()
+    override suspend fun invoke(): Result<Boolean> = premiumRepository.getPremium()
 }

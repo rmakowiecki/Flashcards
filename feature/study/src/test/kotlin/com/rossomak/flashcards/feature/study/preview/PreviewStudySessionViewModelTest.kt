@@ -1988,7 +1988,7 @@ class PreviewStudySessionViewModelTest {
             advanceUntilIdle()
 
             viewModel.state.value.activeDialog shouldBe VoiceAnsweringOffline
-            premiumRepository.fetchCallCount shouldBe 0
+            premiumRepository.getPremiumCallCount shouldBe 0
             permissionGateway.launchedRequests shouldBe emptyList()
             viewModel.events.test { expectNoEvents() }
         }
@@ -2032,7 +2032,7 @@ class PreviewStudySessionViewModelTest {
     fun `a failed Premium check opens the offline dialog`() =
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
-            premiumRepository.fetchResult = Result.failure(IllegalStateException("unreachable"))
+            premiumRepository.getPremiumResult = Result.failure(IllegalStateException("unreachable"))
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.onStartSession()
@@ -2047,7 +2047,7 @@ class PreviewStudySessionViewModelTest {
     @Test
     fun `Start with voice answering when not Premium turns it off with a coming soon message before any microphone prompt`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            premiumRepository.fetchResult = Result.success(false)
+            premiumRepository.getPremiumResult = Result.success(false)
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.messages.test {
@@ -2068,15 +2068,15 @@ class PreviewStudySessionViewModelTest {
     fun `switching to manual answering during the Premium check shows no message, no prompt and starts nothing`() =
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
-            premiumRepository.fetchResult = Result.success(false)
-            premiumRepository.fetchGate = CompletableDeferred()
+            premiumRepository.getPremiumResult = Result.success(false)
+            premiumRepository.getPremiumGate = CompletableDeferred()
             val viewModel = createVoiceAnsweringViewModel()
             viewModel.onStartSession()
             advanceUntilIdle()
 
             viewModel.messages.test {
                 viewModel.onSwitchToManualAnswering()
-                premiumRepository.fetchGate?.complete(Unit)
+                premiumRepository.getPremiumGate?.complete(Unit)
                 advanceUntilIdle()
 
                 expectNoEvents()
@@ -2091,14 +2091,14 @@ class PreviewStudySessionViewModelTest {
     fun `switching to manual answering during a Premium check that succeeds asks for no microphone`() =
         runTest(mainDispatcherRule.testDispatcher) {
             markVoiceAnsweringInfoSeen()
-            premiumRepository.fetchResult = Result.success(true)
-            premiumRepository.fetchGate = CompletableDeferred()
+            premiumRepository.getPremiumResult = Result.success(true)
+            premiumRepository.getPremiumGate = CompletableDeferred()
             val viewModel = createVoiceAnsweringViewModel()
             viewModel.onStartSession()
             advanceUntilIdle()
 
             viewModel.onSwitchToManualAnswering()
-            premiumRepository.fetchGate?.complete(Unit)
+            premiumRepository.getPremiumGate?.complete(Unit)
             advanceUntilIdle()
 
             permissionGateway.launchedRequests shouldBe emptyList()
@@ -2109,13 +2109,13 @@ class PreviewStudySessionViewModelTest {
     fun `Start checks Premium with the server even when the followed value says Premium`() =
         runTest(mainDispatcherRule.testDispatcher) {
             premiumRepository.premium.value = true
-            premiumRepository.fetchResult = Result.success(false)
+            premiumRepository.getPremiumResult = Result.success(false)
             val viewModel = createVoiceAnsweringViewModel()
 
             viewModel.onStartSession()
             advanceUntilIdle()
 
-            premiumRepository.fetchCallCount shouldBe 1
+            premiumRepository.getPremiumCallCount shouldBe 1
             viewModel.state.value.config.voiceAnsweringEnabled shouldBe false
         }
 
@@ -2161,7 +2161,7 @@ class PreviewStudySessionViewModelTest {
     fun `Start without voice answering needs neither a connection nor Premium`() =
         runTest(mainDispatcherRule.testDispatcher) {
             networkAvailabilityGateway.internetAvailable.value = false
-            premiumRepository.fetchResult = Result.success(false)
+            premiumRepository.getPremiumResult = Result.success(false)
             stubRoute(singleSubcategoryRoute)
             flashcardRepository.flashcardsToReturn = Result.success(listOf(flashcard(id = "card-1")))
             val viewModel = createViewModel()
@@ -2171,7 +2171,7 @@ class PreviewStudySessionViewModelTest {
             viewModel.onStartSession()
             advanceUntilIdle()
 
-            premiumRepository.fetchCallCount shouldBe 0
+            premiumRepository.getPremiumCallCount shouldBe 0
             viewModel.events.test {
                 awaitItem() as PreviewStudySessionDestination.RatedStudySession
             }
