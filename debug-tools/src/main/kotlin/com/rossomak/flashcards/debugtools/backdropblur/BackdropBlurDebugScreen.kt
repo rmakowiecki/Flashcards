@@ -390,7 +390,7 @@ private const val MAX_BLUR_RADIUS_DP = 60f
 private fun BackdropBlurDebugContentPreview() {
     FlashcardsTheme {
         BackdropBlurDebugContent(
-            state = BackdropBlurDebugScreenState(blurRadiusDp = 20f),
+            state = BackdropBlurDebugScreenState(blurRadiusDp = 4f),
             onNavigateBack = {},
             onBlobsChange = {},
             onBlurChange = {},
