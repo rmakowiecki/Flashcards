@@ -325,7 +325,7 @@ describe('bugReports/{reportId} (written only by submitBugReport, no client acce
   });
 });
 
-describe('users/{uid}/entitlement/premium (owner-read-only Premium record, ADR-0068)', () => {
+describe('users/{uid}/entitlement/premium (owner-read-only Premium record, ADR-0070)', () => {
   const premiumPath = (uid) => `users/${uid}/entitlement/premium`;
 
   it('the owning user can read their own Premium record', async () => {

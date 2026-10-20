@@ -6,7 +6,7 @@ serves Voice Answering (design in `docs/design/voice-answering.md`, shape in
 `docs/adr/0029-voice-grading-two-callables-payload-inferred-debug-mode.md`). `submitStudySession`
 records a finished session (`docs/design/session-submission.md`), `submitBugReport` stores a Bug
 Report (ADR-0058) and `deleteAccount` runs Account Deletion (ADR-0059). `grantPremiumOnUserCreate`
-is the temporary Premium auto-grant (ADR-0069); no app code calls it.
+is the temporary Premium auto-grant (ADR-0071); no app code calls it.
 This file is the practical "how to set it up / how it works" reference; the ADRs are the "why".
 
 ## Project
@@ -53,7 +53,7 @@ The voice callables are called from `core/data/.../source/FirebaseVoiceGradingRe
 ### Premium
 
 There is no entitlement callable: the app reads its own `users/{uid}/entitlement/premium` record
-through a Firestore listener (owner-read-only rule, ADR-0068), and every server function that needs
+through a Firestore listener (owner-read-only rule, ADR-0070), and every server function that needs
 Premium reads the record directly.
 
 - **`requirePremiumCaller`** (`lib/entitlement.ts`) guards every paid callable: the revoked-token
@@ -65,7 +65,7 @@ Premium reads the record directly.
   `{ isPremium: true, source: "auto-grant", grantedAt }` for every new Auth user, a Guest included,
   so the grant survives the Guest linking Google or GitHub. It uses `create()`, so an existing record
   is never overwritten. A failed grant is retried, and a grant that runs after its Auth user is gone
-  writes nothing, so it never recreates data for a deleted account. Temporary (ADR-0069): deleting it
+  writes nothing, so it never recreates data for a deleted account. Temporary (ADR-0071): deleting it
   needs no app release.
 
 ### `transcribeAndGradeSpokenAnswer`
@@ -154,7 +154,7 @@ All commands below run from the repo root unless noted, via `npx firebase-tools`
    in-place rename), so explicitly delete the retired functions from the previous shape first:
    ```
    npx firebase-tools functions:delete gradeVoiceAnswer transcribe sanitizeAndGrade --force
-   npx firebase-tools functions:delete entitlement --force   # retired by ADR-0068
+   npx firebase-tools functions:delete entitlement --force   # retired by ADR-0070
    cd functions && npm run build && cd .. && npx firebase-tools deploy --only functions
    npx firebase-tools functions:list   # expect: transcribeAndGradeSpokenAnswer, submitStudySession,
                                        # submitBugReport, deleteAccount, grantPremiumOnUserCreate

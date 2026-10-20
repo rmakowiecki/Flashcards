@@ -86,7 +86,7 @@ Called without a question and an expected answer, the same function only transcr
 
 Voice Answering is a **Premium** feature. The server checks Premium on every call and never trusts the app's view of it. It refuses a Guest first, whatever the Guest's record says, then reads the User's Premium record ([firestore-schema.md](firestore-schema.md#entitlement)). The User may read that record too; nothing reports Premium to the app through a function.
 
-For now every new account gets Premium as soon as it is created, Guests included, so a Guest keeps it after linking Google or GitHub ([ADR-0069](../adr/0069-premium-auto-granted-on-auth-user-creation.md)). Admins revoke or grant it by hand. Syncing it from purchases is planned ([planned/voice-answering.md](planned/voice-answering.md)).
+For now every new account gets Premium as soon as it is created, Guests included, so a Guest keeps it after linking Google or GitHub ([ADR-0071](../adr/0071-premium-auto-granted-on-auth-user-creation.md)). Admins revoke or grant it by hand. Syncing it from purchases is planned ([planned/voice-answering.md](planned/voice-answering.md)).
 
 The app checks Premium too, but only to decide what to offer: the Preview Study Session Screen asks the server on Start and switches a User who is not Premium to manual rating with a coming-soon message, or a no-connection dialog when it can't ask ([preview-study-session.md](preview-study-session.md#premium-and-connection)). A User who loses Premium mid-session is not told so: every answer then fails as a service problem, each failure re-inserts the card, and the third in a row pauses voice answering.
 

@@ -166,7 +166,7 @@ export const deleteAccount = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (re
 );
 
 /**
- * The temporary Premium auto-grant (ADR-0069): every new Auth user, a Guest included, gets Premium.
+ * The temporary Premium auto-grant (ADR-0071): every new Auth user, a Guest included, gets Premium.
  * A 1st-gen Auth trigger, because 2nd gen has no non-blocking Auth triggers and the blocking ones need
  * Identity Platform. No app code calls or names it, so deleting it needs no app release. A Guest's
  * grant unlocks nothing until it links Google or GitHub (`requirePremiumCaller`). A failed grant is
