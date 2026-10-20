@@ -14,6 +14,8 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:ui"))
+    // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts).
+    implementation("com.rossomak:morpheus")
     implementation(project(":core:voice"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.hilt.android)

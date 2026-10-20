@@ -21,6 +21,8 @@ The Summary takes the first answer and keeps it. A server score that arrives aft
 
 While the score loads, only a spinner shows.
 
+Behind everything, over the brand gradient, a slow animated network graph gathers around the middle of the screen while the score loads and the total counts up. It morphs once, during the animation sequence, out to two opposite corners, clear of the settled content ([Animation sequence](#animation-sequence)). It is the same mesh the session draws ([ADR-0069](../adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
+
 Once it settles, the screen holds, from top to bottom:
 
 - an app bar with a close button and the screen title;
@@ -65,6 +67,8 @@ The animation is a motion layer over the settled screen. It plays once, when the
 4. The Level card drops in as the list fades, showing where the User stood before the session. The card and the headline push the total down, the stat pills fade in, and the headline, total and pills glide to the middle of the space between the card and the sheet.
 5. The card switches to the User's position after the session, and the earned XP pours into the Level bar from the starting position. Every Level crossed fills the bar, resets it to empty and pulses the Level number. A Level crossed in the middle shows only the bar and the number, because its threshold is not known; the XP-within-Level count runs only for the first and last Level. A negative total drains the bar within the same Level.
 6. The bottom sheet rises and the app bar's title and close button fade in, overlapping the end of the pour. Skip disappears and the breakdown button appears.
+
+The background graph morphs out of the middle as the tile list fades in step 3, timed to land as the sheet starts to rise. A skip morphs it in a short transition with everything else, and a screen shown settled draws it in the corners from the start.
 
 Skip, or the first system back, jumps to the end. Everything still moving finishes with a short transition, and the Level card shows the after position without a pour. Confetti already under way finishes, and a skip before the burst means no burst. The total stays on the screen's centre line throughout, and the breakdown button sits beside it without moving it. Until the screen settles, the Level card and the sheet are hidden from accessibility services; TalkBack then announces the total and any Level-up once.
 

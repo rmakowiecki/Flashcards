@@ -90,6 +90,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.ui.animation.rememberAnimationsEnabled
 import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
@@ -107,6 +108,7 @@ import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatSignedXp
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.StudyMorpheusGraphs
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDestination.StudyAgain
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryDialog.XpBreakdown
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryHeadline.GreatWork
@@ -265,7 +267,12 @@ internal fun SummaryLayout(
     val isLoading = state.scoreStatus == Loading
 
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop()
+        // Around the total from loading on, then one morph off it once the tiles leave, timed to land as
+        // the sheet starts to rise, or the shortest morph after a skip.
+        BrandGradientBackdrop(
+            graph = if (isLoading || sequence.phase == SummaryPhase.Counting) StudyMorpheusGraphs.summaryCounting else StudyMorpheusGraphs.summary,
+            graphMorphDuration = if (sequence.wasSkipped) BrandMorpheusGraphSpecs.minMorphDuration else POUR_START + SHEET_START,
+        )
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,

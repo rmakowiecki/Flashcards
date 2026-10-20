@@ -95,6 +95,7 @@ import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.study.FastStudySessionRoute
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.RatedStudySessionRoute
+import com.rossomak.flashcards.feature.study.StudyMorpheusGraphs
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.FastSessionReadAloud
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.QuickSessionSubcategoryCountRange
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionVoiceAnswering
@@ -276,7 +277,7 @@ fun PreviewStudySessionContent(
     // uncontested. [ReadyContent] (below, inside Scaffold's own content) still wants that inset —
     // its Start button must stay clear of the gesture bar — so Scaffold itself is untouched.
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop()
+        BrandGradientBackdrop(graph = StudyMorpheusGraphs.preview)
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
