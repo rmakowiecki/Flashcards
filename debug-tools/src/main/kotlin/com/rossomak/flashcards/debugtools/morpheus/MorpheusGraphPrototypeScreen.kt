@@ -22,7 +22,7 @@ import com.rossomak.morpheus.tuner.MorpheusGraphPlayground
  * promoted.
  *
  * The lib's [MorpheusGraphPlayground] in Flashcards' brand: [FlashcardsMorpheusGraphPresets] for its pages
- * and both onboarding decks, one [flashcardsPlaygroundStyle] per [FlashcardsComponentStyle], and a
+ * (the app's screen graphs among them) and decks (both onboarding ones and the screens), one [flashcardsPlaygroundStyle] per [FlashcardsComponentStyle], and a
  * copied spec also printed to logcat. Registered on the app's outer graph, so it runs full-screen
  * without the bottom bar.
  */
@@ -30,9 +30,9 @@ import com.rossomak.morpheus.tuner.MorpheusGraphPlayground
 fun MorpheusGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit) {
     MorpheusGraphPlayground(
         modifier = modifier,
-        presets = FlashcardsMorpheusGraphPresets.all,
+        presets = FlashcardsMorpheusGraphPresets.all + FlashcardsMorpheusGraphPresets.screens,
         morphFamily = FlashcardsMorpheusGraphPresets.morphFamily,
-        decks = listOf(FlashcardsMorpheusGraphPresets.onboardingPages, FlashcardsMorpheusGraphPresets.onboardingCometPages),
+        decks = listOf(FlashcardsMorpheusGraphPresets.onboardingPages, FlashcardsMorpheusGraphPresets.onboardingCometPages, FlashcardsMorpheusGraphPresets.screens),
         styles = FlashcardsComponentStyle.entries.map { style -> flashcardsPlaygroundStyle(style) },
         deckStyle = flashcardsPlaygroundStyle(FlashcardsComponentStyle.OnGradient),
         onSpecExport = { source -> logd { "Morpheus graph spec:\n$source" } },

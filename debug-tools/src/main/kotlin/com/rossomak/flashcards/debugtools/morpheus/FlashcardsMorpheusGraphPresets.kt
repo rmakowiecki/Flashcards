@@ -1,6 +1,9 @@
 package com.rossomak.flashcards.debugtools.morpheus
 
 import androidx.compose.ui.graphics.Color
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
+import com.rossomak.flashcards.feature.auth.LoginMorpheusGraphs
+import com.rossomak.flashcards.feature.study.StudyMorpheusGraphs
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphPresets
 import com.rossomak.morpheus.tuner.LabeledMorpheusGraphPresets
@@ -10,7 +13,7 @@ private val BrandIndigo = Color(0xFF2A2E8F)
 
 /**
  * The prototype screen's pages: the lib's [MorpheusGraphPresets] with Flashcards' brand applied, plus
- * the fake onboarding decks. New presets come from the playground's "copy spec" button, pasted here.
+ * the fake onboarding decks and the app's own screen graphs. New presets come from the playground's "copy spec" button, pasted here.
  */
 object FlashcardsMorpheusGraphPresets {
 
@@ -45,4 +48,14 @@ object FlashcardsMorpheusGraphPresets {
         "Corner bloom",
         "Bloom, bottom-start",
     ).map(::morphVariantNamed)
+
+    /** The app's screen graphs, read from where the screens take them, so tuning starts from what ships. */
+    val screens: List<MorpheusGraphPreset> = listOf(
+        MorpheusGraphPreset(name = "Login", note = "Login", spec = LoginMorpheusGraphs.graph),
+        MorpheusGraphPreset(name = "Preview", note = "Preview Study Session", spec = StudyMorpheusGraphs.preview),
+        MorpheusGraphPreset(name = "Session", note = "Rated and Fast sessions", spec = StudyMorpheusGraphs.session),
+        MorpheusGraphPreset(name = "Summary, counting", note = "Summary while the XP total counts up", spec = StudyMorpheusGraphs.summaryCounting),
+        MorpheusGraphPreset(name = "Summary", note = "Settled Summary", spec = StudyMorpheusGraphs.summary),
+        MorpheusGraphPreset(name = "Details top bar", note = "Category and Subcategory Details top bar", spec = BrandMorpheusGraphSpecs.topAppBar),
+    )
 }
