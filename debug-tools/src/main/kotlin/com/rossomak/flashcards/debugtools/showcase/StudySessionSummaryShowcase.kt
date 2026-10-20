@@ -14,12 +14,11 @@ import com.rossomak.flashcards.feature.study.summary.XpBreakdownLine
 
 private val xpLines = listOf(
     XpBreakdownLine(XpAwardSource.NewCards, count = 6, rate = 20, amount = 120),
-    XpBreakdownLine(XpAwardSource.Mastered, count = 11, rate = 200, amount = 2_200),
+    XpBreakdownLine(XpAwardSource.Mastered, count = 11, rate = 100, amount = 1_100),
     XpBreakdownLine(XpAwardSource.Partial, count = 3, rate = 25, amount = 75),
     XpBreakdownLine(XpAwardSource.MasteryDefended, count = 2, rate = 50, amount = 100),
-    XpBreakdownLine(XpAwardSource.TimeStudied, count = 14, rate = 10, amount = 140),
     XpBreakdownLine(XpAwardSource.Streak, count = ShowcaseUser.CURRENT_STREAK, rate = null, amount = 250),
-    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
+    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 100),
 )
 
 /** A Rated session that crossed into Ross's Level. Already scored, so the Summary skips its animation. */
@@ -37,8 +36,8 @@ private val summaryState = StudySessionSummaryScreenState(
     xpForNextLevel = ShowcaseUser.XP_FOR_NEXT_LEVEL,
     levelsCrossed = listOf(ShowcaseUser.LEVEL),
     levelBefore = ShowcaseUser.LEVEL - 1,
-    xpIntoCurrentLevelBefore = 26_400,
-    xpForNextLevelBefore = 28_000,
+    xpIntoCurrentLevelBefore = 6_505,
+    xpForNextLevelBefore = 6_750,
     currentStreak = ShowcaseUser.CURRENT_STREAK,
     hasAuthUserResolved = true,
     displayName = ShowcaseUser.DISPLAY_NAME,

@@ -2,9 +2,11 @@
 
 `testdata/xp-scoring/default-xp-config.json` at the repo root holds every XpConfig field with its
 bundled default; both the Cloud Functions and the Android client test that their own bundled defaults
-equal it. This script copies that file into Firestore as-is, validated first with the same rules the
+equal it. This script copies that file into Firestore as-is, validated first with the rules the
 `submitStudySession` function applies when it reads the document (`functions/src/lib/xpConfig.ts`), so
-a bad file never reaches Firestore.
+a bad file never reaches Firestore. It is stricter in one way: it also rejects fields outside the
+schema, where the server ignores them, so a misspelled field fails here instead of leaving the server
+silently on its bundled defaults.
 
 Idempotent: every run overwrites the whole document. After a console edit to the live rates, rerunning
 this script resets them to the file's defaults.
@@ -26,62 +28,49 @@ DEFAULT_CONFIG_FILE = os.path.join(
 COLLECTION = "config"
 DOCUMENT = "xp"
 
-# Mirrors functions/src/lib/xpConfig.ts: award fields are whole points in Int range, the curve fields finite numbers.
+# Mirrors functions/src/lib/xpConfig.ts: award fields and the two single-number curve fields are whole
+# numbers in Int range, and the step list holds positive whole numbers in Int range.
 INTEGER_FIELDS = (
     "newCardStudied", "cardMastered", "cardPartial", "masteryDefended", "cardDemastered",
-    "sessionCompleted", "dailyGoalMet", "streakPerDay", "streakMaxPerDay", "minuteStudied",
+    "sessionCompleted", "dailyGoalMet", "streakPerDay", "streakMaxPerDay",
 )
-CURVE_FIELDS = ("levelCurveBase", "levelCurveExponent")
+CURVE_INTEGER_FIELDS = ("levelBaseCost", "levelsPerCostStep")
+STEPS_FIELD = "levelCostSteps"
+ALL_FIELDS = INTEGER_FIELDS + CURVE_INTEGER_FIELDS + (STEPS_FIELD,)
 # The Android client holds award fields as Kotlin `Int`, so an award outside this range is one it cannot load.
 INT_MIN, INT_MAX = -2**31, 2**31 - 1
-# Mirrors levelThreshold in functions/src/lib/xpScoring.ts.
-STARTING_LEVEL = 1
-LEVEL_THRESHOLD_ROUNDING_UNIT = 1000
-# Every level threshold up to this level must be a safe integer (JavaScript's Number.MAX_SAFE_INTEGER).
-MAX_VALIDATED_LEVEL = 1000
-MAX_SAFE_INTEGER = 2**53 - 1
 
 
-def level_threshold(config: dict, level: int) -> float:
-    """Math.inf where the JavaScript formula gives Infinity, rather than raising OverflowError."""
-    try:
-        raw = config["levelCurveBase"] * float(level) ** config["levelCurveExponent"]
-    except OverflowError:
-        return math.inf
-    if not math.isfinite(raw):
-        return math.inf
-    return math.ceil(raw / LEVEL_THRESHOLD_ROUNDING_UNIT) * LEVEL_THRESHOLD_ROUNDING_UNIT
+def is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def validate(config: dict) -> list[str]:
     """Returns every problem with `config`; empty when it is a valid XP configuration."""
     problems = []
-    for field in INTEGER_FIELDS + CURVE_FIELDS:
+    for field in INTEGER_FIELDS + CURVE_INTEGER_FIELDS:
         value = config.get(field)
-        is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
-        if not is_number or not math.isfinite(value):
+        if not is_number(value):
             problems.append(f"{field} must be a finite number, got {value!r}")
-        elif field in INTEGER_FIELDS and value != int(value):
+        elif value != int(value):
             problems.append(f"{field} must be an integer, got {value!r}")
-        elif field in INTEGER_FIELDS and not INT_MIN <= value <= INT_MAX:
+        elif not INT_MIN <= value <= INT_MAX:
             problems.append(f"{field} must be between {INT_MIN} and {INT_MAX}, got {value!r}")
+    steps = config.get(STEPS_FIELD)
+    if not isinstance(steps, list) or not steps:
+        problems.append(f"{STEPS_FIELD} must be a nonempty list, got {steps!r}")
+    else:
+        for step in steps:
+            if not is_number(step) or step != int(step) or not 0 < step <= INT_MAX:
+                problems.append(f"{STEPS_FIELD} must hold positive integers up to {INT_MAX}, got {step!r}")
     if not problems:
         if config["cardDemastered"] > 0:
             problems.append(f"cardDemastered must be zero or negative, got {config['cardDemastered']!r}")
-        if config["levelCurveBase"] <= 0:
-            problems.append(f"levelCurveBase must be positive, got {config['levelCurveBase']!r}")
-        if config["levelCurveExponent"] < 0:
-            problems.append(f"levelCurveExponent must be zero or positive, got {config['levelCurveExponent']!r}")
-        elif config["levelCurveBase"] > 0 and level_threshold(config, STARTING_LEVEL) <= 0:
-            problems.append(
-                f"levelCurveBase {config['levelCurveBase']!r} is too small: the starting level's threshold rounds to zero"
-            )
-        elif config["levelCurveBase"] > 0 and not level_threshold(config, MAX_VALIDATED_LEVEL) <= MAX_SAFE_INTEGER:
-            problems.append(
-                f"levelCurveBase {config['levelCurveBase']!r} / levelCurveExponent {config['levelCurveExponent']!r} give a "
-                f"level-{MAX_VALIDATED_LEVEL} threshold of {level_threshold(config, MAX_VALIDATED_LEVEL)}, above {MAX_SAFE_INTEGER}"
-            )
-    unknown = sorted(set(config) - set(INTEGER_FIELDS + CURVE_FIELDS))
+        if config["levelBaseCost"] <= 0:
+            problems.append(f"levelBaseCost must be positive, got {config['levelBaseCost']!r}")
+        if config["levelsPerCostStep"] <= 0:
+            problems.append(f"levelsPerCostStep must be positive, got {config['levelsPerCostStep']!r}")
+    unknown = sorted(set(config) - set(ALL_FIELDS))
     if unknown:
         problems.append(f"unknown fields: {', '.join(unknown)}")
     return problems
@@ -93,11 +82,10 @@ def load_config(path: str) -> dict:
     problems = validate(config)
     if problems:
         sys.exit(f"{path} is not a valid XP configuration:\n  " + "\n  ".join(problems))
-    # Award fields as ints, curve fields as floats, so Firestore stores integers and doubles
-    # regardless of how the JSON spelled them.
+    # Whole numbers as ints, so Firestore stores integers regardless of how the JSON spelled them.
     return {
-        **{field: int(config[field]) for field in INTEGER_FIELDS},
-        **{field: float(config[field]) for field in CURVE_FIELDS},
+        **{field: int(config[field]) for field in INTEGER_FIELDS + CURVE_INTEGER_FIELDS},
+        STEPS_FIELD: [int(step) for step in config[STEPS_FIELD]],
     }
 
 

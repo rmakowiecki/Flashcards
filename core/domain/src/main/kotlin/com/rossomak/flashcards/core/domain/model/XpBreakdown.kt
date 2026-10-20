@@ -24,7 +24,6 @@ import kotlinx.serialization.Serializable
  * ever re-select an already-mastered card.
  * @param demastered [XpConfig.cardDemastered] (negative) × cards ending Failed that were previously
  * Mastered. Rated only; same dependency as [masteryDefenseBonus].
- * @param timeStudied [XpConfig.minuteStudied] × whole minutes studied. Both modes.
  * @param sessionCompletionBonus [XpConfig.sessionCompleted], flat, only for a session that finished
  * its deck rather than being abandoned. Both modes.
  * @param dailyGoalBonus [XpConfig.dailyGoalMet] flat, at most once per calendar day. Both modes.
@@ -38,12 +37,11 @@ data class XpBreakdown(
     val partial: Int = 0,
     val masteryDefenseBonus: Int = 0,
     val demastered: Int = 0,
-    val timeStudied: Int = 0,
     val sessionCompletionBonus: Int = 0,
     val dailyGoalBonus: Int = 0,
     val streakBonus: Int = 0,
 ) {
     val xpTotal: Int
         get() = newCards + mastered + partial + masteryDefenseBonus + demastered +
-            timeStudied + sessionCompletionBonus + dailyGoalBonus + streakBonus
+            sessionCompletionBonus + dailyGoalBonus + streakBonus
 }

@@ -33,7 +33,6 @@ const DEFAULT_XP_RATES = {
   cardPartial: DEFAULT_XP_CONFIG.cardPartial,
   masteryDefended: DEFAULT_XP_CONFIG.masteryDefended,
   cardDemastered: DEFAULT_XP_CONFIG.cardDemastered,
-  minuteStudied: DEFAULT_XP_CONFIG.minuteStudied,
   sessionCompleted: DEFAULT_XP_CONFIG.sessionCompleted,
 };
 
@@ -399,14 +398,13 @@ describe("submitStudySession", () => {
 
     assert.equal(result.breakdown.newCards, 10, "card-1 has no prior progress entry, so it counts as newly studied");
     assert.equal(result.breakdown.mastered, 100);
-    assert.equal(result.breakdown.timeStudied, 10);
-    assert.equal(result.breakdown.sessionCompletionBonus, 500);
+    assert.equal(result.breakdown.sessionCompletionBonus, 100);
     // A fresh uid's ScoringState starts with lastStudyDate "" — this first submission's studyDate
     // is necessarily later, so the streak also advances to 1 (DEFAULT_STREAK_BONUS). dailyGoalMinutes
     // is deliberately far out of reach (DEFAULT_DAILY_GOAL_MINUTES), so no dailyGoalBonus here.
     assert.equal(result.breakdown.streakBonus, DEFAULT_STREAK_BONUS);
     assert.equal(result.breakdown.dailyGoalBonus, 0);
-    assert.equal(result.breakdown.xpTotal, 10 + 100 + 10 + 500 + DEFAULT_STREAK_BONUS);
+    assert.equal(result.breakdown.xpTotal, 10 + 100 + 100 + DEFAULT_STREAK_BONUS);
     assert.equal(result.level, 1);
     assert.equal(result.xpIntoCurrentLevel, result.breakdown.xpTotal);
     assert.deepEqual(result.levelsCrossed, []);
@@ -853,7 +851,7 @@ describe("submitStudySession — streak and daily goal", () => {
     );
     const firstResult = await submitStudySession(admin.firestore(), uid, first);
     assert.equal(firstResult.breakdown.streakBonus, DEFAULT_STREAK_BONUS, "the account's first-ever submission");
-    assert.equal(firstResult.breakdown.dailyGoalBonus, 1000, "1 minute studied meets a 1-minute goal");
+    assert.equal(firstResult.breakdown.dailyGoalBonus, DEFAULT_XP_CONFIG.dailyGoalMet, "1 minute studied meets a 1-minute goal");
 
     const second = validateSubmitStudySessionRequest(
       rawRatedRequest({
@@ -892,7 +890,7 @@ describe("submitStudySession — streak and daily goal", () => {
       }),
     );
     const resultB = await submitStudySession(admin.firestore(), uid, sessionB);
-    assert.equal(resultB.breakdown.dailyGoalBonus, 1000, "sessionA's 5 abandoned minutes plus this session's own 5 reach the 10-minute goal");
+    assert.equal(resultB.breakdown.dailyGoalBonus, DEFAULT_XP_CONFIG.dailyGoalMet, "sessionA's 5 abandoned minutes plus this session's own 5 reach the 10-minute goal");
 
     const sessionBDoc = await admin.firestore().doc(`users/${uid}/sessions/${sessionB.sessionId}`).get();
     assert.equal(sessionBDoc.data()?.studyDate, DEFAULT_STUDY_DATE);
@@ -903,9 +901,9 @@ describe("submitStudySession — streak and daily goal", () => {
 });
 
 describe("submitStudySession — Level position before the session and current Streak", () => {
-  // DEFAULT_XP_CONFIG thresholds: Level 1 needs 1000, Level 2 needs 6000, Level 3 needs 16000.
+  // DEFAULT_XP_CONFIG thresholds: Level 1 needs 1000, Level 2 needs 1250, Level 3 needs 1500.
   const LEVEL_1_THRESHOLD = 1000;
-  const LEVEL_2_THRESHOLD = 6000;
+  const LEVEL_2_THRESHOLD = 1250;
   const DAY_BEFORE_DEFAULT_STUDY_DATE = "2026-08-31";
 
   interface SeededScoringState {
@@ -994,7 +992,7 @@ describe("submitStudySession — Level position before the session and current S
       lastStudyDate: "",
       goalMetDate: "",
     });
-    const request = validateSubmitStudySessionRequest(rawRatedRequest({ cardResults: masteredCardResults(50) }));
+    const request = validateSubmitStudySessionRequest(rawRatedRequest({ cardResults: masteredCardResults(10) }));
 
     const result = await submitStudySession(admin.firestore(), uid, request);
 
@@ -1119,9 +1117,9 @@ describe("submitStudySession — server-owned XP configuration", () => {
     dailyGoalMet: 29,
     streakPerDay: 31,
     streakMaxPerDay: 37,
-    minuteStudied: 23,
-    levelCurveBase: 2000,
-    levelCurveExponent: 1,
+    levelBaseCost: 2000,
+    levelCostSteps: [100, 200],
+    levelsPerCostStep: 3,
   };
 
   afterEach(async () => {
@@ -1136,14 +1134,12 @@ describe("submitStudySession — server-owned XP configuration", () => {
 
     assert.equal(result.breakdown.newCards, CUSTOM_XP_CONFIG.newCardStudied);
     assert.equal(result.breakdown.mastered, CUSTOM_XP_CONFIG.cardMastered);
-    assert.equal(result.breakdown.timeStudied, CUSTOM_XP_CONFIG.minuteStudied);
     assert.equal(result.breakdown.sessionCompletionBonus, CUSTOM_XP_CONFIG.sessionCompleted);
     assert.equal(result.breakdown.streakBonus, CUSTOM_XP_CONFIG.streakPerDay);
-    assert.equal(result.breakdown.xpTotal, 3 + 7 + 23 + 19 + 31);
-    assert.equal(result.xpForNextLevel, 2000, "the level curve also comes from the document: ceil(2000 * 1^1 / 1000) * 1000");
+    assert.equal(result.breakdown.xpTotal, 3 + 7 + 19 + 31);
+    assert.equal(result.xpForNextLevel, 2000, "the level curve also comes from the document: its levelBaseCost");
     assert.equal(result.xpForNextLevelBefore, 2000, "the Level-before threshold uses the same document's curve");
     assert.equal(result.rates.cardMastered, CUSTOM_XP_CONFIG.cardMastered, "the returned rates are the document's, not the default");
-    assert.equal(result.rates.minuteStudied, CUSTOM_XP_CONFIG.minuteStudied);
   });
 
   it("scores with the bundled default when the document is missing, and still succeeds", async () => {
@@ -1151,7 +1147,7 @@ describe("submitStudySession — server-owned XP configuration", () => {
 
     const result = await submitStudySession(admin.firestore(), randomUUID(), request);
 
-    assert.equal(result.breakdown.xpTotal, 10 + 100 + 10 + 500 + DEFAULT_STREAK_BONUS);
+    assert.equal(result.breakdown.xpTotal, 10 + 100 + 100 + DEFAULT_STREAK_BONUS);
     assert.equal(result.xpForNextLevel, 1000);
   });
 
@@ -1161,7 +1157,7 @@ describe("submitStudySession — server-owned XP configuration", () => {
 
     const result = await submitStudySession(admin.firestore(), randomUUID(), request);
 
-    assert.equal(result.breakdown.xpTotal, 10 + 100 + 10 + 500 + DEFAULT_STREAK_BONUS);
+    assert.equal(result.breakdown.xpTotal, 10 + 100 + 100 + DEFAULT_STREAK_BONUS);
     assert.equal(result.xpForNextLevel, 1000);
   });
 });
@@ -1186,12 +1182,12 @@ describe("loadXpConfig", () => {
   });
 
   it("falls back to the bundled default with a reason when the document is invalid", async () => {
-    const { levelCurveBase, ...withoutLevelCurveBase } = DEFAULT_XP_CONFIG;
-    await xpConfigDocRef(admin.firestore()).set(withoutLevelCurveBase);
+    const { levelBaseCost, ...withoutLevelBaseCost } = DEFAULT_XP_CONFIG;
+    await xpConfigDocRef(admin.firestore()).set(withoutLevelBaseCost);
 
     const loaded = await loadXpConfig(admin.firestore());
 
     assert.deepEqual(loaded.config, DEFAULT_XP_CONFIG);
-    assert.match(loaded.fallbackReason ?? "", /invalid: levelCurveBase/);
+    assert.match(loaded.fallbackReason ?? "", /invalid: levelBaseCost/);
   });
 });

@@ -134,7 +134,6 @@ const FIELD_XP_MASTERED = "mastered";
 const FIELD_XP_PARTIAL = "partial";
 const FIELD_XP_MASTERY_DEFENSE_BONUS = "masteryDefenseBonus";
 const FIELD_XP_DEMASTERED = "demastered";
-const FIELD_XP_TIME_STUDIED = "timeStudied";
 const FIELD_XP_SESSION_COMPLETION_BONUS = "sessionCompletionBonus";
 const FIELD_XP_DAILY_GOAL_BONUS = "dailyGoalBonus";
 const FIELD_XP_STREAK_BONUS = "streakBonus";
@@ -212,7 +211,7 @@ export interface SubmitStudySessionCounts {
 /** The per-unit XP rates behind each [XpBreakdown] line, as configured when the session was scored. */
 export type XpRates = Pick<
   XpConfig,
-  "newCardStudied" | "cardMastered" | "cardPartial" | "masteryDefended" | "cardDemastered" | "minuteStudied" | "sessionCompleted"
+  "newCardStudied" | "cardMastered" | "cardPartial" | "masteryDefended" | "cardDemastered" | "sessionCompleted"
 >;
 
 export interface SubmitStudySessionResult {
@@ -520,7 +519,6 @@ function xpBreakdownFields(breakdown: XpBreakdown): Record<string, unknown> {
     [FIELD_XP_PARTIAL]: breakdown.partial,
     [FIELD_XP_MASTERY_DEFENSE_BONUS]: breakdown.masteryDefenseBonus,
     [FIELD_XP_DEMASTERED]: breakdown.demastered,
-    [FIELD_XP_TIME_STUDIED]: breakdown.timeStudied,
     [FIELD_XP_SESSION_COMPLETION_BONUS]: breakdown.sessionCompletionBonus,
     [FIELD_XP_DAILY_GOAL_BONUS]: breakdown.dailyGoalBonus,
     [FIELD_XP_STREAK_BONUS]: breakdown.streakBonus,
@@ -535,7 +533,6 @@ function readXpBreakdownFields(data: FirebaseFirestore.DocumentData): XpBreakdow
     partial: data[FIELD_XP_PARTIAL] ?? 0,
     masteryDefenseBonus: data[FIELD_XP_MASTERY_DEFENSE_BONUS] ?? 0,
     demastered: data[FIELD_XP_DEMASTERED] ?? 0,
-    timeStudied: data[FIELD_XP_TIME_STUDIED] ?? 0,
     sessionCompletionBonus: data[FIELD_XP_SESSION_COMPLETION_BONUS] ?? 0,
     dailyGoalBonus: data[FIELD_XP_DAILY_GOAL_BONUS] ?? 0,
     streakBonus: data[FIELD_XP_STREAK_BONUS] ?? 0,
@@ -550,7 +547,6 @@ function xpRatesFields(config: XpConfig): XpRates {
     cardPartial: config.cardPartial,
     masteryDefended: config.masteryDefended,
     cardDemastered: config.cardDemastered,
-    minuteStudied: config.minuteStudied,
     sessionCompleted: config.sessionCompleted,
   };
 }

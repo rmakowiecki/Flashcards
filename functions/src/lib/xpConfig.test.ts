@@ -13,7 +13,7 @@ function problemOf(data: unknown): string | undefined {
 
 describe("parseXpConfig", () => {
   it("accepts a complete configuration and returns its values", () => {
-    const custom = { ...DEFAULT_XP_CONFIG, cardMastered: 200, levelCurveExponent: 2.0 };
+    const custom = { ...DEFAULT_XP_CONFIG, cardMastered: 200, levelCostSteps: [100, 300], levelsPerCostStep: 2 };
 
     assert.deepEqual(parseXpConfig(custom), { config: custom });
   });
@@ -27,9 +27,16 @@ describe("parseXpConfig", () => {
   });
 
   it("rejects a missing field", () => {
-    const { minuteStudied, ...withoutMinuteStudied } = DEFAULT_XP_CONFIG;
+    const { cardPartial, ...withoutCardPartial } = DEFAULT_XP_CONFIG;
 
-    assert.match(problemOf(withoutMinuteStudied) ?? "", /minuteStudied/);
+    assert.match(problemOf(withoutCardPartial) ?? "", /cardPartial/);
+  });
+
+  it("rejects a document still on the old level curve schema, naming the first new field", () => {
+    const { levelBaseCost, levelCostSteps, levelsPerCostStep, ...withoutCurve } = DEFAULT_XP_CONFIG;
+    const oldSchemaDocument = { ...withoutCurve, levelCurveBase: 1000, levelCurveExponent: 2, minuteStudied: 5 };
+
+    assert.match(problemOf(oldSchemaDocument) ?? "", /levelBaseCost/);
   });
 
   it("rejects a non-numeric field", () => {
@@ -37,28 +44,23 @@ describe("parseXpConfig", () => {
   });
 
   it("rejects a non-finite field", () => {
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: Number.POSITIVE_INFINITY }) ?? "", /levelCurveExponent/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelBaseCost: Number.POSITIVE_INFINITY }) ?? "", /levelBaseCost/);
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, newCardStudied: Number.NaN }) ?? "", /newCardStudied/);
   });
 
   it("rejects a fractional award", () => {
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, sessionCompleted: 500.5 }) ?? "", /sessionCompleted must be an integer/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, sessionCompleted: 100.5 }) ?? "", /sessionCompleted must be an integer/);
   });
 
-  it("accepts a fractional level-curve value", () => {
-    const custom = { ...DEFAULT_XP_CONFIG, levelCurveBase: 1234.5, levelCurveExponent: 1.75 };
-
-    assert.deepEqual(parseXpConfig(custom), { config: custom });
+  it("rejects a fractional level-curve value", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelBaseCost: 1000.5 }) ?? "", /levelBaseCost must be an integer/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelsPerCostStep: 2.5 }) ?? "", /levelsPerCostStep must be an integer/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: [250, 500.5] }) ?? "", /levelCostSteps/);
   });
 
   it("rejects a positive de-mastery penalty and accepts a zero one", () => {
     assert.match(problemOf({ ...DEFAULT_XP_CONFIG, cardDemastered: 80 }) ?? "", /cardDemastered/);
     assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, cardDemastered: 0 }), undefined);
-  });
-
-  it("rejects a level curve base that is not positive", () => {
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 0 }) ?? "", /levelCurveBase/);
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: -1000 }) ?? "", /levelCurveBase/);
   });
 
   it("rejects an award outside the Android Int range and accepts its bounds", () => {
@@ -67,18 +69,28 @@ describe("parseXpConfig", () => {
     assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, cardMastered: 2_147_483_647, cardDemastered: -2_147_483_648 }), undefined);
   });
 
-  it("rejects a level curve base so small the starting level's threshold rounds to zero", () => {
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: Number.MIN_VALUE }) ?? "", /levelCurveBase/);
+  it("rejects a level base cost that is not positive", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelBaseCost: 0 }) ?? "", /levelBaseCost/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelBaseCost: -1000 }) ?? "", /levelBaseCost/);
   });
 
-  it("rejects a level curve whose threshold overflows a safe integer by level 1000 and accepts a steep one below it", () => {
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 1000, levelCurveExponent: 1024 }) ?? "", /Infinity/);
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 1000, levelCurveExponent: 5 }) ?? "", /levelCurveExponent/);
-    assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveBase: 1000, levelCurveExponent: 4 }), undefined);
+  it("rejects a levels-per-step count that is not positive", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelsPerCostStep: 0 }) ?? "", /levelsPerCostStep/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelsPerCostStep: -5 }) ?? "", /levelsPerCostStep/);
   });
 
-  it("rejects a negative level curve exponent and accepts a zero one", () => {
-    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: -0.5 }) ?? "", /levelCurveExponent/);
-    assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCurveExponent: 0 }), undefined);
+  it("rejects a step list that is missing, empty or not a list", () => {
+    const { levelCostSteps, ...withoutSteps } = DEFAULT_XP_CONFIG;
+
+    assert.match(problemOf(withoutSteps) ?? "", /levelCostSteps/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: [] }) ?? "", /levelCostSteps/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: 250 }) ?? "", /levelCostSteps/);
+  });
+
+  it("rejects a step that is not a positive integer and accepts a one-entry list", () => {
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: [250, 0] }) ?? "", /levelCostSteps/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: [250, -500] }) ?? "", /levelCostSteps/);
+    assert.match(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: [250, "500"] }) ?? "", /levelCostSteps/);
+    assert.equal(problemOf({ ...DEFAULT_XP_CONFIG, levelCostSteps: [250] }), undefined);
   });
 });

@@ -119,7 +119,7 @@ class DefaultRecentSessionsRepositoryTest {
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
 
         createRepository().observeRecentSessions().test {
-            // 1 new card × 10 + 1 minute × 10 + 500 completion + a Streak of 1 × 20.
+            // 1 new card × 10 + 500 completion + a Streak of 1 × 20.
             awaitItem() shouldBe listOf(
                 RecentSession.Fast(
                     id = SESSION_ONE_ID,
@@ -131,7 +131,7 @@ class DefaultRecentSessionsRepositoryTest {
                     subcategoryIds = listOf(SUBCATEGORY_ID),
                     subcategoryNames = listOf(SUBCATEGORY_NAME),
                     studiedCount = 1,
-                    xpTotal = 540,
+                    xpTotal = 530,
                     readAloudEnabled = false,
                 ),
             )
@@ -161,7 +161,7 @@ class DefaultRecentSessionsRepositoryTest {
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
 
         createRepository().observeRecentSessions().test {
-            awaitItem().single().xpTotal shouldBe 540
+            awaitItem().single().xpTotal shouldBe 530
 
             remoteRecents.value = RecentsStateDto(entries = listOf(remoteEntry(SESSION_ONE_ID, SESSION_ONE_START)))
             awaitItem().single().xpTotal shouldBe SERVER_XP_TOTAL
@@ -348,17 +348,15 @@ class DefaultRecentSessionsRepositoryTest {
         val SESSION_ONE_START: Instant = Instant.parse("2026-09-06T10:00:00Z")
         val SESSION_TWO_START: Instant = Instant.parse("2026-09-06T11:00:00Z")
 
-        // The bundled defaults, except a small Streak rate, as in PendingSessionProjectorTest.
+        // The bundled defaults, except round completion and Daily Goal awards and a small Streak rate, as in
+        // PendingSessionProjectorTest.
         val CONFIG = XpConfig(
             newCardStudied = 10,
             cardMastered = 100,
             masteryDefended = 50,
-            minuteStudied = 10,
             sessionCompleted = 500,
             streakPerDay = 20,
             dailyGoalMet = 1000,
-            levelCurveBase = 1000.0,
-            levelCurveExponent = 2.5,
         )
     }
 }

@@ -15,9 +15,9 @@ sessionCompleted: Int
 dailyGoalMet: Int
 streakPerDay: Int
 streakMaxPerDay: Int
-minuteStudied: Int
-levelCurveBase: Double
-levelCurveExponent: Double
+levelBaseCost: Int           // level 1's cost
+levelCostSteps: List<Int>    // per-tier increase; the last entry caps every later tier
+levelsPerCostStep: Int       // levels per tier
 ```
 
 The configuration is server-owned. Its source of truth is the Firestore document `config/xp`, written
@@ -39,9 +39,9 @@ versioned. See [ADR-0055](0055-pending-sessions-and-local-progress-projection.md
 ## Context
 
 The XP design fixes a full set of numbers — mastery, defense, de-mastery, completion, daily goal,
-streak, time — and describes them as tunable constants chosen at implementation time. The level
-curve is worse than tunable: its shape is specified but its `base` and `exponent` were never chosen
-at all, so a level is not computable from the design as written.
+streak — and describes them as tunable constants chosen at implementation time. The level
+curve is worse than tunable: its parameters were never chosen at all, so a level is not computable
+from the design as written.
 
 Both facts point the same way. These are balance values, not domain rules. A domain that hardcodes
 them can only be rebalanced by shipping a release, and the numbers most likely to need rebalancing
@@ -71,7 +71,7 @@ without one.
 
 ## Consequences
 
-- The level curve is not pinned in code. Choosing `base` and `exponent` becomes a config change.
+- The level curve is not pinned in code. Choosing the base cost, the steps and the tier length becomes a config change.
 - XP must be computable offline, so the client keeps a cached copy with the bundled defaults as its
   starting point.
 - A session queued on the device across a configuration change is scored with the configuration

@@ -173,11 +173,11 @@ The mechanic that re-tests previously mastered Flashcards so that **Persistent M
 _Avoid_: Review card, Recall challenge
 
 **XP (Experience Points)**:
-Points earned by a User through study activities: studying a Flashcard for the first time, card mastery, a Partial Terminal State, defending mastery, time studied, session completion, daily goal and streak. Accumulate toward the next Level. XP can decrease when a previously mastered Flashcard is de-mastered (XP loss), but Level never decreases — XP loss is clamped to the current Level's floor. Card-level XP is never earned from **Private Flashcards**. Every XP amount is configuration rather than a fixed rule of the domain ([ADR-0047](docs/adr/0047-xp-values-behind-a-config-repository.md)), and the server scores each session with the configuration current when it is delivered.
+Points earned by a User through study activities: studying a Flashcard for the first time, card mastery, a Partial Terminal State, defending mastery, session completion, daily goal and streak. Accumulate toward the next Level. XP can decrease when a previously mastered Flashcard is de-mastered (XP loss), but Level never decreases — XP loss is clamped to the current Level's floor. Card-level XP is never earned from **Private Flashcards**. Every XP amount is configuration rather than a fixed rule of the domain ([ADR-0047](docs/adr/0047-xp-values-behind-a-config-repository.md)), and the server scores each session with the configuration current when it is delivered.
 _Avoid_: Score, Points, Credits
 
 **Level**:
-A User's progression milestone derived from total XP accumulated. Early levels are fast to achieve; later levels require significantly more XP (super-linear curve). Level is displayed on the Level card on Home and on the Session Summary, where every Level crossed fills and resets the card's bar and pulses the Level number.
+A User's progression milestone derived from total XP accumulated. Early levels are fast to achieve; each Level costs more XP than the one before, and the increase grows in tiers up to a cap. Level is displayed on the Level card on Home and on the Session Summary, where every Level crossed fills and resets the card's bar and pulses the Level number.
 _Avoid_: Rank, Tier, Grade
 
 **Streak**:

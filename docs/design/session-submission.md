@@ -20,11 +20,11 @@ The client writes none of these documents. The server decides from its own store
 
 ## Abandoned sessions
 
-A session the User exits before the deck end is recorded exactly like a finished one and marked abandoned. It counts toward the Streak, toward the day's minutes for the Daily Goal, toward time-studied XP, and toward Card Progress for every Flashcard that reached the User. It earns no session-completion XP and never counts toward **Sessions Completed**.
+A session the User exits before the deck end is recorded exactly like a finished one and marked abandoned. It counts toward the Streak, toward the day's minutes for the Daily Goal, and toward Card Progress for every Flashcard that reached the User. It earns no session-completion XP and never counts toward **Sessions Completed**.
 
 ## Duration
 
-A session's duration runs from the moment its first Flashcard is on screen to its termination. The clock never pauses: backgrounding the app or pausing playback does not stop it. Time on the Session Summary screen is excluded, and a session whose Flashcards never loaded has a duration of zero. Time-studied XP counts whole minutes only.
+A session's duration runs from the moment its first Flashcard is on screen to its termination. The clock never pauses: backgrounding the app or pausing playback does not stop it. Time on the Session Summary screen is excluded, and a session whose Flashcards never loaded has a duration of zero. The Daily Goal counts whole minutes only. Duration earns no XP of its own.
 
 ## Study day
 
@@ -52,7 +52,7 @@ The scoring state also keeps the total seconds studied on its last study day. A 
 
 The session's XP total is applied to the User's Level position. A gain climbs through every Level threshold it crosses. A loss is clamped at the floor of the current Level, so Level never decreases ([CONTEXT.md](../../CONTEXT.md), **XP**). The session's id is appended to the list of sessions applied to the scoring state, which the device uses to stop counting a delivered session twice ([ADR-0061](../adr/0061-delivered-sessions-applied-once-in-the-projection.md)).
 
-A session delivered late, after a session from a later day was already recorded, still earns its card, time and completion XP. Only its Streak and Daily Goal effects are lost, because neither date moves backward.
+A session delivered late, after a session from a later day was already recorded, is scored as usual. Only its Streak and Daily Goal effects are lost, because neither date moves backward.
 
 ## Delivery
 

@@ -6,7 +6,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -26,7 +25,6 @@ import com.rossomak.flashcards.feature.study.summary.XpAwardSource.NewCards
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.Partial
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.SessionCompleted
 import com.rossomak.flashcards.feature.study.summary.XpAwardSource.Streak
-import com.rossomak.flashcards.feature.study.summary.XpAwardSource.TimeStudied
 
 @Composable
 internal fun xpSourceLabel(source: XpAwardSource): String = stringResource(
@@ -36,7 +34,6 @@ internal fun xpSourceLabel(source: XpAwardSource): String = stringResource(
         Partial -> R.string.study_session_summary_xp_row_partial_label
         MasteryDefended -> R.string.study_session_summary_xp_row_mastery_defended_label
         MasteryLost -> R.string.study_session_summary_xp_row_mastery_lost_label
-        TimeStudied -> R.string.study_session_summary_xp_row_time_studied_label
         Streak -> R.string.study_session_summary_xp_row_streak_label
         SessionCompleted -> R.string.study_session_summary_xp_row_session_completed_label
         DailyGoal -> R.string.study_session_summary_xp_row_daily_goal_label
@@ -49,7 +46,6 @@ internal fun xpSourceIcon(source: XpAwardSource): ImageVector = when (source) {
     Partial -> Icons.Filled.Star
     MasteryDefended -> Icons.Filled.Shield
     MasteryLost -> Icons.AutoMirrored.Filled.TrendingDown
-    TimeStudied -> Icons.Filled.Schedule
     Streak -> Icons.Filled.LocalFireDepartment
     SessionCompleted -> Icons.Filled.CheckCircle
     DailyGoal -> Icons.Filled.EmojiEvents
@@ -63,7 +59,6 @@ internal fun xpLineFormula(line: XpBreakdownLine): String {
     return when (line.source) {
         NewCards, Mastered, Partial, MasteryDefended, MasteryLost ->
             pluralStringResource(R.plurals.study_session_summary_xp_formula_cards_label, count, count, rate)
-        TimeStudied -> stringResource(R.string.study_session_summary_xp_formula_minutes_label, formatXpFactor(count, AppLocale), rate)
         Streak -> stringResource(R.string.study_session_summary_xp_formula_streak_label, count)
         SessionCompleted -> stringResource(R.string.study_session_summary_xp_formula_session_completed_label)
         DailyGoal -> stringResource(R.string.study_session_summary_xp_formula_daily_goal_label)

@@ -29,7 +29,7 @@ class LevelProgressTest {
 
     @Test
     fun `the threshold comes from the configuration's Level curve for the scoring state's Level`() {
-        val config = XpConfig(levelCurveBase = 2000.0, levelCurveExponent = 2.0)
+        val config = XpConfig(levelBaseCost = 2000, levelCostSteps = listOf(500), levelsPerCostStep = 1)
         val level = 2
         val xpIntoCurrentLevel = 300L
 

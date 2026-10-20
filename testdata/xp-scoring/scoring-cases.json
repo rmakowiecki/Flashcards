@@ -11,9 +11,13 @@
       "dailyGoalMet": 1000,
       "streakPerDay": 250,
       "streakMaxPerDay": 2500,
-      "minuteStudied": 10,
-      "levelCurveBase": 1000,
-      "levelCurveExponent": 2
+      "levelBaseCost": 1000,
+      "levelCostSteps": [
+        1000,
+        3000,
+        5000
+      ],
+      "levelsPerCostStep": 1
     },
     "unusual": {
       "newCardStudied": 3,
@@ -25,9 +29,13 @@
       "dailyGoalMet": 29,
       "streakPerDay": 31,
       "streakMaxPerDay": 37,
-      "minuteStudied": 23,
-      "levelCurveBase": 1000,
-      "levelCurveExponent": 2
+      "levelBaseCost": 700,
+      "levelCostSteps": [
+        100,
+        200,
+        300
+      ],
+      "levelsPerCostStep": 2
     }
   },
   "cases": [
@@ -56,7 +64,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -100,7 +107,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -144,7 +150,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -188,7 +193,6 @@
           "partial": 0,
           "masteryDefenseBonus": 50,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -232,7 +236,6 @@
           "partial": 25,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -276,7 +279,6 @@
           "partial": 25,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -320,7 +322,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": -80,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -364,7 +365,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -424,7 +424,6 @@
           "partial": 25,
           "masteryDefenseBonus": 50,
           "demastered": -80,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -444,7 +443,7 @@
       }
     },
     {
-      "name": "a Fast session earns new-card, time and completion awards and no mastery awards",
+      "name": "a Fast session earns new-card and completion awards and no mastery awards",
       "kind": "sessionXp",
       "input": {
         "config": "test",
@@ -467,16 +466,15 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 20,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
-          "xpTotal": 530
+          "xpTotal": 510
         },
         "newScoringState": {
-          "xp": 530,
+          "xp": 510,
           "level": 1,
-          "xpIntoCurrentLevel": 530,
+          "xpIntoCurrentLevel": 510,
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
@@ -487,7 +485,7 @@
       }
     },
     {
-      "name": "time studied earns a flat rate per whole minute, rounding partial minutes down",
+      "name": "session duration earns no XP of its own",
       "kind": "sessionXp",
       "input": {
         "config": "test",
@@ -506,16 +504,15 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 20,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
-          "xpTotal": 520
+          "xpTotal": 500
         },
         "newScoringState": {
-          "xp": 520,
+          "xp": 500,
           "level": 1,
-          "xpIntoCurrentLevel": 520,
+          "xpIntoCurrentLevel": 500,
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
@@ -545,7 +542,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -589,16 +585,15 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 10,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
-          "xpTotal": 120
+          "xpTotal": 110
         },
         "newScoringState": {
-          "xp": 120,
+          "xp": 110,
           "level": 1,
-          "xpIntoCurrentLevel": 120,
+          "xpIntoCurrentLevel": 110,
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
@@ -637,7 +632,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -685,7 +679,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -735,7 +728,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -785,7 +777,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -837,7 +828,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": -80,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -886,7 +876,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": -80,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -942,16 +931,15 @@
           "partial": 11,
           "masteryDefenseBonus": 13,
           "demastered": -17,
-          "timeStudied": 23,
           "sessionCompletionBonus": 19,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
-          "xpTotal": 62
+          "xpTotal": 39
         },
         "newScoringState": {
-          "xp": 62,
+          "xp": 39,
           "level": 1,
-          "xpIntoCurrentLevel": 62,
+          "xpIntoCurrentLevel": 39,
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
@@ -989,7 +977,6 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
@@ -1037,16 +1024,15 @@
           "partial": 25,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 50,
-          "sessionCompletionBonus": 500,
+          "sessionCompletionBonus": 100,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
-          "xpTotal": 695
+          "xpTotal": 245
         },
         "newScoringState": {
-          "xp": 695,
+          "xp": 245,
           "level": 1,
-          "xpIntoCurrentLevel": 695,
+          "xpIntoCurrentLevel": 245,
           "currentStreak": 0,
           "bestStreak": 0,
           "lastStudyDate": "",
@@ -1062,9 +1048,9 @@
       "input": {
         "config": "default",
         "priorState": {
-          "xp": 6950,
+          "xp": 2200,
           "level": 2,
-          "xpIntoCurrentLevel": 5950
+          "xpIntoCurrentLevel": 1200
         },
         "session": {
           "studyMode": "Rated",
@@ -1086,14 +1072,13 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 0,
           "sessionCompletionBonus": 0,
           "dailyGoalBonus": 0,
           "streakBonus": 0,
           "xpTotal": 100
         },
         "newScoringState": {
-          "xp": 7050,
+          "xp": 2300,
           "level": 3,
           "xpIntoCurrentLevel": 50,
           "currentStreak": 0,
@@ -1143,16 +1128,15 @@
           "partial": 0,
           "masteryDefenseBonus": 0,
           "demastered": 0,
-          "timeStudied": 200,
           "sessionCompletionBonus": 500,
           "dailyGoalBonus": 1000,
           "streakBonus": 750,
-          "xpTotal": 2560
+          "xpTotal": 2360
         },
         "newScoringState": {
-          "xp": 2560,
+          "xp": 2360,
           "level": 2,
-          "xpIntoCurrentLevel": 1560,
+          "xpIntoCurrentLevel": 1360,
           "currentStreak": 3,
           "bestStreak": 3,
           "lastStudyDate": "2026-09-09",
@@ -1209,25 +1193,80 @@
       }
     },
     {
-      "name": "the level 2 threshold under the default curve rounds up to the next thousand",
+      "name": "the level 2 threshold under the default curve",
       "kind": "levelThreshold",
       "input": {
         "config": "default",
         "level": 2
       },
       "expected": {
-        "threshold": 6000
+        "threshold": 1250
       }
     },
     {
-      "name": "the level 3 threshold under the default curve rounds up to the next thousand",
+      "name": "the level 3 threshold under the default curve",
       "kind": "levelThreshold",
       "input": {
         "config": "default",
         "level": 3
       },
       "expected": {
-        "threshold": 16000
+        "threshold": 1500
+      }
+    },
+    {
+      "name": "the level 5 threshold under the default curve: the last level of the first tier",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 5
+      },
+      "expected": {
+        "threshold": 2000
+      }
+    },
+    {
+      "name": "the level 6 threshold under the default curve: the first level of the second tier",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 6
+      },
+      "expected": {
+        "threshold": 2500
+      }
+    },
+    {
+      "name": "the level 10 threshold under the default curve: the last level of the second tier",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 10
+      },
+      "expected": {
+        "threshold": 4500
+      }
+    },
+    {
+      "name": "the level 26 threshold under the default curve: the first level on the capped step",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 26
+      },
+      "expected": {
+        "threshold": 22750
+      }
+    },
+    {
+      "name": "the level 100 threshold under the default curve: a deep level, still on the capped step",
+      "kind": "levelThreshold",
+      "input": {
+        "config": "default",
+        "level": 100
+      },
+      "expected": {
+        "threshold": 170750
       }
     },
     {
@@ -1236,13 +1275,16 @@
       "input": {
         "config": "unusual",
         "configOverrides": {
-          "levelCurveBase": 500,
-          "levelCurveExponent": 1
+          "levelCostSteps": [
+            100,
+            200,
+            400
+          ]
         },
-        "level": 3
+        "level": 5
       },
       "expected": {
-        "threshold": 2000
+        "threshold": 1600
       }
     },
     {

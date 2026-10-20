@@ -69,6 +69,5 @@ data class SessionScoreRates(
     val cardPartial: Int,
     val masteryDefended: Int,
     val cardDemastered: Int,
-    val minuteStudied: Int,
     val sessionCompleted: Int,
 )

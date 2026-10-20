@@ -67,7 +67,6 @@ private fun calculateBreakdown(session: SessionResult, newCardsStudied: Int, con
         partial = cardAwards.partial,
         masteryDefenseBonus = cardAwards.masteryDefenseBonus,
         demastered = cardAwards.demastered,
-        timeStudied = (session.durationSeconds / SECONDS_PER_MINUTE) * config.minuteStudied,
         sessionCompletionBonus = if (session.abandoned) 0 else config.sessionCompleted,
     )
 }

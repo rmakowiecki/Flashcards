@@ -112,6 +112,5 @@ private fun XpConfig.toScoreRates(): SessionScoreRates = SessionScoreRates(
     cardPartial = cardPartial,
     masteryDefended = masteryDefended,
     cardDemastered = cardDemastered,
-    minuteStudied = minuteStudied,
     sessionCompleted = sessionCompleted,
 )

@@ -1,7 +1,7 @@
 package com.rossomak.flashcards.feature.study.summary
 
 /**
- * [XpAwardSource.NewCards] to [XpAwardSource.TimeStudied] carry [count] and [rate]; [XpAwardSource.Streak]
+ * [XpAwardSource.NewCards] to [XpAwardSource.MasteryLost] carry [count] and [rate]; [XpAwardSource.Streak]
  * carries the Streak as [count]; the other bonuses carry neither. Tone comes from [isLoss], never from the
  * sign of [amount].
  */
@@ -20,7 +20,6 @@ enum class XpAwardSource {
     Partial,
     MasteryDefended,
     MasteryLost,
-    TimeStudied,
     Streak,
     SessionCompleted,
     DailyGoal,

@@ -100,13 +100,13 @@ class DefaultXpConfigRepositoryTest {
         dailyGoalMet = dailyGoalMet.toLong(),
         streakPerDay = streakPerDay.toLong(),
         streakMaxPerDay = streakMaxPerDay.toLong(),
-        minuteStudied = minuteStudied.toLong(),
-        levelCurveBase = levelCurveBase,
-        levelCurveExponent = levelCurveExponent,
+        levelBaseCost = levelBaseCost.toLong(),
+        levelCostSteps = levelCostSteps.map { step -> step.toLong() },
+        levelsPerCostStep = levelsPerCostStep.toLong(),
     )
 
     private companion object {
-        val SERVER_CONFIG = XpConfig(cardMastered = 200, minuteStudied = 5, levelCurveExponent = 2.0)
+        val SERVER_CONFIG = XpConfig(cardMastered = 200, levelBaseCost = 1500, levelCostSteps = listOf(100, 300), levelsPerCostStep = 2)
         const val POSITIVE_PENALTY = 80L
     }
 }

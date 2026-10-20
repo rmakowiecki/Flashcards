@@ -1,4 +1,4 @@
-import { DEFAULT_XP_CONFIG, levelThreshold, STARTING_LEVEL, XpConfig } from "./xpScoring";
+import { DEFAULT_XP_CONFIG, XpConfig } from "./xpScoring";
 
 /**
  * The server-owned XP configuration: one Firestore document, `config/xp`, holding every `XpConfig`
@@ -30,29 +30,20 @@ const INTEGER_FIELDS = [
   "dailyGoalMet",
   "streakPerDay",
   "streakMaxPerDay",
-  "minuteStudied",
 ] as const satisfies readonly (keyof XpConfig)[];
 
-// The level-curve check's reach: every level threshold up to this one must be a safe integer. No real user
-// gets near it, and with a nonnegative exponent a threshold only grows with the level, so checking this one
-// level covers every level below it.
-const MAX_VALIDATED_LEVEL = 1000;
-
-/** Level-curve fields: any finite number. */
-const CURVE_FIELDS = ["levelCurveBase", "levelCurveExponent"] as const satisfies readonly (keyof XpConfig)[];
+/** Level-curve fields holding a single whole number, besides the step list. */
+const CURVE_INTEGER_FIELDS = ["levelBaseCost", "levelsPerCostStep"] as const satisfies readonly (keyof XpConfig)[];
 
 export type XpConfigParseResult = { config: XpConfig } | { problem: string };
 
 /**
- * Validates a configuration document's data. Every field must be present and a finite number, every
- * award field an integer within the Android client's `Int` range, the de-mastery penalty at most zero,
- * the level curve's base positive (a zero or negative base makes every level threshold zero, and the
- * level-up loop would never end), its exponent zero or positive (a negative exponent makes each level
- * cheaper than the one before it), and the starting level's threshold above zero (a base so small it
- * rounds to a zero threshold ends the level-up loop no better), and the threshold at `MAX_VALIDATED_LEVEL`
- * at most `Number.MAX_SAFE_INTEGER` (a steeper curve overflows to `Infinity` here, and past the Android
- * client's `Long` range there). With a nonnegative exponent, thresholds only grow with the level, so those
- * two checks bound every level in between.
+ * Validates a configuration document's data. Every award field must be a finite integer within the
+ * Android client's `Int` range and the de-mastery penalty at most zero. The level curve needs a positive
+ * whole `levelBaseCost` and `levelsPerCostStep`, and a nonempty `levelCostSteps` list of positive whole
+ * numbers (a zero or negative step makes a level no more expensive than the one before it, and a zero
+ * `levelsPerCostStep` divides by zero). All of them sit within the `Int` range too, which keeps every
+ * threshold a safe integer for any level a User could reach.
  * Unknown fields are ignored.
  */
 export function parseXpConfig(data: unknown): XpConfigParseResult {
@@ -60,29 +51,26 @@ export function parseXpConfig(data: unknown): XpConfigParseResult {
   const fields = data as Record<string, unknown>;
   const config: Partial<XpConfig> = {};
 
-  for (const field of [...INTEGER_FIELDS, ...CURVE_FIELDS]) {
+  for (const field of [...INTEGER_FIELDS, ...CURVE_INTEGER_FIELDS]) {
     const value = fields[field];
     if (typeof value !== "number" || !Number.isFinite(value)) return { problem: `${field} must be a finite number, got ${String(value)}` };
+    if (!Number.isInteger(value)) return { problem: `${field} must be an integer, got ${value}` };
+    if (value < INT_MIN || value > INT_MAX) return { problem: `${field} must be between ${INT_MIN} and ${INT_MAX}, got ${value}` };
     config[field] = value;
   }
-  for (const field of INTEGER_FIELDS) {
-    if (!Number.isInteger(config[field])) return { problem: `${field} must be an integer, got ${config[field]}` };
-    const award = config[field] as number;
-    if (award < INT_MIN || award > INT_MAX) return { problem: `${field} must be between ${INT_MIN} and ${INT_MAX}, got ${award}` };
+  const steps = fields.levelCostSteps;
+  if (!Array.isArray(steps) || steps.length === 0) return { problem: `levelCostSteps must be a nonempty list, got ${String(steps)}` };
+  for (const step of steps) {
+    if (typeof step !== "number" || !Number.isInteger(step) || step <= 0 || step > INT_MAX) {
+      return { problem: `levelCostSteps must hold positive integers up to ${INT_MAX}, got ${String(step)}` };
+    }
   }
+  config.levelCostSteps = steps as number[];
+
   const complete = config as XpConfig;
   if (complete.cardDemastered > 0) return { problem: `cardDemastered must be zero or negative, got ${complete.cardDemastered}` };
-  if (complete.levelCurveBase <= 0) return { problem: `levelCurveBase must be positive, got ${complete.levelCurveBase}` };
-  if (complete.levelCurveExponent < 0) return { problem: `levelCurveExponent must be zero or positive, got ${complete.levelCurveExponent}` };
-  if (levelThreshold(complete, STARTING_LEVEL) <= 0) return { problem: `levelCurveBase ${complete.levelCurveBase} is too small: the starting level's threshold rounds to zero` };
-  const ceilingThreshold = levelThreshold(complete, MAX_VALIDATED_LEVEL);
-  if (!(ceilingThreshold <= Number.MAX_SAFE_INTEGER)) {
-    return {
-      problem:
-        `levelCurveBase ${complete.levelCurveBase} / levelCurveExponent ${complete.levelCurveExponent} give a level-${MAX_VALIDATED_LEVEL} ` +
-        `threshold of ${ceilingThreshold}, above ${Number.MAX_SAFE_INTEGER}`,
-    };
-  }
+  if (complete.levelBaseCost <= 0) return { problem: `levelBaseCost must be positive, got ${complete.levelBaseCost}` };
+  if (complete.levelsPerCostStep <= 0) return { problem: `levelsPerCostStep must be positive, got ${complete.levelsPerCostStep}` };
   return { config: complete };
 }
 
