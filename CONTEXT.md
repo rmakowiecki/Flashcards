@@ -63,6 +63,10 @@ is told to use that provider. Sign-in stays mandatory: nothing reachable past on
 as authenticated.
 _Avoid_: Anonymous user, Temp user
 
+**Premium**:
+A User's standing entitlement to paid features, held per User on the server and changed only by the backend or a project admin, never by the app. Granted and revocable User by User. Any feature may be made a Premium feature; today only **Voice Answering** is. A **Guest** is never Premium: a Guest may already carry a grant, but it counts only once the Guest has linked Google or GitHub and become a User.
+_Avoid_: Pro, Subscriber, Paid user, Premium status / Premium entitlement (just Premium)
+
 **User**:
 An authenticated person using the app. Represented in code as `AuthUser` with `uid`, `email`, `displayName`, `photoUrl` and the sign-in `provider` (Google or GitHub; none for a Guest).
 _Avoid_: Account, Player, Learner
@@ -102,7 +106,7 @@ _Avoid_: Score, Grade, Answer, Response
 
 **Voice Answering**:
 A Rated-Study-Sessions-only mechanic that replaces manual reveal-and-self-rate with hands-free listen-transcribe-grade: the shared Fast-mode TTS engine reads the question, the app listens for a spoken answer, transcribes and grades it, and the resulting grade band becomes the Flashcard's **Rating** exactly as a manual tap would. Off by default. Selectable up front as a row on the **Preview Study Session Screen** (ADR-0030) — this is a decision made once at session entry, with no way to change it once the session has started. Enabling it auto-enables question TTS through the same engine Fast mode uses, but stops after the question — it never auto-progresses to reading the answer. The microphone is requested on the Preview Study Session Screen's Start tap, preceded once ever by a privacy info notice. A session's delivery mode never changes after it starts: a voice-answering session never falls back to manual self-rating, and an unavailable voice engine pauses the session until the user resumes it.
-_Avoid_: Voice mode (voice is the delivery mechanism, not a Study Mode — see Study Mode's avoid list), Voice grading (grading is the mechanism inside the feature, not the feature's name)
+_Avoid_: Voice mode (voice is the delivery mechanism, not a Study Mode — see Study Mode's avoid list), Voice grading (grading is the mechanism inside the feature, not the feature's name), Rated Voice session (say a Rated Study Session with Voice Answering)
 
 **Terminal State**:
 A Flashcard's final outcome in a **Rated** Study Session, decided by the best **Rating** it achieved across all its Attempts. Three values: **Mastered** (Correct on any Attempt), **Partial** (never Correct, but Partial at least once), **Failed** (never better than Failed). A Flashcard reaches a Terminal State when it is rated Correct, when it exhausts its Attempts limit, or when a Partial Rating ends it under the user's re-queueing setting. Does not apply to Fast Study Sessions. See [ADR-0044](docs/adr/0044-three-valued-terminal-state.md).
@@ -169,11 +173,11 @@ The mechanic that re-tests previously mastered Flashcards so that **Persistent M
 _Avoid_: Review card, Recall challenge
 
 **XP (Experience Points)**:
-Points earned by a User through study activities: studying a Flashcard for the first time, card mastery, a Partial Terminal State, defending mastery, time studied, session completion, daily goal and streak. Accumulate toward the next Level. XP can decrease when a previously mastered Flashcard is de-mastered (XP loss), but Level never decreases — XP loss is clamped to the current Level's floor. Card-level XP is never earned from **Private Flashcards**. Every XP amount is configuration rather than a fixed rule of the domain ([ADR-0047](docs/adr/0047-xp-values-behind-a-config-repository.md)), and the server scores each session with the configuration current when it is delivered.
+Points earned by a User through study activities: studying a Flashcard for the first time, card mastery, a Partial Terminal State, defending mastery, session completion, daily goal and streak. Accumulate toward the next Level. XP can decrease when a previously mastered Flashcard is de-mastered (XP loss), but Level never decreases — XP loss is clamped to the current Level's floor. Card-level XP is never earned from **Private Flashcards**. Every XP amount is configuration rather than a fixed rule of the domain ([ADR-0047](docs/adr/0047-xp-values-behind-a-config-repository.md)), and the server scores each session with the configuration current when it is delivered.
 _Avoid_: Score, Points, Credits
 
 **Level**:
-A User's progression milestone derived from total XP accumulated. Early levels are fast to achieve; later levels require significantly more XP (super-linear curve). Level is displayed on the Level card on Home and on the Session Summary, where every Level crossed fills and resets the card's bar and pulses the Level number.
+A User's progression milestone derived from total XP accumulated. Early levels are fast to achieve; each Level costs more XP than the one before, and the increase grows in tiers up to a cap. Level is displayed on the Level card on Home and on the Session Summary, where every Level crossed fills and resets the card's bar and pulses the Level number.
 _Avoid_: Rank, Tier, Grade
 
 **Streak**:
@@ -204,6 +208,7 @@ _Avoid_: Account removal, Deactivation
 - A **Favorite** is a bookmarked **Category** or **Subcategory**
 - An **Attempt** produces exactly one **Rating** *(Rated sessions only)*
 - **Voice Answering** is chosen up front for a **Rated** Study Session and fixed for its duration; its automatic grade produces a **Rating** the same way a manual tap does
+- **Voice Answering** is a **Premium** feature; a **Guest** is never **Premium**
 - A **Flashcard** in a **Rated** Study Session has at most as many **Attempts** as the User's configured limit (default 3, max 5)
 - A **Terminal State** is decided by the best **Rating** a Flashcard achieved: Correct → Mastered, else Partial → Partial, else Failed *(Rated sessions only)*
 - A **Flashcard** the User has any **Card Progress** for is **Studied**; a Flashcard whose Card Progress state is `Mastered` is in **Persistent Mastery** — so Persistent Mastery is a subset of Studied

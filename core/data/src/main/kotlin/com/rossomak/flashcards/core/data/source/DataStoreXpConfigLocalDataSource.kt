@@ -2,11 +2,14 @@ package com.rossomak.flashcards.core.data.source
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.di.UserPreferencesDataStore
+import com.rossomak.flashcards.core.data.mapper.toDomain
+import com.rossomak.flashcards.core.data.model.XpConfigDto
 import com.rossomak.flashcards.core.domain.model.XpConfig
 import java.io.IOException
 import javax.inject.Inject
@@ -16,7 +19,8 @@ import kotlinx.coroutines.flow.first
 /**
  * Keeps the last fetched XP configuration under its own `xp_config_` keys in the app's one
  * preferences file. All twelve values are written in one edit, so a read sees either a whole
- * configuration or none.
+ * configuration or none. A stored copy that no longer passes the same validation as a fetched one reads
+ * as none, so the caller falls back to the bundled defaults instead of failing.
  */
 class DataStoreXpConfigLocalDataSource @Inject constructor(
     @param:UserPreferencesDataStore private val dataStore: DataStore<Preferences>,
@@ -27,7 +31,7 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
             .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
             .first()
         if (ALL_KEYS.any { key -> key !in prefs }) return null
-        return XpConfig(
+        val storedDto = XpConfigDto(
             newCardStudied = prefs.requireValue(NEW_CARD_STUDIED_KEY),
             cardMastered = prefs.requireValue(CARD_MASTERED_KEY),
             cardPartial = prefs.requireValue(CARD_PARTIAL_KEY),
@@ -37,10 +41,16 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
             dailyGoalMet = prefs.requireValue(DAILY_GOAL_MET_KEY),
             streakPerDay = prefs.requireValue(STREAK_PER_DAY_KEY),
             streakMaxPerDay = prefs.requireValue(STREAK_MAX_PER_DAY_KEY),
-            minuteStudied = prefs.requireValue(MINUTE_STUDIED_KEY),
-            levelCurveBase = prefs.requireValue(LEVEL_CURVE_BASE_KEY),
-            levelCurveExponent = prefs.requireValue(LEVEL_CURVE_EXPONENT_KEY),
+            levelBaseCost = prefs.requireValue(LEVEL_BASE_COST_KEY),
+            levelCostSteps = prefs.requireValue(LEVEL_COST_STEPS_KEY).split(STEP_SEPARATOR).map { step -> step.trim().toIntOrNull() },
+            levelsPerCostStep = prefs.requireValue(LEVELS_PER_COST_STEP_KEY),
         )
+        return try {
+            storedDto.toDomain()
+        } catch (exception: IllegalArgumentException) {
+            logw(exception) { "Stored XP configuration is invalid; using the bundled defaults" }
+            null
+        }
     }
 
     override suspend fun save(config: XpConfig) {
@@ -54,9 +64,9 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
             prefs[DAILY_GOAL_MET_KEY] = config.dailyGoalMet
             prefs[STREAK_PER_DAY_KEY] = config.streakPerDay
             prefs[STREAK_MAX_PER_DAY_KEY] = config.streakMaxPerDay
-            prefs[MINUTE_STUDIED_KEY] = config.minuteStudied
-            prefs[LEVEL_CURVE_BASE_KEY] = config.levelCurveBase
-            prefs[LEVEL_CURVE_EXPONENT_KEY] = config.levelCurveExponent
+            prefs[LEVEL_BASE_COST_KEY] = config.levelBaseCost
+            prefs[LEVEL_COST_STEPS_KEY] = config.levelCostSteps.joinToString(STEP_SEPARATOR)
+            prefs[LEVELS_PER_COST_STEP_KEY] = config.levelsPerCostStep
         }
     }
 
@@ -72,9 +82,12 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
         val DAILY_GOAL_MET_KEY = intPreferencesKey("xp_config_daily_goal_met")
         val STREAK_PER_DAY_KEY = intPreferencesKey("xp_config_streak_per_day")
         val STREAK_MAX_PER_DAY_KEY = intPreferencesKey("xp_config_streak_max_per_day")
-        val MINUTE_STUDIED_KEY = intPreferencesKey("xp_config_minute_studied")
-        val LEVEL_CURVE_BASE_KEY = doublePreferencesKey("xp_config_level_curve_base")
-        val LEVEL_CURVE_EXPONENT_KEY = doublePreferencesKey("xp_config_level_curve_exponent")
+        val LEVEL_BASE_COST_KEY = intPreferencesKey("xp_config_level_base_cost")
+
+        // The ordered step list as one comma-separated string: a preferences file has no list type.
+        val LEVEL_COST_STEPS_KEY = stringPreferencesKey("xp_config_level_cost_steps")
+        val LEVELS_PER_COST_STEP_KEY = intPreferencesKey("xp_config_levels_per_cost_step")
+        const val STEP_SEPARATOR = ","
         val ALL_KEYS = listOf(
             NEW_CARD_STUDIED_KEY,
             CARD_MASTERED_KEY,
@@ -85,9 +98,9 @@ class DataStoreXpConfigLocalDataSource @Inject constructor(
             DAILY_GOAL_MET_KEY,
             STREAK_PER_DAY_KEY,
             STREAK_MAX_PER_DAY_KEY,
-            MINUTE_STUDIED_KEY,
-            LEVEL_CURVE_BASE_KEY,
-            LEVEL_CURVE_EXPONENT_KEY,
+            LEVEL_BASE_COST_KEY,
+            LEVEL_COST_STEPS_KEY,
+            LEVELS_PER_COST_STEP_KEY,
         )
     }
 }

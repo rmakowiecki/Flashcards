@@ -31,9 +31,9 @@ class XpConfigRemoteDataSource @Inject constructor(
             dailyGoalMet = document.number(FIELD_DAILY_GOAL_MET),
             streakPerDay = document.number(FIELD_STREAK_PER_DAY),
             streakMaxPerDay = document.number(FIELD_STREAK_MAX_PER_DAY),
-            minuteStudied = document.number(FIELD_MINUTE_STUDIED),
-            levelCurveBase = document.number(FIELD_LEVEL_CURVE_BASE),
-            levelCurveExponent = document.number(FIELD_LEVEL_CURVE_EXPONENT),
+            levelBaseCost = document.number(FIELD_LEVEL_BASE_COST),
+            levelCostSteps = (document.get(FIELD_LEVEL_COST_STEPS) as? List<*>)?.map { step -> step as? Number },
+            levelsPerCostStep = document.number(FIELD_LEVELS_PER_COST_STEP),
         )
     }
 
@@ -51,8 +51,8 @@ class XpConfigRemoteDataSource @Inject constructor(
         const val FIELD_DAILY_GOAL_MET = "dailyGoalMet"
         const val FIELD_STREAK_PER_DAY = "streakPerDay"
         const val FIELD_STREAK_MAX_PER_DAY = "streakMaxPerDay"
-        const val FIELD_MINUTE_STUDIED = "minuteStudied"
-        const val FIELD_LEVEL_CURVE_BASE = "levelCurveBase"
-        const val FIELD_LEVEL_CURVE_EXPONENT = "levelCurveExponent"
+        const val FIELD_LEVEL_BASE_COST = "levelBaseCost"
+        const val FIELD_LEVEL_COST_STEPS = "levelCostSteps"
+        const val FIELD_LEVELS_PER_COST_STEP = "levelsPerCostStep"
     }
 }

@@ -95,9 +95,9 @@ data class XpScoringCaseConfig(
     val dailyGoalMet: Int,
     val streakPerDay: Int,
     val streakMaxPerDay: Int,
-    val minuteStudied: Int,
-    val levelCurveBase: Double,
-    val levelCurveExponent: Double,
+    val levelBaseCost: Int,
+    val levelCostSteps: List<Int>,
+    val levelsPerCostStep: Int,
 ) {
     fun toDomain(): XpConfig = XpConfig(
         newCardStudied = newCardStudied,
@@ -109,9 +109,9 @@ data class XpScoringCaseConfig(
         dailyGoalMet = dailyGoalMet,
         streakPerDay = streakPerDay,
         streakMaxPerDay = streakMaxPerDay,
-        minuteStudied = minuteStudied,
-        levelCurveBase = levelCurveBase,
-        levelCurveExponent = levelCurveExponent,
+        levelBaseCost = levelBaseCost,
+        levelCostSteps = levelCostSteps,
+        levelsPerCostStep = levelsPerCostStep,
     )
 }
 
@@ -170,7 +170,6 @@ data class ExpectedBreakdown(
     val partial: Int,
     val masteryDefenseBonus: Int,
     val demastered: Int,
-    val timeStudied: Int,
     val sessionCompletionBonus: Int,
     val dailyGoalBonus: Int,
     val streakBonus: Int,
@@ -182,7 +181,6 @@ data class ExpectedBreakdown(
         partial = partial,
         masteryDefenseBonus = masteryDefenseBonus,
         demastered = demastered,
-        timeStudied = timeStudied,
         sessionCompletionBonus = sessionCompletionBonus,
         dailyGoalBonus = dailyGoalBonus,
         streakBonus = streakBonus,

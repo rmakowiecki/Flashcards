@@ -8,6 +8,7 @@ import com.rossomak.flashcards.core.data.repository.DefaultCurationRepository
 import com.rossomak.flashcards.core.data.repository.DefaultFlashcardRepository
 import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultOnboardingSubcategoriesRepository
+import com.rossomak.flashcards.core.data.repository.DefaultPremiumRepository
 import com.rossomak.flashcards.core.data.repository.DefaultRecentSessionsRepository
 import com.rossomak.flashcards.core.data.repository.DefaultScoringStateRepository
 import com.rossomak.flashcards.core.data.repository.DefaultSessionSubmissionRepository
@@ -21,9 +22,11 @@ import com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLoca
 import com.rossomak.flashcards.core.data.source.FirebaseAuthRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirebaseSessionSubmissionRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirestoreCurationRemoteDataSource
+import com.rossomak.flashcards.core.data.source.FirestorePremiumRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirestoreRecentsRemoteDataSource
 import com.rossomak.flashcards.core.data.source.FirestoreUserFavoritesRemoteDataSource
 import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDataSource
+import com.rossomak.flashcards.core.data.source.PremiumRemoteDataSource
 import com.rossomak.flashcards.core.data.source.RecentsRemoteDataSource
 import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource
 import com.rossomak.flashcards.core.data.source.UserFavoritesRemoteDataSource
@@ -35,6 +38,7 @@ import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.LevelProgressRepository
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.OnboardingSubcategoriesRepository
+import com.rossomak.flashcards.core.domain.repository.PremiumRepository
 import com.rossomak.flashcards.core.domain.repository.RecentSessionsRepository
 import com.rossomak.flashcards.core.domain.repository.ScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository
@@ -98,6 +102,14 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSessionSubmissionRemoteDataSource(firebaseSessionSubmissionRemoteDataSource: FirebaseSessionSubmissionRemoteDataSource): SessionSubmissionRemoteDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindPremiumRepository(defaultPremiumRepository: DefaultPremiumRepository): PremiumRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPremiumRemoteDataSource(impl: FirestorePremiumRemoteDataSource): PremiumRemoteDataSource
 
     @Binds
     abstract fun bindNetworkAvailabilityGateway(defaultNetworkAvailabilityGateway: DefaultNetworkAvailabilityGateway): NetworkAvailabilityGateway

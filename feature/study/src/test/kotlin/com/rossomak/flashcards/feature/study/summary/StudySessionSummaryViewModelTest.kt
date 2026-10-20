@@ -344,7 +344,6 @@ class StudySessionSummaryViewModelTest {
                 XpBreakdownLine(XpAwardSource.NewCards, count = 3, rate = 20, amount = 60),
                 XpBreakdownLine(XpAwardSource.Mastered, count = 1, rate = 200, amount = 200),
                 XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
-                XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
                 XpBreakdownLine(XpAwardSource.Streak, count = 8, rate = null, amount = 250),
                 XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
                 XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1000),
@@ -456,22 +455,21 @@ class StudySessionSummaryViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // 4 new cards × 10 + 2 mastered × 100 + 1 partial × 25 + 2 minutes × 10 + 500 completion + the
-            // first day of a Streak × 250 = 1035, which crosses Level 1's threshold of 1000.
+            // 4 new cards × 10 + 2 mastered × 100 + 1 partial × 25 + 100 completion + the first day of a
+            // Streak × 250 = 615, which stays inside Level 1's threshold of 1000.
             val config = XpConfig()
             viewModel.state.assertValue {
                 xpLines shouldBe listOf(
                     XpBreakdownLine(XpAwardSource.NewCards, count = 4, rate = 10, amount = 40),
                     XpBreakdownLine(XpAwardSource.Mastered, count = 2, rate = 100, amount = 200),
                     XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
-                    XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
                     XpBreakdownLine(XpAwardSource.Streak, count = 1, rate = null, amount = 250),
-                    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
+                    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 100),
                 )
-                xpTotal shouldBe 1035
-                level shouldBe 2
-                xpIntoCurrentLevel shouldBe 35L
-                xpForNextLevel shouldBe config.levelThreshold(2)
+                xpTotal shouldBe 615
+                level shouldBe ScoringState.STARTING_LEVEL
+                xpIntoCurrentLevel shouldBe 615L
+                xpForNextLevel shouldBe config.levelThreshold(ScoringState.STARTING_LEVEL)
                 levelBefore shouldBe ScoringState.STARTING_LEVEL
                 xpIntoCurrentLevelBefore shouldBe 0L
                 xpForNextLevelBefore shouldBe config.levelThreshold(ScoringState.STARTING_LEVEL)
@@ -501,9 +499,8 @@ class StudySessionSummaryViewModelTest {
                 XpBreakdownLine(XpAwardSource.Mastered, count = 1, rate = 100, amount = 100),
                 XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
                 XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
-                XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
                 XpBreakdownLine(XpAwardSource.Streak, count = 1, rate = null, amount = 250),
-                XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
+                XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 100),
             )
         }
 
@@ -873,7 +870,6 @@ class StudySessionSummaryViewModelTest {
             XpBreakdownLine(XpAwardSource.Partial, count = 1, rate = 25, amount = 25),
             XpBreakdownLine(XpAwardSource.MasteryDefended, count = 1, rate = 50, amount = 50),
             XpBreakdownLine(XpAwardSource.MasteryLost, count = 1, rate = -80, amount = -80),
-            XpBreakdownLine(XpAwardSource.TimeStudied, count = 2, rate = 10, amount = 20),
             XpBreakdownLine(XpAwardSource.Streak, count = 8, rate = null, amount = 250),
             XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
             XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1000),
@@ -892,7 +888,6 @@ class StudySessionSummaryViewModelTest {
             XpAwardSource.NewCards,
             XpAwardSource.Mastered,
             XpAwardSource.MasteryDefended,
-            XpAwardSource.TimeStudied,
             XpAwardSource.Streak,
             XpAwardSource.SessionCompleted,
             XpAwardSource.DailyGoal,
@@ -927,25 +922,9 @@ class StudySessionSummaryViewModelTest {
 
         viewModel.state.value.xpLines.map { it.source } shouldBe listOf(
             XpAwardSource.NewCards,
-            XpAwardSource.TimeStudied,
             XpAwardSource.Streak,
             XpAwardSource.SessionCompleted,
             XpAwardSource.DailyGoal,
-        )
-    }
-
-    @Test
-    fun `a Fast session under a minute has no Time Studied line`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(fastRoute(durationSeconds = 59))
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(UNDER_A_MINUTE_SCORE))
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.state.value.xpLines.map { it.source } shouldBe listOf(
-            XpAwardSource.NewCards,
-            XpAwardSource.Streak,
-            XpAwardSource.SessionCompleted,
         )
     }
 
@@ -1204,7 +1183,7 @@ class StudySessionSummaryViewModelTest {
 
     private companion object {
         const val SAVED_SCORE_KEY = "savedScore"
-        const val SERVER_LINE_COUNT = 7
+        const val SERVER_LINE_COUNT = 6
         val FIRESTORE_DOWN = IllegalStateException("firestore down")
         val LIVE_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_200L, xpForNextLevel = 4_000L)
         val NEXT_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_900L, xpForNextLevel = 4_000L)
@@ -1221,7 +1200,6 @@ class StudySessionSummaryViewModelTest {
                 newCards = 60,
                 mastered = 200,
                 masteryDefenseBonus = 50,
-                timeStudied = 20,
                 sessionCompletionBonus = 500,
                 dailyGoalBonus = 1000,
                 streakBonus = 250,
@@ -1241,7 +1219,6 @@ class StudySessionSummaryViewModelTest {
                 cardPartial = 25,
                 masteryDefended = 50,
                 cardDemastered = -80,
-                minuteStudied = 10,
                 sessionCompleted = 500,
             ),
         )
@@ -1252,16 +1229,11 @@ class StudySessionSummaryViewModelTest {
                 partial = 25,
                 masteryDefenseBonus = 50,
                 demastered = -80,
-                timeStudied = 20,
                 sessionCompletionBonus = 500,
                 dailyGoalBonus = 1000,
                 streakBonus = 250,
             ),
             counts = SessionScoreCounts(newCardsStudied = 4, newlyMastered = 2, partial = 1, defended = 1, demastered = 1),
-        )
-        val UNDER_A_MINUTE_SCORE = SERVER_SCORE.copy(
-            breakdown = XpBreakdown(newCards = 40, sessionCompletionBonus = 500, streakBonus = 250),
-            counts = SessionScoreCounts(newCardsStudied = 2, newlyMastered = null, partial = null, defended = null, demastered = null),
         )
         val LOSS_SCORE = SERVER_SCORE.copy(
             breakdown = XpBreakdown(demastered = -240),

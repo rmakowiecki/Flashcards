@@ -3,10 +3,11 @@ package com.rossomak.flashcards.core.domain.usecase
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.usecase.base.NoParamUseCase
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 
-class CheckInternetAvailabilityUseCase @Inject constructor(
+class ObserveInternetAvailabilityUseCase @Inject constructor(
     private val networkAvailabilityGateway: NetworkAvailabilityGateway,
-) : NoParamUseCase<Boolean> {
+) : NoParamUseCase<Flow<Boolean>> {
 
-    override suspend fun invoke(): Boolean = networkAvailabilityGateway.isInternetAvailable()
+    override suspend fun invoke(): Flow<Boolean> = networkAvailabilityGateway.observeInternetAvailability()
 }

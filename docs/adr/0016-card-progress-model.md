@@ -80,7 +80,7 @@ mastery and earns neither the bonus nor the penalty.
 ### Private Flashcards are excluded entirely
 
 A Private Flashcard never receives a progress entry, never enters Studied or Mastered, and never
-earns card-level XP. Session-level XP — time studied, session completion, streak, daily goal — is
+earns card-level XP. Session-level XP — session completion, streak, daily goal — is
 unaffected.
 
 The reason is not purity but exploitability: new-card XP on a user-authored card is trivially
@@ -221,7 +221,7 @@ private card to, showing a permanent ceiling with no visible cause.
   card-count label printed beside a ring must use the same figure, or the percentage cannot be
   reconciled against the number next to it.
 - A User who studies only Private cards sees rings that never move. Their Progress screen still
-  advances on time studied, streak and daily goal.
+  advances on streak and daily goal.
 - Drift is impossible between a card's state and the Studied/Mastered sets, since both derive from
   the same map. The summary can still drift from the packed documents; recomputing it is a read of
   the User's progress documents and one write, rather than a per-Subcategory aggregation sweep.

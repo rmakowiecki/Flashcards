@@ -20,9 +20,9 @@ export interface XpConfig {
   dailyGoalMet: number;
   streakPerDay: number;
   streakMaxPerDay: number;
-  minuteStudied: number;
-  levelCurveBase: number;
-  levelCurveExponent: number;
+  levelBaseCost: number;
+  levelCostSteps: number[];
+  levelsPerCostStep: number;
 }
 
 /**
@@ -36,14 +36,14 @@ export const DEFAULT_XP_CONFIG: XpConfig = {
   cardMastered: 100,
   cardPartial: 25,
   masteryDefended: 50,
-  cardDemastered: -80,
-  sessionCompleted: 500,
-  dailyGoalMet: 1000,
+  cardDemastered: -100,
+  sessionCompleted: 100,
+  dailyGoalMet: 500,
   streakPerDay: 250,
-  streakMaxPerDay: 2500,
-  minuteStudied: 10,
-  levelCurveBase: 1000.0,
-  levelCurveExponent: 2.5,
+  streakMaxPerDay: 1000,
+  levelBaseCost: 1000,
+  levelCostSteps: [250, 500, 750, 1000, 1500, 2000],
+  levelsPerCostStep: 5,
 };
 
 /** Every account starts here: level 1, no points into it, before a session has ever committed. */
@@ -73,14 +73,20 @@ export const DEFAULT_SCORING_STATE: ScoringState = {
   studiedSecondsOnLastStudyDate: 0,
 };
 
-const LEVEL_THRESHOLD_ROUNDING_UNIT = 1000;
-
-/** Mirrors `XpConfig.levelThreshold`'s exact formula: `ceil(base * level^exponent / 1000) * 1000`. */
+/**
+ * Mirrors `XpConfig.levelThreshold`: level 1 costs `levelBaseCost`, and every later level costs the
+ * previous level's cost plus the step of its tier. Levels are grouped `levelsPerCostStep` at a time
+ * (levels 2 to 5 are tier 0 with the default of 5, levels 6 to 10 tier 1, and so on), and a tier past the
+ * end of `levelCostSteps` reuses the last step, which is therefore the cap.
+ */
 export function levelThreshold(config: XpConfig, level: number): number {
-  const rounded = Math.ceil(
-    (config.levelCurveBase * Math.pow(level, config.levelCurveExponent)) / LEVEL_THRESHOLD_ROUNDING_UNIT,
-  );
-  return rounded * LEVEL_THRESHOLD_ROUNDING_UNIT;
+  const lastTier = config.levelCostSteps.length - 1;
+  let cost = config.levelBaseCost;
+  for (let reached = STARTING_LEVEL + 1; reached <= level; reached++) {
+    const tier = Math.min(Math.floor((reached - 1) / config.levelsPerCostStep), lastTier);
+    cost += config.levelCostSteps[tier];
+  }
+  return cost;
 }
 
 /** Mirrors `XpBreakdown.kt` field-for-field, [xpTotal] included rather than computed as a getter. */
@@ -90,7 +96,6 @@ export interface XpBreakdown {
   partial: number;
   masteryDefenseBonus: number;
   demastered: number;
-  timeStudied: number;
   sessionCompletionBonus: number;
   dailyGoalBonus: number;
   streakBonus: number;
@@ -106,7 +111,6 @@ function xpBreakdown(fields: Omit<XpBreakdown, "xpTotal">): XpBreakdown {
       fields.partial +
       fields.masteryDefenseBonus +
       fields.demastered +
-      fields.timeStudied +
       fields.sessionCompletionBonus +
       fields.dailyGoalBonus +
       fields.streakBonus,
@@ -172,7 +176,6 @@ function calculateBreakdown(
   streakBonus: number,
 ): XpBreakdown {
   const newCards = newCardsStudied * config.newCardStudied;
-  const timeStudied = Math.floor(session.durationSeconds / SECONDS_PER_MINUTE) * config.minuteStudied;
   const sessionCompletionBonus = session.abandoned ? 0 : config.sessionCompleted;
   const cardAwards: RatedCardAwards =
     session.studyMode === "Rated"
@@ -185,7 +188,6 @@ function calculateBreakdown(
     partial: cardAwards.partial,
     masteryDefenseBonus: cardAwards.masteryDefenseBonus,
     demastered: cardAwards.demastered,
-    timeStudied,
     sessionCompletionBonus,
     dailyGoalBonus,
     streakBonus,

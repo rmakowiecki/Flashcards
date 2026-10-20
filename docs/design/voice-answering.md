@@ -70,7 +70,7 @@ Capture runs only inside the session's foreground playback service, never outsid
 
 Each answer is one call to a streaming Firebase callable function, which carries the signed-in User's identity ([ADR-0029](../adr/0029-voice-grading-two-callables-payload-inferred-debug-mode.md)). The function:
 
-1. rejects a caller without premium entitlement ([Entitlement](#entitlement)) and an empty or oversized recording;
+1. rejects a caller who is not **Premium**, or is a Guest ([Entitlement](#entitlement)), and an empty or oversized recording;
 2. transcribes the audio with ElevenLabs Scribe;
 3. has a language model clean the transcript: filler words and repetitions are normalized, and personal details the User happened to say are removed;
 4. streams that cleaned transcript back at once, so the app can show it before grading ends;
@@ -80,13 +80,15 @@ Both model steps use Gemini on Vertex AI. The app maps the percentage to a Ratin
 
 The whole call runs within one time budget, with no retry, because a retry would upload the answer again inside the same budget. A call that runs out of time, or fails for lack of a connection, is a no-connection failure. The server gives up just before the app does, with its own error, so a slow service reads as a service problem. Every other failure, including a missing entitlement, is a service problem.
 
-Called without a question and an expected answer, the same function only transcribes and cleans. The debug build's voice tab uses this mode. That tab tests each stage separately: voice activity detection, raw capture, obfuscation, transcription, grading and the entitlement check.
+Called without a question and an expected answer, the same function only transcribes and cleans. The debug build's voice tab uses this mode. That tab tests each stage separately: voice activity detection, raw capture, obfuscation, transcription and grading.
 
 ## Entitlement
 
-Grading is a premium capability, checked on the server for every call and never trusted from the app. The record lives with the User's data and only Cloud Functions can read it ([firestore-schema.md](firestore-schema.md)). A separate callable reports it to the app. The record is set by hand today, and syncing it from purchases is planned ([planned/voice-answering.md](planned/voice-answering.md)).
+Voice Answering is a **Premium** feature. The server checks Premium on every call and never trusts the app's view of it. It refuses a Guest first, whatever the Guest's record says, then reads the User's Premium record ([firestore-schema.md](firestore-schema.md#entitlement)). The User may read that record too; nothing reports Premium to the app through a function.
 
-The app does not check entitlement before offering Voice Answering. A User without it can start a session, but every answer then fails as a service problem. Each failure re-inserts the card, and the third in a row pauses voice answering.
+For now every new account gets Premium as soon as it is created, Guests included, so a Guest keeps it after linking Google or GitHub ([ADR-0069](../adr/0069-premium-auto-granted-on-auth-user-creation.md)). Admins revoke or grant it by hand. Syncing it from purchases is planned ([planned/voice-answering.md](planned/voice-answering.md)).
+
+The app checks Premium too, but only to decide what to offer: the Preview Study Session Screen asks the server on Start and switches a User who is not Premium to manual rating with a coming-soon message, or a no-connection dialog when it can't ask ([preview-study-session.md](preview-study-session.md#premium-and-connection)). A User who loses Premium mid-session is not told so: every answer then fails as a service problem, each failure re-inserts the card, and the third in a row pauses voice answering.
 
 ## Related
 

@@ -15,21 +15,19 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreSta
 
 private val FastScoredLines = listOf(
     XpBreakdownLine(XpAwardSource.NewCards, count = 12, rate = 20, amount = 240),
-    XpBreakdownLine(XpAwardSource.TimeStudied, count = 4, rate = 10, amount = 40),
     XpBreakdownLine(XpAwardSource.Streak, count = 3, rate = null, amount = 250),
-    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
+    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 100),
 )
 
 private val EveryLine = listOf(
     XpBreakdownLine(XpAwardSource.NewCards, count = 1, rate = 20, amount = 20),
-    XpBreakdownLine(XpAwardSource.Mastered, count = 8, rate = 200, amount = 1_600),
+    XpBreakdownLine(XpAwardSource.Mastered, count = 8, rate = 100, amount = 800),
     XpBreakdownLine(XpAwardSource.Partial, count = 2, rate = 25, amount = 50),
     XpBreakdownLine(XpAwardSource.MasteryDefended, count = 3, rate = 50, amount = 150),
-    XpBreakdownLine(XpAwardSource.MasteryLost, count = 2, rate = -80, amount = -160),
-    XpBreakdownLine(XpAwardSource.TimeStudied, count = 12, rate = 10, amount = 120),
+    XpBreakdownLine(XpAwardSource.MasteryLost, count = 2, rate = -100, amount = -200),
     XpBreakdownLine(XpAwardSource.Streak, count = 8, rate = null, amount = 250),
-    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
-    XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1_000),
+    XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 100),
+    XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 500),
 )
 
 private val PerfectRunLines = EveryLine.filter { it.source != XpAwardSource.MasteryLost }
@@ -64,7 +62,7 @@ private fun StudySessionSummaryFastScoredPreview() {
             durationSeconds = 240,
             studiedCount = 12,
             xpLines = FastScoredLines,
-            xpTotal = 1_030,
+            xpTotal = 590,
         ),
     )
 }
@@ -95,9 +93,9 @@ private fun StudySessionSummaryRatedLossPreview() {
             abandoned = true,
             headline = NiceEffort,
             xpLines = listOf(
-                XpBreakdownLine(XpAwardSource.MasteryLost, count = 3, rate = -80, amount = -240),
+                XpBreakdownLine(XpAwardSource.MasteryLost, count = 3, rate = -100, amount = -300),
             ),
-            xpTotal = -240,
+            xpTotal = -300,
         ),
     )
 }

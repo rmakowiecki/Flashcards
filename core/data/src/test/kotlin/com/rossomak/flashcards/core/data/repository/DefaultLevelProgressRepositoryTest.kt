@@ -71,7 +71,7 @@ class DefaultLevelProgressRepositoryTest {
         every { scoringStateRemoteDataSource.observeScoringState() } returns MutableStateFlow(ScoringStateDto(xp = 20_000, level = level, xpIntoCurrentLevel = xpIntoCurrentLevel))
 
         createRepository().observeLevelProgress().test {
-            awaitItem() shouldBe LevelProgress(level = level, xpIntoCurrentLevel = xpIntoCurrentLevel, xpForNextLevel = 16_000)
+            awaitItem() shouldBe LevelProgress(level = level, xpIntoCurrentLevel = xpIntoCurrentLevel, xpForNextLevel = 1500)
         }
         verify(exactly = 1) { scoringStateRemoteDataSource.observeScoringState() }
     }
@@ -120,7 +120,7 @@ class DefaultLevelProgressRepositoryTest {
         queue(fastSession(SESSION_ONE_ID, CARD_ID))
 
         createRepository().observeLevelProgress().test {
-            awaitItem() shouldBe LevelProgress(level = 2, xpIntoCurrentLevel = remoteXp + SESSION_XP - STARTING_LEVEL_THRESHOLD, xpForNextLevel = 6000)
+            awaitItem() shouldBe LevelProgress(level = 2, xpIntoCurrentLevel = remoteXp + SESSION_XP - STARTING_LEVEL_THRESHOLD, xpForNextLevel = 1250)
         }
         verify(exactly = 1) { scoringStateRemoteDataSource.observeScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
@@ -232,15 +232,15 @@ class DefaultLevelProgressRepositoryTest {
 
     @Test
     fun `each emission reads the configuration once and uses it for both the replay and the threshold`() = runTest {
-        val config = CONFIG.copy(sessionCompleted = 7, levelCurveBase = 2000.0)
+        val config = CONFIG.copy(sessionCompleted = 7, levelBaseCost = 2000)
         xpConfigRepository.resultToReturn = Result.success(config)
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         every { scoringStateRemoteDataSource.observeScoringState() } returns MutableStateFlow(null)
         queue(fastSession(SESSION_ONE_ID, CARD_ID))
 
         createRepository().observeLevelProgress().test {
-            // 1 new card × 10 + 1 minute × 10 + 7 completion + a Streak of 1 × 20, against a Level 1 threshold of 2000.
-            awaitItem() shouldBe LevelProgress(level = 1, xpIntoCurrentLevel = 47, xpForNextLevel = config.levelThreshold(1))
+            // 1 new card × 10 + 7 completion + a Streak of 1 × 20, against a Level 1 threshold of 2000.
+            awaitItem() shouldBe LevelProgress(level = 1, xpIntoCurrentLevel = 37, xpForNextLevel = config.levelThreshold(1))
         }
         xpConfigRepository.getXpConfigCallCount shouldBe 1
         verify(exactly = 1) { scoringStateRemoteDataSource.observeScoringState() }
@@ -386,8 +386,8 @@ class DefaultLevelProgressRepositoryTest {
         const val REMOTE_XP = 300L
         val REMOTE_SCORING_STATE = ScoringStateDto(xp = REMOTE_XP, xpIntoCurrentLevel = REMOTE_XP)
 
-        // One Fast session with one new card: 1 new card × 10 + 1 minute × 10 + 500 completion + a Streak of 1 × 20.
-        const val SESSION_XP = 540L
+        // One Fast session with one new card: 1 new card × 10 + 100 completion + a Streak of 1 × 20.
+        const val SESSION_XP = 130L
 
         // The bundled defaults, except a small Streak rate, so a Streak award stays inside Level 1.
         val CONFIG = XpConfig(streakPerDay = 20)
@@ -403,7 +403,6 @@ class DefaultLevelProgressRepositoryTest {
             dailyGoalMet = 0,
             streakPerDay = 0,
             streakMaxPerDay = 0,
-            minuteStudied = 0,
         )
     }
 }

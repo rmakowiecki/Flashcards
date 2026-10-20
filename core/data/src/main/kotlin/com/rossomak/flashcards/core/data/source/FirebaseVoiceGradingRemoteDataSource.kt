@@ -4,7 +4,6 @@ import android.util.Base64
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.functions.StreamResponse
-import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import javax.inject.Inject
@@ -15,14 +14,13 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
-import kotlinx.coroutines.tasks.await
 
 /**
  * Firebase Callable client for the voice-grading backend (ADR-0029). Every call resolves its
  * endpoint from the initialized [FirebaseApp] (`google-services.json`), not a base URL — the
  * whole REST/Retrofit stack is gone. `transcribeAndGradeSpokenAnswer` streams over one Callable
  * connection (ADR-0028); `transcribeAndSanitize` rides the same callable with no question/answer
- * and reads only the first streamed chunk; `checkEntitlement` is a plain unary callable.
+ * and reads only the first streamed chunk.
  */
 class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
     private val functions: FirebaseFunctions,
@@ -65,15 +63,6 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
         throw exception
     } catch (exception: Exception) {
         Result.failure(exception.mapEntitlementRejection())
-    }
-
-    override suspend fun checkEntitlement(): EntitlementDto {
-        val result = functions.getHttpsCallable(ENTITLEMENT_FUNCTION_NAME).call().await()
-        val data = result.data as? Map<*, *>
-            ?: error("Unexpected entitlement result shape: ${result.data}")
-        val isPremium = data[FIELD_IS_PREMIUM] as? Boolean
-            ?: error("Entitlement result missing is_premium: ${result.data}")
-        return EntitlementDto(isPremium = isPremium)
     }
 
     private fun streamCallable(payload: Map<String, Any>): Flow<StreamResponse> =
@@ -123,7 +112,6 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
 
     private companion object {
         const val TRANSCRIBE_AND_GRADE_FUNCTION_NAME = "transcribeAndGradeSpokenAnswer"
-        const val ENTITLEMENT_FUNCTION_NAME = "entitlement"
         const val FIELD_CARD_ID = "card_id"
         const val FIELD_QUESTION = "question"
         const val FIELD_EXPECTED_ANSWER = "expected_answer"
@@ -131,6 +119,5 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
         const val FIELD_SANITIZED_TRANSCRIPT = "sanitized_transcript"
         const val FIELD_GRADE = "grade"
         const val FIELD_FEEDBACK = "feedback"
-        const val FIELD_IS_PREMIUM = "is_premium"
     }
 }

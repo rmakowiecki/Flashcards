@@ -29,7 +29,6 @@ data class SessionScoreDto(
     val partial: Int,
     val masteryDefenseBonus: Int,
     val demastered: Int,
-    val timeStudied: Int,
     val sessionCompletionBonus: Int,
     val dailyGoalBonus: Int,
     val streakBonus: Int,
@@ -61,6 +60,5 @@ data class SessionScoreRatesDto(
     val cardPartial: Int,
     val masteryDefended: Int,
     val cardDemastered: Int,
-    val minuteStudied: Int,
     val sessionCompleted: Int,
 )

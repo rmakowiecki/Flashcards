@@ -44,7 +44,7 @@ The dialog itemizes the score: one row per XP source, each with its icon, its la
 
 - A line worth no XP is left out. An abandoned session has no session-completed line, and a Fast session has no Rated-only lines.
 - A loss is shown in the error tone.
-- Lines appear in a fixed order: new cards, card mastery, Partial, mastery defense, de-mastery, time studied, Streak, session completed, Daily Goal.
+- Lines appear in a fixed order: new cards, card mastery, Partial, mastery defense, de-mastery, Streak, session completed, Daily Goal.
 
 ## Level card
 

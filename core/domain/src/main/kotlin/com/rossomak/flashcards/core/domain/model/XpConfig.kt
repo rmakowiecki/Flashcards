@@ -1,8 +1,5 @@
 package com.rossomak.flashcards.core.domain.model
 
-import kotlin.math.ceil
-import kotlin.math.pow
-
 /**
  * Every tunable scoring number XP and leveling needs, in one place — no point award, no
  * penalty, and no level-curve parameter is ever a constant in domain logic; the calculation that
@@ -34,12 +31,14 @@ import kotlin.math.pow
  * @param dailyGoalMet flat, once per calendar day the daily study-minutes goal is met. Both modes.
  * @param streakPerDay per consecutive study day, before [streakMaxPerDay] caps it. Both modes.
  * @param streakMaxPerDay the ceiling [streakPerDay] × streak-length is clamped to.
- * @param minuteStudied per minute of session time. Both modes.
- * @param levelCurveBase the level curve's `base` in `ceil(base × level^exponent / 1000) × 1000` —
- * a tuning value, not yet chosen for real (the intended shape: early levels reachable in one or
- * two good sessions, the middle range demanding multi-day effort, the high levels long-term).
- * @param levelCurveExponent the curve's `exponent`, same formula, same tuning status as
- * [levelCurveBase].
+ * @param levelBaseCost the XP that completes the starting level; every later level costs the previous
+ * one's cost plus its tier's step ([levelThreshold]).
+ * @param levelCostSteps the step added per level, one entry per tier of [levelsPerCostStep] levels,
+ * starting from the first tier. The last entry applies to every later tier too, so it is the cap on how
+ * much more a level costs than the one before it. Never empty, every entry positive.
+ * @param levelsPerCostStep how many levels share one entry of [levelCostSteps]. Positive.
+ * @throws IllegalArgumentException when [levelCostSteps] is empty or holds a non-positive step, or
+ * [levelsPerCostStep] is not positive: [levelThreshold] cannot be computed for such a curve.
  */
 data class XpConfig(
     val newCardStudied: Int = 10,
@@ -47,31 +46,44 @@ data class XpConfig(
     val cardPartial: Int = 25,
     val masteryDefended: Int = 50,
     val cardDemastered: Int = -CARD_DEMASTERED_MAGNITUDE,
-    val sessionCompleted: Int = 500,
-    val dailyGoalMet: Int = 1000,
+    val sessionCompleted: Int = 100,
+    val dailyGoalMet: Int = 500,
     val streakPerDay: Int = 250,
-    val streakMaxPerDay: Int = 2500,
-    val minuteStudied: Int = 10,
-    val levelCurveBase: Double = 1000.0,
-    val levelCurveExponent: Double = 2.5,
+    val streakMaxPerDay: Int = 1000,
+    val levelBaseCost: Int = 1000,
+    val levelCostSteps: List<Int> = DEFAULT_LEVEL_COST_STEPS,
+    val levelsPerCostStep: Int = 5,
 ) {
+    init {
+        require(levelCostSteps.isNotEmpty()) { "levelCostSteps must be a nonempty list, got $levelCostSteps" }
+        require(levelCostSteps.all { step -> step > 0 }) { "levelCostSteps must hold positive integers, got $levelCostSteps" }
+        require(levelsPerCostStep > 0) { "levelsPerCostStep must be positive, got $levelsPerCostStep" }
+    }
+
     private companion object {
-        // Named rather than inlined as a bare -80 default above — detekt's MagicNumber check does
+        // Named rather than inlined as a bare -100 default above — detekt's MagicNumber check does
         // not see through the unary minus on a raw literal default value the way it does a plain one.
-        const val CARD_DEMASTERED_MAGNITUDE = 80
+        const val CARD_DEMASTERED_MAGNITUDE = 100
+
+        val DEFAULT_LEVEL_COST_STEPS = listOf(250, 500, 750, 1000, 1500, 2000)
     }
 }
 
 /**
- * The total points needed to complete [level] and advance to the next one, per the curve
- * shape: `ceil(base × level^exponent / 1000) × 1000`. A free function on [XpConfig] rather than a
- * member, so [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp]'s level-up loop
- * and the Session Summary's own progress-within-level display read the exact same formula — the one
- * place a tuning change to the curve's shape, not just its parameters, would need to happen.
+ * The points needed to complete [level] alone, not a running total across levels, and advance to the
+ * next one. The starting level costs
+ * [XpConfig.levelBaseCost], and every later level costs the previous level's cost plus the step of its
+ * tier: level `n` belongs to tier `(n - 1) / levelsPerCostStep`, a tier past the end of
+ * [XpConfig.levelCostSteps] reuses the last step, so consecutive levels always cost more than the one
+ * before. A free function on [XpConfig] rather than a member, so
+ * [com.rossomak.flashcards.core.domain.scoring.calculateSessionXp]'s level-up loop and the Session
+ * Summary's own progress-within-level display read the exact same rule.
  */
 fun XpConfig.levelThreshold(level: Int): Long {
-    val rounded = ceil(levelCurveBase * level.toDouble().pow(levelCurveExponent) / LEVEL_THRESHOLD_ROUNDING_UNIT)
-    return rounded.toLong() * LEVEL_THRESHOLD_ROUNDING_UNIT
+    var cost = levelBaseCost.toLong()
+    for (reachedLevel in ScoringState.STARTING_LEVEL + 1..level) {
+        val tier = minOf((reachedLevel - 1) / levelsPerCostStep, levelCostSteps.lastIndex)
+        cost += levelCostSteps[tier]
+    }
+    return cost
 }
-
-private const val LEVEL_THRESHOLD_ROUNDING_UNIT = 1000L

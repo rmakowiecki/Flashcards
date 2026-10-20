@@ -95,7 +95,7 @@ class SessionDeliveryReportTest {
     private companion object {
         const val SESSION_ID = "session-1"
         val SCORE = SessionScore(
-            breakdown = XpBreakdown(newCards = 20, mastered = 100, partial = 25, timeStudied = 10, sessionCompletionBonus = 500, streakBonus = 250),
+            breakdown = XpBreakdown(newCards = 20, mastered = 100, partial = 25, sessionCompletionBonus = 500, streakBonus = 250),
             level = 3,
             xpIntoCurrentLevel = 120,
             xpForNextLevel = 16000,
@@ -111,7 +111,6 @@ class SessionDeliveryReportTest {
                 cardPartial = 25,
                 masteryDefended = 50,
                 cardDemastered = -80,
-                minuteStudied = 10,
                 sessionCompleted = 500,
             ),
         )

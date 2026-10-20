@@ -79,6 +79,8 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.FlashcardsRevealContent
+import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
+import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBannerTone
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
@@ -99,8 +101,12 @@ import com.rossomak.flashcards.feature.study.preview.PreviewDialog.RatedSessionV
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionCardCount
 import com.rossomak.flashcards.feature.study.preview.PreviewDialog.SessionMode
 import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.MicPermissionStillDenied
+import com.rossomak.flashcards.feature.study.preview.PreviewStudySessionMessage.PremiumFeatureComingSoon
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 private val HERO_GLYPH_SIZE = 24.dp
@@ -131,11 +137,20 @@ fun PreviewStudySessionScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val micPermissionStillDeniedText = stringResource(CoreUiR.string.common_mic_permission_still_denied_message)
+    val premiumComingSoonText = stringResource(R.string.preview_session_premium_coming_soon_message)
     val snackbarScope = rememberCoroutineScope()
+    val closeSettingsSheetRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
     observeAsEvents(viewModel.messages) { message ->
         when (message) {
             MicPermissionStillDenied -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(message = micPermissionStillDeniedText, duration = SnackbarDuration.Short)
+            }
+
+            PremiumFeatureComingSoon -> {
+                closeSettingsSheetRequests.tryEmit(Unit)
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(message = premiumComingSoonText, duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -161,6 +176,7 @@ fun PreviewStudySessionScreen(
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) viewModel.onStartSession()
         },
         snackbarHostState = snackbarHostState,
+        closeSettingsSheetRequests = closeSettingsSheetRequests,
     )
 }
 
@@ -209,11 +225,13 @@ fun PreviewStudySessionContent(
     onSwitchToManualAnswering: () -> Unit,
     onStartSession: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    closeSettingsSheetRequests: Flow<Unit> = emptyFlow(),
     initiallySettingsSheetOpen: Boolean = false,
 ) {
     PreviewDialogHost(
         activeDialog = state.activeDialog,
         onDialogEvent = onDialogEvent,
+        onSwitchToManualAnswering = onSwitchToManualAnswering,
     )
 
     var settingsSheetOpen by rememberSaveable { mutableStateOf(initiallySettingsSheetOpen) }
@@ -235,6 +253,7 @@ fun PreviewStudySessionContent(
         settingsSheetOpen = false
         pendingBadgeDialog = null
     }
+    observeAsEvents(closeSettingsSheetRequests) { onDismissSettingsSheet() }
     val onToggleSettings = {
         settingsSheetOpen = !settingsSheetOpen
         if (!settingsSheetOpen) pendingBadgeDialog = null
@@ -419,6 +438,17 @@ private fun ReadyContent(
             }
         }
         Spacer(modifier = Modifier.weight(1f))
+        if (state.isVoiceAnsweringOffline) {
+            FlashcardsInfoBanner(
+                text = stringResource(R.string.preview_session_voice_offline_hint_message),
+                icon = Icons.Default.CloudOff,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = MaterialTheme.spacing.small),
+                tone = FlashcardsInfoBannerTone.Warning,
+                style = OnGradient,
+            )
+        }
         HeroActions(
             state = state,
             settingsSheetOpen = settingsSheetOpen,
@@ -747,7 +777,7 @@ private fun StartSessionButton(
     FlashcardsFilledButton(
         text = stringResource(CoreUiR.string.common_start_session_button),
         onClick = onStartSession,
-        enabled = state.canStart,
+        enabled = state.canStart && !state.isCheckingPremium,
         icon = Icons.Default.PlayArrow,
         style = OnGradient,
         modifier = modifier,

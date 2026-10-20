@@ -117,7 +117,6 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         partial = requireInt(breakdown, FIELD_PARTIAL),
         masteryDefenseBonus = requireInt(breakdown, FIELD_MASTERY_DEFENSE_BONUS),
         demastered = requireInt(breakdown, FIELD_DEMASTERED),
-        timeStudied = requireInt(breakdown, FIELD_TIME_STUDIED),
         sessionCompletionBonus = requireInt(breakdown, FIELD_SESSION_COMPLETION_BONUS),
         dailyGoalBonus = requireInt(breakdown, FIELD_DAILY_GOAL_BONUS),
         streakBonus = requireInt(breakdown, FIELD_STREAK_BONUS),
@@ -137,7 +136,6 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         cardPartial = requireInt(rates, FIELD_RATE_CARD_PARTIAL),
         masteryDefended = requireInt(rates, FIELD_RATE_MASTERY_DEFENDED),
         cardDemastered = requireInt(rates, FIELD_RATE_CARD_DEMASTERED),
-        minuteStudied = requireInt(rates, FIELD_RATE_MINUTE_STUDIED),
         sessionCompleted = requireInt(rates, FIELD_RATE_SESSION_COMPLETED),
     )
 
@@ -172,7 +170,6 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val FIELD_PARTIAL = "partial"
         const val FIELD_MASTERY_DEFENSE_BONUS = "masteryDefenseBonus"
         const val FIELD_DEMASTERED = "demastered"
-        const val FIELD_TIME_STUDIED = "timeStudied"
         const val FIELD_SESSION_COMPLETION_BONUS = "sessionCompletionBonus"
         const val FIELD_DAILY_GOAL_BONUS = "dailyGoalBonus"
         const val FIELD_STREAK_BONUS = "streakBonus"
@@ -184,7 +181,6 @@ class FirebaseSessionSubmissionRemoteDataSource @Inject constructor(
         const val FIELD_RATE_CARD_PARTIAL = "cardPartial"
         const val FIELD_RATE_MASTERY_DEFENDED = "masteryDefended"
         const val FIELD_RATE_CARD_DEMASTERED = "cardDemastered"
-        const val FIELD_RATE_MINUTE_STUDIED = "minuteStudied"
         const val FIELD_RATE_SESSION_COMPLETED = "sessionCompleted"
 
         // Mirrors ValidatedSubmitStudySessionRequest's field names in functions/src/lib/submitStudySession.ts.

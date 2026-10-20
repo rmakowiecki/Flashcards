@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.core.data.source
 
-import com.rossomak.flashcards.core.data.model.EntitlementDto
 import com.rossomak.flashcards.core.data.model.VoiceGradingStreamEventDto
 import com.rossomak.flashcards.core.domain.model.VoiceGradingEntitlementException
 import java.io.IOException
@@ -62,11 +61,6 @@ class FakeVoiceGradingRemoteDataSource : VoiceGradingRemoteDataSource {
         Result.failure(exception)
     } catch (exception: IOException) {
         Result.failure(exception)
-    }
-
-    override suspend fun checkEntitlement(): EntitlementDto {
-        simulateNetworkCall()
-        return EntitlementDto(isPremium = simulatePremiumEntitlement)
     }
 
     private suspend fun simulateNetworkCall() {

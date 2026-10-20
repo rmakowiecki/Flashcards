@@ -52,13 +52,13 @@ class PendingSessionProjectorTest {
 
         val state = createProjector().projectScoringState().getOrThrow()
 
-        // Session 1: 1 new card × 10 + 1 mastered × 100 + 1 minute × 10 + 500 completion + a Streak of
-        // 1 × 20 = 640. Session 2, the same day: card-1 is neither new nor freshly Mastered, so 1
-        // defended × 50 + 10 + 500 = 560. 1200 crosses Level 1's threshold of 1000.
+        // Session 1: 1 new card × 10 + 1 mastered × 100 + 500 completion + a Streak of 1 × 20 = 630.
+        // Session 2, the same day: card-1 is neither new nor freshly Mastered, so 1 defended × 50 + 500
+        // = 550. 1180 crosses Level 1's threshold of 1000.
         state shouldBe ScoringState(
-            xp = 1200,
+            xp = 1180,
             level = 2,
-            xpIntoCurrentLevel = 200,
+            xpIntoCurrentLevel = 180,
             currentStreak = 1,
             bestStreak = 1,
             lastStudyDate = STUDY_DATE,
@@ -77,8 +77,8 @@ class PendingSessionProjectorTest {
 
         val state = createProjector().projectScoringState().getOrThrow()
 
-        // (1 new × 10 + 10 + 500 + a Streak of 1 × 20) + (0 new + 10 + 500).
-        state?.xp shouldBe 1050L
+        // (1 new × 10 + 500 + a Streak of 1 × 20) + (0 new + 500).
+        state?.xp shouldBe 1030L
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -100,12 +100,12 @@ class PendingSessionProjectorTest {
 
         val state = createProjector().projectScoringState().getOrThrow()
 
-        // 300 + 1 defended × 50 + 10 + 500 + a Streak of 5 × 20. The previous day's seconds do not
+        // 300 + 1 defended × 50 + 500 + a Streak of 5 × 20. The previous day's seconds do not
         // count toward today's goal.
         state shouldBe ScoringState(
-            xp = 960,
+            xp = 950,
             level = 1,
-            xpIntoCurrentLevel = 960,
+            xpIntoCurrentLevel = 950,
             currentStreak = 5,
             bestStreak = 7,
             lastStudyDate = STUDY_DATE,
@@ -175,7 +175,7 @@ class PendingSessionProjectorTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } returns null
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
 
-        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 47L
+        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 37L
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -222,9 +222,9 @@ class PendingSessionProjectorTest {
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
 
         createProjector().projectScoringState().getOrThrow() shouldBe ScoringState(
-            xp = 540,
+            xp = 530,
             level = 1,
-            xpIntoCurrentLevel = 540,
+            xpIntoCurrentLevel = 530,
             currentStreak = 1,
             bestStreak = 1,
             lastStudyDate = STUDY_DATE,
@@ -240,7 +240,7 @@ class PendingSessionProjectorTest {
         coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) } throws IllegalStateException("offline, not cached")
         queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
 
-        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 640L
+        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 630L
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -254,7 +254,7 @@ class PendingSessionProjectorTest {
         }
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
 
-        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 540L
+        createProjector().projectScoringState().getOrThrow()?.xp shouldBe 530L
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -279,8 +279,8 @@ class PendingSessionProjectorTest {
 
         val state = projector.projectScoringStateOver(ScoringStateDto(xp = 300, xpIntoCurrentLevel = 300), pendingSessions, CONFIG.copy(sessionCompleted = 7))
 
-        // 300 + 1 new × 10 + 10 + 7 completion + a Streak of 1 × 20.
-        state?.xp shouldBe 347L
+        // 300 + 1 new × 10 + 7 completion + a Streak of 1 × 20.
+        state?.xp shouldBe 337L
         coVerify(exactly = 0) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
         xpConfigRepository.getXpConfigCallCount shouldBe 0
@@ -293,9 +293,9 @@ class PendingSessionProjectorTest {
         val projector = createProjector()
 
         projector.projectScoringStateOver(null, projector.observePendingSessions().first(), CONFIG) shouldBe ScoringState(
-            xp = 540,
+            xp = 530,
             level = 1,
-            xpIntoCurrentLevel = 540,
+            xpIntoCurrentLevel = 530,
             currentStreak = 1,
             bestStreak = 1,
             lastStudyDate = STUDY_DATE,
@@ -385,8 +385,8 @@ class PendingSessionProjectorTest {
 
         val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
 
-        // 1 new card × 10 + 1 mastered × 100 + 1 minute × 10 + 500 completion + a Streak of 1 × 20.
-        xpTotals shouldBe mapOf(SESSION_ONE_ID to 640)
+        // 1 new card × 10 + 1 mastered × 100 + 500 completion + a Streak of 1 × 20.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 630)
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -401,9 +401,9 @@ class PendingSessionProjectorTest {
 
         val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
 
-        // Session 1: 1 new × 10 + 10 + 500 + a Streak of 1 × 20. Session 2: card-1 is no longer new, no
-        // second Streak award the same day, and the two minutes together meet the 2-minute goal: 10 + 500 + 1000.
-        xpTotals shouldBe mapOf(SESSION_ONE_ID to 540, SESSION_TWO_ID to 1510)
+        // Session 1: 1 new × 10 + 500 + a Streak of 1 × 20. Session 2: card-1 is no longer new, no
+        // second Streak award the same day, and the two minutes together meet the 2-minute goal: 500 + 1000.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 530, SESSION_TWO_ID to 1500)
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -415,7 +415,7 @@ class PendingSessionProjectorTest {
         queue(fastSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID))
         val projector = createProjector()
 
-        projector.projectSessionXpTotals(projector.observePendingSessions().first()) shouldBe mapOf(SESSION_ONE_ID to 540)
+        projector.projectSessionXpTotals(projector.observePendingSessions().first()) shouldBe mapOf(SESSION_ONE_ID to 530)
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
         coVerify(exactly = 1) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID) }
     }
@@ -447,12 +447,12 @@ class PendingSessionProjectorTest {
         val state = projector.projectScoringState().getOrThrow()
         val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
 
-        // Each: 1 new × 10 + 10 + 500, the first also a Streak of 1 × 20. 1580 crosses Level 1's 1000.
-        xpTotals shouldBe mapOf(SESSION_ONE_ID to 540, SESSION_TWO_ID to 520, SESSION_THREE_ID to 520)
+        // Each: 1 new × 10 + 500, the first also a Streak of 1 × 20. 1550 crosses Level 1's 1000.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 530, SESSION_TWO_ID to 510, SESSION_THREE_ID to 510)
         state shouldBe ScoringState(
-            xp = 1580,
+            xp = 1550,
             level = 2,
-            xpIntoCurrentLevel = 580,
+            xpIntoCurrentLevel = 550,
             currentStreak = 1,
             bestStreak = 1,
             lastStudyDate = STUDY_DATE,
@@ -496,9 +496,9 @@ class PendingSessionProjectorTest {
 
         val xpTotals = projector.projectSessionXpTotals(projector.observePendingSessions().first())
 
-        // Both are scored against the cached state's 60 seconds, so each meets the 2-minute goal: 10 + 10
-        // + 500 + 1000. Had the applied session advanced the chain, only it would have met the goal.
-        xpTotals shouldBe mapOf(SESSION_ONE_ID to 1520, SESSION_TWO_ID to 1520)
+        // Both are scored against the cached state's 60 seconds, so each meets the 2-minute goal: 10 + 500
+        // + 1000. Had the applied session advanced the chain, only it would have met the goal.
+        xpTotals shouldBe mapOf(SESSION_ONE_ID to 1510, SESSION_TWO_ID to 1510)
     }
 
     @Test
@@ -604,24 +604,25 @@ class PendingSessionProjectorTest {
         val SESSION_THREE_START: Instant = Instant.parse("2026-09-06T12:00:00Z")
         val NEXT_DAY_START: Instant = Instant.parse("2026-09-07T10:00:00Z")
 
-        // The bundled defaults, spelled out so the arithmetic in each test reads against known rates,
-        // except a small Streak rate, so a Streak award stays inside Level 1.
-        // The cached state once the server applied a Fast session one studying one new card: 10 + 10 +
-        // 500 + a Streak of 1 × 20.
+        // Rates spelled out so the arithmetic in each test reads against known values: the bundled
+        // defaults, except round completion and Daily Goal awards and a small Streak rate, so a Streak
+        // award stays inside Level 1.
+        // The cached state once the server applied a Fast session one studying one new card: 10 + 500 + a
+        // Streak of 1 × 20.
         val SCORING_STATE_AFTER_SESSION_ONE = ScoringStateDto(
-            xp = 540,
-            xpIntoCurrentLevel = 540,
+            xp = 530,
+            xpIntoCurrentLevel = 530,
             currentStreak = 1,
             bestStreak = 1,
             lastStudyDate = STUDY_DATE,
             studiedSecondsOnLastStudyDate = 60,
         )
 
-        // Session two adds 1 new × 10 + 10 + 500 over it, crossing Level 1's 1000.
+        // Session two adds 1 new × 10 + 500 over it, crossing Level 1's 1000.
         val SCORING_STATE_AFTER_SESSIONS_ONE_AND_TWO = ScoringState(
-            xp = 1060,
+            xp = 1040,
             level = 2,
-            xpIntoCurrentLevel = 60,
+            xpIntoCurrentLevel = 40,
             currentStreak = 1,
             bestStreak = 1,
             lastStudyDate = STUDY_DATE,
@@ -632,12 +633,9 @@ class PendingSessionProjectorTest {
             newCardStudied = 10,
             cardMastered = 100,
             masteryDefended = 50,
-            minuteStudied = 10,
             sessionCompleted = 500,
             streakPerDay = 20,
             dailyGoalMet = 1000,
-            levelCurveBase = 1000.0,
-            levelCurveExponent = 2.5,
         )
     }
 }

@@ -13,7 +13,7 @@ import com.rossomak.flashcards.core.domain.model.SignInResult.Failed
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
-import com.rossomak.flashcards.core.domain.usecase.CheckInternetAvailabilityUseCase
+import com.rossomak.flashcards.core.domain.usecase.GetInternetAvailabilityUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGitHubUseCase
 import com.rossomak.flashcards.core.domain.usecase.SignInWithGoogleUseCase
@@ -60,7 +60,7 @@ class LoginViewModelTest {
             SignInWithGoogleUseCase(authRepository),
             SignInWithGitHubUseCase(authRepository),
             ObserveUserPreferencesUseCase(userPreferencesRepository),
-            CheckInternetAvailabilityUseCase(networkAvailabilityGateway),
+            GetInternetAvailabilityUseCase(networkAvailabilityGateway),
         )
     }
 
