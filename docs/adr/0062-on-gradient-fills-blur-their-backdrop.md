@@ -31,7 +31,9 @@ screen:
   backdrop state and exposes it to descendants through a `ModifierLocal`.
 - `blurBackdropSource()` on any background. It reads the scope's state and registers the node as
   something to blur. The brand gradient is only the first source: an animated or image background is
-  a source the same way. `BrandGradientBackdrop` is a convenience for the gradient case.
+  a source the same way. `BrandGradientBackdrop` is a convenience for the gradient case. Given a
+  `graph`, it also draws a Morpheus network graph over the gradient inside the same source, so
+  on-gradient components blur the graph with the gradient ([ADR-0069](0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
 - `blurBackdrop(shape, enabled)` inside a component. It finds the nearest scope and draws a blur of
   the sources registered in it, clipped to the shape, behind the component's container. It draws the
   blur only: no tint, no fill.
