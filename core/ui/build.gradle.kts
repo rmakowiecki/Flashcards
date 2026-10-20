@@ -35,7 +35,8 @@ dependencies {
     implementation(libs.haze)
     implementation(libs.haze.blur)
     // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts).
-    implementation("com.rossomak:morpheus")
+    // api: MorpheusGraphSpec and MorpheusGraphMorphState are in BrandGradientBackdrop's public signature.
+    api("com.rossomak:morpheus")
     // Annotation only on the main compile classpath so components can carry
     // @ShowkaseComposable; SOURCE-retained, so no release-runtime cost. The processor and
     // browser UI stay debug-only.

@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
@@ -24,7 +22,8 @@ import kotlin.time.Duration
  *
  * With a [graph] (a [BrandMorpheusGraphSpecs] spec), the network graph is drawn over the gradient, inside
  * the source, so translucent components blur it with the gradient. A changed [graph] morphs from the
- * screen as it is over [graphMorphDuration]; the first composition shows it at once. [graphAlpha] fades
+ * screen as it is over [graphMorphDuration], and a changed [graphMorphDuration] retimes a morph under way
+ * from where it has got to; the first composition shows it at once. [graphAlpha] fades
  * the graph alone, read in the draw phase.
  */
 @Composable
@@ -39,9 +38,8 @@ fun BoxScope.BrandGradientBackdrop(
         return
     }
     val graphState = rememberMorpheusGraphMorphState(graph)
-    val currentMorphDuration by rememberUpdatedState(graphMorphDuration)
-    LaunchedEffect(graph) {
-        graphState.animateTo(graph, tween(currentMorphDuration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing))
+    LaunchedEffect(graph, graphMorphDuration) {
+        graphState.animateTo(graph, tween(graphMorphDuration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing))
     }
     BrandGradientBackdrop(graphState = graphState, modifier = modifier, graphAlpha = graphAlpha)
 }
