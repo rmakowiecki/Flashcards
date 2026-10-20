@@ -115,7 +115,7 @@ internal fun FlashcardsDialog(
 }
 
 /** Blur-behind radius applied to a dialog's window when cross-window blur is available. */
-private val DIALOG_BLUR_RADIUS = 32.dp
+private val DIALOG_BLUR_RADIUS = 16.dp
 
 /**
  * Scrim dim used instead of blur when cross-window blur isn't available at runtime. This is not

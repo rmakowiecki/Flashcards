@@ -63,7 +63,7 @@ object AppSizes {
     val onGradientButtonBorder: Dp = 1.5.dp
 
     /** Blur radius behind every translucent on-gradient fill; `LocalBackdropBlurRadius` defaults to it. */
-    val backdropBlurRadius: Dp = 20.dp
+    val backdropBlurRadius: Dp = 4.dp
 
     /** Leading icon inside a [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]. */
     val xpBreakdownRowIcon: Dp = 20.dp
