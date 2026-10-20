@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Refines ADR-0024 (four-`onRequest`-function proxy shape) and ADR-0028 (streaming callable for the production grade path). Supersedes the parts of both noted under "Supersession" below. The `entitlement` callable (decisions 1, 5 and 6) is since deleted by [ADR-0068](0068-client-observes-premium-from-the-entitlement-record.md): the app reads its own Premium record instead.
+Accepted. Refines ADR-0024 (four-`onRequest`-function proxy shape) and ADR-0028 (streaming callable for the production grade path). Supersedes the parts of both noted under "Supersession" below. The `entitlement` callable (decisions 1, 5 and 6) is since deleted by [ADR-0070](0070-client-observes-premium-from-the-entitlement-record.md): the app reads its own Premium record instead.
 
 ## Decision
 

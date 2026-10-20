@@ -47,9 +47,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "Flashcards"
 
-// Morpheus (the animated graph background and its tuner) lives in its own repository, checked out here
-// as the `morpheus` git submodule and built from source as part of this build. Swap this block for a
-// repository dependency once Morpheus is published; the `com.rossomak:*` coordinates stay the same.
+// Morpheus is built from source from the `morpheus` git submodule. Once it is published to Maven Central,
+// replace this block with versioned `com.rossomak:*` dependencies and drop the submodule.
 includeBuild("morpheus") {
     dependencySubstitution {
         substitute(module("com.rossomak:morpheus")).using(project(":morpheus"))

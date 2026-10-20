@@ -4,7 +4,7 @@ The unbuilt remainder of Voice Answering: filling the premium entitlement record
 
 ## Why it is needed
 
-Voice grading costs money on every answer, for transcription and two model calls. The server therefore grades only for a **Premium** User, and it never trusts a premium flag sent by the app ([ADR-0024](../../adr/0024-voice-grading-cloud-function-proxy.md)). Today every new account is granted Premium when it is created, and admins revoke it by hand ([ADR-0069](../../adr/0069-premium-auto-granted-on-auth-user-creation.md)). Selling it needs the record kept in step with the User's subscription instead.
+Voice grading costs money on every answer, for transcription and two model calls. The server therefore grades only for a **Premium** User, and it never trusts a premium flag sent by the app ([ADR-0024](../../adr/0024-voice-grading-cloud-function-proxy.md)). Today every new account is granted Premium when it is created, and admins revoke it by hand ([ADR-0071](../../adr/0071-premium-auto-granted-on-auth-user-creation.md)). Selling it needs the record kept in step with the User's subscription instead.
 
 ## What it must do
 

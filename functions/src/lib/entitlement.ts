@@ -20,7 +20,7 @@ function entitlementDocument(firestore: Firestore, uid: string) {
 /**
  * Server-side Premium source of truth: the User's entitlement record, written only by the Admin SDK
  * (this module's auto-grant, or an admin editing it in the console). The app reads the same record to
- * decide what to offer, but a client-side "is premium" flag is never trusted (ADR-0024, ADR-0068).
+ * decide what to offer, but a client-side "is premium" flag is never trusted (ADR-0024, ADR-0070).
  */
 export async function isPremiumUser(firestore: Firestore, uid: string): Promise<boolean> {
   const snapshot = await entitlementDocument(firestore, uid).get();
@@ -33,7 +33,7 @@ export async function isPremiumUser(firestore: Firestore, uid: string): Promise<
  *
  * A Guest is refused whatever its record says: the auto-grant gives every new Auth user Premium, a
  * Guest included, so the grant survives the Guest linking Google or GitHub, which creates no new Auth
- * user (ADR-0069). The provider is read from the Auth user record, not the ID token, so a token minted
+ * user (ADR-0071). The provider is read from the Auth user record, not the ID token, so a token minted
  * before the Guest linked cannot misreport it. A Guest's user record has no provider data. A caller
  * whose session is no longer active is refused as `unauthenticated` (`requireActiveUser`); the Guest
  * and Premium refusals are `permission-denied`.
@@ -61,7 +61,7 @@ async function authUserExists(auth: Auth, uid: string): Promise<boolean> {
 }
 
 /**
- * The temporary auto-grant (ADR-0069): gives a newly created Auth user Premium. Creates the record only
+ * The temporary auto-grant (ADR-0071): gives a newly created Auth user Premium. Creates the record only
  * when none exists, so a record an admin already wrote is never overwritten. Safe to run twice.
  *
  * Skips a user whose Auth user is already gone: the trigger runs in the background and is retried on

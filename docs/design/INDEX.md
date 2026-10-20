@@ -35,7 +35,7 @@ Entry format:
   Read when: changing app shortcuts, the pin action, the dynamic shortcut sync or shortcut launch routing.
 - [navigation.md](navigation.md): How screens connect: launch routing through Splash, Onboarding and Login, the tab shell, the back stack around a Study Session, leaving for Login, and navigation as one-time events.
   Read when: adding a screen or route, changing launch routing, tabs or back-stack behavior, or writing a ViewModel that navigates.
-- [onboarding-flow.md](onboarding-flow.md): The first-run onboarding gallery: its pager and chrome, each step, the on-device voice test and its microphone permission, Skip, and the commit with its Guest session, failure and offline handling.
+- [onboarding-flow.md](onboarding-flow.md): The first-run onboarding gallery: its pager, chrome and background graph, each step, the on-device voice test and its microphone permission, Skip, and the commit with its Guest session, failure and offline handling.
   Read when: changing `feature:onboarding`, first-run behavior, or what onboarding writes.
 - [preview-study-session.md](preview-study-session.md): The Preview Study Session screen: every entry point and what it sends, starting values, the hero and its states, the settings sheet and its rows, "keep as default", the microphone handshake and starting the session.
   Read when: changing `feature:study` preview, a session entry point, session settings, "keep as default" or the Voice Answering microphone flow.
