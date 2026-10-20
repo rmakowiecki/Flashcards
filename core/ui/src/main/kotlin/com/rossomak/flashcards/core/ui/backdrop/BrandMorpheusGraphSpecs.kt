@@ -7,6 +7,7 @@ import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphLayerSpec
 import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.ShapePrimitive
+import com.rossomak.morpheus.ShapePrimitive.Bloom
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -45,6 +46,9 @@ object BrandMorpheusGraphSpecs {
         cometSpark = 0.6f,
         alpha = 0.42f,
     )
+
+    /** [FlashcardsTopAppBar][com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar]'s graph, from the top-end corner across most of the bar. */
+    val topAppBar: MorpheusGraphSpec = spec(Bloom(reach = 0.9f, plateau = 0.3f))
 
     /** [base] in the shape of [shapes]. */
     fun spec(vararg shapes: ShapePrimitive): MorpheusGraphSpec = spec(base.copy(shapes = shapes.toList()))

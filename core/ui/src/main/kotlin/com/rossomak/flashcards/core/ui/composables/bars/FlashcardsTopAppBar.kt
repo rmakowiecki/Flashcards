@@ -23,6 +23,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,7 +33,13 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.ui.R
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.morpheus.morpheusGraphBackground
+import com.rossomak.morpheus.rememberMorpheusGraphMorphState
+
+/** How far the bar has collapsed when its graph has faded out, so the collapsed bar never shows a faint remnant. */
+private const val GRAPH_GONE_AT_COLLAPSED_FRACTION = 0.6f
 
 /**
  * The app's detail-screen top bar: a [LargeFlexibleTopAppBar] painted with
@@ -53,6 +60,10 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * the classic large app bar's `headlineMedium` (28sp) — that's M3's own token for this component,
  * not a local choice.
  *
+ * Over the gradient sits [BrandMorpheusGraphSpecs.topAppBar], a network graph on the top-end corner. It
+ * fades out as the bar collapses, gone by [GRAPH_GONE_AT_COLLAPSED_FRACTION], read in the draw phase so
+ * a scroll never recomposes the bar.
+ *
  * Settings, Debug and other plain screens deliberately keep the stock M3 app bars — this component
  * exists for the gradient treatment alone, so it has no on-surface variant.
  */
@@ -67,9 +78,19 @@ fun FlashcardsTopAppBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val onGradientContent = MaterialTheme.brandColors.onTopBarGradient
+    val graphState = rememberMorpheusGraphMorphState(BrandMorpheusGraphSpecs.topAppBar)
+    if (scrollBehavior != null) {
+        val hiddenGraph = remember { BrandMorpheusGraphSpecs.hidden(BrandMorpheusGraphSpecs.topAppBar) }
+        LaunchedEffect(scrollBehavior, graphState) {
+            snapshotFlow { (scrollBehavior.state.collapsedFraction / GRAPH_GONE_AT_COLLAPSED_FRACTION).coerceIn(0f, 1f) }
+                .collect { fadeFraction -> graphState.seekTo(hiddenGraph, fadeFraction) }
+        }
+    }
 
     LargeFlexibleTopAppBar(
-        modifier = modifier.background(MaterialTheme.brandColors.topBarGradient),
+        modifier = modifier
+            .background(MaterialTheme.brandColors.topBarGradient)
+            .morpheusGraphBackground(graphState, BrandMorpheusGraphSpecs.fill),
         title = {
             Text(text = title, modifier = Modifier.basicMarquee(), maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
