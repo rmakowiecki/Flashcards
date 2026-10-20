@@ -52,7 +52,7 @@ The scoring state also keeps the total seconds studied on its last study day. A 
 
 The session's XP total is applied to the User's Level position. A gain climbs through every Level threshold it crosses. A loss is clamped at the floor of the current Level, so Level never decreases ([CONTEXT.md](../../CONTEXT.md), **XP**). The session's id is appended to the list of sessions applied to the scoring state, which the device uses to stop counting a delivered session twice ([ADR-0061](../adr/0061-delivered-sessions-applied-once-in-the-projection.md)).
 
-A session delivered late, after a session from a later day was already recorded, still earns its card, time and completion XP. Only its Streak and Daily Goal effects are lost, because neither date moves backward.
+A session delivered late, after a session from a later day was already recorded, still earns its card and completion XP. Only its Streak and Daily Goal effects are lost, because neither date moves backward.
 
 ## Delivery
 
