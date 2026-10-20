@@ -25,6 +25,9 @@ object BrandMorpheusGraphSpecs {
     /** The least a morph between two brand graphs takes, so a quick change still morphs instead of jumping. */
     val minMorphDuration: Duration = 500.milliseconds
 
+    /** The morph of a deliberate jump between two brand graphs, such as onboarding's Skip or the Summary settling. */
+    val settleMorphDuration: Duration = 1_000.milliseconds
+
     private const val SEED = 29
 
     /** The layer every brand graph shares: dense and dimmed, a few haloed nodes, far nodes fading for depth. */

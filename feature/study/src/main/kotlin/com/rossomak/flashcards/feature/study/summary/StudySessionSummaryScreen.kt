@@ -267,11 +267,11 @@ internal fun SummaryLayout(
     val isLoading = state.scoreStatus == Loading
 
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        // Around the total from loading on, then one morph off it once the tiles leave, timed to land as
-        // the sheet starts to rise, or the shortest morph after a skip.
+        // Around the total from loading on, then one morph off it once the tiles leave, the same length
+        // whether the sequence plays out or is skipped.
         BrandGradientBackdrop(
             graph = if (isLoading || sequence.phase == SummaryPhase.Counting) StudyMorpheusGraphs.summaryCounting else StudyMorpheusGraphs.summary,
-            graphMorphDuration = if (sequence.wasSkipped) BrandMorpheusGraphSpecs.minMorphDuration else POUR_START + SHEET_START,
+            graphMorphDuration = BrandMorpheusGraphSpecs.settleMorphDuration,
         )
         Scaffold(
             modifier = Modifier.fillMaxSize(),
