@@ -38,7 +38,6 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.morpheus.morpheusGraphBackground
 import com.rossomak.morpheus.rememberMorpheusGraphMorphState
 
-/** How far the bar has collapsed when its graph has faded out, so the collapsed bar never shows a faint remnant. */
 private const val GRAPH_GONE_AT_COLLAPSED_FRACTION = 0.6f
 
 /**
@@ -60,9 +59,7 @@ private const val GRAPH_GONE_AT_COLLAPSED_FRACTION = 0.6f
  * the classic large app bar's `headlineMedium` (28sp) — that's M3's own token for this component,
  * not a local choice.
  *
- * Over the gradient sits [BrandMorpheusGraphSpecs.topAppBar], a network graph on the top-end corner. It
- * fades out as the bar collapses, gone by [GRAPH_GONE_AT_COLLAPSED_FRACTION], read in the draw phase so
- * a scroll never recomposes the bar.
+ * A [BrandMorpheusGraphSpecs.topAppBar] graph over the gradient fades out as the bar collapses.
  *
  * Settings, Debug and other plain screens deliberately keep the stock M3 app bars — this component
  * exists for the gradient treatment alone, so it has no on-surface variant.

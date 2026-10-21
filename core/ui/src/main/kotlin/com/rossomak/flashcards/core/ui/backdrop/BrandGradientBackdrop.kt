@@ -19,12 +19,7 @@ import kotlin.time.Duration
 
 /**
  * The brand gradient as a [blurBackdropSource]; the first child of a `Box` carrying [blurBackdropScope].
- *
- * With a [graph] (a [BrandMorpheusGraphSpecs] spec), the network graph is drawn over the gradient, inside
- * the source, so translucent components blur it with the gradient. A changed [graph] morphs from the
- * screen as it is over [graphMorphDuration], and a changed [graphMorphDuration] retimes a morph under way
- * from where it has got to; the first composition shows it at once. [graphAlpha] fades
- * the graph alone, read in the draw phase.
+ * An optional [graph] is drawn over it, blurred with it, and morphs over [graphMorphDuration] on change.
  */
 @Composable
 fun BoxScope.BrandGradientBackdrop(
@@ -44,7 +39,7 @@ fun BoxScope.BrandGradientBackdrop(
     BrandGradientBackdrop(graphState = graphState, modifier = modifier, graphAlpha = graphAlpha)
 }
 
-/** [BrandGradientBackdrop] with a graph driven by its caller, for a screen that seeks or follows the morph itself. */
+/** [BrandGradientBackdrop] with a caller-driven [graphState]. */
 @Composable
 fun BoxScope.BrandGradientBackdrop(graphState: MorpheusGraphMorphState, modifier: Modifier = Modifier, graphAlpha: () -> Float = { 1f }) {
     Box(modifier = brandGradientSource(modifier)) {

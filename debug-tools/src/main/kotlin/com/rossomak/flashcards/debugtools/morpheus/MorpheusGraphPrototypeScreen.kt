@@ -22,7 +22,7 @@ import com.rossomak.morpheus.tuner.MorpheusGraphPlayground
  * promoted.
  *
  * The lib's [MorpheusGraphPlayground] in Flashcards' brand: [FlashcardsMorpheusGraphPresets] for its pages
- * (the app's screen graphs among them) and decks (both onboarding ones and the screens), one [flashcardsPlaygroundStyle] per [FlashcardsComponentStyle], and a
+ * and decks, one [flashcardsPlaygroundStyle] per [FlashcardsComponentStyle], and a
  * copied spec also printed to logcat. Registered on the app's outer graph, so it runs full-screen
  * without the bottom bar.
  */
