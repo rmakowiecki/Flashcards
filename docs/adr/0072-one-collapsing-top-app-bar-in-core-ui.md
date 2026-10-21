@@ -38,7 +38,7 @@ content's scroll, and a release settles on the nearer end.
 **Content changes keep the collapse position.** A new block height writes a new travel limit: a fully
 collapsed bar stays collapsed, a partly collapsed one keeps its offset clamped into the new range.
 
-A planned Konsist rule will ban stock M3 app bars outside `:core:ui` once every screen uses this bar.
+A Konsist rule bans stock M3 app bars outside `:core:ui`.
 
 ## Considered options
 
