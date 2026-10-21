@@ -43,20 +43,6 @@ fun FlashcardsTopAppBarLargeOnGradientShowcase() = ShowcaseBar(size = Large, sty
 @Composable
 fun FlashcardsTopAppBarLargeOnGradientCollapsedShowcase() = ShowcaseBar(size = Large, style = OnGradient, collapsed = true, backdrop = { GradientGraph() })
 
-@ShowkaseComposable(name = "Top app bar — Large with white graph, fading", group = "Bars")
-@Composable
-fun FlashcardsTopAppBarOnSurfaceGraphShowcase() = ShowcaseBar(
-    size = Large,
-    style = OnSurface,
-    backdrop = {
-        FlashcardsTopAppBarGraph(
-            spec = BrandMorpheusGraphSpecs.topAppBarOnSurface,
-            fill = BrandMorpheusGraphSpecs.onSurfaceFill,
-            fadesOnCollapse = true,
-        )
-    },
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @ShowkaseComposable(name = "Top app bar — leading element and details", group = "Bars")
 @Composable
@@ -92,11 +78,11 @@ fun FlashcardsCollapsingTopAppBarIdentityShowcase() {
 }
 
 @Composable
-private fun FlashcardsTopAppBarBackdropScope.GradientGraph() {
+private fun GradientGraph() {
     FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill)
 }
 
-/** [collapsed] passes an offset past any limit, which the bar pulls back to exactly collapsed, so a static preview renders collapsed. */
+/** [collapsed] seeds an offset past any limit, which the bar clamps to exactly collapsed. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShowcaseBar(
@@ -137,12 +123,6 @@ private fun RowScope.ShowcaseActions() {
 @Composable
 private fun FlashcardsTopAppBarLargeOnGradientCollapsedPreview() {
     FlashcardsTopAppBarLargeOnGradientCollapsedShowcase()
-}
-
-@PreviewLightDark
-@Composable
-private fun FlashcardsTopAppBarOnSurfaceGraphPreview() {
-    FlashcardsTopAppBarOnSurfaceGraphShowcase()
 }
 
 @PreviewLightDark

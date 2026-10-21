@@ -6,21 +6,20 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCo
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** Collapse fraction by which a [Fade] subtitle and the details are gone. */
 internal const val FADED_SLOTS_GONE_AT_FRACTION = 0.5f
 
 internal fun fadedSlotAlpha(collapsedFraction: Float): Float = (1f - collapsedFraction / FADED_SLOTS_GONE_AT_FRACTION).coerceIn(0f, 1f)
 
 internal data class SlotSize(val width: Int, val height: Int)
 
-/** The bar's fixed dimensions in px: [width] inside the horizontal insets, heights below the status bar. */
+/** The bar's dimensions in px; [width] is inside the horizontal insets, heights exclude the status bar. */
 internal data class TopAppBarMetrics(
     val width: Int,
     val pinnedHeight: Int,
     val minBlockHeight: Int,
-    val edge: Int,
-    val padding: Int,
-    val gap: Int,
+    val navigationInset: Int,
+    val contentPadding: Int,
+    val itemGap: Int,
     val bottomPadding: Int,
 )
 
@@ -45,7 +44,7 @@ internal data class TopAppBarSlots(
 
 internal data class TopAppBarTextWidths(val title: Int, val subtitle: Int)
 
-/** Relative to the content's top-start corner. A slot at [alpha] `0` is left unplaced. */
+/** Relative to the content's top-start corner. */
 internal data class SlotPlacement(val x: Int, val y: Int, val scale: Float = 1f, val alpha: Float = 1f) {
     val isPlaced: Boolean get() = alpha > 0f
 }
@@ -62,23 +61,21 @@ internal data class TopAppBarPlacements(
 )
 
 /**
- * The collapsing bar's arithmetic, free of Compose for JVM tests. The measure policy calls it in order,
- * each step needing the last one's measurements: [expandedTextWidth] and [detailsWidth], then
- * [blockHeight] and [travel], then [textWidths], then [placements].
+ * The collapsing bar's arithmetic, Compose-free for JVM tests. The measure policy calls it in this order:
+ * [expandedTextWidth] and [detailsWidth], [blockHeight] and [travel], [textWidths], [placements].
  *
- * Expanded, the block holds the identity row (leading element, then title over subtitle) with the details
- * under it, bottom-aligned. Collapsed, the scaled leading element and the title follow the navigation
- * icon, the title ending before the actions. A [Keep] subtitle travels under the title; a [Fade] subtitle
- * and the details scroll up with the block and fade out.
+ * Expanded, the identity row (leading element, then title over subtitle) sits above the details,
+ * bottom-aligned. Collapsed, the scaled leading element and the title follow the navigation icon and
+ * end before the actions. A [Keep] subtitle travels under the title; a [Fade] subtitle and the details
+ * scroll up and fade.
  */
 internal object TopAppBarGeometry {
 
     fun expandedTextWidth(metrics: TopAppBarMetrics, titleLeading: SlotSize?): Int =
-        (metrics.width - expandedTextStart(metrics, titleLeading) - metrics.padding).coerceAtLeast(0)
+        (metrics.width - expandedTextStart(metrics, titleLeading) - metrics.contentPadding).coerceAtLeast(0)
 
-    fun detailsWidth(metrics: TopAppBarMetrics): Int = (metrics.width - 2 * metrics.padding).coerceAtLeast(0)
+    fun detailsWidth(metrics: TopAppBarMetrics): Int = (metrics.width - 2 * metrics.contentPadding).coerceAtLeast(0)
 
-    /** The content's height, but never less than [TopAppBarMetrics.minBlockHeight]. */
     fun blockHeight(
         metrics: TopAppBarMetrics,
         titleLeading: SlotSize?,
@@ -88,8 +85,8 @@ internal object TopAppBarGeometry {
     ): Int = max(metrics.minBlockHeight, contentHeight(metrics, titleLeading, expandedTitle, expandedSubtitle, details))
 
     /**
-     * On a changed limit, a fully collapsed bar stays fully collapsed (which also pulls a preview's
-     * offset past any limit back to exactly collapsed); any other offset is clamped into the new range.
+     * A fully collapsed bar stays collapsed when the limit changes (also pulling a preview's overshoot back
+     * to the limit); any other offset is clamped into the new range.
      */
     fun travel(blockHeight: Int, previous: TopAppBarTravel): TopAppBarTravel {
         val limit = -blockHeight.toFloat()
@@ -140,15 +137,15 @@ internal object TopAppBarGeometry {
 
         TopAppBarPlacements(
             layoutHeight = metrics.pinnedHeight + blockHeight - collapsedOffset,
-            navigation = SlotPlacement(x = metrics.edge, y = (metrics.pinnedHeight - navigation.height) / 2),
+            navigation = SlotPlacement(x = metrics.navigationInset, y = (metrics.pinnedHeight - navigation.height) / 2),
             actions = SlotPlacement(
-                x = metrics.width - metrics.edge - actions.width,
+                x = metrics.width - metrics.navigationInset - actions.width,
                 y = (metrics.pinnedHeight - actions.height) / 2,
             ),
             titleLeading = titleLeading?.let { leading ->
                 val collapsedY = ((metrics.pinnedHeight - leading.height * titleLeadingCollapsedScale) / 2).roundToInt()
                 SlotPlacement(
-                    x = lerp(metrics.padding, collapsedContentStart(metrics, navigation), fraction),
+                    x = lerp(metrics.contentPadding, collapsedContentStart(metrics, navigation), fraction),
                     y = lerp(identityTop + (identityRowHeight - leading.height) / 2, collapsedY, fraction),
                     scale = lerp(1f, titleLeadingCollapsedScale, fraction),
                 )
@@ -166,8 +163,8 @@ internal object TopAppBarGeometry {
             },
             details = details?.let {
                 SlotPlacement(
-                    x = metrics.padding,
-                    y = identityTop + identityRowHeight + metrics.gap - collapsedOffset,
+                    x = metrics.contentPadding,
+                    y = identityTop + identityRowHeight + metrics.itemGap - collapsedOffset,
                     alpha = fadedAlpha,
                 )
             },
@@ -185,27 +182,27 @@ private fun contentHeight(
     expandedSubtitle: SlotSize?,
     details: SlotSize?,
 ): Int {
-    val detailsHeight = details?.let { metrics.gap + it.height } ?: 0
+    val detailsHeight = details?.let { metrics.itemGap + it.height } ?: 0
     return identityRowHeight(titleLeading, expandedTitle, expandedSubtitle) + detailsHeight + metrics.bottomPadding
 }
 
 private fun expandedTextStart(metrics: TopAppBarMetrics, titleLeading: SlotSize?): Int =
-    metrics.padding + (titleLeading?.let { it.width + metrics.padding } ?: 0)
+    metrics.contentPadding + (titleLeading?.let { it.width + metrics.contentPadding } ?: 0)
 
-private fun expandedTextEnd(metrics: TopAppBarMetrics): Int = metrics.width - metrics.padding
+private fun expandedTextEnd(metrics: TopAppBarMetrics): Int = metrics.width - metrics.contentPadding
 
 private fun collapsedContentStart(metrics: TopAppBarMetrics, navigation: SlotSize): Int =
-    if (navigation.width > 0) metrics.edge + navigation.width + metrics.gap else metrics.padding
+    if (navigation.width > 0) metrics.navigationInset + navigation.width + metrics.itemGap else metrics.contentPadding
 
 private fun collapsedTextStart(
     metrics: TopAppBarMetrics,
     navigation: SlotSize,
     titleLeading: SlotSize?,
     titleLeadingCollapsedScale: Float,
-): Float = collapsedContentStart(metrics, navigation) + (titleLeading?.let { it.width * titleLeadingCollapsedScale + metrics.gap } ?: 0f)
+): Float = collapsedContentStart(metrics, navigation) + (titleLeading?.let { it.width * titleLeadingCollapsedScale + metrics.itemGap } ?: 0f)
 
 private fun collapsedTextEnd(metrics: TopAppBarMetrics, actions: SlotSize): Int =
-    if (actions.width > 0) metrics.width - metrics.edge - actions.width - metrics.gap else expandedTextEnd(metrics)
+    if (actions.width > 0) metrics.width - metrics.navigationInset - actions.width - metrics.itemGap else expandedTextEnd(metrics)
 
 private fun textStart(
     metrics: TopAppBarMetrics,

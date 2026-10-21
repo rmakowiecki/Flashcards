@@ -8,4 +8,4 @@ interface FlashcardsTopAppBarBackdropScope {
     val collapsedFraction: () -> Float
 }
 
-internal class TopAppBarBackdropScope(override val collapsedFraction: () -> Float) : FlashcardsTopAppBarBackdropScope
+internal class DefaultFlashcardsTopAppBarBackdropScope(override val collapsedFraction: () -> Float) : FlashcardsTopAppBarBackdropScope

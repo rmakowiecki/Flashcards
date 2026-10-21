@@ -2,9 +2,6 @@
 
 package com.rossomak.flashcards.core.ui.backdrop
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphLayerSpec
@@ -15,21 +12,15 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The one network-graph family the app draws: one seed and one [base] layer, so any two of the app's
- * graphs morph within one mesh and a screen differs from the next only in where its nodes sit. A
- * screen keeps its graph calm by placing its shapes away from its content, not by a dimmer layer of
- * its own.
+ * The one network-graph family every brand-gradient surface draws: one seed and one [base] layer, so
+ * any two of the app's graphs morph within one mesh and a screen differs from the next only in where
+ * its nodes sit. A screen keeps its graph calm by placing its shapes away from its content, not by a
+ * dimmer layer of its own.
  */
 object BrandMorpheusGraphSpecs {
 
-    /** Every graph on a brand gradient is white. */
+    /** Every brand graph is white. */
     val fill: MorpheusGraphFill = MorpheusGraphFill.Solid(Color.White)
-
-    /** A graph on a plain surface takes the theme's primary color. */
-    val onSurfaceFill: MorpheusGraphFill
-        @Composable
-        @ReadOnlyComposable
-        get() = MorpheusGraphFill.Solid(MaterialTheme.colorScheme.primary)
 
     /** The least a morph between two brand graphs takes, so a quick change still morphs instead of jumping. */
     val minMorphDuration: Duration = 500.milliseconds
@@ -61,9 +52,6 @@ object BrandMorpheusGraphSpecs {
 
     /** A gradient top app bar's graph, from the top-end corner across most of the bar. */
     val topAppBar: MorpheusGraphSpec = spec(Bloom(reach = 0.9f, plateau = 0.3f))
-
-    /** [topAppBar] dimmed for a white top app bar, drawn with [onSurfaceFill]. */
-    val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(Bloom(reach = 0.9f, plateau = 0.3f)), alpha = 0.22f))
 
     /** [base] in the shape of [shapes]. */
     fun spec(vararg shapes: ShapePrimitive): MorpheusGraphSpec = spec(base.copy(shapes = shapes.toList()))

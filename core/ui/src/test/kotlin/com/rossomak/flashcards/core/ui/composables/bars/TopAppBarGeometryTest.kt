@@ -12,9 +12,9 @@ class TopAppBarGeometryTest {
         width = 400,
         pinnedHeight = 64,
         minBlockHeight = 48,
-        edge = 4,
-        padding = 16,
-        gap = 8,
+        navigationInset = 4,
+        contentPadding = 16,
+        itemGap = 8,
         bottomPadding = 12,
     )
     private val large = medium.copy(minBlockHeight = 88, bottomPadding = 16)
@@ -27,8 +27,11 @@ class TopAppBarGeometryTest {
     private val subtitle = SlotSize(width = 140, height = 24)
     private val collapsedSubtitle = SlotSize(width = 120, height = 20)
     private val avatar = SlotSize(width = 88, height = 88)
-    private val avatarCollapsedScale = 32f / 88f
+    private val collapsedAvatarSize = 32
+    private val avatarCollapsedScale = collapsedAvatarSize.toFloat() / avatar.height
     private val details = SlotSize(width = 200, height = 40)
+
+    private val collapsedContentStart = medium.navigationInset + iconButton.width + medium.itemGap
 
     private val titleOnlySlots = TopAppBarSlots(
         navigation = iconButton,
@@ -53,8 +56,8 @@ class TopAppBarGeometryTest {
     fun `a Medium bar with a one-line title is 112 expanded and 64 collapsed`() {
         val collapsed = titleOnlySlots.copy(title = collapsedTitle)
 
-        titleOnlySlots.placementsAt(medium, fraction = 0f).layoutHeight shouldBe 112
-        collapsed.placementsAt(medium, fraction = 1f).layoutHeight shouldBe 64
+        titleOnlySlots.placementsAt(medium, fraction = 0f).layoutHeight shouldBe medium.pinnedHeight + medium.minBlockHeight
+        collapsed.placementsAt(medium, fraction = 1f).layoutHeight shouldBe medium.pinnedHeight
     }
 
     @Test
@@ -62,8 +65,8 @@ class TopAppBarGeometryTest {
         val expanded = titleOnlySlots.copy(expandedTitle = largeTitle, title = largeTitle, expandedSubtitle = subtitle, subtitle = subtitle)
         val collapsed = expanded.copy(title = collapsedTitle, subtitle = collapsedSubtitle)
 
-        expanded.placementsAt(large, fraction = 0f).layoutHeight shouldBe 152
-        collapsed.placementsAt(large, fraction = 1f).layoutHeight shouldBe 64
+        expanded.placementsAt(large, fraction = 0f).layoutHeight shouldBe large.pinnedHeight + large.minBlockHeight
+        collapsed.placementsAt(large, fraction = 1f).layoutHeight shouldBe large.pinnedHeight
     }
 
     @Test
@@ -73,9 +76,9 @@ class TopAppBarGeometryTest {
 
         val blockHeight = slots.blockHeight(large)
 
-        blockHeight shouldBe 88 + 24 + 16
+        blockHeight shouldBe twoLineTitle.height + subtitle.height + large.bottomPadding
         TopAppBarGeometry.travel(blockHeight, TopAppBarTravel(limit = -Float.MAX_VALUE, offset = 0f)).limit shouldBe -blockHeight.toFloat()
-        slots.placementsAt(large, fraction = 0f).layoutHeight shouldBe 64 + blockHeight
+        slots.placementsAt(large, fraction = 0f).layoutHeight shouldBe large.pinnedHeight + blockHeight
     }
 
     @Test
@@ -83,7 +86,7 @@ class TopAppBarGeometryTest {
         val doubledTitle = SlotSize(width = 240, height = 72)
         val slots = titleOnlySlots.copy(expandedTitle = doubledTitle, title = doubledTitle)
 
-        slots.blockHeight(medium) shouldBe 72 + 12
+        slots.blockHeight(medium) shouldBe doubledTitle.height + medium.bottomPadding
     }
 
     @Test
@@ -97,9 +100,10 @@ class TopAppBarGeometryTest {
     fun `title travels from the block's start into the pinned row after the navigation icon`() {
         val halfwayTitle = SlotSize(width = 110, height = 32)
 
-        titleOnlySlots.placementsAt(medium, fraction = 0f).title shouldBe SlotPlacement(x = 16, y = 64)
+        titleOnlySlots.placementsAt(medium, fraction = 0f).title shouldBe SlotPlacement(x = medium.contentPadding, y = medium.pinnedHeight)
         titleOnlySlots.copy(title = halfwayTitle).placementsAt(medium, fraction = 0.5f).title shouldBe SlotPlacement(x = 38, y = 40)
-        titleOnlySlots.copy(title = collapsedTitle).placementsAt(medium, fraction = 1f).title shouldBe SlotPlacement(x = 60, y = 18)
+        titleOnlySlots.copy(title = collapsedTitle).placementsAt(medium, fraction = 1f).title shouldBe
+            SlotPlacement(x = collapsedContentStart, y = (medium.pinnedHeight - collapsedTitle.height) / 2)
     }
 
     @Test
@@ -116,11 +120,12 @@ class TopAppBarGeometryTest {
         val halfway = slots.placementsAt(large, fraction = 0.5f)
         val collapsed = slots.placementsAt(large, fraction = 1f)
 
-        expanded.titleLeading shouldBe SlotPlacement(x = 16, y = 64, scale = 1f)
-        expanded.title.x shouldBe 16 + 88 + 16
+        expanded.titleLeading shouldBe SlotPlacement(x = large.contentPadding, y = large.pinnedHeight, scale = 1f)
+        expanded.title.x shouldBe large.contentPadding + avatar.width + large.contentPadding
         halfway.titleLeading shouldBe SlotPlacement(x = 38, y = 40, scale = (1f + avatarCollapsedScale) / 2)
-        collapsed.titleLeading shouldBe SlotPlacement(x = 60, y = 16, scale = avatarCollapsedScale)
-        collapsed.title.x shouldBe 60 + 32 + 8
+        collapsed.titleLeading shouldBe
+            SlotPlacement(x = collapsedContentStart, y = (large.pinnedHeight - collapsedAvatarSize) / 2, scale = avatarCollapsedScale)
+        collapsed.title.x shouldBe collapsedContentStart + collapsedAvatarSize + large.itemGap
     }
 
     @Test
@@ -133,8 +138,10 @@ class TopAppBarGeometryTest {
 
         val collapsed = slots.placementsAt(medium, fraction = 1f)
 
-        collapsed.title shouldBe SlotPlacement(x = 60, y = 8)
-        collapsed.subtitle shouldBe SlotPlacement(x = 60, y = 8 + 28)
+        val pairTop = (medium.pinnedHeight - collapsedTitle.height - collapsedSubtitle.height) / 2
+
+        collapsed.title shouldBe SlotPlacement(x = collapsedContentStart, y = pairTop)
+        collapsed.subtitle shouldBe SlotPlacement(x = collapsedContentStart, y = pairTop + collapsedTitle.height)
     }
 
     @Test
@@ -145,7 +152,7 @@ class TopAppBarGeometryTest {
 
         val quarter = slots.placementsAt(medium, fraction = 0.25f).subtitle
 
-        quarter shouldBe SlotPlacement(x = 16, y = expandedY - blockHeight / 4, alpha = 0.5f)
+        quarter shouldBe SlotPlacement(x = medium.contentPadding, y = expandedY - blockHeight / 4, alpha = 0.5f)
         slots.placementsAt(medium, fraction = 0.5f).subtitle?.isPlaced shouldBe false
         slots.placementsAt(medium, fraction = 1f).subtitle?.isPlaced shouldBe false
     }
@@ -166,40 +173,54 @@ class TopAppBarGeometryTest {
         val expanded = slots.placementsAt(large, fraction = 0f).details
         val quarter = slots.placementsAt(large, fraction = 0.25f).details
 
-        blockHeight shouldBe 44 + 8 + 40 + 16
-        expanded shouldBe SlotPlacement(x = 16, y = 64 + 44 + 8)
-        quarter shouldBe SlotPlacement(x = 16, y = 64 + 44 + 8 - 27, alpha = 0.5f)
+        val expandedY = large.pinnedHeight + largeTitle.height + large.itemGap
+
+        blockHeight shouldBe largeTitle.height + large.itemGap + details.height + large.bottomPadding
+        expanded shouldBe SlotPlacement(x = large.contentPadding, y = expandedY)
+        quarter shouldBe SlotPlacement(x = large.contentPadding, y = expandedY - blockHeight / 4, alpha = 0.5f)
         slots.placementsAt(large, fraction = 0.5f).details?.isPlaced shouldBe false
     }
 
     @Test
     fun `an unchanged limit keeps the travel as it is`() {
-        val previous = TopAppBarTravel(limit = -48f, offset = -20f)
+        val blockHeight = 48
+        val previous = TopAppBarTravel(limit = -blockHeight.toFloat(), offset = -20f)
 
-        TopAppBarGeometry.travel(blockHeight = 48, previous = previous) shouldBe previous
+        TopAppBarGeometry.travel(blockHeight, previous) shouldBe previous
     }
 
     @Test
     fun `a collapsed bar stays collapsed when the block grows or shrinks`() {
-        val collapsed = TopAppBarTravel(limit = -88f, offset = -88f)
+        val initialBlockHeight = 88
+        val grownBlockHeight = 128
+        val shrunkBlockHeight = 64
+        val collapsed = TopAppBarTravel(limit = -initialBlockHeight.toFloat(), offset = -initialBlockHeight.toFloat())
 
-        TopAppBarGeometry.travel(blockHeight = 128, previous = collapsed) shouldBe TopAppBarTravel(limit = -128f, offset = -128f)
-        TopAppBarGeometry.travel(blockHeight = 64, previous = collapsed) shouldBe TopAppBarTravel(limit = -64f, offset = -64f)
+        TopAppBarGeometry.travel(grownBlockHeight, collapsed) shouldBe
+            TopAppBarTravel(limit = -grownBlockHeight.toFloat(), offset = -grownBlockHeight.toFloat())
+        TopAppBarGeometry.travel(shrunkBlockHeight, collapsed) shouldBe
+            TopAppBarTravel(limit = -shrunkBlockHeight.toFloat(), offset = -shrunkBlockHeight.toFloat())
     }
 
     @Test
     fun `a partly collapsed bar keeps its offset, clamped into the new range`() {
-        val partly = TopAppBarTravel(limit = -88f, offset = -60f)
+        val partlyOffset = -60f
+        val grownBlockHeight = 128
+        val shrunkBlockHeight = 48
+        val partly = TopAppBarTravel(limit = -88f, offset = partlyOffset)
 
-        TopAppBarGeometry.travel(blockHeight = 128, previous = partly) shouldBe TopAppBarTravel(limit = -128f, offset = -60f)
-        TopAppBarGeometry.travel(blockHeight = 48, previous = partly) shouldBe TopAppBarTravel(limit = -48f, offset = -48f)
+        TopAppBarGeometry.travel(grownBlockHeight, partly) shouldBe TopAppBarTravel(limit = -grownBlockHeight.toFloat(), offset = partlyOffset)
+        TopAppBarGeometry.travel(shrunkBlockHeight, partly) shouldBe
+            TopAppBarTravel(limit = -shrunkBlockHeight.toFloat(), offset = -shrunkBlockHeight.toFloat())
     }
 
     @Test
     fun `an offset past any limit is pulled back to exactly collapsed`() {
         val preview = TopAppBarTravel(limit = -Float.MAX_VALUE, offset = -Float.MAX_VALUE)
 
-        TopAppBarGeometry.travel(blockHeight = 88, previous = preview) shouldBe TopAppBarTravel(limit = -88f, offset = -88f)
+        val blockHeight = 88
+
+        TopAppBarGeometry.travel(blockHeight, preview) shouldBe TopAppBarTravel(limit = -blockHeight.toFloat(), offset = -blockHeight.toFloat())
     }
 
     @Test
@@ -209,14 +230,14 @@ class TopAppBarGeometryTest {
         placements.titleLeading shouldBe null
         placements.subtitle shouldBe null
         placements.details shouldBe null
-        placements.title.x shouldBe 16
+        placements.title.x shouldBe medium.contentPadding
     }
 
     @Test
     fun `without a navigation icon the collapsed title starts at the padding`() {
         val slots = titleOnlySlots.copy(navigation = noActions, title = collapsedTitle)
 
-        slots.placementsAt(medium, fraction = 1f).title.x shouldBe 16
+        slots.placementsAt(medium, fraction = 1f).title.x shouldBe medium.contentPadding
     }
 
     @Test
@@ -225,9 +246,11 @@ class TopAppBarGeometryTest {
         val collapsed = TopAppBarGeometry.textWidths(medium, iconButton, iconButton, null, 1f, Keep, fraction = 1f)
         val withoutActions = TopAppBarGeometry.textWidths(medium, iconButton, noActions, null, 1f, Keep, fraction = 1f)
 
-        expanded.title shouldBe 400 - 16 - 16
-        collapsed.title shouldBe (400 - 4 - 48 - 8) - (4 + 48 + 8)
-        withoutActions.title shouldBe (400 - 16) - (4 + 48 + 8)
+        val collapsedEnd = medium.width - medium.navigationInset - iconButton.width - medium.itemGap
+
+        expanded.title shouldBe medium.width - 2 * medium.contentPadding
+        collapsed.title shouldBe collapsedEnd - collapsedContentStart
+        withoutActions.title shouldBe medium.width - medium.contentPadding - collapsedContentStart
     }
 
     @Test

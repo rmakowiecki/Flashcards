@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kotlin.math.abs
 
-/** The fraction is a float quotient, never exactly 0, so below this the bar counts as expanded. */
+/** The fraction is a float quotient, rarely exactly 0; below this the bar counts as expanded. */
 private const val SETTLED_EXPANDED_FRACTION = 0.01f
 
 private const val SNAP_TO_COLLAPSED_FRACTION = 0.5f
@@ -22,9 +22,8 @@ private const val FLING_ROUNDING_TOLERANCE_PX = 0.5f
 private const val MIN_FLING_VELOCITY = 1f
 
 /**
- * Moves [scrollBehavior]'s state for a drag that starts on the bar, as content scrolling does, and
- * settles on the nearer end on release. The settle runs inside the draggable's mutex, so a new drag
- * cancels it.
+ * Drags [scrollBehavior]'s state like content scrolling and settles on the nearer end on release. The
+ * settle runs in the draggable's mutex, so a new drag cancels it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
