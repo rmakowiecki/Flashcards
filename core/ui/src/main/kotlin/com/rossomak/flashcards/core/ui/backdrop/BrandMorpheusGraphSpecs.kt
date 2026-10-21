@@ -52,12 +52,12 @@ object BrandMorpheusGraphSpecs {
         alpha = 0.42f,
     )
 
-    private val TopAppBarBloom = Bloom(reach = 0.9f, plateau = 0.3f)
+    private val topAppBarBloom = Bloom(reach = 0.9f, plateau = 0.3f)
 
-    val topAppBar: MorpheusGraphSpec = spec(TopAppBarBloom)
+    val topAppBar: MorpheusGraphSpec = spec(topAppBarBloom)
 
     /** [topAppBar] dimmed for a white bar, drawn with [onSurfaceFill]. */
-    val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(TopAppBarBloom), alpha = 0.22f))
+    val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(topAppBarBloom), alpha = 0.22f))
 
     fun spec(vararg shapes: ShapePrimitive): MorpheusGraphSpec = spec(base.copy(shapes = shapes.toList()))
 
