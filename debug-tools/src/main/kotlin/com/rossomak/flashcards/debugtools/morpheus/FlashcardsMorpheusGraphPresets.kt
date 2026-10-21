@@ -57,5 +57,19 @@ object FlashcardsMorpheusGraphPresets {
         MorpheusGraphPreset(name = "Summary, counting", note = "Summary while the XP total counts up", spec = StudyMorpheusGraphs.summaryCounting),
         MorpheusGraphPreset(name = "Summary", note = "Settled Summary", spec = StudyMorpheusGraphs.summary),
         MorpheusGraphPreset(name = "Details top bar", note = "Category and Subcategory Details top bar", spec = BrandMorpheusGraphSpecs.topAppBar),
+        whiteTopBar,
     )
+
+    /**
+     * [BrandMorpheusGraphSpecs.topAppBarOnSurface] in brand indigo, standing in for the theme's primary
+     * color that the app fills it with, so it shows on the tuner's plain surface.
+     */
+    private val whiteTopBar: MorpheusGraphPreset
+        get() = BrandMorpheusGraphSpecs.topAppBarOnSurface.let { spec ->
+            MorpheusGraphPreset(
+                name = "White top bar",
+                note = "White top app bars; brand indigo standing in for the theme's primary",
+                spec = spec.copy(layers = spec.layers.map { layer -> layer.copy(fill = MorpheusGraphFill.Solid(BrandIndigo)) }),
+            )
+        }
 }
