@@ -116,8 +116,7 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `stock M3 app bars are used only inside core ui`() {
-        // ADR-0072: every other module uses the :core:ui bars. TopAppBarDefaults, TopAppBarScrollBehavior
-        // and the state stay allowed, so the names match exactly.
+        // ADR-0072: other modules use the :core:ui bars; TopAppBarDefaults and the scroll behavior stay allowed.
         val stockAppBars = listOf(
             "TopAppBar",
             "CenterAlignedTopAppBar",
@@ -126,12 +125,14 @@ class ArchitectureKonsistTest {
             "MediumFlexibleTopAppBar",
             "LargeFlexibleTopAppBar",
             "TwoRowsTopAppBar",
-        ).map { name -> "androidx.compose.material3.$name" }
+        )
+        val stockAppBarReference = Regex("""androidx\.compose\.material3\.(${stockAppBars.joinToString("|")})\b""")
         projectScope
             .files
-            .filter { !it.path.contains("/core/ui/") }
+            .filter { !it.path.contains("/core/ui/src/main/") }
             .assertTrue { file ->
-                file.imports.none { import -> import.name in stockAppBars }
+                file.imports.none { import -> import.isWildcard && import.name.removeSuffix(".*") == "androidx.compose.material3" } &&
+                    !stockAppBarReference.containsMatchIn(file.text)
             }
     }
 
