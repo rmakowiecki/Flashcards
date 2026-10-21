@@ -19,10 +19,8 @@ import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.TwoRowsTopAppBar
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,13 +30,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.AppVersion
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -226,32 +228,17 @@ private fun debugToolRow(
     trailing = { FlashcardsChevron() },
 )
 
-/**
- * [TwoRowsTopAppBar] rather than a flexible app bar: its subtitle slot is told which row it renders
- * in, so the build line shows only while the bar is expanded and the collapsed bar keeps the title
- * alone — the flexible bars repeat the subtitle in both rows.
- */
+/** The build line fades out as the bar collapses, so the collapsed bar keeps the title alone. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DebugTopAppBar(appVersion: AppVersion?, gitShortSha: String, scrollBehavior: TopAppBarScrollBehavior) {
-    TwoRowsTopAppBar(
-        title = { Text(text = stringResource(R.string.debug_title)) },
-        subtitle = { expanded ->
-            if (expanded && appVersion != null) {
-                Text(
-                    text = stringResource(
-                        R.string.debug_build_info_label,
-                        appVersion.name,
-                        appVersion.code,
-                        gitShortSha,
-                    ),
-                    modifier = Modifier.padding(bottom = MaterialTheme.spacing.normal),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        },
+    FlashcardsTopAppBar(
+        title = stringResource(R.string.debug_title),
+        size = FlashcardsTopAppBarSize.Medium,
         scrollBehavior = scrollBehavior,
+        subtitle = appVersion?.let { stringResource(R.string.debug_build_info_label, it.name, it.code, gitShortSha) },
+        subtitleWhenCollapsed = FlashcardsSubtitleWhenCollapsed.Fade,
+        backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
     )
 }
 

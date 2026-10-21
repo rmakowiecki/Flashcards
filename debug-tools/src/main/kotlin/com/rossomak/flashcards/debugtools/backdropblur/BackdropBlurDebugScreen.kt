@@ -38,8 +38,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -71,6 +69,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsMetadataBadge
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow
 import com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownTone
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsGradientTopBar
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
@@ -114,8 +113,6 @@ fun BackdropBlurDebugContent(
     onBlurChange: (Boolean) -> Unit,
     onBlurRadiusChange: (Float) -> Unit,
 ) {
-    val onGradientContent = MaterialTheme.brandColors.onGradientContent
-
     CompositionLocalProvider(
         LocalBackdropBlurEnabled provides state.isBlurOn,
         LocalBackdropBlurRadius provides state.blurRadiusDp.dp,
@@ -133,8 +130,8 @@ fun BackdropBlurDebugContent(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = Color.Transparent,
                 topBar = {
-                    TopAppBar(
-                        title = { Text(text = stringResource(R.string.backdrop_blur_debug_title)) },
+                    FlashcardsGradientTopBar(
+                        title = stringResource(R.string.backdrop_blur_debug_title),
                         navigationIcon = {
                             IconButton(onClick = onNavigateBack) {
                                 Icon(
@@ -143,12 +140,6 @@ fun BackdropBlurDebugContent(
                                 )
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = Color.Transparent,
-                            navigationIconContentColor = onGradientContent,
-                            titleContentColor = onGradientContent,
-                        ),
                     )
                 },
             ) { innerPadding ->

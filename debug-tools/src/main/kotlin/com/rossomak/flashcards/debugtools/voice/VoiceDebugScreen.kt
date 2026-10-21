@@ -20,21 +20,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -52,6 +51,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.code
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.debugtools.R
 import kotlinx.collections.immutable.ImmutableList
@@ -122,19 +125,16 @@ fun VoiceDebugContent(
     onRerandomizeObfuscation: () -> Unit,
     onTranscribeClip: () -> Unit,
 ) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(text = stringResource(R.string.voice_debug_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.debug_voice_harness_back_cd),
-                        )
-                    }
-                },
+            FlashcardsTopAppBar(
+                title = stringResource(R.string.voice_debug_title),
+                size = FlashcardsTopAppBarSize.Medium,
+                scrollBehavior = scrollBehavior,
+                onNavigateBack = onNavigateBack,
+                backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
             )
         },
     ) { innerPadding ->
