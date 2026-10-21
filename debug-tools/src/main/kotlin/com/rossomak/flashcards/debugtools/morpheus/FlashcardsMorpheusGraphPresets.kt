@@ -13,7 +13,7 @@ private val BrandIndigo = Color(0xFF2A2E8F)
 
 /**
  * The prototype screen's pages: the lib's [MorpheusGraphPresets] with Flashcards' brand applied, plus
- * the fake onboarding decks and the app's own screen graphs. New presets come from the playground's "copy spec" button, pasted here.
+ * the fake onboarding decks and the app's screen graphs. New presets come from the playground's "copy spec" button, pasted here.
  */
 object FlashcardsMorpheusGraphPresets {
 
@@ -49,7 +49,7 @@ object FlashcardsMorpheusGraphPresets {
         "Bloom, bottom-start",
     ).map(::morphVariantNamed)
 
-    /** The app's screen graphs, read from where the screens take them, so tuning starts from what ships. */
+    /** The shipped screen graphs, so tuning starts from what ships. */
     val screens: List<MorpheusGraphPreset> = listOf(
         MorpheusGraphPreset(name = "Login", note = "Login", spec = LoginMorpheusGraphs.graph),
         MorpheusGraphPreset(name = "Preview", note = "Preview Study Session", spec = StudyMorpheusGraphs.preview),
@@ -57,16 +57,5 @@ object FlashcardsMorpheusGraphPresets {
         MorpheusGraphPreset(name = "Summary, counting", note = "Summary while the XP total counts up", spec = StudyMorpheusGraphs.summaryCounting),
         MorpheusGraphPreset(name = "Summary", note = "Settled Summary", spec = StudyMorpheusGraphs.summary),
         MorpheusGraphPreset(name = "Details top bar", note = "Category and Subcategory Details top bar", spec = BrandMorpheusGraphSpecs.topAppBar),
-        whiteTopBar,
     )
-
-    /** Brand indigo stands in for the theme's primary, which the tuner cannot resolve. */
-    private val whiteTopBar: MorpheusGraphPreset
-        get() = BrandMorpheusGraphSpecs.topAppBarOnSurface.let { spec ->
-            MorpheusGraphPreset(
-                name = "White top bar",
-                note = "White top app bars; brand indigo standing in for the theme's primary",
-                spec = spec.copy(layers = spec.layers.map { layer -> layer.copy(fill = MorpheusGraphFill.Solid(BrandIndigo)) }),
-            )
-        }
 }

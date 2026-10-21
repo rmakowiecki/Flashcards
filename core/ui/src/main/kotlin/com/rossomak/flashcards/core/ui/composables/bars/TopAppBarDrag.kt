@@ -12,14 +12,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kotlin.math.abs
 
-/** The fraction is a float quotient, never exactly 0, so below this the bar counts as expanded. */
+/** The fraction is a float quotient, rarely exactly 0; below this the bar counts as expanded. */
 private const val SETTLED_EXPANDED_FRACTION = 0.01f
+
+private const val SNAP_TO_COLLAPSED_FRACTION = 0.5f
 
 private const val FLING_ROUNDING_TOLERANCE_PX = 0.5f
 
 private const val MIN_FLING_VELOCITY = 1f
 
-/** Drags [scrollBehavior]'s state like content scrolling does, then settles on the nearer end. A new drag cancels the settle. */
+/**
+ * Drags [scrollBehavior]'s state like content scrolling and settles on the nearer end on release. The
+ * settle runs in the draggable's mutex, so a new drag cancels it.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Modifier.topAppBarDrag(scrollBehavior: TopAppBarScrollBehavior): Modifier {
@@ -32,9 +37,12 @@ internal fun Modifier.topAppBarDrag(scrollBehavior: TopAppBarScrollBehavior): Mo
     )
 }
 
-/** M3's private `settleAppBar` on public API. */
+/** M3's private `settleAppBar` on public API: continue the fling, then snap to the nearer end. */
 @OptIn(ExperimentalMaterial3Api::class)
-private suspend fun settleTopAppBar(scrollBehavior: TopAppBarScrollBehavior, velocity: Float) {
+internal suspend fun settleTopAppBar(
+    scrollBehavior: TopAppBarScrollBehavior,
+    velocity: Float,
+) {
     val appBarState = scrollBehavior.state
     if (appBarState.collapsedFraction < SETTLED_EXPANDED_FRACTION || appBarState.collapsedFraction == 1f) return
 
@@ -52,8 +60,11 @@ private suspend fun settleTopAppBar(scrollBehavior: TopAppBarScrollBehavior, vel
     }
 
     scrollBehavior.snapAnimationSpec?.let { snapSpec ->
-        val travel = TopAppBarTravel(limit = appBarState.heightOffsetLimit, offset = appBarState.heightOffset)
-        TopAppBarGeometry.snapTarget(travel)?.let { target ->
+        if (appBarState.heightOffset < 0f && appBarState.heightOffset > appBarState.heightOffsetLimit) {
+            val target = when {
+                appBarState.collapsedFraction < SNAP_TO_COLLAPSED_FRACTION -> 0f
+                else -> appBarState.heightOffsetLimit
+            }
             AnimationState(initialValue = appBarState.heightOffset).animateTo(target, animationSpec = snapSpec) {
                 appBarState.heightOffset = value
             }

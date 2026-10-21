@@ -22,7 +22,10 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 
 private const val TITLE_ONE_LINE_FROM_FRACTION = 0.5f
 
-/** [FlashcardsCollapsingTopAppBar] for a plain text [title] and [subtitle]; only an expanded [FlashcardsTopAppBarSize.Large] title wraps. */
+/**
+ * [FlashcardsCollapsingTopAppBar] for a plain text [title] and [subtitle]. The title wraps to two lines
+ * only on a [FlashcardsTopAppBarSize.Large] bar, until it is half collapsed.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlashcardsTopAppBar(
@@ -35,7 +38,7 @@ fun FlashcardsTopAppBar(
     subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed = Keep,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
-    backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
+    backdrop: @Composable () -> Unit = {},
 ) {
     FlashcardsCollapsingTopAppBar(
         size = size,

@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed.Fade
@@ -40,20 +39,6 @@ fun FlashcardsTopAppBarLargeOnGradientShowcase() = ShowcaseBar(size = Large, sty
 @ShowkaseComposable(name = "Top app bar — Large on gradient, collapsed", group = "Bars")
 @Composable
 fun FlashcardsTopAppBarLargeOnGradientCollapsedShowcase() = ShowcaseBar(size = Large, style = OnGradient, collapsed = true, backdrop = { FlashcardsTopAppBarBrandGraph() })
-
-@ShowkaseComposable(name = "Top app bar — Large with white graph, fading", group = "Bars")
-@Composable
-fun FlashcardsTopAppBarOnSurfaceGraphShowcase() = ShowcaseBar(
-    size = Large,
-    style = OnSurface,
-    backdrop = {
-        FlashcardsTopAppBarGraph(
-            spec = BrandMorpheusGraphSpecs.topAppBarOnSurface,
-            fill = BrandMorpheusGraphSpecs.onSurfaceFill,
-            fadesOnCollapse = true,
-        )
-    },
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @ShowkaseComposable(name = "Top app bar — leading element and details", group = "Bars")
@@ -97,7 +82,7 @@ private fun ShowcaseBar(
     title: String = SHOWCASE_TITLE,
     subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed = Keep,
     collapsed: Boolean = false,
-    backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
+    backdrop: @Composable () -> Unit = {},
 ) {
     FlashcardsTheme {
         Surface {
@@ -127,12 +112,6 @@ private fun RowScope.ShowcaseActions() {
 @Composable
 private fun FlashcardsTopAppBarLargeOnGradientCollapsedPreview() {
     FlashcardsTopAppBarLargeOnGradientCollapsedShowcase()
-}
-
-@PreviewLightDark
-@Composable
-private fun FlashcardsTopAppBarOnSurfaceGraphPreview() {
-    FlashcardsTopAppBarOnSurfaceGraphShowcase()
 }
 
 @PreviewLightDark

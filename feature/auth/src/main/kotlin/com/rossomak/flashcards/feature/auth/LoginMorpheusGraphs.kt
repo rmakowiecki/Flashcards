@@ -6,7 +6,6 @@ import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.ShapePrimitive.Bloom
 
-/** The network graph behind Login: two opposite corners, clear of the logo and the sign-in buttons. */
 object LoginMorpheusGraphs {
 
     val graph: MorpheusGraphSpec = BrandMorpheusGraphSpecs.spec(

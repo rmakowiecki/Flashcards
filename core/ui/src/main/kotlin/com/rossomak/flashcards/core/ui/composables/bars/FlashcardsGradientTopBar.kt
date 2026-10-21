@@ -42,7 +42,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * component on its second consumer. [actions] follows the same convention.
  *
  * [FlashcardsTopAppBar] is the collapsing bar that paints its own container; this component is for
- * screens that paint the gradient themselves and keep a small pinned bar.
+ * screens that paint the gradient themselves.
  *
  * [titleAlpha] fades the title in or out while the bar keeps its height, for a screen that reveals
  * the bar after an entrance sequence. It is read in the draw phase, so a running fade never recomposes

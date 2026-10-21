@@ -9,16 +9,14 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
 
-/**
- * A [FlashcardsCollapsingTopAppBar]'s minimum expanded height on M3's classic tokens, below the status
- * bar and pinned row included. Both sizes collapse to the same pinned row.
- */
+/** Minimum expanded height on M3's classic tokens, pinned row included, status bar excluded. */
 @OptIn(ExperimentalMaterial3Api::class)
 enum class FlashcardsTopAppBarSize(
     internal val expandedHeight: Dp,
     internal val expandedTitleMaxLines: Int,
 ) {
     Medium(expandedHeight = TopAppBarDefaults.MediumAppBarExpandedHeight, expandedTitleMaxLines = 1),
+
     Large(expandedHeight = TopAppBarDefaults.LargeAppBarExpandedHeight, expandedTitleMaxLines = 2),
     ;
 
@@ -38,11 +36,11 @@ enum class FlashcardsTopAppBarSize(
     }
 }
 
-/** What a [FlashcardsCollapsingTopAppBar]'s subtitle does as the bar collapses. */
+/** What the subtitle does as the bar collapses. */
 enum class FlashcardsSubtitleWhenCollapsed {
-    /** Travels under the title into the pinned row. */
+    /** Moves under the title into the pinned row. */
     Keep,
 
-    /** Scrolls up with the expanded block and fades out by half the collapse. */
+    /** Scrolls away with the block, fading out by half the collapse. */
     Fade,
 }

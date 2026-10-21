@@ -17,12 +17,7 @@ import com.rossomak.morpheus.ShapePrimitive.Bloom
 import com.rossomak.morpheus.ShapePrimitive.Ribbon
 import com.rossomak.morpheus.ShapePrimitive.Uniform
 
-/**
- * The network graph behind each onboarding step. Every spec is one layer of the brand graph family
- * ([BrandMorpheusGraphSpecs.base], same seed), so swiping between any two steps, Skip's jump included,
- * morphs one mesh in place: only the shape, motion, glow and alpha differ. None sets a fill: all of them
- * inherit [BrandMorpheusGraphSpecs.fill].
- */
+/** One graph per onboarding step, all [BrandMorpheusGraphSpecs] family members so any two morph in place. */
 object OnboardingMorpheusGraphs {
 
     private val base = BrandMorpheusGraphSpecs.base

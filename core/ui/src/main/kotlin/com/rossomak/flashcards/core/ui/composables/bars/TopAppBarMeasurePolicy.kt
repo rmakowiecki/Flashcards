@@ -20,15 +20,18 @@ internal enum class TopAppBarSlot {
     Actions,
     TitleLeading,
     Title,
-    Subtitle,
-
-    /** [Title] and [Subtitle] at their expanded styles, measured for the block height and never placed. */
     TitleSizer,
+    Subtitle,
     SubtitleSizer,
     Details,
 }
 
-/** Places the slots via [TopAppBarGeometry], reading [appBarState] in layout so a scroll never recomposes the bar. */
+/**
+ * Places the bar's slots via [TopAppBarGeometry], reading [appBarState] in layout so a scroll never
+ * recomposes. The block height is measured from the expanded-style sizers, because the live title changes
+ * with the fraction; a changed height is written back to [appBarState]. The status-bar inset is laid out,
+ * not padded, so only the paint and backdrop reach behind it.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 internal class TopAppBarMeasurePolicy(
     private val appBarState: TopAppBarState,
@@ -39,7 +42,10 @@ internal class TopAppBarMeasurePolicy(
     private val spacing: AppSpacing,
 ) : MeasurePolicy {
 
-    override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
+    override fun MeasureScope.measure(
+        measurables: List<Measurable>,
+        constraints: Constraints,
+    ): MeasureResult {
         val slots = measurables.associateBy { it.layoutId }
         val isLtr = layoutDirection == LayoutDirection.Ltr
         val insetLeft = windowInsets.getLeft(this, layoutDirection)
@@ -47,40 +53,37 @@ internal class TopAppBarMeasurePolicy(
         val insetStart = if (isLtr) insetLeft else insetRight
         val insetTop = windowInsets.getTop(this)
         val width = constraints.maxWidth
-        val pinnedHeight = size.collapsedHeight.roundToPx()
-        val metrics = TopAppBarMetrics(
-            width = (width - insetLeft - insetRight).coerceAtLeast(0),
-            pinnedHeight = pinnedHeight,
-            minBlockHeight = size.expandedHeight.roundToPx() - pinnedHeight,
-            edge = spacing.xxsmall.roundToPx(),
-            padding = spacing.normal.roundToPx(),
-            gap = spacing.xsmall.roundToPx(),
-            bottomPadding = size.bottomPadding(spacing).roundToPx(),
-        )
+        val metrics = metrics(width = (width - insetLeft - insetRight).coerceAtLeast(0))
 
         val widthOnly = Constraints(maxWidth = metrics.width)
         val navigation = slots.getValue(TopAppBarSlot.Navigation).measure(widthOnly)
         val actions = slots.getValue(TopAppBarSlot.Actions).measure(widthOnly)
         val titleLeading = slots[TopAppBarSlot.TitleLeading]?.measure(widthOnly)
-        val expandedText = Constraints(maxWidth = TopAppBarGeometry.expandedTextWidth(metrics, titleLeading?.slotSize()))
+        val navigationSize = navigation.slotSize()
+        val actionsSize = actions.slotSize()
+        val titleLeadingSize = titleLeading?.slotSize()
+        val expandedText = Constraints(maxWidth = TopAppBarGeometry.expandedTextWidth(metrics, titleLeadingSize))
         val expandedTitle = slots.getValue(TopAppBarSlot.TitleSizer).measure(expandedText)
         val expandedSubtitle = slots[TopAppBarSlot.SubtitleSizer]?.measure(expandedText)
         val details = slots[TopAppBarSlot.Details]?.measure(Constraints(maxWidth = TopAppBarGeometry.detailsWidth(metrics)))
+        val expandedTitleSize = expandedTitle.slotSize()
+        val expandedSubtitleSize = expandedSubtitle?.slotSize()
+        val detailsSize = details?.slotSize()
 
-        val blockHeight = TopAppBarGeometry.blockHeight(
-            metrics = metrics,
-            titleLeading = titleLeading?.slotSize(),
-            expandedTitle = expandedTitle.slotSize(),
-            expandedSubtitle = expandedSubtitle?.slotSize(),
-            details = details?.slotSize(),
+        val expandedContent = TopAppBarExpandedContent(
+            titleLeading = titleLeadingSize,
+            title = expandedTitleSize,
+            subtitle = expandedSubtitleSize,
+            details = detailsSize,
         )
+        val blockHeight = TopAppBarGeometry.blockHeight(metrics, expandedContent)
         val travel = updateTravel(blockHeight)
 
         val textWidths = TopAppBarGeometry.textWidths(
             metrics = metrics,
-            navigation = navigation.slotSize(),
-            actions = actions.slotSize(),
-            titleLeading = titleLeading?.slotSize(),
+            navigation = navigationSize,
+            actions = actionsSize,
+            titleLeading = titleLeadingSize,
             titleLeadingCollapsedScale = titleLeadingCollapsedScale,
             subtitleWhenCollapsed = subtitleWhenCollapsed,
             fraction = travel.fraction,
@@ -91,21 +94,21 @@ internal class TopAppBarMeasurePolicy(
         val placements = TopAppBarGeometry.placements(
             metrics = metrics,
             slots = TopAppBarSlots(
-                navigation = navigation.slotSize(),
-                actions = actions.slotSize(),
-                titleLeading = titleLeading?.slotSize(),
+                navigation = navigationSize,
+                actions = actionsSize,
+                titleLeading = titleLeadingSize,
                 titleLeadingCollapsedScale = titleLeadingCollapsedScale,
-                expandedTitle = expandedTitle.slotSize(),
-                expandedSubtitle = expandedSubtitle?.slotSize(),
+                expandedTitle = expandedTitleSize,
+                expandedSubtitle = expandedSubtitleSize,
                 title = title.slotSize(),
                 subtitle = subtitle?.slotSize(),
-                details = details?.slotSize(),
+                details = detailsSize,
                 subtitleWhenCollapsed = subtitleWhenCollapsed,
             ),
             blockHeight = blockHeight,
             fraction = travel.fraction,
         )
-        val backdrop = slots.getValue(TopAppBarSlot.Backdrop).measure(Constraints.fixed(width, insetTop + pinnedHeight + blockHeight))
+        val backdrop = slots.getValue(TopAppBarSlot.Backdrop).measure(Constraints.fixed(width, insetTop + metrics.pinnedHeight + blockHeight))
 
         return layout(width, insetTop + placements.layoutHeight) {
             val origin = SlotOrigin(x = insetStart, y = insetTop, pivotX = if (isLtr) 0f else 1f)
@@ -119,6 +122,19 @@ internal class TopAppBarMeasurePolicy(
         }
     }
 
+    private fun MeasureScope.metrics(width: Int): TopAppBarMetrics {
+        val pinnedHeight = size.collapsedHeight.roundToPx()
+        return TopAppBarMetrics(
+            width = width,
+            pinnedHeight = pinnedHeight,
+            minBlockHeight = size.expandedHeight.roundToPx() - pinnedHeight,
+            navigationInset = spacing.xxsmall.roundToPx(),
+            contentPadding = spacing.normal.roundToPx(),
+            itemGap = spacing.xsmall.roundToPx(),
+            bottomPadding = size.bottomPadding(spacing).roundToPx(),
+        )
+    }
+
     private fun updateTravel(blockHeight: Int): TopAppBarTravel {
         val previous = TopAppBarTravel(limit = appBarState.heightOffsetLimit, offset = appBarState.heightOffset)
         val travel = TopAppBarGeometry.travel(blockHeight, previous)
@@ -129,7 +145,7 @@ internal class TopAppBarMeasurePolicy(
         return travel
     }
 
-    /** The content's top-start corner, and the side a scaled slot shrinks toward. */
+    /** Top-start corner of the content; [pivotX] is the side scaled slots shrink toward. */
     private class SlotOrigin(val x: Int, val y: Int, val pivotX: Float)
 
     /** Scales about the start corner, so [placement] is where the shrunken slot's corner lands. */
