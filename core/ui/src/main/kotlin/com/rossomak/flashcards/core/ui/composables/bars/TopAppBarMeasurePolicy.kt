@@ -73,13 +73,13 @@ internal class TopAppBarMeasurePolicy(
         val expandedSubtitleSize = expandedSubtitle?.slotSize()
         val detailsSize = details?.slotSize()
 
-        val blockHeight = TopAppBarGeometry.blockHeight(
-            metrics = metrics,
+        val expandedContent = TopAppBarExpandedContent(
             titleLeading = titleLeadingSize,
-            expandedTitle = expandedTitleSize,
-            expandedSubtitle = expandedSubtitleSize,
+            title = expandedTitleSize,
+            subtitle = expandedSubtitleSize,
             details = detailsSize,
         )
+        val blockHeight = TopAppBarGeometry.blockHeight(metrics, expandedContent)
         val travel = updateTravel(blockHeight)
 
         val textWidths = TopAppBarGeometry.textWidths(

@@ -46,8 +46,7 @@ class TopAppBarGeometryTest {
         subtitleWhenCollapsed = Keep,
     )
 
-    private fun TopAppBarSlots.blockHeight(metrics: TopAppBarMetrics): Int =
-        TopAppBarGeometry.blockHeight(metrics, titleLeading, expandedTitle, expandedSubtitle, details)
+    private fun TopAppBarSlots.blockHeight(metrics: TopAppBarMetrics): Int = TopAppBarGeometry.blockHeight(metrics, expandedContent)
 
     private fun TopAppBarSlots.placementsAt(metrics: TopAppBarMetrics, fraction: Float): TopAppBarPlacements =
         TopAppBarGeometry.placements(metrics, this, blockHeight(metrics), fraction)
@@ -87,6 +86,13 @@ class TopAppBarGeometryTest {
         val slots = titleOnlySlots.copy(expandedTitle = doubledTitle, title = doubledTitle)
 
         slots.blockHeight(medium) shouldBe doubledTitle.height + medium.bottomPadding
+    }
+
+    @Test
+    fun `a subtitle on a Medium bar grows the block past the token`() {
+        val slots = titleOnlySlots.copy(expandedSubtitle = subtitle, subtitle = subtitle)
+
+        slots.blockHeight(medium) shouldBe mediumTitle.height + subtitle.height + medium.bottomPadding
     }
 
     @Test

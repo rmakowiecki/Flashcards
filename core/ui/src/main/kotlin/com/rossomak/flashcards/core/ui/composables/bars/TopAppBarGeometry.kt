@@ -28,6 +28,14 @@ internal data class TopAppBarTravel(val limit: Float, val offset: Float) {
     val fraction: Float get() = if (limit != 0f) offset / limit else 0f
 }
 
+/** The slots that size the expanded block, measured at the expanded text styles. */
+internal data class TopAppBarExpandedContent(
+    val titleLeading: SlotSize?,
+    val title: SlotSize,
+    val subtitle: SlotSize?,
+    val details: SlotSize?,
+)
+
 /** [expandedTitle] and [expandedSubtitle] come from the expanded-style sizers; [title] and [subtitle] are the live nodes. */
 internal data class TopAppBarSlots(
     val navigation: SlotSize,
@@ -40,7 +48,10 @@ internal data class TopAppBarSlots(
     val subtitle: SlotSize?,
     val details: SlotSize?,
     val subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed,
-)
+) {
+    val expandedContent: TopAppBarExpandedContent
+        get() = TopAppBarExpandedContent(titleLeading, expandedTitle, expandedSubtitle, details)
+}
 
 internal data class TopAppBarTextWidths(val title: Int, val subtitle: Int)
 
@@ -76,13 +87,8 @@ internal object TopAppBarGeometry {
 
     fun detailsWidth(metrics: TopAppBarMetrics): Int = (metrics.width - 2 * metrics.contentPadding).coerceAtLeast(0)
 
-    fun blockHeight(
-        metrics: TopAppBarMetrics,
-        titleLeading: SlotSize?,
-        expandedTitle: SlotSize,
-        expandedSubtitle: SlotSize?,
-        details: SlotSize?,
-    ): Int = max(metrics.minBlockHeight, contentHeight(metrics, titleLeading, expandedTitle, expandedSubtitle, details))
+    fun blockHeight(metrics: TopAppBarMetrics, expanded: TopAppBarExpandedContent): Int =
+        max(metrics.minBlockHeight, contentHeight(metrics, expanded))
 
     /**
      * A fully collapsed bar stays collapsed when the limit changes (also pulling a preview's overshoot back
@@ -124,8 +130,8 @@ internal object TopAppBarGeometry {
         fraction: Float,
     ): TopAppBarPlacements = with(slots) {
         val collapsedOffset = (fraction * blockHeight).roundToInt()
-        val identityRowHeight = identityRowHeight(titleLeading, expandedTitle, expandedSubtitle)
-        val contentHeight = contentHeight(metrics, titleLeading, expandedTitle, expandedSubtitle, details)
+        val identityRowHeight = identityRowHeight(expandedContent)
+        val contentHeight = contentHeight(metrics, expandedContent)
         val identityTop = metrics.pinnedHeight + blockHeight - contentHeight
         val fadedAlpha = fadedSlotAlpha(fraction)
 
@@ -172,18 +178,12 @@ internal object TopAppBarGeometry {
     }
 }
 
-private fun identityRowHeight(titleLeading: SlotSize?, expandedTitle: SlotSize, expandedSubtitle: SlotSize?): Int =
-    max(titleLeading?.height ?: 0, expandedTitle.height + (expandedSubtitle?.height ?: 0))
+private fun identityRowHeight(expanded: TopAppBarExpandedContent): Int =
+    max(expanded.titleLeading?.height ?: 0, expanded.title.height + (expanded.subtitle?.height ?: 0))
 
-private fun contentHeight(
-    metrics: TopAppBarMetrics,
-    titleLeading: SlotSize?,
-    expandedTitle: SlotSize,
-    expandedSubtitle: SlotSize?,
-    details: SlotSize?,
-): Int {
-    val detailsHeight = details?.let { metrics.itemGap + it.height } ?: 0
-    return identityRowHeight(titleLeading, expandedTitle, expandedSubtitle) + detailsHeight + metrics.bottomPadding
+private fun contentHeight(metrics: TopAppBarMetrics, expanded: TopAppBarExpandedContent): Int {
+    val detailsHeight = expanded.details?.let { metrics.itemGap + it.height } ?: 0
+    return identityRowHeight(expanded) + detailsHeight + metrics.bottomPadding
 }
 
 private fun expandedTextStart(metrics: TopAppBarMetrics, titleLeading: SlotSize?): Int =

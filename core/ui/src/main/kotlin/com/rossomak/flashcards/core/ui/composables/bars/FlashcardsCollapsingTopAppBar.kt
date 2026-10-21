@@ -12,6 +12,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -19,6 +20,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -74,18 +76,7 @@ fun FlashcardsCollapsingTopAppBar(
         Keep -> MaterialTheme.typography.labelLargeEmphasized
         Fade -> subtitleStyle
     }
-    val containerModifier = when (style) {
-        OnSurface -> Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest)
-        OnGradient -> Modifier.background(MaterialTheme.brandColors.topBarGradient)
-    }
-    val contentColor = when (style) {
-        OnSurface -> MaterialTheme.colorScheme.onSurface
-        OnGradient -> MaterialTheme.brandColors.onTopBarGradient
-    }
-    val variantContentColor = when (style) {
-        OnSurface -> MaterialTheme.colorScheme.onSurfaceVariant
-        OnGradient -> MaterialTheme.brandColors.onTopBarGradient
-    }
+    val colors = style.topAppBarColors()
     val windowInsets = TopAppBarDefaults.windowInsets
     val spacing = MaterialTheme.spacing
     val measurePolicy = remember(appBarState, windowInsets, size, titleLeadingCollapsedScale, subtitleWhenCollapsed, spacing) {
@@ -101,14 +92,14 @@ fun FlashcardsCollapsingTopAppBar(
 
     Layout(
         modifier = modifier
-            .then(containerModifier)
+            .then(colors.container)
             .clipToBounds()
             .topAppBarDrag(scrollBehavior),
         content = {
             Box(modifier = Modifier.layoutId(TopAppBarSlot.Backdrop).clearAndSetSemantics {}) {
                 backdrop()
             }
-            CompositionLocalProvider(LocalContentColor provides contentColor) {
+            CompositionLocalProvider(LocalContentColor provides colors.content) {
                 Box(modifier = Modifier.layoutId(TopAppBarSlot.Navigation)) { navigationIcon() }
                 Row(modifier = Modifier.layoutId(TopAppBarSlot.Actions), verticalAlignment = Alignment.CenterVertically) {
                     actions(collapsedFraction)
@@ -125,7 +116,7 @@ fun FlashcardsCollapsingTopAppBar(
                     CompositionLocalProvider(LocalTextStyle provides titleStyle, content = title)
                 }
             }
-            CompositionLocalProvider(LocalContentColor provides variantContentColor) {
+            CompositionLocalProvider(LocalContentColor provides colors.variantContent) {
                 subtitle?.let { subtitleSlot ->
                     FadingSlot(slot = TopAppBarSlot.Subtitle, fades = subtitleWhenCollapsed == Fade, collapsedFraction = collapsedFraction) {
                         ProvideCollapsingTextStyle(expanded = subtitleStyle, collapsed = collapsedSubtitleStyle, collapsedFraction = collapsedFraction, content = subtitleSlot)
@@ -140,6 +131,27 @@ fun FlashcardsCollapsingTopAppBar(
             }
         },
         measurePolicy = measurePolicy,
+    )
+}
+
+private class TopAppBarColors(
+    val container: Modifier,
+    val content: Color,
+    val variantContent: Color,
+)
+
+@Composable
+@ReadOnlyComposable
+private fun FlashcardsComponentStyle.topAppBarColors(): TopAppBarColors = when (this) {
+    OnSurface -> TopAppBarColors(
+        container = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest),
+        content = MaterialTheme.colorScheme.onSurface,
+        variantContent = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OnGradient -> TopAppBarColors(
+        container = Modifier.background(MaterialTheme.brandColors.topBarGradient),
+        content = MaterialTheme.brandColors.onTopBarGradient,
+        variantContent = MaterialTheme.brandColors.onTopBarGradient,
     )
 }
 

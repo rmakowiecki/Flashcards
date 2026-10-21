@@ -39,7 +39,7 @@ internal fun Modifier.topAppBarDrag(scrollBehavior: TopAppBarScrollBehavior): Mo
 
 /** M3's private `settleAppBar` on public API: continue the fling, then snap to the nearer end. */
 @OptIn(ExperimentalMaterial3Api::class)
-private suspend fun settleTopAppBar(
+internal suspend fun settleTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior,
     velocity: Float,
 ) {
