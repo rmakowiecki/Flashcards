@@ -18,15 +18,14 @@ import kotlin.time.Duration.Companion.milliseconds
  * The one network-graph family the app draws: one seed and one [base] layer, so any two of the app's
  * graphs morph within one mesh and a screen differs from the next only in where its nodes sit. A
  * screen keeps its graph calm by placing its shapes away from its content, not by a dimmer layer of
- * its own. On a brand gradient every graph is white ([fill]); on a plain surface it takes the theme's
- * primary color ([onSurfaceFill]).
+ * its own.
  */
 object BrandMorpheusGraphSpecs {
 
-    /** The fill of every graph on a brand gradient: white. */
+    /** Every graph on a brand gradient is white. */
     val fill: MorpheusGraphFill = MorpheusGraphFill.Solid(Color.White)
 
-    /** The fill of a graph on a plain surface: the theme's primary color, so light and dark each resolve their own. */
+    /** A graph on a plain surface takes the theme's primary color. */
     val onSurfaceFill: MorpheusGraphFill
         @Composable
         @ReadOnlyComposable
@@ -60,16 +59,10 @@ object BrandMorpheusGraphSpecs {
         alpha = 0.42f,
     )
 
-    /**
-     * The graph of a top app bar on the brand gradient, from the top-end corner across most of the bar; drawn by
-     * [FlashcardsTopAppBarGraph][com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph] with [fill].
-     */
+    /** A gradient top app bar's graph, from the top-end corner across most of the bar. */
     val topAppBar: MorpheusGraphSpec = spec(Bloom(reach = 0.9f, plateau = 0.3f))
 
-    /**
-     * [topAppBar]'s shape for a white top app bar, dimmed so it reads as faint on `surfaceContainerLowest`
-     * in both themes; drawn with [onSurfaceFill].
-     */
+    /** [topAppBar] dimmed for a white top app bar, drawn with [onSurfaceFill]. */
     val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(Bloom(reach = 0.9f, plateau = 0.3f)), alpha = 0.22f))
 
     /** [base] in the shape of [shapes]. */

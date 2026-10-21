@@ -36,38 +36,21 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 
 private val ExpandedFraction: () -> Float = { 0f }
 
-/**
- * The collapse fraction as the title slot sees it: the bar's own for the live title, always `0` for
- * the copy measured at the expanded style. Lets a title change its line count as it collapses
- * without the expanded measurement following it.
- */
+/** The collapse fraction the title slot sees: the bar's own for the live title, `0` for the expanded-style sizer copy. */
 internal val LocalTopAppBarTitleFraction = staticCompositionLocalOf { ExpandedFraction }
 
 /**
- * The app's collapsing top app bar: a pinned row with [navigationIcon] and [actions] over an expanded
- * block, both driven by [scrollBehavior]'s state. The [title], and the [titleLeading] element before
- * it, are one node each that travels from the block into the pinned row as the bar collapses, rather
- * than two copies cross-fading. The bar can also be dragged directly, and a released drag settles on
- * the nearer end. See ADR-0072.
+ * The app's collapsing top app bar (ADR-0072): a pinned row with [navigationIcon] and [actions] over an
+ * expanded block. [title] and [titleLeading] are single nodes that travel into the pinned row instead of
+ * cross-fading. The bar can be dragged, and a released drag settles on the nearer end.
  *
- * [size] sets the expanded height on M3's classic tokens; the block grows past it rather than clip
- * when its content needs the room, and writes its height to the state as the travel limit.
+ * Slot text gets its style from [LocalTextStyle], lerped from expanded to collapsed. The title is also
+ * composed once more, unplaced and silent, to measure the block, so it should hold no state.
  *
- * The bar lerps the title from [titleStyle] to [collapsedTitleStyle], and a [Keep] subtitle from
- * `titleMediumEmphasized` to `labelLargeEmphasized`, and provides each through [LocalTextStyle]: a
- * slot's `Text` sets no style of its own. The title slot is composed a second time, unplaced and
- * silent, at the expanded style, to measure the block, so it should hold no state of its own.
- *
- * [subtitleWhenCollapsed] picks whether the [subtitle] travels under the title or fades out with the
- * block. The [details] sit under the identity row and always fade out; a faded slot is gone by half
- * the collapse, and from then on it is neither placed nor announced.
- *
- * [style] paints the container: `surfaceContainerLowest` [OnSurface], the top bar gradient
- * [OnGradient], behind the status bar either way. [backdrop] is a layer over that paint and under
- * every slot, laid out at the expanded height and clipped as the bar collapses, and silent.
- *
- * Nothing recomposes as the bar collapses except the title and subtitle, whose styles change each
- * frame; [actions] and [backdrop] get the fraction as a provider to read in layout or draw.
+ * A [Fade] [subtitle] and the [details] fade out by half the collapse, then are neither placed nor
+ * announced. [backdrop] sits over the [style] paint and under every slot, at the expanded height, clipped
+ * as the bar collapses. Only the title and subtitle recompose while collapsing; [actions] and [backdrop]
+ * read the fraction through a provider.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -165,7 +148,7 @@ fun FlashcardsCollapsingTopAppBar(
     )
 }
 
-/** Provides the style between [expanded] and [collapsed] at the current fraction. Read in its own scope, so a scroll recomposes only the text under it. */
+/** Provides the style lerped at the current fraction, in its own scope so a scroll recomposes only the text under it. */
 @Composable
 private fun ProvideCollapsingTextStyle(
     expanded: TextStyle,
@@ -177,10 +160,7 @@ private fun ProvideCollapsingTextStyle(
     CompositionLocalProvider(LocalTextStyle provides style, content = content)
 }
 
-/**
- * A slot that, when it [fades], goes silent once the bar has faded it out. Its alpha and whether it
- * is placed are the measure policy's; only the switch to silent recomposes, once each way.
- */
+/** A slot that, when it [fades], goes silent once faded out. Alpha and placement are the measure policy's. */
 @Composable
 private fun FadingSlot(
     slot: TopAppBarSlot,

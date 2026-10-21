@@ -17,7 +17,6 @@ import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Large
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Medium
 
-/** The children of a [FlashcardsCollapsingTopAppBar], tagged with `Modifier.layoutId` so [TopAppBarMeasurePolicy] can tell them apart. */
 internal enum class TopAppBarSlot {
     Backdrop,
     Navigation,
@@ -25,27 +24,21 @@ internal enum class TopAppBarSlot {
     TitleLeading,
     Title,
 
-    /** A copy of the title at its expanded style, measured for the block height and never placed. */
+    /** The title at its expanded style, measured for the block height, never placed. */
     TitleSizer,
     Subtitle,
 
-    /** A copy of the subtitle at its expanded style, measured for the block height and never placed. */
+    /** The subtitle at its expanded style, measured for the block height, never placed. */
     SubtitleSizer,
     Details,
 }
 
 /**
- * Measures a [FlashcardsCollapsingTopAppBar]'s slots, asks [TopAppBarGeometry] where they go and
- * places them. It reads [appBarState]'s offset here, in the layout phase, so a scroll relayouts the
- * bar without recomposing it.
- *
- * The block height comes from the sizer copies, measured at the expanded styles: measured from the
- * live, lerped title, the block would change with the fraction it is the limit of. Whenever the block
- * height changes, the limit is written back to [appBarState] with the corrected offset, so a list
- * scrolling underneath moves this bar with the same state.
- *
- * The status-bar inset is laid out here rather than as padding, so the container paint and the
- * backdrop reach behind the status bar while every other slot stays below it.
+ * Places a [FlashcardsCollapsingTopAppBar]'s slots via [TopAppBarGeometry], reading [appBarState] in
+ * layout so a scroll never recomposes the bar. The block height comes from the sizers, since the live
+ * title would change with the fraction the height is the limit of; a changed height is written back
+ * to [appBarState]. The status-bar inset is laid out here, not padded, so only the paint and the
+ * backdrop reach behind it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 internal class TopAppBarMeasurePolicy(
@@ -126,7 +119,7 @@ internal class TopAppBarMeasurePolicy(
             blockHeight = blockHeight,
             fraction = travel.fraction,
         )
-        // Laid out at the expanded height and clipped by the bar, so collapsing reveals less of it rather than squashing it.
+        // Expanded height, clipped by the bar: collapsing reveals less of it instead of squashing it.
         val backdrop = slots.getValue(TopAppBarSlot.Backdrop).measure(Constraints.fixed(width, insetTop + pinnedHeight + blockHeight))
 
         return layout(width, insetTop + placements.layoutHeight) {
@@ -146,7 +139,6 @@ internal class TopAppBarMeasurePolicy(
         Large -> spacing.normal
     }
 
-    /** Writes a changed block height to [appBarState] as the travel limit, with the offset [TopAppBarGeometry.travel] corrects. */
     private fun updateTravel(blockHeight: Int): TopAppBarTravel {
         val previous = TopAppBarTravel(limit = appBarState.heightOffsetLimit, offset = appBarState.heightOffset)
         val travel = TopAppBarGeometry.travel(blockHeight, previous)
@@ -157,10 +149,10 @@ internal class TopAppBarMeasurePolicy(
         return travel
     }
 
-    /** Where the content's top-start corner sits in the bar, and which side a scaled slot shrinks toward. */
+    /** The content's top-start corner, and the side a scaled slot shrinks toward. */
     private class SlotOrigin(val x: Int, val y: Int, val pivotX: Float)
 
-    /** Places [placeable] at [placement], or leaves it unplaced at alpha `0`. Scales about the start corner, so the position is where the shrunken slot's corner lands. */
+    /** Scales about the start corner, so [placement] is where the shrunken slot's corner lands. */
     private fun Placeable.PlacementScope.placeSlot(placeable: Placeable, placement: SlotPlacement?, origin: SlotOrigin) {
         if (placement == null || !placement.isPlaced) return
         val x = origin.x + placement.x

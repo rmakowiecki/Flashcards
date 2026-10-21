@@ -60,10 +60,7 @@ object FlashcardsMorpheusGraphPresets {
         whiteTopBar,
     )
 
-    /**
-     * [BrandMorpheusGraphSpecs.topAppBarOnSurface] in brand indigo, standing in for the theme's primary
-     * color that the app fills it with, so it shows on the tuner's plain surface.
-     */
+    /** Brand indigo stands in for the theme's primary, which the tuner cannot resolve. */
     private val whiteTopBar: MorpheusGraphPreset
         get() = BrandMorpheusGraphSpecs.topAppBarOnSurface.let { spec ->
             MorpheusGraphPreset(

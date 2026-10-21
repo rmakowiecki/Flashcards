@@ -24,13 +24,9 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSty
 private const val TITLE_ONE_LINE_FROM_FRACTION = 0.5f
 
 /**
- * The app's collapsing top app bar for a plain text [title] and [subtitle]: a
- * [FlashcardsCollapsingTopAppBar] with the standard navigation control.
- *
- * A non-null [navigationIcon] wins; otherwise a non-null [onNavigateBack] shows the back arrow, and
- * with neither there is no navigation control. The title wraps to two lines expanded on
- * [FlashcardsTopAppBarSize.Large] and keeps to one on [FlashcardsTopAppBarSize.Medium] and once
- * collapsed; the subtitle keeps to one line. Both ellipsize.
+ * [FlashcardsCollapsingTopAppBar] for a plain text [title] and [subtitle]. [navigationIcon] wins over
+ * the back arrow [onNavigateBack] shows. The title wraps to two lines only on an expanded
+ * [FlashcardsTopAppBarSize.Large] bar; everything else is one line, ellipsized.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +57,7 @@ fun FlashcardsTopAppBar(
     )
 }
 
-/** The title, wrapping to [expandedMaxLines] until the bar is halfway collapsed. Only crossing that point recomposes it for its line count. */
+/** Wraps to [expandedMaxLines] until the bar is halfway collapsed. */
 @Composable
 private fun FlashcardsTopAppBarTitle(text: String, expandedMaxLines: Int) {
     val collapsedFraction = LocalTopAppBarTitleFraction.current

@@ -12,16 +12,12 @@ import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.morpheusGraphBackground
 import com.rossomak.morpheus.rememberMorpheusGraphMorphState
 
-/** How far the bar has collapsed when a fading graph is gone, so the collapsed bar never shows a faint remnant. */
+/** Gone before fully collapsed, so the collapsed bar shows no faint remnant. */
 private const val GRAPH_GONE_AT_COLLAPSED_FRACTION = 0.6f
 
 /**
- * A network graph as a top app bar's backdrop, filling the bar at its expanded height.
- *
- * By default the graph stays: the bar clips it as it collapses, so the collapsed row shows the part
- * of the graph behind it, never a squashed copy. With [fadesOnCollapse] it fades out instead, gone
- * by [GRAPH_GONE_AT_COLLAPSED_FRACTION], by seeking a morph toward [BrandMorpheusGraphSpecs.hidden];
- * the fraction is read in a snapshot flow, so a scroll never recomposes the bar.
+ * A network graph backdrop. It stays and is clipped as the bar collapses, or with [fadesOnCollapse]
+ * morphs toward [BrandMorpheusGraphSpecs.hidden], read in a snapshot flow so a scroll never recomposes.
  */
 @Composable
 fun FlashcardsTopAppBarBackdropScope.FlashcardsTopAppBarGraph(
