@@ -267,8 +267,7 @@ internal fun SummaryLayout(
     val isLoading = state.scoreStatus == Loading
 
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        // Around the total from loading on, then one morph off it once the tiles leave, the same length
-        // whether the sequence plays out or is skipped.
+        // Same morph length whether the sequence plays out or is skipped.
         BrandGradientBackdrop(
             graph = if (isLoading || sequence.phase == SummaryPhase.Counting) StudyMorpheusGraphs.summaryCounting else StudyMorpheusGraphs.summary,
             graphMorphDuration = BrandMorpheusGraphSpecs.settleMorphDuration,
