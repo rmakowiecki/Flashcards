@@ -4,7 +4,7 @@ The Account screen holds everything about the signed-in User that is not a study
 
 ## Header
 
-The top of the screen is the large collapsing top app bar the rest of the app uses ([ADR-0072](../adr/0072-one-collapsing-top-app-bar-in-core-ui.md)). A faint animated network graph sits on it and stays when it is collapsed.
+The top of the screen is the large collapsing top app bar the rest of the app uses ([ADR-0072](../adr/0072-one-collapsing-top-app-bar-in-core-ui.md)). A faint animated network graph sits on it and stays when it is collapsed. The expanded header is 152dp tall, so the avatar is 72dp.
 
 - **Expanded**, it shows the User's avatar (their profile photo or, without one, their initials) beside three lines: their name, their email, and a line naming the sign-in provider, Google or GitHub, with a Manage link that opens that provider's account page in the browser. For Google, the page opens on the signed-in account even when the device holds several.
 - **Collapsed**, a smaller avatar and the name sit in the pinned row between the back arrow and Sign out. The email and the provider line fade out and stop being announced on the way, which also takes the Manage link out of reach.
