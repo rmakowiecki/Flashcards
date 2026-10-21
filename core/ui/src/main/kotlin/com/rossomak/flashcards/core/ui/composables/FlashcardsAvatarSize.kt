@@ -14,6 +14,6 @@ enum class FlashcardsAvatarSize(val diameter: Dp) {
     /** Level card. */
     Medium(56.dp),
 
-    /** Account header. */
-    Large(88.dp),
+    /** Account header: as tall as the three text lines beside it, so the large top app bar stays 152dp. */
+    Large(72.dp),
 }

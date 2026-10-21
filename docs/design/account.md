@@ -4,9 +4,9 @@ The Account screen holds everything about the signed-in User that is not a study
 
 ## Header
 
-The top of the screen is a collapsing header built like a large app bar.
+The top of the screen is the large collapsing top app bar the rest of the app uses ([ADR-0072](../adr/0072-one-collapsing-top-app-bar-in-core-ui.md)). A faint animated network graph sits on it and stays when it is collapsed.
 
-- **Expanded**, it shows the User's avatar (their profile photo or, without one, their initials) beside their name and email. Under both is a line naming the sign-in provider, Google or GitHub, with a Manage link that opens that provider's account page in the browser. For Google, the page opens on the signed-in account even when the device holds several.
+- **Expanded**, it shows the User's avatar (their profile photo or, without one, their initials) beside three lines: their name, their email, and a line naming the sign-in provider, Google or GitHub, with a Manage link that opens that provider's account page in the browser. For Google, the page opens on the signed-in account even when the device holds several.
 - **Collapsed**, a smaller avatar and the name sit in the pinned row between the back arrow and Sign out. The email and the provider line fade out and stop being announced on the way, which also takes the Manage link out of reach.
 - The header collapses as the list scrolls, and it can also be dragged directly. Released part-way, it settles on whichever end is nearer.
 - A GitHub User's name is their GitHub Name, or their GitHub username when they have not set one ([ADR-0066](../adr/0066-github-sign-in-runs-as-a-firebase-provider-flow-in-the-data-layer.md)).
@@ -57,7 +57,7 @@ Signing in again after a deletion, even with the same provider account, starts a
 
 ## Report a bug
 
-Report a bug is a full-screen form for writing a **Bug Report**. Close sits at the start of the top app bar and Send at the end.
+Report a bug is a full-screen form for writing a **Bug Report**. Close sits at the start of the top app bar and Send at the end. The bar collapses as the form scrolls and carries the same faint network graph as the Account header.
 
 - **Severity**: a field that opens a dialog with three choices, each with a short description: Blocker, Minor and Cosmetic. The dialog's Confirm stays disabled until a choice is made, and cancelling keeps the earlier choice.
 - **Description**: a multi-line text field under three guiding questions: what the User was doing, what happened against what they expected, and how reliably it reproduces. Enter adds a new line rather than sending. A counter under the field shows the length against the minimum until the text reaches it, then against the maximum, and flags text that is too long. Length is counted on the trimmed text.
@@ -74,7 +74,7 @@ Close or system back with text in the description asks whether to discard the re
 
 ## Open-source licenses
 
-A list of every library the release build ships, generated at build time, with each library's version and license. Tapping one opens a detail sheet with what the library is, its license text when the build bundled it, or a link to the license's web page when it did not, plus links to the library's website and source. The open sheet survives process death. A link no app can open shows a snackbar.
+A list of every library the release build ships, generated at build time, with each library's version and license. Its top app bar collapses as the list scrolls and carries the same faint network graph as the Account header. Tapping one opens a detail sheet with what the library is, its license text when the build bundled it, or a link to the license's web page when it did not, plus links to the library's website and source. The open sheet survives process death. A link no app can open shows a snackbar.
 
 ## Related
 

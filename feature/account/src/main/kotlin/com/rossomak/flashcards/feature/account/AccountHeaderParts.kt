@@ -43,7 +43,7 @@ private val SIGN_OUT_CONTAINER_HEIGHT = 40.dp
 
 /**
  * Sign out in the error color: an icon with a label that shrinks away as [labelProgress] falls from
- * 1 to 0, leaving the icon alone. The ripple and the click area are a pill 40dp tall, which is a
+ * 1 to 0, leaving the icon alone. [labelProgress] is read in layout and draw, so a scroll never recomposes it. The ripple and the click area are a pill 40dp tall, which is a
  * circle once the label is gone, like the back arrow's; the 48dp touch target around it is kept.
  *
  * It is one clickable node named by the label's text, so a screen reader announces "Sign out" in both
@@ -52,7 +52,7 @@ private val SIGN_OUT_CONTAINER_HEIGHT = 40.dp
 @Composable
 internal fun AccountSignOutAction(
     modifier: Modifier = Modifier,
-    labelProgress: Float,
+    labelProgress: () -> Float,
     onClick: () -> Unit,
 ) {
     val label = stringResource(R.string.account_sign_out_button)
@@ -77,12 +77,12 @@ internal fun AccountSignOutAction(
             modifier = Modifier
                 .clearAndSetSemantics {}
                 .graphicsLayer {
-                    alpha = labelProgress
+                    alpha = labelProgress()
                     clip = true
                 }
                 .layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints)
-                    layout((placeable.width * labelProgress).roundToInt(), placeable.height) {
+                    layout((placeable.width * labelProgress()).roundToInt(), placeable.height) {
                         placeable.place(0, 0)
                     }
                 }
