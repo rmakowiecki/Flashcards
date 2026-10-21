@@ -56,16 +56,21 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Resolv
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Unresolved
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
@@ -294,9 +299,13 @@ private fun CategoryDetailsTopBar(
     }
     FlashcardsTopAppBar(
         title = categoryName,
-        subtitle = subtitle,
-        onNavigateBack = if (isSelectionMode) onSelectionModeToggle else onNavigateBack,
+        size = FlashcardsTopAppBarSize.Large,
         scrollBehavior = scrollBehavior,
+        style = FlashcardsComponentStyle.OnGradient,
+        subtitle = subtitle,
+        subtitleWhenCollapsed = FlashcardsSubtitleWhenCollapsed.Keep,
+        onNavigateBack = if (isSelectionMode) onSelectionModeToggle else onNavigateBack,
+        backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill) },
         actions = {
             CategoryDetailsActions(
                 isFavorite = isFavorite,

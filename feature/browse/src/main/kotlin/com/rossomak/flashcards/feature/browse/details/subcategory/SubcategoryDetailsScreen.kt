@@ -51,14 +51,19 @@ import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsExpandableListRow
@@ -282,10 +287,14 @@ private fun SubcategoryDetailsTopBar(
 ) {
     FlashcardsTopAppBar(
         title = subcategoryName,
-        modifier = modifier,
-        subtitle = stringResource(R.string.subcategory_details_subtitle_label, categoryName),
-        onNavigateBack = onNavigateBack,
+        size = FlashcardsTopAppBarSize.Large,
         scrollBehavior = scrollBehavior,
+        modifier = modifier,
+        style = FlashcardsComponentStyle.OnGradient,
+        subtitle = stringResource(R.string.subcategory_details_subtitle_label, categoryName),
+        subtitleWhenCollapsed = FlashcardsSubtitleWhenCollapsed.Keep,
+        onNavigateBack = onNavigateBack,
+        backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill) },
         actions = {
             SubcategoryDetailsActions(
                 isFavorite = isFavorite,

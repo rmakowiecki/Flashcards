@@ -18,7 +18,7 @@ While the list loads, a spinner shows, and loaded content fades in as one block 
 
 ## Category Details
 
-Category Details and Subcategory Details share a gradient top app bar that collapses as the list scrolls. A faint animated network graph spreads across it from its end corner, thinning out toward the title, and fades out as the bar collapses and is gone well before it is fully collapsed ([ADR-0069](../adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
+Category Details and Subcategory Details share a large gradient top app bar that collapses as the list scrolls or as the User drags it, and settles on the nearer end when released ([ADR-0072](../adr/0072-one-collapsing-top-app-bar-in-core-ui.md)). The title and subtitle move from the expanded block into the collapsed row. The title wraps to two lines until the bar is half collapsed, then shortens with an ellipsis. A faint animated network graph spreads across the bar from its end corner, thinning out toward the title ([ADR-0069](../adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)). It stays in the collapsed row: collapsing reveals less of it rather than squashing it.
 
 Category Details lists every Subcategory of the Category, labeled **Topics** in the UI. An overline gives the Topic count. Each row shows:
 
