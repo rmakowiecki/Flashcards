@@ -6,7 +6,6 @@ import com.rossomak.flashcards.core.data.repository.DefaultAuthRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCardProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultCurationRepository
 import com.rossomak.flashcards.core.data.repository.DefaultFlashcardRepository
-import com.rossomak.flashcards.core.data.repository.DefaultLevelProgressRepository
 import com.rossomak.flashcards.core.data.repository.DefaultOnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.data.repository.DefaultPremiumRepository
 import com.rossomak.flashcards.core.data.repository.DefaultRecentSessionsRepository
@@ -35,7 +34,6 @@ import com.rossomak.flashcards.core.domain.repository.AuthRepository
 import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FlashcardRepository
-import com.rossomak.flashcards.core.domain.repository.LevelProgressRepository
 import com.rossomak.flashcards.core.domain.repository.NetworkAvailabilityGateway
 import com.rossomak.flashcards.core.domain.repository.OnboardingSubcategoriesRepository
 import com.rossomak.flashcards.core.domain.repository.PremiumRepository
@@ -137,10 +135,6 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindScoringStateRepository(defaultScoringStateRepository: DefaultScoringStateRepository): ScoringStateRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindLevelProgressRepository(defaultLevelProgressRepository: DefaultLevelProgressRepository): LevelProgressRepository
 
     @Binds
     @Singleton

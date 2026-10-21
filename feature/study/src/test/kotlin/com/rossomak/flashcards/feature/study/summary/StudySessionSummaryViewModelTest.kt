@@ -6,6 +6,7 @@ import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.LevelProgress
+import com.rossomak.flashcards.core.domain.model.ObservedScoringState
 import com.rossomak.flashcards.core.domain.model.ScoringState
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
 import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
@@ -25,14 +26,14 @@ import com.rossomak.flashcards.core.domain.model.XpConfig
 import com.rossomak.flashcards.core.domain.model.levelThreshold
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
-import com.rossomak.flashcards.core.domain.repository.FakeLevelProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.FakeSessionSubmissionRepository
+import com.rossomak.flashcards.core.domain.repository.FakeTodayProvider
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import com.rossomak.flashcards.core.domain.usecase.GetXpConfigUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveScoringStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
@@ -70,6 +71,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -97,22 +99,26 @@ class StudySessionSummaryViewModelTest {
     private val userPreferencesRepository = FakeUserPreferencesRepository()
     private val xpConfigRepository = FakeXpConfigRepository()
     private val authRepository = FakeAuthRepository()
-    private val levelProgressRepository = FakeLevelProgressRepository()
 
     private fun createViewModel(
-        observeLevelProgress: ObserveLevelProgressUseCase = ObserveLevelProgressUseCase(levelProgressRepository),
+        observeScoringState: ObserveScoringStateUseCase = ObserveScoringStateUseCase(scoringStateRepository, FakeXpConfigRepository(), FakeTodayProvider()),
         observeAuthUser: ObserveAuthUserUseCase = ObserveAuthUserUseCase(authRepository),
     ): StudySessionSummaryViewModel = StudySessionSummaryViewModel(
         savedStateHandle,
         ObserveUserPreferencesUseCase(userPreferencesRepository),
         SubmitStudySessionUseCase(cardProgressRepository, scoringStateRepository, GetXpConfigUseCase(xpConfigRepository), sessionSubmissionRepository),
         observeAuthUser,
-        observeLevelProgress,
+        observeScoringState,
     )
 
-    private fun levelProgressReturning(levelProgress: Flow<LevelProgress>): ObserveLevelProgressUseCase = mockk {
-        coEvery { this@mockk() } returns levelProgress
+    private fun levelProgressReturning(levelProgress: Flow<LevelProgress>): ObserveScoringStateUseCase = mockk {
+        coEvery { this@mockk() } returns levelProgress.map { progress ->
+            ObservedScoringState(scoringState = progress.toScoringState(), levelProgress = progress, streak = null, todayStudiedSeconds = 0)
+        }
     }
+
+    /** The scoring state the default Level curve measures as [this]; its [LevelProgress.xpForNextLevel] must be that curve's. */
+    private fun LevelProgress.toScoringState() = ScoringState(level = level, xpIntoCurrentLevel = xpIntoCurrentLevel)
 
     private fun authUserReturning(authUser: Flow<AuthUser?>): ObserveAuthUserUseCase = mockk {
         coEvery { this@mockk() } returns authUser
@@ -585,7 +591,7 @@ class StudySessionSummaryViewModelTest {
             authRepository.userToReturn = AUTH_USER
             stubRoute(ratedRoute())
             sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
-            levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+            scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -606,12 +612,12 @@ class StudySessionSummaryViewModelTest {
     fun `a scored Level card stays on the score when the live Level changes`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
         sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
         val viewModel = createViewModel()
         advanceUntilIdle()
         val scoredCard = viewModel.state.value.levelCard
 
-        levelProgressRepository.emit(NEXT_LEVEL_PROGRESS)
+        scoringStateRepository.emit(NEXT_LEVEL_PROGRESS.toScoringState())
         advanceUntilIdle()
 
         viewModel.state.value.levelCard shouldBe scoredCard
@@ -673,7 +679,7 @@ class StudySessionSummaryViewModelTest {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         authRepository.userToReturn = AUTH_USER
         stubRoute(ratedRoute())
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -688,7 +694,7 @@ class StudySessionSummaryViewModelTest {
     fun `an unscored Level card stays Loading until the auth user has emitted`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
         val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { awaitCancellation() }))
         advanceUntilIdle()
@@ -700,7 +706,7 @@ class StudySessionSummaryViewModelTest {
     fun `an unscored Level card with no signed-in User still shows content`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -712,14 +718,33 @@ class StudySessionSummaryViewModelTest {
     fun `a later Level emission updates an unscored Level card`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        levelProgressRepository.emit(NEXT_LEVEL_PROGRESS)
+        scoringStateRepository.emit(NEXT_LEVEL_PROGRESS.toScoringState())
         advanceUntilIdle()
 
         viewModel.state.value.levelCard shouldBe liveLevelCard(NEXT_LEVEL_PROGRESS, photoUrl = null, displayName = null)
+    }
+
+    @Test
+    fun `a Streak-only change leaves the live Level and the state untouched`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
+        stubRoute(ratedRoute())
+        val liveScoringState = LIVE_LEVEL_PROGRESS.toScoringState()
+        scoringStateRepository.emit(liveScoringState)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.test {
+            awaitItem().liveLevel shouldBe LIVE_LEVEL_PROGRESS
+
+            scoringStateRepository.emit(liveScoringState.copy(currentStreak = 3, bestStreak = 3, lastStudyDate = "2026-09-06"))
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
     }
 
     @Test
@@ -730,7 +755,7 @@ class StudySessionSummaryViewModelTest {
             delay(3.seconds)
             emit(Scored(SERVER_SCORE))
         }
-        levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+        scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
         val viewModel = createViewModel()
         advanceTimeBy(2.seconds)
@@ -746,7 +771,7 @@ class StudySessionSummaryViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
-            levelProgressRepository.levelProgressReadFailure = IllegalStateException("level listener failed")
+            scoringStateRepository.scoringStateReadFailure = IllegalStateException("level listener failed")
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -759,7 +784,7 @@ class StudySessionSummaryViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
-            levelProgressRepository.completesWithoutEmitting = true
+            scoringStateRepository.completesWithoutEmitting = true
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -772,14 +797,14 @@ class StudySessionSummaryViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
-            val observeLevelProgress = mockk<ObserveLevelProgressUseCase>()
-            coEvery { observeLevelProgress() } throws IllegalStateException("could not build the stream")
+            val observeScoringState = mockk<ObserveScoringStateUseCase>()
+            coEvery { observeScoringState() } throws IllegalStateException("could not build the stream")
 
-            val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
+            val viewModel = createViewModel(observeScoringState = observeScoringState)
             advanceUntilIdle()
 
             viewModel.state.value.levelCard shouldBe LevelCardUnavailable
-            coVerify(exactly = 1) { observeLevelProgress() }
+            coVerify(exactly = 1) { observeScoringState() }
         }
 
     @Test
@@ -787,7 +812,7 @@ class StudySessionSummaryViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
             stubRoute(ratedRoute())
-            levelProgressRepository.emit(LIVE_LEVEL_PROGRESS)
+            scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
             val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { error("auth listener failed") }))
             advanceUntilIdle()
@@ -799,31 +824,31 @@ class StudySessionSummaryViewModelTest {
     fun `a Level stream failure after the first emission keeps the last Level`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
-        val observeLevelProgress = levelProgressReturning(
+        val observeScoringState = levelProgressReturning(
             flow {
                 emit(LIVE_LEVEL_PROGRESS)
                 error("level listener failed")
             },
         )
 
-        val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
+        val viewModel = createViewModel(observeScoringState = observeScoringState)
         advanceUntilIdle()
 
         viewModel.state.value.levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, photoUrl = null, displayName = null)
-        coVerify(exactly = 1) { observeLevelProgress() }
+        coVerify(exactly = 1) { observeScoringState() }
     }
 
     @Test
     fun `a Level stream completion after the first emission keeps the last Level`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
-        val observeLevelProgress = levelProgressReturning(flow { emit(LIVE_LEVEL_PROGRESS) })
+        val observeScoringState = levelProgressReturning(flow { emit(LIVE_LEVEL_PROGRESS) })
 
-        val viewModel = createViewModel(observeLevelProgress = observeLevelProgress)
+        val viewModel = createViewModel(observeScoringState = observeScoringState)
         advanceUntilIdle()
 
         viewModel.state.value.levelCard shouldBe liveLevelCard(LIVE_LEVEL_PROGRESS, photoUrl = null, displayName = null)
-        coVerify(exactly = 1) { observeLevelProgress() }
+        coVerify(exactly = 1) { observeScoringState() }
     }
 
     @Test
@@ -1185,8 +1210,8 @@ class StudySessionSummaryViewModelTest {
         const val SAVED_SCORE_KEY = "savedScore"
         const val SERVER_LINE_COUNT = 6
         val FIRESTORE_DOWN = IllegalStateException("firestore down")
-        val LIVE_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_200L, xpForNextLevel = 4_000L)
-        val NEXT_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_900L, xpForNextLevel = 4_000L)
+        val LIVE_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_200L, xpForNextLevel = XpConfig().levelThreshold(5))
+        val NEXT_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_900L, xpForNextLevel = XpConfig().levelThreshold(5))
         const val AUTH_USER_PHOTO_URL = "https://example.com/jane.jpg"
         const val AUTH_USER_DISPLAY_NAME = "Jane Doe"
         val AUTH_USER = AuthUser(
