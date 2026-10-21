@@ -11,11 +11,8 @@ import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Large
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Medium
 
 internal enum class TopAppBarSlot {
     Backdrop,
@@ -134,13 +131,8 @@ internal class TopAppBarMeasurePolicy(
             navigationInset = spacing.xxsmall.roundToPx(),
             contentPadding = spacing.normal.roundToPx(),
             itemGap = spacing.xsmall.roundToPx(),
-            bottomPadding = bottomPadding().roundToPx(),
+            bottomPadding = size.bottomPadding(spacing).roundToPx(),
         )
-    }
-
-    private fun bottomPadding(): Dp = when (size) {
-        Medium -> spacing.small
-        Large -> spacing.normal
     }
 
     private fun updateTravel(blockHeight: Int): TopAppBarTravel {

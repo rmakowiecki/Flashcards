@@ -31,9 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -56,21 +54,21 @@ import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Resolv
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressState.Unresolved
 import com.rossomak.flashcards.core.domain.model.UserFavorites
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyStateTone
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsProgressRing
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsBottomToolbar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBackButton
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBrandGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Large
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
-import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
@@ -183,7 +181,7 @@ fun CategoryDetailsContent(
     // Hoisted here, and never reset: the row set is identical in both modes and only the chrome changes, unlike Subcategory Details where filtering changes which items exist.
     // Resetting on list mode switch would throw a user who long-pressed halfway down the list back to the top.
     val listState = rememberLazyListState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
 
     val progressFor = rememberProgressFor(state.progressSummary, state.isProgressResolved)
 
@@ -299,13 +297,12 @@ private fun CategoryDetailsTopBar(
     }
     FlashcardsTopAppBar(
         title = categoryName,
-        size = FlashcardsTopAppBarSize.Large,
+        size = Large,
         scrollBehavior = scrollBehavior,
-        style = FlashcardsComponentStyle.OnGradient,
+        style = OnGradient,
         subtitle = subtitle,
-        subtitleWhenCollapsed = FlashcardsSubtitleWhenCollapsed.Keep,
-        onNavigateBack = if (isSelectionMode) onSelectionModeToggle else onNavigateBack,
-        backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill) },
+        navigationIcon = { FlashcardsTopAppBarBackButton(onClick = if (isSelectionMode) onSelectionModeToggle else onNavigateBack) },
+        backdrop = { FlashcardsTopAppBarBrandGraph() },
         actions = {
             CategoryDetailsActions(
                 isFavorite = isFavorite,

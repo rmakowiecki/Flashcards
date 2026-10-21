@@ -26,7 +26,7 @@ class TopAppBarGeometryTest {
     private val collapsedTitle = SlotSize(width = 100, height = 28)
     private val subtitle = SlotSize(width = 140, height = 24)
     private val collapsedSubtitle = SlotSize(width = 120, height = 20)
-    private val avatar = SlotSize(width = 88, height = 88)
+    private val avatar = SlotSize(width = 72, height = 72)
     private val collapsedAvatarSize = 32
     private val avatarCollapsedScale = collapsedAvatarSize.toFloat() / avatar.height
     private val details = SlotSize(width = 200, height = 40)

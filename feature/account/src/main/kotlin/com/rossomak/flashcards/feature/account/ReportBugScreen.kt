@@ -23,19 +23,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -48,6 +46,10 @@ import com.rossomak.flashcards.core.domain.model.BugReport
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Blocker
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Minor
 import com.rossomak.flashcards.core.ui.R as CoreUiR
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
@@ -108,6 +110,7 @@ fun ReportBugScreen(
 }
 
 @Suppress("LongParameterList")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReportBugContent(
     modifier: Modifier = Modifier,
@@ -123,13 +126,18 @@ private fun ReportBugContent(
         onDialogEvent = onDialogEvent,
     )
 
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
+
     // imePadding on the Scaffold lifts the snackbar above the keyboard too.
     Scaffold(
-        modifier = modifier.imePadding(),
+        modifier = modifier
+            .imePadding()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         topBar = {
             ReportBugTopBar(
                 state = state,
+                scrollBehavior = scrollBehavior,
                 onCloseClick = onCloseClick,
                 onSendClick = onSendClick,
             )
@@ -155,18 +163,15 @@ private fun ReportBugContent(
 @Composable
 private fun ReportBugTopBar(
     state: ReportBugScreenState,
+    scrollBehavior: TopAppBarScrollBehavior,
     onCloseClick: () -> Unit,
     onSendClick: () -> Unit,
 ) {
-    val containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
     Column {
-        TopAppBar(
-            title = {
-                Text(
-                    text = stringResource(R.string.report_bug_title),
-                    modifier = Modifier.semantics { heading() },
-                )
-            },
+        FlashcardsTopAppBar(
+            title = stringResource(R.string.report_bug_title),
+            size = FlashcardsTopAppBarSize.Medium,
+            scrollBehavior = scrollBehavior,
             navigationIcon = {
                 IconButton(onClick = onCloseClick) {
                     Icon(
@@ -182,7 +187,7 @@ private fun ReportBugTopBar(
                     onClick = onSendClick,
                 )
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = containerColor, scrolledContainerColor = containerColor),
+            backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }

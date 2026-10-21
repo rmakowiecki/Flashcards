@@ -7,11 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
 
 /** Minimum expanded height on M3's classic tokens, pinned row included, status bar excluded. */
 @OptIn(ExperimentalMaterial3Api::class)
 enum class FlashcardsTopAppBarSize(
-    val expandedHeight: Dp,
+    internal val expandedHeight: Dp,
     internal val expandedTitleMaxLines: Int,
 ) {
     Medium(expandedHeight = TopAppBarDefaults.MediumAppBarExpandedHeight, expandedTitleMaxLines = 1),
@@ -19,15 +20,20 @@ enum class FlashcardsTopAppBarSize(
     Large(expandedHeight = TopAppBarDefaults.LargeAppBarExpandedHeight, expandedTitleMaxLines = 2),
     ;
 
-    val collapsedHeight: Dp get() = TopAppBarDefaults.LargeAppBarCollapsedHeight
+    internal val collapsedHeight: Dp get() = TopAppBarDefaults.LargeAppBarCollapsedHeight
 
-    val titleStyle: TextStyle
+    internal val titleStyle: TextStyle
         @Composable
         @ReadOnlyComposable
         get() = when (this) {
             Medium -> MaterialTheme.typography.headlineMediumEmphasized
             Large -> MaterialTheme.typography.displaySmallEmphasized
         }
+
+    internal fun bottomPadding(spacing: AppSpacing): Dp = when (this) {
+        Medium -> spacing.small
+        Large -> spacing.normal
+    }
 }
 
 /** What the subtitle does as the bar collapses. */

@@ -115,6 +115,28 @@ class ArchitectureKonsistTest {
     }
 
     @Test
+    fun `stock M3 app bars are used only inside core ui`() {
+        // ADR-0072: other modules use the :core:ui bars; TopAppBarDefaults and the scroll behavior stay allowed.
+        val stockAppBars = listOf(
+            "TopAppBar",
+            "CenterAlignedTopAppBar",
+            "MediumTopAppBar",
+            "LargeTopAppBar",
+            "MediumFlexibleTopAppBar",
+            "LargeFlexibleTopAppBar",
+            "TwoRowsTopAppBar",
+        )
+        val stockAppBarReference = Regex("""androidx\.compose\.material3\.(${stockAppBars.joinToString("|")})\b""")
+        projectScope
+            .files
+            .filter { !it.path.contains("/core/ui/src/main/") }
+            .assertTrue { file ->
+                file.imports.none { import -> import.isWildcard && import.name.removeSuffix(".*") == "androidx.compose.material3" } &&
+                    !stockAppBarReference.containsMatchIn(file.text)
+            }
+    }
+
+    @Test
     fun `destinations are declared only through guardedNavComposable`() {
         // A bare composable<T> exposes the raw NavController, which navigates even while the screen is leaving.
         projectScope

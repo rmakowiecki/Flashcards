@@ -19,14 +19,10 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,6 +44,10 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.dialogs.label
 import com.rossomak.flashcards.core.ui.composables.dialogs.partialRatingCardRequeueingLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.readAloudLabel
@@ -117,7 +117,7 @@ private fun SettingsContent(
     onDialogEvent: (SettingsDialogEvent) -> Unit,
     onAccountClick: () -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
 
     SettingsDialogHost(
         activeDialog = state.activeDialog,
@@ -128,8 +128,10 @@ private fun SettingsContent(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            MediumFlexibleTopAppBar(
-                title = { Text(text = stringResource(R.string.settings_title)) },
+            FlashcardsTopAppBar(
+                title = stringResource(R.string.settings_title),
+                size = FlashcardsTopAppBarSize.Medium,
+                scrollBehavior = scrollBehavior,
                 actions = {
                     AccountAction(
                         photoUrl = state.avatarPhotoUrl,
@@ -137,10 +139,7 @@ private fun SettingsContent(
                         onClick = onAccountClick,
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                ),
-                scrollBehavior = scrollBehavior,
+                backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
             )
         },
     ) { innerPadding ->

@@ -8,7 +8,8 @@ import kotlin.math.roundToInt
 
 internal const val FADED_SLOTS_GONE_AT_FRACTION = 0.5f
 
-internal fun fadedSlotAlpha(collapsedFraction: Float): Float = (1f - collapsedFraction / FADED_SLOTS_GONE_AT_FRACTION).coerceIn(0f, 1f)
+/** `1` expanded, `0` from [FADED_SLOTS_GONE_AT_FRACTION] on. */
+fun fadedSlotAlpha(collapsedFraction: Float): Float = (1f - collapsedFraction / FADED_SLOTS_GONE_AT_FRACTION).coerceIn(0f, 1f)
 
 internal data class SlotSize(val width: Int, val height: Int)
 

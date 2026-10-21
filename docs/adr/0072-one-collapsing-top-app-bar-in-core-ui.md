@@ -11,7 +11,7 @@ the Debug hub used `TwoRowsTopAppBar`, and Account had a hand-built header.
 The stock flexible bars cross-fade two title copies instead of moving one, repeat the subtitle in both
 rows, have no leading element that travels with the title, and cannot be dragged. The hand-built Account
 header stacked a block of at least 152dp under the 64dp pinned row, so it was at least 216dp tall where
-M3 means 152dp in total.
+M3 means 152dp in total. Fitting the Account header into 152dp shrank the Large avatar from 88dp to 72dp.
 
 ## Decision
 
@@ -37,7 +37,9 @@ collapsed, then one, ellipsized; a `Medium` title is always one line.
 end. A new block height keeps the collapse position: a fully collapsed bar stays collapsed, a partly
 collapsed one keeps its offset clamped into the new range.
 
-A planned Konsist rule will ban stock M3 app bars outside `:core:ui` once every screen uses this bar.
+A Konsist rule bans stock M3 app bars outside `:core:ui`, by import, wildcard import or fully qualified
+name. The migration covers the collapsing screens only: Preview Study Session, onboarding's Skip bar and
+the session headers stay on `FlashcardsGradientTopBar`.
 
 ## Considered options
 

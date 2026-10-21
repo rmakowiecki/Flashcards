@@ -2,6 +2,9 @@
 
 package com.rossomak.flashcards.core.ui.backdrop
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphLayerSpec
@@ -15,6 +18,12 @@ import kotlin.time.Duration.Companion.milliseconds
 object BrandMorpheusGraphSpecs {
 
     val fill: MorpheusGraphFill = MorpheusGraphFill.Solid(Color.White)
+
+    /** A graph on a plain surface takes the theme's primary color. */
+    val onSurfaceFill: MorpheusGraphFill
+        @Composable
+        @ReadOnlyComposable
+        get() = MorpheusGraphFill.Solid(MaterialTheme.colorScheme.primary)
 
     /** Floor for any morph, so a quick change never jumps. */
     val minMorphDuration: Duration = 500.milliseconds
@@ -43,7 +52,12 @@ object BrandMorpheusGraphSpecs {
         alpha = 0.42f,
     )
 
-    val topAppBar: MorpheusGraphSpec = spec(Bloom(reach = 0.9f, plateau = 0.3f))
+    private val topAppBarBloom = Bloom(reach = 0.9f, plateau = 0.3f)
+
+    val topAppBar: MorpheusGraphSpec = spec(topAppBarBloom)
+
+    /** [topAppBar] dimmed for a white bar, drawn with [onSurfaceFill]. */
+    val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(topAppBarBloom), alpha = 0.22f))
 
     fun spec(vararg shapes: ShapePrimitive): MorpheusGraphSpec = spec(base.copy(shapes = shapes.toList()))
 

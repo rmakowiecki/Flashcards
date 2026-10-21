@@ -4,7 +4,7 @@ The Settings tab and the persisted study preferences that it and other screens e
 
 ## Screen
 
-The top app bar collapses as the list scrolls. It carries one action: the User's avatar, showing their profile photo or, without one, their initials. Tapping it opens the Account screen ([account.md](account.md)). Sign-out, Account Deletion and Bug Reports live there, not here.
+The top app bar collapses as the list scrolls, and it can also be dragged directly. It carries the same faint network graph as the Account header ([account.md](account.md)). It carries one action: the User's avatar, showing their profile photo or, without one, their initials. Tapping it opens the Account screen ([account.md](account.md)). Sign-out, Account Deletion and Bug Reports live there, not here.
 
 Below the bar are two grouped lists, **Study sessions** and **Voice**. Every row has the same shape: an icon, a title, its current value and a chevron. Tapping a row opens a focused dialog for that one value. There are no other controls on the screen.
 

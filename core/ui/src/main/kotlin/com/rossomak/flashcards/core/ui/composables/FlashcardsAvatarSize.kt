@@ -15,5 +15,5 @@ enum class FlashcardsAvatarSize(val diameter: Dp) {
     Medium(56.dp),
 
     /** Account header. */
-    Large(88.dp),
+    Large(72.dp),
 }
