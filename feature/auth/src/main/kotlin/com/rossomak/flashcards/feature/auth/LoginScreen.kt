@@ -164,7 +164,8 @@ private fun LoginContent(
     }
 
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop()
+        // The graph fades in with the buttons, but stays while they fade out once signed in.
+        BrandGradientBackdrop(graph = LoginMorpheusGraphs.graph, graphAlpha = { if (isSignedIn) 1f else buttonReveal.value })
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,

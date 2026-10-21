@@ -23,6 +23,8 @@ The defaults are a snapshot, not watched. A "keep as default" save made on this 
 
 ## Layout
 
+Behind everything, over the brand gradient, a slow animated network graph runs in one wide, wavy band diagonally through the middle of the screen. Translucent surfaces blur it. It never changes shape, and unlike the session and Session Summary graphs it has its own layout and a gentle wave of its own ([ADR-0069](../adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
+
 The top bar holds a close button and a title naming the Category with either the Subcategory, for a single-subcategory session, or the Quick or Custom kind of session. Close leaves the screen and starts nothing.
 
 The **hero** describes the session:

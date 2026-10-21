@@ -49,6 +49,7 @@ import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureI
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.study.R
+import com.rossomak.flashcards.feature.study.StudyMorpheusGraphs
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -171,7 +172,7 @@ fun RatedStudySessionContent(
     )
 
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop()
+        BrandGradientBackdrop(graph = StudyMorpheusGraphs.session)
         BottomSheetScaffold(
             modifier = Modifier.fillMaxSize(),
             scaffoldState = scaffoldState,

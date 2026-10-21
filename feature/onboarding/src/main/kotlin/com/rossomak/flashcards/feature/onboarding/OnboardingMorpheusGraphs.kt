@@ -2,7 +2,7 @@
 
 package com.rossomak.flashcards.feature.onboarding
 
-import androidx.compose.ui.graphics.Color
+import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.feature.onboarding.OnboardingStep.AllSet
 import com.rossomak.flashcards.feature.onboarding.OnboardingStep.DailyGoal
 import com.rossomak.flashcards.feature.onboarding.OnboardingStep.Favorites
@@ -11,49 +11,18 @@ import com.rossomak.flashcards.feature.onboarding.OnboardingStep.SessionModes
 import com.rossomak.flashcards.feature.onboarding.OnboardingStep.Structure
 import com.rossomak.flashcards.feature.onboarding.OnboardingStep.VoicePrivacy
 import com.rossomak.flashcards.feature.onboarding.OnboardingStep.Welcome
-import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphLayerSpec
 import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.ShapePrimitive.Bloom
 import com.rossomak.morpheus.ShapePrimitive.Ribbon
 import com.rossomak.morpheus.ShapePrimitive.Uniform
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * The network graph behind each onboarding step. Every spec is one layer of one morph family (same
- * seed, density, jitter and fixed strict triangulation), so swiping between any two steps, Skip's jump
- * included, morphs one mesh in place: only the shape, motion, glow and alpha differ. None sets a fill:
- * all of them inherit [fill].
- */
+/** One graph per onboarding step, all [BrandMorpheusGraphSpecs] family members so any two morph in place. */
 object OnboardingMorpheusGraphs {
 
-    /** Every onboarding graph is white; the steps differ only in how dim their layer is. */
-    val fill: MorpheusGraphFill = MorpheusGraphFill.Solid(Color.White)
+    private val base = BrandMorpheusGraphSpecs.base
 
-    /** The least a step-to-step morph takes, so a quick flick or a Next tap still morphs instead of jumping. */
-    val minMorphDuration: Duration = 500.milliseconds
-
-    private const val SEED = 29
-
-    /** The morph family every step shares, dense and dimmed. */
-    private val base = MorpheusGraphLayerSpec(
-        density = 26f,
-        jitter = 0.42f,
-        driftAmplitude = 0.35f,
-        maxEdgeFactor = 2.4f,
-        minAngleDegrees = 14f,
-        lengthFalloff = 0.5f,
-        strokeWidthDp = 0.7f,
-        edgeAlpha = 0.5f,
-        nodeSizeDp = 2f,
-        nodeSizeVariance = 0.4f,
-        glowStrength = 0.3f,
-        cometSpark = 0.6f,
-        alpha = 0.35f,
-    )
-
-    private fun spec(layer: MorpheusGraphLayerSpec) = MorpheusGraphSpec(seed = SEED, layers = listOf(layer))
+    private fun spec(layer: MorpheusGraphLayerSpec) = BrandMorpheusGraphSpecs.spec(layer)
 
     fun specFor(step: OnboardingStep): MorpheusGraphSpec = when (step) {
         Welcome -> spec(
@@ -93,5 +62,5 @@ object OnboardingMorpheusGraphs {
     val pages: List<MorpheusGraphSpec> = OnboardingStep.entries.map(::specFor)
 
     /** [step]'s spec with every layer invisible, which the entrance fades in from. */
-    fun hiddenFor(step: OnboardingStep): MorpheusGraphSpec = specFor(step).let { spec -> spec.copy(layers = spec.layers.map { it.copy(alpha = 0f) }) }
+    fun hiddenFor(step: OnboardingStep): MorpheusGraphSpec = BrandMorpheusGraphSpecs.hidden(specFor(step))
 }
