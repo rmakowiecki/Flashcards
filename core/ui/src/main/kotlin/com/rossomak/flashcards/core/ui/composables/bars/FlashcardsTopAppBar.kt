@@ -1,200 +1,80 @@
 package com.rossomak.flashcards.core.ui.composables.bars
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AddToHomeScreen
-import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AppBarRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.PreviewLightDark
-import com.airbnb.android.showkase.annotation.ShowkaseComposable
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.ui.R
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
-import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.morpheus.morpheusGraphBackground
-import com.rossomak.morpheus.rememberMorpheusGraphMorphState
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed.Keep
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
 
-/** How far the bar has collapsed when its graph has faded out, so the collapsed bar never shows a faint remnant. */
-private const val GRAPH_GONE_AT_COLLAPSED_FRACTION = 0.6f
+/** Collapse fraction past which a title that wraps while expanded drops to one line. */
+private const val TITLE_ONE_LINE_FROM_FRACTION = 0.5f
 
 /**
- * The app's detail-screen top bar: a [LargeFlexibleTopAppBar] painted with
- * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.topBarGradient].
+ * The app's collapsing top app bar for a plain text [title] and [subtitle]: a
+ * [FlashcardsCollapsingTopAppBar] with the standard navigation control.
  *
- * The gradient is drawn via [modifier] rather than as a container color — `colors` is forced
- * transparent below so the bar's own container paint doesn't cover it — so it sizes to the bar and
- * shrinks with it as the bar collapses — and, because [modifier] lands on the bar's outermost node,
- * before its internal status-bar inset padding, the gradient bleeds behind the status bar for free.
- *
- * [subtitle] goes straight into the flexible app bar's own `subtitle` slot — M3 1.5 graduated that
- * slot out of `internal`, so there's no more hand-stacking it under [title] in a shared `Column` and
- * no more hand-interpolating the title's text style across the two rows: `LargeFlexibleTopAppBar`
- * composes title and subtitle into both rows itself, at the correct per-row size, and cross-fades
- * them on scroll the same way the rest of M3's app bars do.
- *
- * One behavior change worth knowing: the flexible large title role is `displaySmall` (36sp), not
- * the classic large app bar's `headlineMedium` (28sp) — that's M3's own token for this component,
- * not a local choice.
- *
- * Over the gradient sits [BrandMorpheusGraphSpecs.topAppBar], a network graph on the top-end corner. It
- * fades out as the bar collapses, gone by [GRAPH_GONE_AT_COLLAPSED_FRACTION], read in the draw phase so
- * a scroll never recomposes the bar.
- *
- * Settings, Debug and other plain screens deliberately keep the stock M3 app bars — this component
- * exists for the gradient treatment alone, so it has no on-surface variant.
+ * A non-null [navigationIcon] wins; otherwise a non-null [onNavigateBack] shows the back arrow, and
+ * with neither there is no navigation control. The title wraps to two lines expanded on
+ * [FlashcardsTopAppBarSize.Large] and keeps to one on [FlashcardsTopAppBarSize.Medium] and once
+ * collapsed; the subtitle keeps to one line. Both ellipsize.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlashcardsTopAppBar(
     title: String,
+    size: FlashcardsTopAppBarSize,
+    scrollBehavior: TopAppBarScrollBehavior,
     modifier: Modifier = Modifier,
+    style: FlashcardsComponentStyle = OnSurface,
     subtitle: String? = null,
+    subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed = Keep,
+    navigationIcon: (@Composable () -> Unit)? = null,
     onNavigateBack: (() -> Unit)? = null,
-    scrollBehavior: TopAppBarScrollBehavior? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
 ) {
-    val onGradientContent = MaterialTheme.brandColors.onTopBarGradient
-    val graphState = rememberMorpheusGraphMorphState(BrandMorpheusGraphSpecs.topAppBar)
-    if (scrollBehavior != null) {
-        val hiddenGraph = remember { BrandMorpheusGraphSpecs.hidden(BrandMorpheusGraphSpecs.topAppBar) }
-        LaunchedEffect(scrollBehavior, graphState) {
-            snapshotFlow { (scrollBehavior.state.collapsedFraction / GRAPH_GONE_AT_COLLAPSED_FRACTION).coerceIn(0f, 1f) }
-                .collect { fadeFraction -> graphState.seekTo(hiddenGraph, fadeFraction) }
-        }
-    }
-
-    LargeFlexibleTopAppBar(
-        modifier = modifier
-            .background(MaterialTheme.brandColors.topBarGradient)
-            .morpheusGraphBackground(graphState, BrandMorpheusGraphSpecs.fill),
-        title = {
-            Text(text = title, modifier = Modifier.basicMarquee(), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        subtitle = subtitle?.let {
-            { Text(text = it, modifier = Modifier.basicMarquee(), maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        },
-        navigationIcon = {
-            if (onNavigateBack != null) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.common_navigate_back_cd),
-                    )
-                }
-            }
-        },
-        actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent,
-            navigationIconContentColor = onGradientContent,
-            titleContentColor = onGradientContent,
-            actionIconContentColor = onGradientContent,
-            subtitleContentColor = onGradientContent,
-        ),
+    FlashcardsCollapsingTopAppBar(
+        size = size,
         scrollBehavior = scrollBehavior,
+        title = { FlashcardsTopAppBarTitle(text = title, expandedMaxLines = size.expandedTitleMaxLines) },
+        modifier = modifier,
+        style = style,
+        navigationIcon = navigationIcon ?: onNavigateBack?.let { { FlashcardsTopAppBarBackButton(onClick = it) } } ?: {},
+        subtitle = subtitle?.let { { Text(text = it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+        subtitleWhenCollapsed = subtitleWhenCollapsed,
+        actions = { actions() },
+        backdrop = backdrop,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@ShowkaseComposable(name = "Top app bar", group = "Bars")
+/** The title, wrapping to [expandedMaxLines] until the bar is halfway collapsed. Only crossing that point recomposes it for its line count. */
 @Composable
-fun FlashcardsTopAppBarShowcase() {
-    FlashcardsTheme {
-        Surface {
-            FlashcardsTopAppBar(
-                title = "Compose",
-                subtitle = "Android · Topic",
-                onNavigateBack = {},
-                scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState()),
-                actions = { ShowcaseActions() },
-            )
-        }
-    }
+private fun FlashcardsTopAppBarTitle(text: String, expandedMaxLines: Int) {
+    val collapsedFraction = LocalTopAppBarTitleFraction.current
+    val wraps by remember(collapsedFraction) { derivedStateOf { collapsedFraction() < TITLE_ONE_LINE_FROM_FRACTION } }
+    Text(text = text, maxLines = if (wraps) expandedMaxLines else 1, overflow = TextOverflow.Ellipsis)
 }
 
-/**
- * The collapsed state. `heightOffsetLimit` is only published once the bar has measured itself, and
- * an offset assigned before then is clamped to zero — hence the effect that follows the limit
- * rather than a one-shot assignment. A static `@Preview` renders one frame without running
- * effects, so this reads as expanded there and as collapsed in the Showkase browser.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@ShowkaseComposable(name = "Top app bar — collapsed", group = "Bars")
 @Composable
-fun FlashcardsTopAppBarCollapsedShowcase() {
-    FlashcardsTheme {
-        Surface {
-            val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-            LaunchedEffect(scrollBehavior) {
-                snapshotFlow { scrollBehavior.state.heightOffsetLimit }
-                    .collect { limit -> scrollBehavior.state.heightOffset = limit }
-            }
-            FlashcardsTopAppBar(
-                title = "Compose",
-                subtitle = "Android · Topic",
-                onNavigateBack = {},
-                scrollBehavior = scrollBehavior,
-                actions = { ShowcaseActions() },
-            )
-        }
-    }
-}
-
-/**
- * The details-screen action set: a bookmark toggle in the bar and, behind the overflow indicator,
- * the items that don't fit. [AppBarRow] renders `maxItemCount - 1` items inline and moves the rest
- * into the menu, so two items with a max of two means one visible icon plus the ⋮.
- */
-@Composable
-private fun RowScope.ShowcaseActions() {
-    AppBarRow(
-        overflowIndicator = { menuState ->
-            IconButton(onClick = { menuState.show() }) {
-                Icon(imageVector = Icons.Filled.MoreVert, contentDescription = null)
-            }
-        },
-        maxItemCount = 2,
-    ) {
-        clickableItem(
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Filled.BookmarkBorder, contentDescription = null) },
-            label = "Bookmark",
-        )
-        clickableItem(
-            onClick = {},
-            icon = { Icon(imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen, contentDescription = null) },
-            label = "Add to home screen",
+private fun FlashcardsTopAppBarBackButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.common_navigate_back_cd),
         )
     }
-}
-
-@PreviewLightDark
-@Composable
-private fun FlashcardsTopAppBarPreview() {
-    FlashcardsTopAppBarShowcase()
 }

@@ -41,8 +41,8 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * (X), a future session-summary screen may want nothing at all. Hardcoding one shape would fork this
  * component on its second consumer. [actions] follows the same convention.
  *
- * [FlashcardsTopAppBar] is untouched by this — it exists for the large gradient-*painting* treatment
- * and keeps its own users; this component is for screens that paint the gradient themselves.
+ * [FlashcardsTopAppBar] is the collapsing bar that paints its own container; this component is for
+ * screens that paint the gradient themselves and keep a small pinned bar.
  *
  * [titleAlpha] fades the title in or out while the bar keeps its height, for a screen that reveals
  * the bar after an entrance sequence. It is read in the draw phase, so a running fade never recomposes
