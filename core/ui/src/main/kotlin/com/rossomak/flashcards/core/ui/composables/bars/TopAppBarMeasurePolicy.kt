@@ -11,11 +11,8 @@ import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Large
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize.Medium
 
 internal enum class TopAppBarSlot {
     Backdrop,
@@ -23,23 +20,15 @@ internal enum class TopAppBarSlot {
     Actions,
     TitleLeading,
     Title,
-
-    /** The title at its expanded style, measured for the block height, never placed. */
-    TitleSizer,
     Subtitle,
 
-    /** The subtitle at its expanded style, measured for the block height, never placed. */
+    /** [Title] and [Subtitle] at their expanded styles, measured for the block height and never placed. */
+    TitleSizer,
     SubtitleSizer,
     Details,
 }
 
-/**
- * Places a [FlashcardsCollapsingTopAppBar]'s slots via [TopAppBarGeometry], reading [appBarState] in
- * layout so a scroll never recomposes the bar. The block height comes from the sizers, since the live
- * title would change with the fraction the height is the limit of; a changed height is written back
- * to [appBarState]. The status-bar inset is laid out here, not padded, so only the paint and the
- * backdrop reach behind it.
- */
+/** Places the slots via [TopAppBarGeometry], reading [appBarState] in layout so a scroll never recomposes the bar. */
 @OptIn(ExperimentalMaterial3Api::class)
 internal class TopAppBarMeasurePolicy(
     private val appBarState: TopAppBarState,
@@ -50,10 +39,7 @@ internal class TopAppBarMeasurePolicy(
     private val spacing: AppSpacing,
 ) : MeasurePolicy {
 
-    override fun MeasureScope.measure(
-        measurables: List<Measurable>,
-        constraints: Constraints,
-    ): MeasureResult {
+    override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
         val slots = measurables.associateBy { it.layoutId }
         val isLtr = layoutDirection == LayoutDirection.Ltr
         val insetLeft = windowInsets.getLeft(this, layoutDirection)
@@ -69,7 +55,7 @@ internal class TopAppBarMeasurePolicy(
             edge = spacing.xxsmall.roundToPx(),
             padding = spacing.normal.roundToPx(),
             gap = spacing.xsmall.roundToPx(),
-            bottomPadding = bottomPadding().roundToPx(),
+            bottomPadding = size.bottomPadding(spacing).roundToPx(),
         )
 
         val widthOnly = Constraints(maxWidth = metrics.width)
@@ -119,7 +105,6 @@ internal class TopAppBarMeasurePolicy(
             blockHeight = blockHeight,
             fraction = travel.fraction,
         )
-        // Expanded height, clipped by the bar: collapsing reveals less of it instead of squashing it.
         val backdrop = slots.getValue(TopAppBarSlot.Backdrop).measure(Constraints.fixed(width, insetTop + pinnedHeight + blockHeight))
 
         return layout(width, insetTop + placements.layoutHeight) {
@@ -132,11 +117,6 @@ internal class TopAppBarMeasurePolicy(
             placeSlot(navigation, placements.navigation, origin)
             placeSlot(actions, placements.actions, origin)
         }
-    }
-
-    private fun bottomPadding(): Dp = when (size) {
-        Medium -> spacing.small
-        Large -> spacing.normal
     }
 
     private fun updateTravel(blockHeight: Int): TopAppBarTravel {

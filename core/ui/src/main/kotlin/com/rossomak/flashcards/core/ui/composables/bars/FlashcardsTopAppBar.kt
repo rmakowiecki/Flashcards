@@ -20,14 +20,9 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCo
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface
 
-/** Collapse fraction past which a title that wraps while expanded drops to one line. */
 private const val TITLE_ONE_LINE_FROM_FRACTION = 0.5f
 
-/**
- * [FlashcardsCollapsingTopAppBar] for a plain text [title] and [subtitle]. [navigationIcon] wins over
- * the back arrow [onNavigateBack] shows. The title wraps to two lines only on an expanded
- * [FlashcardsTopAppBarSize.Large] bar; everything else is one line, ellipsized.
- */
+/** [FlashcardsCollapsingTopAppBar] for a plain text [title] and [subtitle]; only an expanded [FlashcardsTopAppBarSize.Large] title wraps. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlashcardsTopAppBar(
@@ -38,8 +33,7 @@ fun FlashcardsTopAppBar(
     style: FlashcardsComponentStyle = OnSurface,
     subtitle: String? = null,
     subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed = Keep,
-    navigationIcon: (@Composable () -> Unit)? = null,
-    onNavigateBack: (() -> Unit)? = null,
+    navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
 ) {
@@ -49,7 +43,7 @@ fun FlashcardsTopAppBar(
         title = { FlashcardsTopAppBarTitle(text = title, expandedMaxLines = size.expandedTitleMaxLines) },
         modifier = modifier,
         style = style,
-        navigationIcon = navigationIcon ?: onNavigateBack?.let { { FlashcardsTopAppBarBackButton(onClick = it) } } ?: {},
+        navigationIcon = navigationIcon,
         subtitle = subtitle?.let { { Text(text = it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
         subtitleWhenCollapsed = subtitleWhenCollapsed,
         actions = { actions() },
@@ -57,7 +51,6 @@ fun FlashcardsTopAppBar(
     )
 }
 
-/** Wraps to [expandedMaxLines] until the bar is halfway collapsed. */
 @Composable
 private fun FlashcardsTopAppBarTitle(text: String, expandedMaxLines: Int) {
     val collapsedFraction = LocalTopAppBarTitleFraction.current
@@ -65,8 +58,9 @@ private fun FlashcardsTopAppBarTitle(text: String, expandedMaxLines: Int) {
     Text(text = text, maxLines = if (wraps) expandedMaxLines else 1, overflow = TextOverflow.Ellipsis)
 }
 
+/** The back arrow for a [FlashcardsTopAppBar]'s `navigationIcon`. */
 @Composable
-private fun FlashcardsTopAppBarBackButton(onClick: () -> Unit) {
+fun FlashcardsTopAppBarBackButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,

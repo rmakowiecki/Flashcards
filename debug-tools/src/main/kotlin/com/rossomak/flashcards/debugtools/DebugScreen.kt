@@ -19,9 +19,7 @@ import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,12 +33,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.AppVersion
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -115,7 +113,7 @@ private fun DebugContent(
     onMorpheusGraphPrototypeClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -238,7 +236,7 @@ private fun DebugTopAppBar(appVersion: AppVersion?, gitShortSha: String, scrollB
         scrollBehavior = scrollBehavior,
         subtitle = appVersion?.let { stringResource(R.string.debug_build_info_label, it.name, it.code, gitShortSha) },
         subtitleWhenCollapsed = FlashcardsSubtitleWhenCollapsed.Fade,
-        backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
+        backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
     )
 }
 

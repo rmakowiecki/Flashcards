@@ -31,8 +31,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,10 +49,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.code
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBackButton
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.debugtools.R
 import kotlinx.collections.immutable.ImmutableList
@@ -125,7 +124,7 @@ fun VoiceDebugContent(
     onRerandomizeObfuscation: () -> Unit,
     onTranscribeClip: () -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -133,8 +132,8 @@ fun VoiceDebugContent(
                 title = stringResource(R.string.voice_debug_title),
                 size = FlashcardsTopAppBarSize.Medium,
                 scrollBehavior = scrollBehavior,
-                onNavigateBack = onNavigateBack,
-                backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
+                navigationIcon = { FlashcardsTopAppBarBackButton(onClick = onNavigateBack) },
+                backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
             )
         },
     ) { innerPadding ->

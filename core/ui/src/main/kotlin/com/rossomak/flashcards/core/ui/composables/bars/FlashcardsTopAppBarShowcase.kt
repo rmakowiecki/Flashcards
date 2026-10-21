@@ -11,8 +11,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -37,11 +35,11 @@ fun FlashcardsTopAppBarMediumShowcase() = ShowcaseBar(size = Medium, style = OnS
 
 @ShowkaseComposable(name = "Top app bar — Large on gradient", group = "Bars")
 @Composable
-fun FlashcardsTopAppBarLargeOnGradientShowcase() = ShowcaseBar(size = Large, style = OnGradient, backdrop = { GradientGraph() })
+fun FlashcardsTopAppBarLargeOnGradientShowcase() = ShowcaseBar(size = Large, style = OnGradient, backdrop = { FlashcardsTopAppBarBrandGraph() })
 
 @ShowkaseComposable(name = "Top app bar — Large on gradient, collapsed", group = "Bars")
 @Composable
-fun FlashcardsTopAppBarLargeOnGradientCollapsedShowcase() = ShowcaseBar(size = Large, style = OnGradient, collapsed = true, backdrop = { GradientGraph() })
+fun FlashcardsTopAppBarLargeOnGradientCollapsedShowcase() = ShowcaseBar(size = Large, style = OnGradient, collapsed = true, backdrop = { FlashcardsTopAppBarBrandGraph() })
 
 @ShowkaseComposable(name = "Top app bar — Large with white graph, fading", group = "Bars")
 @Composable
@@ -66,7 +64,7 @@ fun FlashcardsCollapsingTopAppBarIdentityShowcase() {
         Surface {
             FlashcardsCollapsingTopAppBar(
                 size = Large,
-                scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState()),
+                scrollBehavior = rememberPreviewTopAppBarScrollBehavior(),
                 title = { Text(text = displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 titleStyle = MaterialTheme.typography.headlineSmallEmphasized,
                 navigationIcon = {
@@ -91,12 +89,6 @@ fun FlashcardsCollapsingTopAppBarIdentityShowcase() {
     }
 }
 
-@Composable
-private fun FlashcardsTopAppBarBackdropScope.GradientGraph() {
-    FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill)
-}
-
-/** [collapsed] passes an offset past any limit, which the bar pulls back to exactly collapsed, so a static preview renders collapsed. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShowcaseBar(
@@ -112,13 +104,11 @@ private fun ShowcaseBar(
             FlashcardsTopAppBar(
                 title = title,
                 size = size,
-                scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
-                    rememberTopAppBarState(initialHeightOffset = if (collapsed) -Float.MAX_VALUE else 0f),
-                ),
+                scrollBehavior = rememberPreviewTopAppBarScrollBehavior(collapsed),
                 style = style,
                 subtitle = "Android · Topic",
                 subtitleWhenCollapsed = subtitleWhenCollapsed,
-                onNavigateBack = {},
+                navigationIcon = { FlashcardsTopAppBarBackButton(onClick = {}) },
                 actions = { ShowcaseActions() },
                 backdrop = backdrop,
             )

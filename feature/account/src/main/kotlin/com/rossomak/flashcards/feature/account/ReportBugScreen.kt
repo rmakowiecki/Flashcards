@@ -23,9 +23,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,10 +46,10 @@ import com.rossomak.flashcards.core.domain.model.BugReport
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Blocker
 import com.rossomak.flashcards.core.domain.model.BugReportSeverity.Minor
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
@@ -128,7 +126,7 @@ private fun ReportBugContent(
         onDialogEvent = onDialogEvent,
     )
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
 
     // imePadding on the Scaffold lifts the snackbar above the keyboard too.
     Scaffold(
@@ -189,7 +187,7 @@ private fun ReportBugTopBar(
                     onClick = onSendClick,
                 )
             },
-            backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
+            backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }

@@ -59,11 +59,13 @@ object BrandMorpheusGraphSpecs {
         alpha = 0.42f,
     )
 
+    private val TopAppBarBloom = Bloom(reach = 0.9f, plateau = 0.3f)
+
     /** A gradient top app bar's graph, from the top-end corner across most of the bar. */
-    val topAppBar: MorpheusGraphSpec = spec(Bloom(reach = 0.9f, plateau = 0.3f))
+    val topAppBar: MorpheusGraphSpec = spec(TopAppBarBloom)
 
     /** [topAppBar] dimmed for a white top app bar, drawn with [onSurfaceFill]. */
-    val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(Bloom(reach = 0.9f, plateau = 0.3f)), alpha = 0.22f))
+    val topAppBarOnSurface: MorpheusGraphSpec = spec(base.copy(shapes = listOf(TopAppBarBloom), alpha = 0.22f))
 
     /** [base] in the shape of [shapes]. */
     fun spec(vararg shapes: ShapePrimitive): MorpheusGraphSpec = spec(base.copy(shapes = shapes.toList()))

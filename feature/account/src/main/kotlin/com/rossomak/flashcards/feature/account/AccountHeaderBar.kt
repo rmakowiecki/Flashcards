@@ -1,36 +1,27 @@
 package com.rossomak.flashcards.feature.account
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
-import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatar
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Large
 import com.rossomak.flashcards.core.ui.composables.FlashcardsAvatarSize.Small
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsCollapsingTopAppBar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsSubtitleWhenCollapsed.Fade
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBackButton
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.fadedSlotAlpha
+import com.rossomak.flashcards.core.ui.composables.bars.rememberPreviewTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-
-/** Collapse fraction by which Sign out's label is gone, in step with the email and the provider line under the name. */
-private const val SIGN_OUT_LABEL_GONE_AT_FRACTION = 0.5f
 
 /**
  * The Account screen's top bar: a large collapsing bar whose avatar and name travel into the pinned row.
@@ -62,14 +53,7 @@ internal fun AccountHeaderBar(
         },
         modifier = modifier,
         titleStyle = MaterialTheme.typography.headlineSmallEmphasized,
-        navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(CoreUiR.string.common_navigate_back_cd),
-                )
-            }
-        },
+        navigationIcon = { FlashcardsTopAppBarBackButton(onClick = onNavigateBack) },
         // Decorative: the name beside it already says whose account this is.
         titleLeading = {
             FlashcardsAvatar(
@@ -80,7 +64,6 @@ internal fun AccountHeaderBar(
             )
         },
         titleLeadingCollapsedScale = Small.diameter / Large.diameter,
-        // The email and the provider line stack under the name as one subtitle, so both fade out together.
         subtitle = if (state.email == null && state.provider == null) {
             null
         } else {
@@ -98,26 +81,21 @@ internal fun AccountHeaderBar(
         subtitleWhenCollapsed = Fade,
         actions = { collapsedFraction ->
             AccountSignOutAction(
-                labelProgress = { (1f - collapsedFraction() / SIGN_OUT_LABEL_GONE_AT_FRACTION).coerceIn(0f, 1f) },
+                labelProgress = { fadedSlotAlpha(collapsedFraction()) },
                 onClick = onSignOutClick,
             )
         },
-        backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
+        backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountHeaderBarPreview(
-    state: AccountScreenState,
-    initialHeightOffset: Float,
-) {
+private fun AccountHeaderBarPreview(state: AccountScreenState, collapsed: Boolean) {
     FlashcardsTheme {
         AccountHeaderBar(
             state = state,
-            scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
-                rememberTopAppBarState(initialHeightOffset = initialHeightOffset),
-            ),
+            scrollBehavior = rememberPreviewTopAppBarScrollBehavior(collapsed),
             onNavigateBack = {},
             onSignOutClick = {},
             onManageAccountClick = {},
@@ -134,18 +112,17 @@ private val PreviewState = AccountScreenState(
 @PreviewLightDark
 @Composable
 private fun AccountHeaderBarExpandedPreview() {
-    AccountHeaderBarPreview(state = PreviewState, initialHeightOffset = 0f)
+    AccountHeaderBarPreview(state = PreviewState, collapsed = false)
 }
 
-/** The offset starts past the end of travel; the bar pulls it back to exactly collapsed. */
 @PreviewLightDark
 @Composable
 private fun AccountHeaderBarCollapsedPreview() {
-    AccountHeaderBarPreview(state = PreviewState, initialHeightOffset = -Float.MAX_VALUE)
+    AccountHeaderBarPreview(state = PreviewState, collapsed = true)
 }
 
 @PreviewLightDark
 @Composable
 private fun AccountHeaderBarNoNamePreview() {
-    AccountHeaderBarPreview(state = AccountScreenState(email = "radek@example.com", provider = GitHub), initialHeightOffset = 0f)
+    AccountHeaderBarPreview(state = AccountScreenState(email = "radek@example.com", provider = GitHub), collapsed = false)
 }

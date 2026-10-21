@@ -8,19 +8,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.rossomak.flashcards.core.designsystem.theme.spacing
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBackButton
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -34,7 +33,7 @@ fun ScreenShowcaseListScreen(
     onNavigateBack: () -> Unit,
     onNavigateToEntry: (ScreenShowcaseEntry) -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -42,8 +41,8 @@ fun ScreenShowcaseListScreen(
                 title = stringResource(R.string.screen_showcase_title),
                 size = FlashcardsTopAppBarSize.Medium,
                 scrollBehavior = scrollBehavior,
-                onNavigateBack = onNavigateBack,
-                backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
+                navigationIcon = { FlashcardsTopAppBarBackButton(onClick = onNavigateBack) },
+                backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
             )
         },
     ) { innerPadding ->

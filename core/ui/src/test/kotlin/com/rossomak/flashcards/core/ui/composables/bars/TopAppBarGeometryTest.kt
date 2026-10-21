@@ -26,8 +26,8 @@ class TopAppBarGeometryTest {
     private val collapsedTitle = SlotSize(width = 100, height = 28)
     private val subtitle = SlotSize(width = 140, height = 24)
     private val collapsedSubtitle = SlotSize(width = 120, height = 20)
-    private val avatar = SlotSize(width = 88, height = 88)
-    private val avatarCollapsedScale = 32f / 88f
+    private val avatar = SlotSize(width = 72, height = 72)
+    private val avatarCollapsedScale = 32f / 72f
     private val details = SlotSize(width = 200, height = 40)
 
     private val titleOnlySlots = TopAppBarSlots(
@@ -117,7 +117,7 @@ class TopAppBarGeometryTest {
         val collapsed = slots.placementsAt(large, fraction = 1f)
 
         expanded.titleLeading shouldBe SlotPlacement(x = 16, y = 64, scale = 1f)
-        expanded.title.x shouldBe 16 + 88 + 16
+        expanded.title.x shouldBe 16 + 72 + 16
         halfway.titleLeading shouldBe SlotPlacement(x = 38, y = 40, scale = (1f + avatarCollapsedScale) / 2)
         collapsed.titleLeading shouldBe SlotPlacement(x = 60, y = 16, scale = avatarCollapsedScale)
         collapsed.title.x shouldBe 60 + 32 + 8
@@ -200,6 +200,18 @@ class TopAppBarGeometryTest {
         val preview = TopAppBarTravel(limit = -Float.MAX_VALUE, offset = -Float.MAX_VALUE)
 
         TopAppBarGeometry.travel(blockHeight = 88, previous = preview) shouldBe TopAppBarTravel(limit = -88f, offset = -88f)
+    }
+
+    @Test
+    fun `a released bar settles on the nearer end`() {
+        TopAppBarGeometry.snapTarget(TopAppBarTravel(limit = -100f, offset = -49f)) shouldBe 0f
+        TopAppBarGeometry.snapTarget(TopAppBarTravel(limit = -100f, offset = -50f)) shouldBe -100f
+    }
+
+    @Test
+    fun `a bar already at an end has nowhere to settle`() {
+        TopAppBarGeometry.snapTarget(TopAppBarTravel(limit = -100f, offset = 0f)) shouldBe null
+        TopAppBarGeometry.snapTarget(TopAppBarTravel(limit = -100f, offset = -100f)) shouldBe null
     }
 
     @Test

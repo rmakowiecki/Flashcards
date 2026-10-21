@@ -41,16 +41,12 @@ internal val LocalTopAppBarTitleFraction = staticCompositionLocalOf { ExpandedFr
 
 /**
  * The app's collapsing top app bar (ADR-0072): a pinned row with [navigationIcon] and [actions] over an
- * expanded block. [title] and [titleLeading] are single nodes that travel into the pinned row instead of
- * cross-fading. The bar can be dragged, and a released drag settles on the nearer end.
+ * expanded block. [title] and [titleLeading] travel into the pinned row instead of cross-fading; a
+ * released drag settles on the nearer end.
  *
- * Slot text gets its style from [LocalTextStyle], lerped from expanded to collapsed. The title is also
- * composed once more, unplaced and silent, to measure the block, so it should hold no state.
- *
- * A [Fade] [subtitle] and the [details] fade out by half the collapse, then are neither placed nor
- * announced. [backdrop] sits over the [style] paint and under every slot, at the expanded height, clipped
- * as the bar collapses. Only the title and subtitle recompose while collapsing; [actions] and [backdrop]
- * read the fraction through a provider.
+ * The title is composed a second time, unplaced, to measure the expanded block, so it must hold no state.
+ * A [Fade] [subtitle] and the [details] fade out by half the collapse. [backdrop] sits over the [style]
+ * paint and under every slot, at the expanded height, clipped as the bar collapses.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +57,6 @@ fun FlashcardsCollapsingTopAppBar(
     modifier: Modifier = Modifier,
     style: FlashcardsComponentStyle = OnSurface,
     titleStyle: TextStyle = size.titleStyle,
-    collapsedTitleStyle: TextStyle = MaterialTheme.typography.titleLargeEmphasized,
     navigationIcon: @Composable () -> Unit = {},
     titleLeading: (@Composable () -> Unit)? = null,
     titleLeadingCollapsedScale: Float = 1f,
@@ -73,7 +68,8 @@ fun FlashcardsCollapsingTopAppBar(
 ) {
     val appBarState = scrollBehavior.state
     val collapsedFraction = remember(appBarState) { { appBarState.collapsedFraction } }
-    val backdropScope = remember(collapsedFraction) { TopAppBarBackdropScope(collapsedFraction) }
+    val backdropScope = remember(collapsedFraction) { FlashcardsTopAppBarBackdropScope(collapsedFraction) }
+    val collapsedTitleStyle = MaterialTheme.typography.titleLargeEmphasized
     val subtitleStyle = MaterialTheme.typography.titleMediumEmphasized
     val collapsedSubtitleStyle = when (subtitleWhenCollapsed) {
         Keep -> MaterialTheme.typography.labelLargeEmphasized
@@ -133,7 +129,7 @@ fun FlashcardsCollapsingTopAppBar(
             CompositionLocalProvider(LocalContentColor provides variantContentColor) {
                 subtitle?.let { subtitleSlot ->
                     FadingSlot(slot = TopAppBarSlot.Subtitle, fades = subtitleWhenCollapsed == Fade, collapsedFraction = collapsedFraction) {
-                        ProvideCollapsingTextStyle(expanded = subtitleStyle, collapsed = collapsedSubtitleStyle, collapsedFraction = collapsedFraction, content = subtitleSlot)
+                        ProvideCollapsingTextStyle(subtitleStyle, collapsedSubtitleStyle, collapsedFraction, content = subtitleSlot)
                     }
                     Box(modifier = Modifier.layoutId(TopAppBarSlot.SubtitleSizer).clearAndSetSemantics {}) {
                         CompositionLocalProvider(LocalTextStyle provides subtitleStyle, content = subtitleSlot)
@@ -150,24 +146,14 @@ fun FlashcardsCollapsingTopAppBar(
 
 /** Provides the style lerped at the current fraction, in its own scope so a scroll recomposes only the text under it. */
 @Composable
-private fun ProvideCollapsingTextStyle(
-    expanded: TextStyle,
-    collapsed: TextStyle,
-    collapsedFraction: () -> Float,
-    content: @Composable () -> Unit,
-) {
+private fun ProvideCollapsingTextStyle(expanded: TextStyle, collapsed: TextStyle, collapsedFraction: () -> Float, content: @Composable () -> Unit) {
     val style = if (expanded == collapsed) expanded else lerp(expanded, collapsed, collapsedFraction())
     CompositionLocalProvider(LocalTextStyle provides style, content = content)
 }
 
 /** A slot that, when it [fades], goes silent once faded out. Alpha and placement are the measure policy's. */
 @Composable
-private fun FadingSlot(
-    slot: TopAppBarSlot,
-    fades: Boolean,
-    collapsedFraction: () -> Float,
-    content: @Composable () -> Unit,
-) {
+private fun FadingSlot(slot: TopAppBarSlot, fades: Boolean, collapsedFraction: () -> Float, content: @Composable () -> Unit) {
     val isFadedOut by remember(collapsedFraction) { derivedStateOf { fadedSlotAlpha(collapsedFraction()) == 0f } }
     val silence = if (fades && isFadedOut) Modifier.clearAndSetSemantics {} else Modifier
     Box(modifier = Modifier.layoutId(slot).then(silence)) { content() }

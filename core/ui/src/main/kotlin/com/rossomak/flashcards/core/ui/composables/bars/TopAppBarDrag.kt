@@ -15,17 +15,11 @@ import kotlin.math.abs
 /** The fraction is a float quotient, never exactly 0, so below this the bar counts as expanded. */
 private const val SETTLED_EXPANDED_FRACTION = 0.01f
 
-private const val SNAP_TO_COLLAPSED_FRACTION = 0.5f
-
 private const val FLING_ROUNDING_TOLERANCE_PX = 0.5f
 
 private const val MIN_FLING_VELOCITY = 1f
 
-/**
- * Moves [scrollBehavior]'s state for a drag that starts on the bar, as content scrolling does, and
- * settles on the nearer end on release. The settle runs inside the draggable's mutex, so a new drag
- * cancels it.
- */
+/** Drags [scrollBehavior]'s state like content scrolling does, then settles on the nearer end. A new drag cancels the settle. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Modifier.topAppBarDrag(scrollBehavior: TopAppBarScrollBehavior): Modifier {
@@ -38,12 +32,9 @@ internal fun Modifier.topAppBarDrag(scrollBehavior: TopAppBarScrollBehavior): Mo
     )
 }
 
-/** M3's private `settleAppBar` on public API: continue the fling, then snap to the nearer end. */
+/** M3's private `settleAppBar` on public API. */
 @OptIn(ExperimentalMaterial3Api::class)
-private suspend fun settleTopAppBar(
-    scrollBehavior: TopAppBarScrollBehavior,
-    velocity: Float,
-) {
+private suspend fun settleTopAppBar(scrollBehavior: TopAppBarScrollBehavior, velocity: Float) {
     val appBarState = scrollBehavior.state
     if (appBarState.collapsedFraction < SETTLED_EXPANDED_FRACTION || appBarState.collapsedFraction == 1f) return
 
@@ -61,11 +52,8 @@ private suspend fun settleTopAppBar(
     }
 
     scrollBehavior.snapAnimationSpec?.let { snapSpec ->
-        if (appBarState.heightOffset < 0f && appBarState.heightOffset > appBarState.heightOffsetLimit) {
-            val target = when {
-                appBarState.collapsedFraction < SNAP_TO_COLLAPSED_FRACTION -> 0f
-                else -> appBarState.heightOffsetLimit
-            }
+        val travel = TopAppBarTravel(limit = appBarState.heightOffsetLimit, offset = appBarState.heightOffset)
+        TopAppBarGeometry.snapTarget(travel)?.let { target ->
             AnimationState(initialValue = appBarState.heightOffset).animateTo(target, animationSpec = snapSpec) {
                 appBarState.heightOffset = value
             }

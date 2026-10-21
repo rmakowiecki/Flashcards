@@ -9,7 +9,11 @@ import kotlin.math.roundToInt
 /** Collapse fraction by which a [Fade] subtitle and the details are gone. */
 internal const val FADED_SLOTS_GONE_AT_FRACTION = 0.5f
 
-internal fun fadedSlotAlpha(collapsedFraction: Float): Float = (1f - collapsedFraction / FADED_SLOTS_GONE_AT_FRACTION).coerceIn(0f, 1f)
+/** `1` expanded, `0` from [FADED_SLOTS_GONE_AT_FRACTION] on: a slot's alpha, or a custom action's progress. */
+fun fadedSlotAlpha(collapsedFraction: Float): Float = (1f - collapsedFraction / FADED_SLOTS_GONE_AT_FRACTION).coerceIn(0f, 1f)
+
+/** Collapse fraction at which a released bar settles on collapsed rather than expanded. */
+private const val SNAP_TO_COLLAPSED_FRACTION = 0.5f
 
 internal data class SlotSize(val width: Int, val height: Int)
 
@@ -62,14 +66,11 @@ internal data class TopAppBarPlacements(
 )
 
 /**
- * The collapsing bar's arithmetic, free of Compose for JVM tests. The measure policy calls it in order,
- * each step needing the last one's measurements: [expandedTextWidth] and [detailsWidth], then
- * [blockHeight] and [travel], then [textWidths], then [placements].
- *
- * Expanded, the block holds the identity row (leading element, then title over subtitle) with the details
- * under it, bottom-aligned. Collapsed, the scaled leading element and the title follow the navigation
- * icon, the title ending before the actions. A [Keep] subtitle travels under the title; a [Fade] subtitle
- * and the details scroll up with the block and fade out.
+ * The collapsing bar's arithmetic, free of Compose for JVM tests. Expanded, the block holds the identity
+ * row (leading element, then title over subtitle) with the details under it, bottom-aligned. Collapsed,
+ * the scaled leading element and the title follow the navigation icon, the title ending before the
+ * actions. A [Keep] subtitle travels under the title; a [Fade] subtitle and the details scroll up with
+ * the block and fade out.
  */
 internal object TopAppBarGeometry {
 
@@ -100,6 +101,13 @@ internal object TopAppBarGeometry {
         }
     }
 
+    /** The offset a released bar settles on: the nearer end, or `null` when it is already at one. */
+    fun snapTarget(travel: TopAppBarTravel): Float? = when {
+        travel.offset >= 0f || travel.offset <= travel.limit -> null
+        travel.fraction < SNAP_TO_COLLAPSED_FRACTION -> 0f
+        else -> travel.limit
+    }
+
     /** A [Fade] subtitle keeps its expanded width. */
     fun textWidths(
         metrics: TopAppBarMetrics,
@@ -120,12 +128,7 @@ internal object TopAppBarGeometry {
         return TopAppBarTextWidths(title = titleWidth, subtitle = subtitleWidth)
     }
 
-    fun placements(
-        metrics: TopAppBarMetrics,
-        slots: TopAppBarSlots,
-        blockHeight: Int,
-        fraction: Float,
-    ): TopAppBarPlacements = with(slots) {
+    fun placements(metrics: TopAppBarMetrics, slots: TopAppBarSlots, blockHeight: Int, fraction: Float): TopAppBarPlacements = with(slots) {
         val collapsedOffset = (fraction * blockHeight).roundToInt()
         val identityRowHeight = identityRowHeight(titleLeading, expandedTitle, expandedSubtitle)
         val contentHeight = contentHeight(metrics, titleLeading, expandedTitle, expandedSubtitle, details)
@@ -178,13 +181,7 @@ internal object TopAppBarGeometry {
 private fun identityRowHeight(titleLeading: SlotSize?, expandedTitle: SlotSize, expandedSubtitle: SlotSize?): Int =
     max(titleLeading?.height ?: 0, expandedTitle.height + (expandedSubtitle?.height ?: 0))
 
-private fun contentHeight(
-    metrics: TopAppBarMetrics,
-    titleLeading: SlotSize?,
-    expandedTitle: SlotSize,
-    expandedSubtitle: SlotSize?,
-    details: SlotSize?,
-): Int {
+private fun contentHeight(metrics: TopAppBarMetrics, titleLeading: SlotSize?, expandedTitle: SlotSize, expandedSubtitle: SlotSize?, details: SlotSize?): Int {
     val detailsHeight = details?.let { metrics.gap + it.height } ?: 0
     return identityRowHeight(titleLeading, expandedTitle, expandedSubtitle) + detailsHeight + metrics.bottomPadding
 }
@@ -207,13 +204,7 @@ private fun collapsedTextStart(
 private fun collapsedTextEnd(metrics: TopAppBarMetrics, actions: SlotSize): Int =
     if (actions.width > 0) metrics.width - metrics.edge - actions.width - metrics.gap else expandedTextEnd(metrics)
 
-private fun textStart(
-    metrics: TopAppBarMetrics,
-    navigation: SlotSize,
-    titleLeading: SlotSize?,
-    titleLeadingCollapsedScale: Float,
-    fraction: Float,
-): Float = lerp(
+private fun textStart(metrics: TopAppBarMetrics, navigation: SlotSize, titleLeading: SlotSize?, titleLeadingCollapsedScale: Float, fraction: Float): Float = lerp(
     start = expandedTextStart(metrics, titleLeading).toFloat(),
     stop = collapsedTextStart(metrics, navigation, titleLeading, titleLeadingCollapsedScale),
     fraction = fraction,

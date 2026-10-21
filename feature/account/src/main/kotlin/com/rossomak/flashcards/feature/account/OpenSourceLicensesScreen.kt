@@ -20,8 +20,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,13 +42,14 @@ import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheet
 import com.rossomak.flashcards.core.ui.composables.FlashcardsBottomSheetState
 import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
-import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarGraph
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBackButton
+import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
+import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
@@ -122,7 +121,7 @@ private fun OpenSourceLicensesContent(
     onDetailDismiss: () -> Unit,
     onLinkClick: (url: String) -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
     val listState = rememberLazyListState()
 
     // The sheet is a plain, unaligned sibling of Scaffold: see FlashcardsBottomSheet for why.
@@ -137,8 +136,8 @@ private fun OpenSourceLicensesContent(
                     title = stringResource(R.string.open_source_licenses_title),
                     size = FlashcardsTopAppBarSize.Medium,
                     scrollBehavior = scrollBehavior,
-                    onNavigateBack = onNavigateBack,
-                    backdrop = { FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill) },
+                    navigationIcon = { FlashcardsTopAppBarBackButton(onClick = onNavigateBack) },
+                    backdrop = { FlashcardsTopAppBarOnSurfaceGraph() },
                 )
             },
         ) { innerPadding ->

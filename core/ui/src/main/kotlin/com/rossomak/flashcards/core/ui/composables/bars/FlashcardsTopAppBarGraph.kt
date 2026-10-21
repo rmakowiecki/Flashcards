@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
+import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.morpheusGraphBackground
@@ -20,12 +21,7 @@ private const val GRAPH_GONE_AT_COLLAPSED_FRACTION = 0.6f
  * morphs toward [BrandMorpheusGraphSpecs.hidden], read in a snapshot flow so a scroll never recomposes.
  */
 @Composable
-fun FlashcardsTopAppBarBackdropScope.FlashcardsTopAppBarGraph(
-    spec: MorpheusGraphSpec,
-    fill: MorpheusGraphFill,
-    modifier: Modifier = Modifier,
-    fadesOnCollapse: Boolean = false,
-) {
+fun FlashcardsTopAppBarBackdropScope.FlashcardsTopAppBarGraph(spec: MorpheusGraphSpec, fill: MorpheusGraphFill, modifier: Modifier = Modifier, fadesOnCollapse: Boolean = false) {
     if (fadesOnCollapse) {
         val graphState = rememberMorpheusGraphMorphState(spec)
         LaunchedEffect(graphState, spec) {
@@ -37,4 +33,16 @@ fun FlashcardsTopAppBarBackdropScope.FlashcardsTopAppBarGraph(
     } else {
         Box(modifier = modifier.fillMaxSize().morpheusGraphBackground(spec, fill))
     }
+}
+
+/** The graph on a [FlashcardsComponentStyle.OnSurface] bar. */
+@Composable
+fun FlashcardsTopAppBarBackdropScope.FlashcardsTopAppBarOnSurfaceGraph(modifier: Modifier = Modifier) {
+    FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill, modifier = modifier)
+}
+
+/** The brand graph on a [FlashcardsComponentStyle.OnGradient] bar. */
+@Composable
+fun FlashcardsTopAppBarBackdropScope.FlashcardsTopAppBarBrandGraph(modifier: Modifier = Modifier) {
+    FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill, modifier = modifier)
 }
