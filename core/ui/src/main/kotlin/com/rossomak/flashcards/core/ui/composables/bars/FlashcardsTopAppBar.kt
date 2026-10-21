@@ -61,7 +61,6 @@ private fun FlashcardsTopAppBarTitle(text: String, expandedMaxLines: Int) {
     Text(text = text, maxLines = if (wraps) expandedMaxLines else 1, overflow = TextOverflow.Ellipsis)
 }
 
-/** The back arrow for a [FlashcardsTopAppBar]'s `navigationIcon`. */
 @Composable
 fun FlashcardsTopAppBarBackButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {

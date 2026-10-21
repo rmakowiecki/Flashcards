@@ -23,11 +23,7 @@ import com.rossomak.flashcards.core.ui.composables.bars.fadedSlotAlpha
 import com.rossomak.flashcards.core.ui.composables.bars.rememberPreviewTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 
-/**
- * The Account screen's top bar: a large collapsing bar whose avatar and name travel into the pinned row.
- * The email and the "Signed in with …" line fade out, and Sign out drops its label. A null name, email
- * or provider leaves its line out.
- */
+/** The Account screen's top bar. A null name, email or provider leaves its line out. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AccountHeaderBar(

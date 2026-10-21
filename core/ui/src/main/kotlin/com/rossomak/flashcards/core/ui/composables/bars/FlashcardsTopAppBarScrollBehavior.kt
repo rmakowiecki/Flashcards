@@ -6,7 +6,6 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 
-/** The scroll behavior every [FlashcardsCollapsingTopAppBar] screen uses: the bar collapses until pinned. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun rememberFlashcardsTopAppBarScrollBehavior(): TopAppBarScrollBehavior =

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
-import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.morpheusGraphBackground
@@ -20,13 +19,11 @@ fun FlashcardsTopAppBarGraph(
     Box(modifier = modifier.fillMaxSize().morpheusGraphBackground(spec, fill))
 }
 
-/** The graph for a [FlashcardsComponentStyle.OnSurface] bar. */
 @Composable
 fun FlashcardsTopAppBarOnSurfaceGraph(modifier: Modifier = Modifier) {
     FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBarOnSurface, fill = BrandMorpheusGraphSpecs.onSurfaceFill, modifier = modifier)
 }
 
-/** The graph for a [FlashcardsComponentStyle.OnGradient] bar. */
 @Composable
 fun FlashcardsTopAppBarBrandGraph(modifier: Modifier = Modifier) {
     FlashcardsTopAppBarGraph(spec = BrandMorpheusGraphSpecs.topAppBar, fill = BrandMorpheusGraphSpecs.fill, modifier = modifier)

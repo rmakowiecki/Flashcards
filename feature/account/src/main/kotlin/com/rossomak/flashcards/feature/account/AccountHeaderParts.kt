@@ -42,13 +42,8 @@ private const val MANAGE_LINK_TAG = "manage"
 private val SIGN_OUT_CONTAINER_HEIGHT = 40.dp
 
 /**
- * Sign out in the error color: an icon with a label that shrinks away as [labelProgress] falls from
- * 1 to 0, leaving the icon alone. [labelProgress] is read in layout and draw, so a scroll never
- * recomposes it. The ripple and the click area are a pill 40dp tall, a circle once the label is gone,
- * like the back arrow's; the 48dp touch target around it is kept.
- *
- * It is one clickable node named by the label's text, so a screen reader announces "Sign out" in both
- * states even once the label has no width left to draw in.
+ * Sign out in the error color; its label shrinks away as [labelProgress] falls from 1 to 0. It is one
+ * clickable node named by the label, so a screen reader announces "Sign out" even once the label is gone.
  */
 @Composable
 internal fun AccountSignOutAction(
