@@ -40,7 +40,7 @@ fun FlashcardsTopAppBar(
     navigationIcon: (@Composable () -> Unit)? = null,
     onNavigateBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
-    backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
+    backdrop: @Composable () -> Unit = {},
 ) {
     FlashcardsCollapsingTopAppBar(
         size = size,

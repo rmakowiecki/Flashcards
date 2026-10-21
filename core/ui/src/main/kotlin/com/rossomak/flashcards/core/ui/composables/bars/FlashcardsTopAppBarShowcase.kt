@@ -91,7 +91,7 @@ private fun ShowcaseBar(
     title: String = SHOWCASE_TITLE,
     subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed = Keep,
     collapsed: Boolean = false,
-    backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
+    backdrop: @Composable () -> Unit = {},
 ) {
     FlashcardsTheme {
         Surface {

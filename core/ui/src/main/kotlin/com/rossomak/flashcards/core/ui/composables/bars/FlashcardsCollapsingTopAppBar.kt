@@ -47,7 +47,7 @@ internal val LocalTopAppBarTitleFraction = staticCompositionLocalOf { ExpandedFr
  * Slot text style comes from [LocalTextStyle], lerped expanded to collapsed. [title] is composed twice
  * (once unplaced, to measure the block), so it should hold no state. A [Fade] [subtitle] and [details]
  * fade out by half the collapse. [backdrop] sits under every slot at the expanded height, clipped on
- * collapse. [actions] and [backdrop] read the fraction through a provider.
+ * collapse. [actions] reads the fraction through a provider.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,11 +65,10 @@ fun FlashcardsCollapsingTopAppBar(
     subtitleWhenCollapsed: FlashcardsSubtitleWhenCollapsed = Keep,
     details: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.(collapsedFraction: () -> Float) -> Unit = {},
-    backdrop: @Composable FlashcardsTopAppBarBackdropScope.() -> Unit = {},
+    backdrop: @Composable () -> Unit = {},
 ) {
     val appBarState = scrollBehavior.state
     val collapsedFraction = remember(appBarState) { { appBarState.collapsedFraction } }
-    val backdropScope = remember(collapsedFraction) { DefaultFlashcardsTopAppBarBackdropScope(collapsedFraction) }
     val subtitleStyle = MaterialTheme.typography.titleMediumEmphasized
     val collapsedSubtitleStyle = when (subtitleWhenCollapsed) {
         Keep -> MaterialTheme.typography.labelLargeEmphasized
@@ -107,7 +106,7 @@ fun FlashcardsCollapsingTopAppBar(
             .topAppBarDrag(scrollBehavior),
         content = {
             Box(modifier = Modifier.layoutId(TopAppBarSlot.Backdrop).clearAndSetSemantics {}) {
-                backdropScope.backdrop()
+                backdrop()
             }
             CompositionLocalProvider(LocalContentColor provides contentColor) {
                 Box(modifier = Modifier.layoutId(TopAppBarSlot.Navigation)) { navigationIcon() }
