@@ -12,40 +12,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kotlin.math.abs
 
-/** Below this a collapse is treated as fully expanded: the fraction is a float quotient, so never exactly 0. */
+/** The fraction is a float quotient, never exactly 0, so below this the bar counts as expanded. */
 private const val SETTLED_EXPANDED_FRACTION = 0.01f
 
-/** Past this fraction a released drag snaps to collapsed, short of it back to expanded. */
 private const val SNAP_TO_COLLAPSED_FRACTION = 0.5f
 
-/** Leftover distance below which a fling is taken to have hit the end of the bar's travel. */
 private const val FLING_ROUNDING_TOLERANCE_PX = 0.5f
 
-/** Velocity below which a release is a plain drag stop with no fling to continue. */
 private const val MIN_FLING_VELOCITY = 1f
 
 /**
- * Lets the bar itself be dragged, which M3's bars do not offer: content scrolling already moves
- * [scrollBehavior]'s state through its nested-scroll connection, and this adds the same movement
- * for a drag that starts on the bar. On release the bar settles on whichever end is nearer. It stays
- * on when the content cannot scroll, and adds no semantics actions.
+ * Moves [scrollBehavior]'s state for a drag that starts on the bar, as content scrolling does, and
+ * settles on the nearer end on release. The settle runs inside the draggable's mutex, so a new drag
+ * cancels it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Modifier.topAppBarDrag(scrollBehavior: TopAppBarScrollBehavior): Modifier {
     val appBarState = scrollBehavior.state
+    val draggableState = rememberDraggableState { delta -> appBarState.heightOffset += delta }
     return draggable(
-        state = rememberDraggableState { delta -> appBarState.heightOffset += delta },
+        state = draggableState,
         orientation = Orientation.Vertical,
-        onDragStopped = { velocity -> settleTopAppBar(scrollBehavior, velocity) },
+        onDragStopped = { velocity -> draggableState.drag { settleTopAppBar(scrollBehavior, velocity) } },
     )
 }
 
-/**
- * M3's private `settleAppBar`, rebuilt on public API: continues a fling with the behavior's decay
- * spec, then animates the remainder to the nearer end with its snap spec. Skips both when the bar
- * is already fully expanded or collapsed.
- */
+/** M3's private `settleAppBar` on public API: continue the fling, then snap to the nearer end. */
 @OptIn(ExperimentalMaterial3Api::class)
 private suspend fun settleTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior,
@@ -62,7 +55,7 @@ private suspend fun settleTopAppBar(
             appBarState.heightOffset = offsetBeforeStep + delta
             val consumed = abs(offsetBeforeStep - appBarState.heightOffset)
             lastValue = value
-            // Anything left unconsumed means the bar hit an end, so the fling is over.
+            // Unconsumed delta means the bar hit an end.
             if (abs(delta - consumed) > FLING_ROUNDING_TOLERANCE_PX) cancelAnimation()
         }
     }
