@@ -34,25 +34,25 @@ class ObserveScoringStateUseCase @Inject constructor(
 
     override suspend operator fun invoke(): Flow<ObservedScoringState> = scoringStateRepository.observeScoringState().map { scoringState ->
         val config = xpConfigRepository.getXpConfig().getOrDefault(XpConfig())
-        observe(scoringState, config, todayProvider.today())
+        scoringState.observe(config, todayProvider.today())
     }
 
     /**
      * A last study day after today (the device moved to an earlier timezone) keeps the Streak, not at
      * risk, but its seconds belong to that other day.
      */
-    private fun observe(scoringState: ScoringState, config: XpConfig, today: LocalDate): ObservedScoringState {
-        val levelProgress = scoringState.toLevelProgress(config)
-        if (scoringState.lastStudyDate.isEmpty()) {
-            return ObservedScoringState(scoringState = scoringState, levelProgress = levelProgress, streak = null, todayStudiedSeconds = 0)
+    private fun ScoringState.observe(config: XpConfig, today: LocalDate): ObservedScoringState {
+        val levelProgress = toLevelProgress(config)
+        if (lastStudyDate.isEmpty()) {
+            return ObservedScoringState(scoringState = this, levelProgress = levelProgress, streak = null, todayStudiedSeconds = 0)
         }
-        val daysSinceLastStudy = ChronoUnit.DAYS.between(LocalDate.parse(scoringState.lastStudyDate), today)
-        val streakDays = if (daysSinceLastStudy >= 2) 0 else scoringState.currentStreak
+        val daysSinceLastStudy = ChronoUnit.DAYS.between(LocalDate.parse(lastStudyDate), today)
+        val streakDays = if (daysSinceLastStudy >= 2) 0 else currentStreak
         return ObservedScoringState(
-            scoringState = scoringState,
+            scoringState = this,
             levelProgress = levelProgress,
-            streak = Streak(days = streakDays, best = scoringState.bestStreak, isAtRisk = daysSinceLastStudy == 1L),
-            todayStudiedSeconds = if (daysSinceLastStudy == 0L) scoringState.studiedSecondsOnLastStudyDate else 0,
+            streak = Streak(days = streakDays, best = bestStreak, isAtRisk = daysSinceLastStudy == 1L),
+            todayStudiedSeconds = if (daysSinceLastStudy == 0L) studiedSecondsOnLastStudyDate else 0,
         )
     }
 }
