@@ -15,6 +15,7 @@ import com.rossomak.flashcards.feature.home.HomeContent
 import com.rossomak.flashcards.feature.home.HomeFavoritesState
 import com.rossomak.flashcards.feature.home.HomeRecentsState
 import com.rossomak.flashcards.feature.home.HomeScreenState
+import com.rossomak.flashcards.feature.home.HomeStreakState
 import java.time.Instant
 
 /** Newest first, Categories and Topics mixed, as Home resolves them. */
@@ -31,6 +32,13 @@ private fun ShowcaseFixtures.homeState(now: Instant) = HomeScreenState(
     levelCard = ShowcaseUser.levelCard,
     favorites = HomeFavoritesState.Content(favoriteItems()),
     recents = HomeRecentsState.Content(recentItems(now)),
+    streak = HomeStreakState.Content(
+        days = ShowcaseUser.CURRENT_STREAK,
+        bestDays = ShowcaseUser.BEST_STREAK,
+        isAtRisk = false,
+        studiedMinutes = ShowcaseUser.STUDIED_MINUTES_TODAY,
+        goalMinutes = ShowcaseUser.DAILY_GOAL_MINUTES,
+    ),
     hasHiddenFavoritesHint = true,
     progressSummary = showcaseProgressSummary,
     isProgressResolved = true,

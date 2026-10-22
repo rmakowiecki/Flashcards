@@ -9,7 +9,7 @@ flowchart TD
 
     %% Legend: (Screen)  [/Action/]  {Decision}  ([Entry/Exit])
 
-    Home(HOME SCREEN\nLevel card · Favorites carousel · Recently studied list)
+    Home(HOME SCREEN\nLevel card · Streak and Daily Goal · Favorites carousel · Recently studied list)
 
     %% ── Empty state ───────────────────────────────────────────────
     Home -->|no Favorites and no Recents| EmptyCTA[/Tap first-session button/]

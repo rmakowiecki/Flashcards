@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Resolved
 import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Unresolved
+import com.rossomak.flashcards.core.domain.model.ObservedScoringState
 import com.rossomak.flashcards.core.domain.model.RecentItem
+import com.rossomak.flashcards.core.domain.model.Streak
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavoritesHint
 import com.rossomak.flashcards.core.domain.model.toReplay
@@ -29,22 +32,32 @@ import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsC
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
+import com.rossomak.flashcards.feature.home.HomeStreakState.Content as StreakContent
+import com.rossomak.flashcards.feature.home.HomeStreakState.Empty as StreakEmpty
+import com.rossomak.flashcards.feature.home.HomeStreakState.Failed as StreakFailed
+import com.rossomak.flashcards.feature.home.HomeStreakState.Loading as StreakLoading
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onEmpty
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -67,14 +80,14 @@ class HomeViewModel @Inject constructor(
     val events = eventChannel.receiveAsFlow()
 
     // One handle per section collector: a thrown failure or a completion leaves its flow dead, so Retry relaunches it.
-    private var levelCardJob: Job? = null
+    private var scoringStateJob: Job? = null
     private var favoritesJob: Job? = null
     private var recentsJob: Job? = null
     private var revealCeilingJob: Job? = null
 
     init {
         startRevealCeiling()
-        collectLevelCard()
+        collectScoringState()
         collectFavoriteItems()
         collectProgressSummary()
         collectRecentSessions()
@@ -152,28 +165,28 @@ class HomeViewModel @Inject constructor(
      * Retry button goes away at once and a second tap finds nothing to retry. Restarts the reveal ceiling, so
      * the retried sections reveal together again. The progress summary is not part of Retry. The Level card
      * is retried whenever it is not [Content][LevelCardContent], with no ceiling of its own; a card that has
-     * content is left alone.
+     * content is left alone. The card and the Streak row share one stream, so retrying either restarts both.
      */
     fun onRetry() {
         val current = _state.value
         val retriesFavorites = current.favorites is FavoritesFailed
         val retriesRecents = current.recents is RecentsFailed
+        val retriesStreak = current.streak is StreakFailed
         val retriesLevelCard = current.levelCard !is LevelCardContent
-        if (retriesFavorites || retriesRecents) {
+        if (retriesFavorites || retriesRecents || retriesStreak) {
             _state.update {
                 it.copy(
                     favorites = if (retriesFavorites) FavoritesLoading else it.favorites,
                     recents = if (retriesRecents) RecentsLoading else it.recents,
+                    streak = if (retriesStreak) StreakLoading else it.streak,
                 )
             }
             startRevealCeiling()
             if (retriesFavorites) collectFavoriteItems()
             if (retriesRecents) collectRecentSessions()
         }
-        if (retriesLevelCard) {
-            _state.update { it.copy(levelCard = LevelCardLoading) }
-            collectLevelCard()
-        }
+        if (retriesLevelCard) _state.update { it.copy(levelCard = LevelCardLoading) }
+        if (retriesLevelCard || retriesStreak) collectScoringState()
     }
 
     /**
@@ -188,7 +201,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /** One ceiling for both sections, so a hung read cannot hold back [HomeScreenState.body] forever. */
+    /** One ceiling for every section, so a hung read cannot hold back [HomeScreenState.body] forever. */
     private fun startRevealCeiling() {
         revealCeilingJob?.cancel()
         _state.update { it.copy(hasRevealCeilingElapsed = false) }
@@ -199,59 +212,84 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * The card needs the Level and the auth user together, so it stays [LevelCardLoading] until both have
-     * emitted; a null auth user still gives [LevelCardContent], with no name or photo, and so does a failed
-     * auth read. The Level stream's end is handled on that stream itself, not on the combined flow: the auth
-     * stream never ends, so `combine` would wait on it forever. Before the Level's first emission a failure or a completion (a signed-out start ends
-     * the stream silently) gives [LevelCardUnavailable], which the card draws like [LevelCardLoading] without
-     * the shimmer; after one, the card keeps waiting for the auth user or keeps its last content, and auth
-     * changes still update it in place.
+     * One listener feeds the Level card and the Streak row so they never disagree. Before its first value, a failure
+     * or completion (a signed-out start ends silently) fails both; after one, both keep their content.
      */
-    private fun collectLevelCard() {
-        levelCardJob?.cancel()
-        levelCardJob = viewModelScope.launch {
-            var hasLevelEmitted = false
-            val levelProgressFlow = flow { emitAll(observeScoringState()) }
-                .map { observedScoringState -> observedScoringState.levelProgress }
-                .onEach { hasLevelEmitted = true }
+    private fun collectScoringState() {
+        scoringStateJob?.cancel()
+        scoringStateJob = viewModelScope.launch {
+            val scoringStateFeed = MutableStateFlow(ScoringStateFeed())
+            launch { collectLevelCard(scoringStateFeed) }
+            launch { collectStreak(scoringStateFeed) }
+            flow { emitAll(observeScoringState()) }
                 .onCompletion { cause ->
-                    if (cause == null && !hasLevelEmitted) failLevelCardIfLoading { "Observing the Level completed before its first emission" }
+                    if (cause == null && scoringStateFeed.value.latest == null) logw { "Observing the scoring state completed before its first emission" }
                 }
-                .catch { error ->
-                    loge(error) { "Observing the Level failed" }
-                    if (!hasLevelEmitted) failLevelCardIfLoading()
-                }
-            // A failed auth read is not worth hiding the Level for: the card shows its figures without a name.
-            val authUserFlow = flow { emitAll(observeAuthUser()) }
-                .catch { error ->
-                    logw(error) { "Observing the auth user for the Level card failed, showing it without a name" }
-                    emit(null)
-                }
-            combine(levelProgressFlow, authUserFlow) { levelProgress, authUser -> levelProgress to authUser }
-                .catch { error ->
-                    loge(error) { "Observing the auth user for the Level card failed" }
-                    failLevelCardIfLoading()
-                }
-                .collect { (levelProgress, authUser) ->
-                    _state.update {
-                        it.copy(
-                            levelCard = LevelCardContent(
-                                level = levelProgress.level,
-                                xpIntoCurrentLevel = levelProgress.xpIntoCurrentLevel,
-                                xpForNextLevel = levelProgress.xpForNextLevel,
-                                photoUrl = authUser?.photoUrl,
-                                displayName = authUser?.displayName,
-                            ),
-                        )
-                    }
-                }
+                .catch { error -> loge(error) { "Observing the scoring state failed" } }
+                .collect { observedScoringState -> scoringStateFeed.update { it.copy(latest = observedScoringState) } }
+            scoringStateFeed.update { it.copy(hasEnded = true) }
         }
     }
 
-    private fun failLevelCardIfLoading(logMessage: (() -> String)? = null) {
-        if (_state.value.levelCard !is LevelCardLoading) return
-        logMessage?.let { message -> logw(message = message) }
-        _state.update { it.copy(levelCard = LevelCardUnavailable) }
+    /**
+     * Waits for the Level and the auth user; a null or failed auth user gives [LevelCardContent] without name or
+     * photo. A scoring state that ends with no value gives [LevelCardUnavailable], drawn like Loading without the
+     * shimmer.
+     */
+    private suspend fun collectLevelCard(scoringStateFeed: Flow<ScoringStateFeed>) {
+        val levelProgressFlow = scoringStateFeed.latestValues(onEndedWithoutValue = ::failLevelCardIfLoading)
+            .map { observedScoringState -> observedScoringState.levelProgress }
+            .distinctUntilChanged()
+        val authUserFlow = flow { emitAll(observeAuthUser()) }
+            .catch { error ->
+                logw(error) { "Observing the auth user for the Level card failed, showing it without a name" }
+                emit(null)
+            }
+        combine(levelProgressFlow, authUserFlow) { levelProgress, authUser -> levelProgress to authUser }
+            .collect { (levelProgress, authUser) ->
+                _state.update {
+                    it.copy(
+                        levelCard = LevelCardContent(
+                            level = levelProgress.level,
+                            xpIntoCurrentLevel = levelProgress.xpIntoCurrentLevel,
+                            xpForNextLevel = levelProgress.xpForNextLevel,
+                            photoUrl = authUser?.photoUrl,
+                            displayName = authUser?.displayName,
+                        ),
+                    )
+                }
+            }
+    }
+
+    private fun failLevelCardIfLoading() {
+        _state.update { if (it.levelCard is LevelCardLoading) it.copy(levelCard = LevelCardUnavailable) else it }
+    }
+
+    /**
+     * A User who never studied gets [StreakEmpty] without waiting for the Daily Goal (the `null` seed). A Daily Goal
+     * read that fails keeps the last goal, or [DailyGoal.DEFAULT_MINUTES] when none was read.
+     */
+    private suspend fun collectStreak(scoringStateFeed: Flow<ScoringStateFeed>) {
+        val dailyGoalMinutesFlow = flow<Int?> { emitAll(observeUserPreferences().map { preferences -> preferences.dailyGoalMinutes }) }
+            .catch { error -> logw(error) { "Observing the Daily Goal failed" } }
+            .onEmpty { emit(DailyGoal.DEFAULT_MINUTES) }
+            .onStart { emit(null) }
+        val observedScoringStateFlow = scoringStateFeed.latestValues(onEndedWithoutValue = ::failStreakIfLoading)
+        combine(observedScoringStateFlow, dailyGoalMinutesFlow) { observedScoringState, goalMinutes ->
+            val streak = observedScoringState.streak
+            when {
+                streak == null -> StreakEmpty
+                goalMinutes == null -> null
+                else -> streak.toStreakContent(observedScoringState.todayStudiedSeconds, goalMinutes)
+            }
+        }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { streak -> _state.update { it.copy(streak = streak) } }
+    }
+
+    private fun failStreakIfLoading() {
+        _state.update { if (it.streak is StreakLoading) it.copy(streak = StreakFailed) else it }
     }
 
     /**
@@ -350,7 +388,25 @@ class HomeViewModel @Inject constructor(
     }
 
     internal companion object {
-        /** How long Favorites and Recents wait for each other before a still-loading one is left out. */
+        /** How long the sections wait for each other before a still-loading one is left out. */
         val REVEAL_CEILING = 2.seconds
     }
 }
+
+private data class ScoringStateFeed(val latest: ObservedScoringState? = null, val hasEnded: Boolean = false)
+
+private fun Flow<ScoringStateFeed>.latestValues(onEndedWithoutValue: () -> Unit): Flow<ObservedScoringState> =
+    onEach { feed -> if (feed.latest == null && feed.hasEnded) onEndedWithoutValue() }
+        .mapNotNull { feed -> feed.latest }
+        .distinctUntilChanged()
+
+/** Rounds the day's total up once, so any study shows at least 1 minute. */
+private fun Streak.toStreakContent(todayStudiedSeconds: Long, goalMinutes: Int) = StreakContent(
+    days = days,
+    bestDays = best,
+    isAtRisk = isAtRisk,
+    studiedMinutes = ((todayStudiedSeconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE).toInt(),
+    goalMinutes = goalMinutes,
+)
+
+private const val SECONDS_PER_MINUTE = 60L

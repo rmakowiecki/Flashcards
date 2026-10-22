@@ -21,27 +21,22 @@ Every figure on the screen includes Pending Sessions as soon as they are queued,
 
 ### Stale values
 
-The scoring state changes only when a session is recorded, so the screen derives what to show against the device's local date:
-
-- The current Streak reads zero once the last study day is earlier than yesterday. A Streak that is alive but not yet extended today keeps its value.
-- Today's minutes read zero unless the last study day is today.
-- Best Streak is never derived.
+The Streak, Best Streak and today's minutes follow the same rules about today as on Home ([home.md](../home.md#streak-and-daily-goal)).
 
 ## Layout
 
 From top to bottom:
 
 1. **Level card.** The same shared card as Home's, with the same live updates, loading skeleton and pour. It is not tappable ([home.md](../home.md#level-card)).
-2. **Daily Goal.** A circular progress ring of today's minutes against the goal, with a label giving both. Tapping the goal opens the same stepper dialog and limits as the Settings row, and saves the same device preference, so the two screens cannot disagree. No navigation is needed to edit it.
-3. **Streak.** The current Streak with a flame icon, and Best Streak as a secondary value on the same row.
-4. **Weekly study time.** The minutes studied in the last 7 days, including today, as a single stat line.
-5. **Summary figures.** Four figures in a row:
+2. **Streak and Daily Goal.** The same row of two cards as on Home ([home.md](../home.md#streak-and-daily-goal)).
+3. **Weekly study time.** The minutes studied in the last 7 days, including today, as a single stat line.
+4. **Summary figures.** Four figures in a row:
    - total study time, all-time;
    - **Sessions Completed**, which counts deck-end sessions only ([session-submission.md](../session-submission.md#abandoned-sessions));
    - Cards Studied, from both Study Modes, which never goes down;
    - Cards Mastered, the Persistent Mastery set held now, which goes down on de-mastery rather than counting every card ever mastered.
-6. **History chart.** A stacked bar chart with one bar per calendar day. A bar's height is the minutes studied that day, and each segment is one Category in that Category's own color ([category-icon-color.md](../category-icon-color.md)). A toggle above the chart switches between the last 7 days, which is the default, and the last 30 days. Bars are not interactive in the first version.
-7. **Per-Category breakdown.** A section directly below the chart that doubles as its legend. It has one row per Category studied in the chart's selected window, showing a color swatch, the name and the minutes, ordered by minutes studied, most first. Because it follows the toggle, it always describes the same period as the chart. Rows are not tappable in the first version.
+5. **History chart.** A stacked bar chart with one bar per calendar day. A bar's height is the minutes studied that day, and each segment is one Category in that Category's own color ([category-icon-color.md](../category-icon-color.md)). A toggle above the chart switches between the last 7 days, which is the default, and the last 30 days. Bars are not interactive in the first version.
+6. **Per-Category breakdown.** A section directly below the chart that doubles as its legend. It has one row per Category studied in the chart's selected window, showing a color swatch, the name and the minutes, ordered by minutes studied, most first. Because it follows the toggle, it always describes the same period as the chart. Rows are not tappable in the first version.
 
 ## Windows
 

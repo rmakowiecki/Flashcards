@@ -9,14 +9,22 @@ sealed interface HomeBody {
     /** A section is still loading and the reveal ceiling has not elapsed, so nothing renders yet. */
     data object Resolving : HomeBody
 
-    /** Both sections loaded and the User has neither Favorites nor Recents. */
+    /** Favorites and Recents loaded and the User has neither. */
     data object FirstSession : HomeBody
 
     /** A section failed and none has content: an error with Retry, never the first-session prompt. */
     data object LoadError : HomeBody
 
-    /** What each area renders, Favorites above Recents. */
-    data class Sections(val favorites: HomeFavoritesArea, val recents: HomeRecentsArea) : HomeBody
+    /** What each area renders, in screen order. */
+    data class Sections(val streak: HomeStreakArea, val favorites: HomeFavoritesArea, val recents: HomeRecentsArea) : HomeBody
+}
+
+sealed interface HomeStreakArea {
+
+    data class Row(val content: HomeStreakState.Content) : HomeStreakArea
+
+    /** Nothing renders: the User never studied, the row failed, or it is still loading after the ceiling. */
+    data object Omitted : HomeStreakArea
 }
 
 /** The Favorites area of [HomeBody.Sections]. */

@@ -25,14 +25,14 @@ The content is real, exported once from Firestore into `:debug-tools`'s raw reso
 - **Categories and Topics** are the whole real taxonomy, with each Category's real glyph and color ([category-icon-color.md](category-icon-color.md)) and each Topic's real card count. The Study tab's search results show a search for "con", less Apple Platforms and every Concurrency Topic but Swift's.
 - **Flashcards** are a sample of real cards for the three Topics a screen lists: 15 of Kotlin Coroutines on Subcategory Details, 20 of Kotlin Functions in the Rated session and 20 of Android Compose in the Fast session. Each sample spans the Difficulty range and includes code blocks and Extended Context where the Topic has them. Subcategory Details shows the Topic's real total of 194 above its 15 listed cards.
 - **The User** is Ross, with no photo, so the avatar shows initials, at Level 14 with a Streak running.
-- **Progress, Favorites and Recents** are filled in, so rings, bookmark badges, the Favorites carousel and the Recently studied list all show content. Recents are timed relative to when the entry opens.
+- **Progress, Favorites and Recents** are filled in, so rings, bookmark badges, the Favorites carousel and the Recently studied list all show content. The Daily Goal is part done. Recents are timed relative to when the entry opens.
 
 ## Entries
 
 | Group | Entries |
 |---|---|
 | Onboarding | the gallery on its cover, paged through by hand to reach each step ([onboarding-flow.md](onboarding-flow.md)) |
-| Home | Favorites and Recents loaded ([home.md](home.md)) |
+| Home | the Streak and Daily Goal row, Favorites and Recents loaded ([home.md](home.md)) |
 | Browse | the Category list, whose search bar shows a fixed set of results for whatever is typed; Category Details; Category Details in Selection Mode; Subcategory Details ([browse.md](browse.md), [category-search.md](category-search.md)) |
 | Study session | Preview of a drawn Quick Session; Rated at the question; Rated with the answer revealed; Rated with Voice Answering listening; Fast tapping through; Fast reading aloud; the Session Summary ([preview-study-session.md](preview-study-session.md), [rated-mode.md](rated-mode.md), [fast-mode.md](fast-mode.md), [session-summary.md](session-summary.md)) |
 

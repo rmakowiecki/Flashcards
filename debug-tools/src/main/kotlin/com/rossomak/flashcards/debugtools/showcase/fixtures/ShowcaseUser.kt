@@ -12,6 +12,9 @@ internal object ShowcaseUser {
     const val XP_INTO_LEVEL = 1_500L
     const val XP_FOR_NEXT_LEVEL = 7_500L
     const val CURRENT_STREAK = 6
+    const val BEST_STREAK = 14
+    const val STUDIED_MINUTES_TODAY = 12
+    const val DAILY_GOAL_MINUTES = 20
 
     val levelCard = FlashcardsLevelCardState.Content(
         level = LEVEL,

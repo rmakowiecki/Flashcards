@@ -41,6 +41,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsRevealContent
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
+import com.rossomak.flashcards.core.ui.composables.streak.StreakAndDailyGoalRow
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
 import com.rossomak.flashcards.feature.home.HomeBody.LoadError
@@ -57,6 +58,8 @@ import com.rossomak.flashcards.feature.home.HomeFavoritesArea.Omitted as Favorit
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Omitted as RecentsOmitted
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Placeholder
 import com.rossomak.flashcards.feature.home.HomeRecentsArea.Rows
+import com.rossomak.flashcards.feature.home.HomeStreakArea.Omitted as StreakOmitted
+import com.rossomak.flashcards.feature.home.HomeStreakArea.Row as StreakRow
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.time.Duration.Companion.minutes
@@ -311,6 +314,27 @@ private fun HomeSections(
     // Each area keyed by kind, so a section arriving after the reveal ceiling reveals by itself while
     // new items inside an area update in place.
     Column {
+        FlashcardsRevealContent(targetState = sections.streak, contentKey = { streak -> streak::class }) { streak ->
+            when (streak) {
+                is StreakRow -> with(streak.content) {
+                    StreakAndDailyGoalRow(
+                        streakDays = days,
+                        bestStreakDays = bestDays,
+                        isStreakAtRisk = isAtRisk,
+                        studiedMinutes = studiedMinutes,
+                        goalMinutes = goalMinutes,
+                        goalProgress = progress,
+                        modifier = Modifier.padding(
+                            start = MaterialTheme.spacing.normal,
+                            top = MaterialTheme.spacing.normal,
+                            end = MaterialTheme.spacing.normal,
+                        ),
+                    )
+                }
+
+                StreakOmitted -> Unit
+            }
+        }
         FlashcardsRevealContent(targetState = sections.favorites, contentKey = { favorites -> favorites::class }) { favorites ->
             when (favorites) {
                 is Carousel -> FavoritesCarousel(

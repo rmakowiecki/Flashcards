@@ -20,14 +20,21 @@ import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsC
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
+import com.rossomak.flashcards.feature.home.HomeStreakArea.Omitted as StreakOmitted
+import com.rossomak.flashcards.feature.home.HomeStreakArea.Row as StreakRow
+import com.rossomak.flashcards.feature.home.HomeStreakState.Content as StreakContent
+import com.rossomak.flashcards.feature.home.HomeStreakState.Failed as StreakFailed
+import com.rossomak.flashcards.feature.home.HomeStreakState.Loading as StreakLoading
 
 /**
  * @param levelCard what Home knows about the Level card; [FlashcardsLevelCardState.Loading] until the Level and
  * the auth user have both emitted. Stored on its own and never part of [body].
  * @param favorites what Home knows about the Favorites; [HomeFavoritesState.Loading] until the first emission.
  * @param recents what Home knows about the Recents; [HomeRecentsState.Loading] until the first emission.
+ * @param streak what Home knows about the Streak and Daily Goal row; [HomeStreakState.Loading] until the scoring state
+ * emits and, for a User who studied, the Daily Goal.
  * @param hasRevealCeilingElapsed whether the reveal ceiling ran out. Once it has, a section still loading is left
- * out of [body] instead of holding back the other one, and joins in place when it arrives.
+ * out of [body] instead of holding back the others, and joins in place when it arrives.
  * @param hasHiddenFavoritesHint whether the User hid the Favorites hint; `null` until the preference is read.
  * Consulted only when Favorites are empty next to Recents, the one body the hint can appear in.
  * @param progressSummary the User's per-Subcategory counts; `null` until a summary document exists.
@@ -38,30 +45,33 @@ data class HomeScreenState(
     val levelCard: FlashcardsLevelCardState = FlashcardsLevelCardState.Loading,
     val favorites: HomeFavoritesState = FavoritesLoading,
     val recents: HomeRecentsState = RecentsLoading,
+    val streak: HomeStreakState = StreakLoading,
     val hasRevealCeilingElapsed: Boolean = false,
     val hasHiddenFavoritesHint: Boolean? = null,
     val progressSummary: ProgressSummary? = null,
     val isProgressResolved: Boolean = false,
 ) {
     /**
-     * Favorites and Recents reveal together: [Resolving] while either is loading, until the ceiling elapses. A
-     * [Failed][FavoritesFailed] section is never "none", so it never produces [FirstSession]: with no content
-     * anywhere it is [LoadError], next to content it is simply left out. When the Favorites hint could show,
-     * the hint preference holds the body back too, so an already-hidden hint never flashes.
+     * [FirstSession] reads Favorites and Recents only, so it never waits for the row. Otherwise every section
+     * reveals together: [Resolving] while any is loading, until the ceiling elapses. A Failed section is never
+     * "none": with no content anywhere it is [LoadError], next to content it is left out. An unresolved hint
+     * preference holds the body back too, so a hidden hint never flashes.
      */
     val body: HomeBody
         get() {
-            val isAnyLoading = favorites is FavoritesLoading || recents is RecentsLoading
-            val isAnyFailed = favorites is FavoritesFailed || recents is RecentsFailed
-            val hasAnyContent = favorites is FavoritesContent || recents is RecentsContent
+            val isAnyLoading = favorites is FavoritesLoading || recents is RecentsLoading || streak is StreakLoading
+            val isAnyFailed = favorites is FavoritesFailed || recents is RecentsFailed || streak is StreakFailed
+            val hasAnyContent = favorites is FavoritesContent || recents is RecentsContent || streak is StreakContent
             val isHintPreferenceUnresolved = canShowFavoritesHint && hasHiddenFavoritesHint == null
             return when {
-                (isAnyLoading || isHintPreferenceUnresolved) && !hasRevealCeilingElapsed -> Resolving
                 favorites is FavoritesEmpty && recents is RecentsEmpty -> FirstSession
+                (isAnyLoading || isHintPreferenceUnresolved) && !hasRevealCeilingElapsed -> Resolving
                 isAnyFailed && !hasAnyContent -> LoadError
-                else -> Sections(favorites = favoritesArea(), recents = recentsArea())
+                else -> Sections(streak = streakArea(), favorites = favoritesArea(), recents = recentsArea())
             }
         }
+
+    private fun streakArea(): HomeStreakArea = if (streak is StreakContent) StreakRow(streak) else StreakOmitted
 
     private val canShowFavoritesHint: Boolean
         get() = favorites is FavoritesEmpty && recents is RecentsContent

@@ -29,8 +29,8 @@ Entry format:
   Read when: changing Flashcard repositories, startup sync, or the seed version bump.
 - [flashcard-selection.md](flashcard-selection.md): How a session's Flashcards are chosen on Preview: the Subcategories in scope (including the Quick Session sample), pool loading, filters, the draw and its order, when it reruns, and the duration estimate.
   Read when: changing card selection, the Quick Session sample, session filters, Length or Sort Order.
-- [home.md](home.md): The Home tab: the Level card, the Favorites carousel and its cards, the Recently studied list and replay, how the sections load and reveal together, the empty states and the Favorites hint, and failure and Retry.
-  Read when: changing `feature:home`, the Level card on Home, Favorite cards or Recent rows.
+- [home.md](home.md): The Home tab: the Level card, the Streak and Daily Goal row, the Favorites carousel and its cards, the Recently studied list and replay, how the sections load and reveal together, the empty states and the Favorites hint, and failure and Retry.
+  Read when: changing `feature:home`, the Level card on Home, the Streak and Daily Goal row, Favorite cards or Recent rows.
 - [launcher-shortcuts.md](launcher-shortcuts.md): Launcher shortcuts to a Category or Subcategory: labels and icons, pinning from the Details screens, the dynamic set that mirrors Favorites, and how a tapped shortcut is resolved, including stale targets and the sign-in gate.
   Read when: changing app shortcuts, the pin action, the dynamic shortcut sync or shortcut launch routing.
 - [navigation.md](navigation.md): How screens connect: launch routing through Splash, Onboarding and Login, the tab shell, the back stack around a Study Session, leaving for Login, and navigation as one-time events.

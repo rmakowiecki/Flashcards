@@ -60,9 +60,12 @@ private val previewProgressSummary = ProgressSummary(
     subcategories = mapOf(previewSubcategory.id to SubcategoryProgressSummary(masteredCount = 10, studiedCount = 25)),
 )
 
+private val previewStreak = HomeStreakState.Content(days = 8, bestDays = 14, isAtRisk = false, studiedMinutes = 14, goalMinutes = 20)
+
 private val previewFavoritesAndRecentsState = HomeScreenState(
     favorites = previewFavorites,
     recents = RecentsContent(previewRecentItems),
+    streak = previewStreak,
     progressSummary = previewProgressSummary,
     isProgressResolved = true,
 )
@@ -127,6 +130,12 @@ private fun HomeContentFavoritesOnlyPreview() {
 @Composable
 private fun HomeContentFavoritesAndRecentsPreview() {
     HomeContentPreviewHost(state = previewFavoritesAndRecentsState)
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentStreakAtRiskPreview() {
+    HomeContentPreviewHost(state = previewFavoritesAndRecentsState.copy(streak = previewStreak.copy(isAtRisk = true, studiedMinutes = 0)))
 }
 
 @PreviewLightDark

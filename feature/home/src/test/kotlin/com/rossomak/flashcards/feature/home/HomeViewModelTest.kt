@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.home
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.Category
+import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.FavoriteItem.FavoriteSubcategory
 import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult
 import com.rossomak.flashcards.core.domain.model.FavoriteItemsResult.Resolved
@@ -16,6 +17,7 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcategory
+import com.rossomak.flashcards.core.domain.model.Streak
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressSummary
@@ -59,6 +61,12 @@ import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsC
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
+import com.rossomak.flashcards.feature.home.HomeStreakArea.Omitted as StreakOmitted
+import com.rossomak.flashcards.feature.home.HomeStreakArea.Row as StreakRow
+import com.rossomak.flashcards.feature.home.HomeStreakState.Content as StreakContent
+import com.rossomak.flashcards.feature.home.HomeStreakState.Empty as StreakEmpty
+import com.rossomak.flashcards.feature.home.HomeStreakState.Failed as StreakFailed
+import com.rossomak.flashcards.feature.home.HomeStreakState.Loading as StreakLoading
 import com.rossomak.flashcards.feature.home.HomeViewModel.Companion.REVEAL_CEILING
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.testutil.assertValue
@@ -72,6 +80,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -94,6 +103,11 @@ private const val UNREAD_CATEGORY_ID = "unread-category"
 private const val AVATAR_URL = "https://example.com/jane.png"
 private const val DISPLAY_NAME = "Jane Doe"
 private const val RENAMED_DISPLAY_NAME = "Jane Smith"
+private const val STREAK_DAYS = 8
+private const val BEST_STREAK_DAYS = 14
+private const val LONGER_GOAL_MINUTES = 40
+private const val STUDIED_MINUTES = 10
+private const val STUDIED_SECONDS = STUDIED_MINUTES * 60L
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -128,13 +142,14 @@ class HomeViewModelTest {
         observeScoringState: ObserveScoringStateUseCase = ObserveScoringStateUseCase(scoringStateRepository, FakeXpConfigRepository(), FakeTodayProvider()),
         observeFavoriteItems: ObserveFavoriteItemsUseCase = ObserveFavoriteItemsUseCase(userFavoritesRepository, flashcardRepository),
         observeRecentSessions: ObserveRecentSessionsUseCase = ObserveRecentSessionsUseCase(recentSessionsRepository, flashcardRepository),
+        observeUserPreferences: ObserveUserPreferencesUseCase = ObserveUserPreferencesUseCase(userPreferencesRepository),
     ): HomeViewModel = HomeViewModel(
         observeAuthUser = observeAuthUser,
         observeFavoriteItems = observeFavoriteItems,
         observeScoringState = observeScoringState,
         observeProgressSummary = ObserveProgressSummaryUseCase(cardProgressRepository),
         observeRecentSessions = observeRecentSessions,
-        observeUserPreferences = ObserveUserPreferencesUseCase(userPreferencesRepository),
+        observeUserPreferences = observeUserPreferences,
         saveUserPreference = SaveUserPreferenceUseCase(userPreferencesRepository),
     )
 
@@ -960,7 +975,7 @@ class HomeViewModelTest {
 
             viewModel.state.assertValue {
                 favorites shouldBe Empty
-                body shouldBe Sections(favorites = FavoritesOmitted, recents = RecentsOmitted)
+                body shouldBe Sections(streak = StreakOmitted, favorites = FavoritesOmitted, recents = RecentsOmitted)
             }
         }
 
@@ -972,7 +987,7 @@ class HomeViewModelTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.body shouldBe Sections(favorites = FavoritesOmitted, recents = RecentsOmitted)
+        viewModel.state.value.body shouldBe Sections(streak = StreakOmitted, favorites = FavoritesOmitted, recents = RecentsOmitted)
     }
 
     @Test
@@ -1106,6 +1121,8 @@ class HomeViewModelTest {
 
     @Test
     fun `an unresolved hint preference never delays Favorites Content`() = runTest(mainDispatcherRule.testDispatcher) {
+        // Never studied: the row needs no Daily Goal, so the stalled read holds nothing back.
+        scoringStateRepository.emit(ScoringState())
         userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
         favorite(COMPOSE_ID)
 
@@ -1118,6 +1135,7 @@ class HomeViewModelTest {
     @Test
     fun `both sections Empty give the first-session body even with an unresolved hint preference`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.emit(ScoringState())
             userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
 
             val viewModel = createViewModel()
@@ -1149,6 +1167,7 @@ class HomeViewModelTest {
 
     @Test
     fun `a hint preference read that ends without a value counts as not hidden`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.emit(ScoringState())
         userPreferencesRepository.userPreferencesEmissionLimit = 0
         givenOneRecentSession()
 
@@ -1161,6 +1180,7 @@ class HomeViewModelTest {
     @Test
     fun `an unresolved hint preference never delays Failed Favorites next to Recents Content`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.emit(ScoringState())
             userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
             userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
             givenOneRecentSession()
@@ -1173,6 +1193,7 @@ class HomeViewModelTest {
 
     @Test
     fun `an unresolved hint preference never delays the Recents placeholder`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.emit(ScoringState())
         userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
         favorite(COMPOSE_ID)
 
@@ -1524,4 +1545,353 @@ class HomeViewModelTest {
                 favorites shouldBe Loading
             }
         }
+
+    private val today = FakeTodayProvider().today
+
+    private fun studiedToday(seconds: Long) = ScoringState(
+        currentStreak = STREAK_DAYS,
+        bestStreak = BEST_STREAK_DAYS,
+        lastStudyDate = today.toString(),
+        studiedSecondsOnLastStudyDate = seconds,
+    )
+
+    private fun HomeStreakState.content(): StreakContent = shouldBeInstanceOf<StreakContent>()
+
+    private fun HomeBody.streakArea(): HomeStreakArea = shouldBeInstanceOf<Sections>().streak
+
+    @Test
+    fun `today's seconds round up to whole minutes once`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        val minutesBySeconds = listOf(0L to 0, 1L to 1, 59L to 1, 60L to 1, 61L to 2)
+
+        minutesBySeconds.forEach { (seconds, expectedMinutes) ->
+            scoringStateRepository.emit(studiedToday(seconds))
+            advanceUntilIdle()
+
+            viewModel.state.value.streak.content().studiedMinutes shouldBe expectedMinutes
+        }
+    }
+
+    @Test
+    fun `the row carries the Streak, Best Streak, at-risk flag and today's progress against the Daily Goal`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            val streak = viewModel.state.value.streak.content()
+            streak shouldBe StreakContent(
+                days = STREAK_DAYS,
+                bestDays = BEST_STREAK_DAYS,
+                isAtRisk = false,
+                studiedMinutes = STUDIED_MINUTES,
+                goalMinutes = DailyGoal.DEFAULT_MINUTES,
+            )
+            streak.progress shouldBe STUDIED_MINUTES.toFloat() / DailyGoal.DEFAULT_MINUTES
+        }
+
+    @Test
+    fun `a Streak last extended yesterday is at risk with no minutes today`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS).copy(lastStudyDate = today.minusDays(1).toString()))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().run {
+            isAtRisk shouldBe true
+            studiedMinutes shouldBe 0
+        }
+    }
+
+    @Test
+    fun `progress past the Daily Goal is capped at 1 while the minutes stay real`() = runTest(mainDispatcherRule.testDispatcher) {
+        val overGoalMinutes = DailyGoal.DEFAULT_MINUTES + STUDIED_MINUTES
+        scoringStateRepository.emit(studiedToday(seconds = overGoalMinutes * 60L))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().run {
+            studiedMinutes shouldBe overGoalMinutes
+            progress shouldBe 1f
+        }
+    }
+
+    @Test
+    fun `a Daily Goal that is not positive gives no progress`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = 0)
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().progress shouldBe 0f
+    }
+
+    @Test
+    fun `a Daily Goal change updates the row in place`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = LONGER_GOAL_MINUTES)
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().run {
+            goalMinutes shouldBe LONGER_GOAL_MINUTES
+            progress shouldBe STUDIED_MINUTES.toFloat() / LONGER_GOAL_MINUTES
+        }
+    }
+
+    @Test
+    fun `a failed Daily Goal read uses the default goal`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesReadFailure = IllegalStateException("preferences read failed")
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().goalMinutes shouldBe DailyGoal.DEFAULT_MINUTES
+    }
+
+    @Test
+    fun `a Daily Goal read that fails after a value keeps that goal`() = runTest(mainDispatcherRule.testDispatcher) {
+        val longerGoalPreferences = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = LONGER_GOAL_MINUTES)
+        val failingAfterOneValue = mockk<ObserveUserPreferencesUseCase> {
+            coEvery { this@mockk() } returns flow {
+                emit(longerGoalPreferences)
+                error("preferences listener failed")
+            }
+        }
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel(observeUserPreferences = failingAfterOneValue)
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().goalMinutes shouldBe LONGER_GOAL_MINUTES
+    }
+
+    @Test
+    fun `a stalled Daily Goal read holds back the row of a User who studied`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesReadGate = CompletableDeferred()
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.assertValue {
+            levelCard.shouldBeInstanceOf<LevelCardContent>()
+            streak shouldBe StreakLoading
+        }
+    }
+
+    @Test
+    fun `a Daily Goal read that ends without a value uses the default goal`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.userPreferencesEmissionLimit = 0
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().goalMinutes shouldBe DailyGoal.DEFAULT_MINUTES
+    }
+
+    @Test
+    fun `the Level card and the row share one scoring state stream and update together`() = runTest(mainDispatcherRule.testDispatcher) {
+        val domainStreak = Streak(days = STREAK_DAYS, best = BEST_STREAK_DAYS, isAtRisk = false)
+        val observedScoringStates = MutableStateFlow(
+            ObservedScoringState(studiedToday(seconds = 0), startingLevelProgress, domainStreak, todayStudiedSeconds = 0),
+        )
+        val scoringState = mockk<ObserveScoringStateUseCase> { coEvery { this@mockk() } returns observedScoringStates }
+        val viewModel = createViewModel(observeScoringState = scoringState)
+        advanceUntilIdle()
+
+        observedScoringStates.value = ObservedScoringState(studiedToday(STUDIED_SECONDS), levelThreeProgress, domainStreak, todayStudiedSeconds = STUDIED_SECONDS)
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            levelCard.shouldBeInstanceOf<LevelCardContent>().toLevelProgress() shouldBe levelThreeProgress
+            streak.content().studiedMinutes shouldBe STUDIED_MINUTES
+        }
+        coVerify(exactly = 1) { scoringState() }
+    }
+
+    @Test
+    fun `a User who never studied gets an Empty row that is not shown`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+        scoringStateRepository.emit(ScoringState())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            streak shouldBe StreakEmpty
+            body.streakArea() shouldBe StreakOmitted
+        }
+    }
+
+    @Test
+    fun `the body stays Resolving while the row loads, until the ceiling elapses`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+        givenOneRecentSession()
+
+        val viewModel = createViewModel()
+        runCurrent()
+        viewModel.state.assertValue {
+            favorites.shouldBeInstanceOf<Content>()
+            recents.shouldBeInstanceOf<RecentsContent>()
+            body shouldBe Resolving
+        }
+
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+        runCurrent()
+
+        viewModel.state.value.body.streakArea().shouldBeInstanceOf<StreakRow>().content.studiedMinutes shouldBe STUDIED_MINUTES
+    }
+
+    @Test
+    fun `a row that arrives after the ceiling joins the Sections in place`() = runTest(mainDispatcherRule.testDispatcher) {
+        favorite(COMPOSE_ID)
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.assertValue {
+            streak shouldBe StreakLoading
+            body.streakArea() shouldBe StreakOmitted
+        }
+
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+        advanceUntilIdle()
+
+        viewModel.state.value.body.streakArea().shouldBeInstanceOf<StreakRow>()
+    }
+
+    @Test
+    fun `a failing scoring state stream fails the row and the Level card together`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.scoringStateReadFailure = IllegalStateException("scoring state listener failed")
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            streak shouldBe StreakFailed
+            levelCard shouldBe LevelCardUnavailable
+        }
+    }
+
+    @Test
+    fun `a scoring state stream that completes before its first emission fails the row`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.completesWithoutEmitting = true
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak shouldBe StreakFailed
+    }
+
+    @Test
+    fun `a scoring state failure after the first emission keeps the row`() = runTest(mainDispatcherRule.testDispatcher) {
+        val scoringState = mockk<ObserveScoringStateUseCase>()
+        coEvery { scoringState() } returns flow {
+            val streak = Streak(days = STREAK_DAYS, best = BEST_STREAK_DAYS, isAtRisk = false)
+            emit(ObservedScoringState(studiedToday(STUDIED_SECONDS), startingLevelProgress, streak, todayStudiedSeconds = STUDIED_SECONDS))
+            error("scoring state listener failed")
+        }
+
+        val viewModel = createViewModel(observeScoringState = scoringState)
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().days shouldBe STREAK_DAYS
+    }
+
+    @Test
+    fun `a Failed row next to content is not shown`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.scoringStateReadFailure = IllegalStateException("scoring state listener failed")
+        favorite(COMPOSE_ID)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.streak shouldBe StreakOmitted
+        sections.favorites.shouldBeInstanceOf<Carousel>()
+    }
+
+    @Test
+    fun `a Failed row next to Empty Favorites and Recents still loading after the ceiling gives the error body`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.scoringStateReadFailure = IllegalStateException("scoring state listener failed")
+            recentSessionsRepository.recentSessionsReadGate = CompletableDeferred()
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                favorites shouldBe Empty
+                body shouldBe LoadError
+            }
+        }
+
+    @Test
+    fun `a row with content next to two Failed sections shows the row only`() = runTest(mainDispatcherRule.testDispatcher) {
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        recentSessionsRepository.recentSessionsReadFailure = IllegalStateException("recents listener failed")
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val sections = viewModel.state.value.body.shouldBeInstanceOf<Sections>()
+        sections.streak.shouldBeInstanceOf<StreakRow>()
+        sections.favorites shouldBe FavoritesOmitted
+        sections.recents shouldBe RecentsOmitted
+    }
+
+    @Test
+    fun `both sections Empty give the first-session body even when the row has content`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            streak.shouldBeInstanceOf<StreakContent>()
+            body shouldBe FirstSession
+        }
+    }
+
+    @Test
+    fun `Empty Favorites and Recents give the first-session body without waiting for the row`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.state.assertValue {
+            streak shouldBe StreakLoading
+            hasRevealCeilingElapsed shouldBe false
+            body shouldBe FirstSession
+        }
+    }
+
+    @Test
+    fun `Retry on a Failed row sets it back to Loading and restarts the scoring state stream`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.scoringStateReadFailure = IllegalStateException("scoring state listener failed")
+        userFavoritesRepository.favoritesReadFailure = IllegalStateException("favorites listener failed")
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.state.value.body shouldBe LoadError
+
+        scoringStateRepository.scoringStateReadFailure = null
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+        viewModel.onRetry()
+        viewModel.state.assertValue {
+            streak shouldBe StreakLoading
+            hasRevealCeilingElapsed shouldBe false
+        }
+        advanceUntilIdle()
+
+        viewModel.state.assertValue {
+            streak.content().studiedMinutes shouldBe STUDIED_MINUTES
+            levelCard.shouldBeInstanceOf<LevelCardContent>()
+        }
+    }
 }
