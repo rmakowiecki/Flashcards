@@ -12,8 +12,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.spacing
+
+/** The size of the flame and the smallest Daily Goal ring, so the two cards line up. */
+internal val DAILY_PROGRESS_CARD_VISUAL_SIZE = 44.dp
 
 /** The card shell shared by [StreakCard] and [DailyGoalCard], read by TalkBack as one node: [description]. */
 @Composable

@@ -30,6 +30,13 @@ class StreakCardBestLabelTest {
     }
 
     @Test
+    fun `emphasizeValue emphasizes a value written in non-ASCII digits`() {
+        val label = emphasizeValue(text = "Best: ١٤d", value = "١٤")
+
+        label.spanStyles shouldBe listOf(AnnotatedString.Range(EmphasizedSpanStyle, start = 6, end = 9))
+    }
+
+    @Test
     fun `emphasizeValue with the value missing returns the text plain`() {
         val label = emphasizeValue(text = "Best: 14d", value = "7")
 
