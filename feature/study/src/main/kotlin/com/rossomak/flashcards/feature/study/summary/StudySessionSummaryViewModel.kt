@@ -11,7 +11,7 @@ import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.StudySessionReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveScoringStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Confirm
@@ -36,9 +36,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -56,7 +58,7 @@ class StudySessionSummaryViewModel @Inject constructor(
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
     private val submitStudySession: SubmitStudySessionUseCase,
     private val observeAuthUser: ObserveAuthUserUseCase,
-    private val observeLevelProgress: ObserveLevelProgressUseCase,
+    private val observeScoringState: ObserveScoringStateUseCase,
 ) : ViewModel() {
 
     private val route = savedStateHandle.decodeRoute<StudySessionSummaryRoute>()
@@ -118,7 +120,9 @@ class StudySessionSummaryViewModel @Inject constructor(
     private fun observeLevelCard() {
         viewModelScope.launch {
             var hasLevelEmitted = false
-            flow { emitAll(observeLevelProgress()) }
+            flow { emitAll(observeScoringState()) }
+                .map { observedScoringState -> observedScoringState.levelProgress }
+                .distinctUntilChanged()
                 .onEach { hasLevelEmitted = true }
                 .onCompletion { cause ->
                     if (cause == null && !hasLevelEmitted) {

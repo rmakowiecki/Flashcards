@@ -13,9 +13,9 @@ import com.rossomak.flashcards.core.domain.model.UserPreference.HasHiddenFavorit
 import com.rossomak.flashcards.core.domain.model.toReplay
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveFavoriteItemsUseCase
-import com.rossomak.flashcards.core.domain.usecase.ObserveLevelProgressUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveRecentSessionsUseCase
+import com.rossomak.flashcards.core.domain.usecase.ObserveScoringStateUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.domain.usecase.SaveUserPreferenceUseCase
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCardState.Content as LevelCardContent
@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -52,7 +53,7 @@ import kotlinx.coroutines.launch
 class HomeViewModel @Inject constructor(
     private val observeAuthUser: ObserveAuthUserUseCase,
     private val observeFavoriteItems: ObserveFavoriteItemsUseCase,
-    private val observeLevelProgress: ObserveLevelProgressUseCase,
+    private val observeScoringState: ObserveScoringStateUseCase,
     private val observeProgressSummary: ObserveProgressSummaryUseCase,
     private val observeRecentSessions: ObserveRecentSessionsUseCase,
     private val observeUserPreferences: ObserveUserPreferencesUseCase,
@@ -210,7 +211,8 @@ class HomeViewModel @Inject constructor(
         levelCardJob?.cancel()
         levelCardJob = viewModelScope.launch {
             var hasLevelEmitted = false
-            val levelProgressFlow = flow { emitAll(observeLevelProgress()) }
+            val levelProgressFlow = flow { emitAll(observeScoringState()) }
+                .map { observedScoringState -> observedScoringState.levelProgress }
                 .onEach { hasLevelEmitted = true }
                 .onCompletion { cause ->
                     if (cause == null && !hasLevelEmitted) failLevelCardIfLoading { "Observing the Level completed before its first emission" }

@@ -6,9 +6,9 @@ package com.rossomak.flashcards.core.domain.model
  * `progress/` (ADR-0014, ADR-0016). The server-authoritative `submitStudySession` Cloud Function is its
  * only writer. The client reads it through
  * [com.rossomak.flashcards.core.domain.repository.ScoringStateRepository], with its Pending Sessions
- * replayed on top by [com.rossomak.flashcards.core.domain.scoring.scoreSession], for the Session
- * Summary's fallback preview. Home, and a Summary with no score, follow its Level live through
- * [com.rossomak.flashcards.core.domain.repository.LevelProgressRepository].
+ * replayed on top by [com.rossomak.flashcards.core.domain.scoring.scoreSession]: once for the Session
+ * Summary's fallback preview, and live for Home and a Summary with no score, through
+ * [com.rossomak.flashcards.core.domain.usecase.ObserveScoringStateUseCase].
  *
  * [currentStreak], [bestStreak], [lastStudyDate], [goalMetDate] and [studiedSecondsOnLastStudyDate]
  * advance by the Streak and Daily Goal rules

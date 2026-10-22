@@ -145,7 +145,7 @@ inside a sharing grace window never restarts a completed upstream.
   nothing until the server answers. A consumer shows its loading state rather than Level 1.
 - **One configuration per value.** Each emission reads the cached XP configuration once and uses it for
   both the replay and the Level threshold. A configuration refreshed while a screen is open applies
-  from the next emission.
+  from the next emission. (Relaxed on 2026-10-22, below.)
 - **Sign-out ends the flow.** Permission denied completes the listener, and the flow completes with no
   further value, cancelling a replay still in flight.
 
@@ -167,3 +167,18 @@ from the session's score; only a Summary with no score follows the live Level st
 scored card can differ from Home's when the server scored with a newer XP configuration than the
 device's cached one, or when the Summary shows a local preview that the server later scores
 differently. The Summary never replaces a score it has shown.
+
+**2026-10-22 — One live scoring state stream.** The live flow moved into `ScoringStateRepository`
+(`observeScoringState`, served by `DefaultScoringStateRepository`) and emits the whole projected
+`ScoringState`, Streak and Daily Goal fields included, instead of `LevelProgress`. Every rule of the
+2026-10-10 amendment holds, except that the Level threshold is no longer measured inside the
+repository: `ObserveScoringStateUseCase` measures it, and reads the Streak and today's studied seconds
+against today's local date. The repository still emits only on change, so a delivery that moves a
+session from the queue to the server state emits nothing.
+
+- **Two configuration reads per value.** The replay and the use case's Level threshold each read the
+  cached XP configuration, so a refresh between the two reads can briefly measure a value against a
+  newer Level curve than its replay used. Accepted: the configuration rarely changes after release,
+  and the next emission corrects it.
+- **No midnight re-emission.** Today is read on each upstream value only, so a Streak at risk or
+  today's minutes stay as they were across midnight until the scoring state next changes.
