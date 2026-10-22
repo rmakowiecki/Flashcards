@@ -23,6 +23,8 @@ import com.rossomak.flashcards.feature.home.HomeRecentsState.Content as RecentsC
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Empty as RecentsEmpty
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Failed as RecentsFailed
 import com.rossomak.flashcards.feature.home.HomeRecentsState.Loading as RecentsLoading
+import com.rossomak.flashcards.feature.home.HomeStreakState.Empty as StreakEmpty
+import com.rossomak.flashcards.feature.home.HomeStreakState.Failed as StreakFailed
 import java.time.Instant
 
 private val previewCategory = Category(
@@ -104,13 +106,13 @@ private fun HomeContentFirstSessionPreview() {
 @PreviewLightDark
 @Composable
 private fun HomeContentErrorPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsFailed))
+    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsFailed, streak = StreakFailed))
 }
 
 @PreviewLightDark
 @Composable
 private fun HomeContentRecentsOnlyPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsContent(previewRecentItems)))
+    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsContent(previewRecentItems), streak = previewStreak))
 }
 
 @PreviewLightDark
@@ -120,6 +122,7 @@ private fun HomeContentFavoritesOnlyPreview() {
         state = HomeScreenState(
             favorites = previewFavorites,
             recents = RecentsFailed,
+            streak = previewStreak,
             progressSummary = previewProgressSummary,
             isProgressResolved = true,
         ),
@@ -142,7 +145,7 @@ private fun HomeContentStreakAtRiskPreview() {
 @Composable
 private fun HomeContentFavoritesHintPreview() {
     HomeContentPreviewHost(
-        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), hasHiddenFavoritesHint = false),
+        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), streak = previewStreak, hasHiddenFavoritesHint = false),
     )
 }
 
@@ -150,7 +153,7 @@ private fun HomeContentFavoritesHintPreview() {
 @Composable
 private fun HomeContentFavoritesHintHiddenPreview() {
     HomeContentPreviewHost(
-        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), hasHiddenFavoritesHint = true),
+        state = HomeScreenState(favorites = FavoritesEmpty, recents = RecentsContent(previewRecentItems), streak = previewStreak, hasHiddenFavoritesHint = true),
     )
 }
 
@@ -161,6 +164,7 @@ private fun HomeContentRecentsPlaceholderPreview() {
         state = HomeScreenState(
             favorites = previewFavorites,
             recents = RecentsEmpty,
+            streak = StreakEmpty,
             progressSummary = previewProgressSummary,
             isProgressResolved = true,
         ),
@@ -199,7 +203,7 @@ private fun HomeContentLargeFontPreview() {
 @Preview(fontScale = 2f, uiMode = UI_MODE_NIGHT_YES)
 @Composable
 private fun HomeContentErrorLargeFontPreview() {
-    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsFailed))
+    HomeContentPreviewHost(state = HomeScreenState(favorites = FavoritesFailed, recents = RecentsFailed, streak = StreakFailed))
 }
 
 @Preview(locale = "ar")
