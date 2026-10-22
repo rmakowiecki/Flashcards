@@ -111,6 +111,7 @@
     <string name="level_card_xp_count_label">%1$,d / %2$,d</string>
     <string name="level_card_xp_unit_label">XP</string>
 
+    <string name="daily_progress_card_count_label" translatable="false">%1$d</string>
     <string name="streak_card_title">Streak</string>
     <plurals name="streak_card_days_label">
         <item quantity="one">day</item>
@@ -125,7 +126,8 @@
     <string name="streak_card_at_risk_cd">Streak, %1$s, best %2$s, today not counted yet</string>
 
     <string name="daily_goal_card_title">Daily goal</string>
-    <string name="daily_goal_card_goal_label">of %1$d</string>
+    <string name="daily_goal_card_goal_label">of %1$d min</string>
+    <string name="daily_goal_card_percent_label">%1$d%%</string>
     <string name="daily_goal_card_unit_label">min</string>
     <plurals name="daily_goal_card_cd">
         <item quantity="one">Daily goal, %1$d of %2$d minute</item>

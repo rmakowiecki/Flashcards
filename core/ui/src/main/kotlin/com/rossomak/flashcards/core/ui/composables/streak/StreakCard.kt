@@ -22,14 +22,11 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.EmphasizedSpanStyle
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-
-private val STREAK_CARD_FLAME_SIZE = 32.dp
 
 /** Read-only Streak card. The flame dims while [isAtRisk], meaning the Streak is alive but today doesn't count yet. */
 @Composable
@@ -45,7 +42,8 @@ fun StreakCard(days: Int, bestDays: Int, isAtRisk: Boolean, modifier: Modifier =
         else -> MaterialTheme.brandColors.streakFlame
     }
     val bestText = stringResource(R.string.streak_card_best_label, bestDays)
-    val bestLabel = remember(bestText, bestDays) { emphasizeValue(bestText, bestDays.toString()) }
+    val bestCount = stringResource(R.string.daily_progress_card_count_label, bestDays)
+    val bestLabel = remember(bestText, bestCount) { emphasizeValue(bestText, bestCount) }
 
     DailyProgressCardFrame(
         title = stringResource(R.string.streak_card_title),
@@ -53,34 +51,36 @@ fun StreakCard(days: Int, bestDays: Int, isAtRisk: Boolean, modifier: Modifier =
         modifier = modifier,
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = Icons.Filled.LocalFireDepartment,
                 contentDescription = null,
-                modifier = Modifier.size(STREAK_CARD_FLAME_SIZE),
+                modifier = Modifier.size(DAILY_PROGRESS_CARD_VISUAL_SIZE),
                 tint = flameColor,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall)) {
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall)) {
+                    Text(
+                        text = stringResource(R.string.daily_progress_card_count_label, days),
+                        modifier = Modifier.alignByBaseline(),
+                        style = MaterialTheme.typography.titleLargeEmphasized,
+                    )
+                    Text(
+                        text = pluralStringResource(R.plurals.streak_card_days_label, days),
+                        modifier = Modifier.alignByBaseline(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
-                    text = days.toString(),
-                    modifier = Modifier.alignByBaseline(),
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
-                )
-                Text(
-                    text = pluralStringResource(R.plurals.streak_card_days_label, days),
-                    modifier = Modifier.alignByBaseline(),
+                    text = bestLabel,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        Text(
-            text = bestLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
