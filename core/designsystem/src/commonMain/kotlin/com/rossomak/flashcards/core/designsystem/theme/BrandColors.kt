@@ -27,6 +27,7 @@ data class BrandColors(
     val onGradientLoss: Color,
     val codeBlockBackground: Color,
     val onCodeBlock: Color,
+    val streakFlame: Color,
 )
 
 /**
@@ -164,6 +165,10 @@ private val onGradientLossColor = errorDark
 private val codeBlockBackgroundColor = Color(0xFF1E1E1E)
 private val onCodeBlockColor = Color(0xFFFFFFFF)
 
+/** The Streak card's flame; flips with the theme because it sits on a themed card, not a gradient. */
+private val streakFlameLight = Color(0xFFE8590C)
+private val streakFlameDark = Color(0xFFFF9F43)
+
 val lightBrandColors = BrandColors(
     screenGradient = brandScreenGradient,
     screenGradientBase = brandScreenGradientBase,
@@ -183,6 +188,7 @@ val lightBrandColors = BrandColors(
     onGradientLoss = onGradientLossColor,
     codeBlockBackground = codeBlockBackgroundColor,
     onCodeBlock = onCodeBlockColor,
+    streakFlame = streakFlameLight,
 )
 
 // Dark uses a neutral elevated-surface container (surfaceContainerHighDark) with primaryDark as
@@ -211,6 +217,7 @@ val darkBrandColors = BrandColors(
     onGradientLoss = onGradientLossColor,
     codeBlockBackground = codeBlockBackgroundColor,
     onCodeBlock = onCodeBlockColor,
+    streakFlame = streakFlameDark,
 )
 
 val LocalBrandColors = staticCompositionLocalOf { lightBrandColors }
