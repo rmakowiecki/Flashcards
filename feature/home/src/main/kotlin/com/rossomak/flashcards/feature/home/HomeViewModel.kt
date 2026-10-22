@@ -280,7 +280,7 @@ class HomeViewModel @Inject constructor(
             when {
                 streak == null -> StreakEmpty
                 goalMinutes == null -> null
-                else -> streak.toStreakContent(observedScoringState.todayStudiedSeconds, goalMinutes)
+                else -> with(observedScoringState) { streak.toStreakContent(todayStudiedSeconds, goalMinutes, isDailyGoalMetToday) }
             }
         }
             .filterNotNull()
@@ -400,13 +400,31 @@ private fun Flow<ScoringStateFeed>.latestValues(onEndedWithoutValue: () -> Unit)
         .mapNotNull { feed -> feed.latest }
         .distinctUntilChanged()
 
-/** Rounds the day's total up once, so any study shows at least 1 minute. */
-private fun Streak.toStreakContent(todayStudiedSeconds: Long, goalMinutes: Int) = StreakContent(
-    days = days,
-    bestDays = best,
-    isAtRisk = isAtRisk,
-    studiedMinutes = ((todayStudiedSeconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE).toInt(),
-    goalMinutes = goalMinutes,
-)
+/**
+ * Rounds the day's total up, so any study shows at least 1 minute. Until the goal is met the minutes stop one
+ * short of it and the percent, rounded down, at 99, so a full goal always comes with the check. Once met, the
+ * minutes may pass the goal.
+ */
+private fun Streak.toStreakContent(todayStudiedSeconds: Long, goalMinutes: Int, isDailyGoalMetToday: Boolean): StreakContent {
+    val isGoalMet = isDailyGoalMetToday && goalMinutes > 0
+    val roundedUpMinutes = ((todayStudiedSeconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE).toInt()
+    return StreakContent(
+        days = days,
+        bestDays = best,
+        isAtRisk = isAtRisk,
+        studiedMinutes = when {
+            isGoalMet || goalMinutes <= 0 -> roundedUpMinutes
+            else -> roundedUpMinutes.coerceAtMost(goalMinutes - 1)
+        },
+        goalMinutes = goalMinutes,
+        goalPercent = when {
+            isGoalMet -> PERCENT
+            goalMinutes <= 0 -> 0
+            else -> (todayStudiedSeconds * PERCENT / (goalMinutes * SECONDS_PER_MINUTE)).toInt().coerceIn(0, PERCENT - 1)
+        },
+        isGoalMet = isGoalMet,
+    )
+}
 
 private const val SECONDS_PER_MINUTE = 60L
+private const val PERCENT = 100

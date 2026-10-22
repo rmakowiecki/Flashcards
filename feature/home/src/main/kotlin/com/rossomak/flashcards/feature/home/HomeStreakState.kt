@@ -6,8 +6,14 @@ sealed interface HomeStreakState {
     data object Empty : HomeStreakState
     data object Failed : HomeStreakState
 
-    data class Content(val days: Int, val bestDays: Int, val isAtRisk: Boolean, val studiedMinutes: Int, val goalMinutes: Int) : HomeStreakState {
-        val progress: Float
-            get() = if (goalMinutes > 0) (studiedMinutes.toFloat() / goalMinutes).coerceAtMost(1f) else 0f
-    }
+    /** [studiedMinutes] and [goalPercent] read as shown; [isGoalMet] means today's Daily Goal XP is earned. */
+    data class Content(
+        val days: Int,
+        val bestDays: Int,
+        val isAtRisk: Boolean,
+        val studiedMinutes: Int,
+        val goalMinutes: Int,
+        val goalPercent: Int,
+        val isGoalMet: Boolean,
+    ) : HomeStreakState
 }

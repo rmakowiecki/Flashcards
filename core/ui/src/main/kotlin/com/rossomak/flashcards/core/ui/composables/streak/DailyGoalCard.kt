@@ -1,13 +1,20 @@
 package com.rossomak.flashcards.core.ui.composables.streak
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -19,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.IntrinsicMeasurable
 import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.Layout
@@ -28,6 +37,7 @@ import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -35,6 +45,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.semanticColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.animation.rememberAnimationsEnabled
@@ -48,41 +59,47 @@ private val DAILY_GOAL_RING_STROKE = 4.dp
 private const val DAILY_GOAL_RING_FULL_CIRCLE_DEGREES = 360f
 private const val DAILY_GOAL_RING_START_DEGREES = -90f
 private const val DAILY_GOAL_RING_TRACK_ALPHA = 0.16f
+private const val DAILY_GOAL_CHECK_SCALE = 1.5f
 private const val PERCENT = 100
 
 /**
- * Read-only Daily Goal card. The caller passes minutes already rounded and [progress] already capped at 1.
- * A full ring never means the goal was met: the server rounds the minutes down when awarding the Daily Goal XP.
+ * Read-only Daily Goal card. The caller passes the minutes and [percent] as they should read; [isGoalMet] means
+ * today's Daily Goal XP is earned, and swaps the percent for a check inside a full green ring.
  */
 @Composable
-fun DailyGoalCard(studiedMinutes: Int, goalMinutes: Int, progress: Float, modifier: Modifier = Modifier) {
+fun DailyGoalCard(studiedMinutes: Int, goalMinutes: Int, percent: Int, isGoalMet: Boolean, modifier: Modifier = Modifier) {
     val animationsEnabled = rememberAnimationsEnabled()
-    val animationSpec = remember(animationsEnabled) {
-        when {
-            animationsEnabled -> tween<Float>(durationMillis = FlashcardsMotion.REVEAL_DURATION_MS, easing = FlashcardsMotion.EmphasizedEasing)
-            else -> snap()
-        }
-    }
     val shownProgress by animateFloatAsState(
-        targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = animationSpec,
+        targetValue = if (isGoalMet) 1f else percent.coerceIn(0, PERCENT).toFloat() / PERCENT,
+        animationSpec = revealSpec(animationsEnabled),
         label = "DailyGoalCardProgress",
     )
+    val checkAlpha by animateFloatAsState(
+        targetValue = if (isGoalMet) 1f else 0f,
+        animationSpec = revealSpec(animationsEnabled),
+        label = "DailyGoalCardCheckAlpha",
+    )
+    val arcColor by animateColorAsState(
+        targetValue = if (isGoalMet) MaterialTheme.semanticColors.onPositiveContainer else MaterialTheme.colorScheme.primary,
+        animationSpec = revealSpec(animationsEnabled),
+        label = "DailyGoalCardArcColor",
+    )
+    val description = when {
+        isGoalMet -> pluralStringResource(R.plurals.daily_goal_card_met_cd, goalMinutes, studiedMinutes, goalMinutes)
+        else -> pluralStringResource(R.plurals.daily_goal_card_cd, goalMinutes, studiedMinutes, goalMinutes)
+    }
 
     DailyProgressCardFrame(
         title = stringResource(R.string.daily_goal_card_title),
-        description = pluralStringResource(R.plurals.daily_goal_card_cd, goalMinutes, studiedMinutes, goalMinutes),
+        description = description,
         modifier = modifier,
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DailyGoalRing(progress = { shownProgress }) {
-                Text(
-                    text = stringResource(R.string.daily_goal_card_percent_label, dailyGoalPercent(studiedMinutes, goalMinutes)),
-                    style = MaterialTheme.typography.labelSmall,
-                )
+            DailyGoalRing(progress = { shownProgress }, arcColor = arcColor) {
+                DailyGoalRingLabel(percent = if (isGoalMet) PERCENT else percent, checkAlpha = { checkAlpha }, checkColor = arcColor)
             }
             Column {
                 Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall)) {
@@ -108,16 +125,39 @@ fun DailyGoalCard(studiedMinutes: Int, goalMinutes: Int, progress: Float, modifi
     }
 }
 
-/** Rounded down, so 100% shows only once the minutes reach the goal. */
-internal fun dailyGoalPercent(studiedMinutes: Int, goalMinutes: Int): Int = when {
-    goalMinutes > 0 -> (studiedMinutes * PERCENT / goalMinutes).coerceIn(0, PERCENT)
-    else -> 0
+@Composable
+private fun <T> revealSpec(animationsEnabled: Boolean): AnimationSpec<T> = remember(animationsEnabled) {
+    when {
+        animationsEnabled -> tween(durationMillis = FlashcardsMotion.REVEAL_DURATION_MS, easing = FlashcardsMotion.EmphasizedEasing)
+        else -> snap()
+    }
+}
+
+/**
+ * The percent crossfading into the check. The percent keeps its space while hidden and the check never takes
+ * any, so the ring is the same size met or not, at every font scale.
+ */
+@Composable
+private fun DailyGoalRingLabel(percent: Int, checkAlpha: () -> Float, checkColor: Color) {
+    val checkSize = with(LocalDensity.current) { MaterialTheme.typography.labelSmall.lineHeight.toDp() } * DAILY_GOAL_CHECK_SCALE
+    Box(contentAlignment = Alignment.Center) {
+        Text(
+            text = stringResource(R.string.daily_goal_card_percent_label, percent),
+            modifier = Modifier.graphicsLayer { alpha = 1f - checkAlpha() },
+            style = MaterialTheme.typography.labelSmall,
+        )
+        Icon(
+            imageVector = Icons.Rounded.Check,
+            contentDescription = null,
+            modifier = Modifier.requiredSize(checkSize).graphicsLayer { alpha = checkAlpha() },
+            tint = checkColor,
+        )
+    }
 }
 
 /** A round ring that grows to hold [content], never capped, so large text stays inside it; [progress] is read only while drawing, so the sweep never recomposes. */
 @Composable
-private fun DailyGoalRing(progress: () -> Float, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val arcColor = MaterialTheme.colorScheme.primary
+private fun DailyGoalRing(progress: () -> Float, arcColor: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val trackColor = arcColor.copy(alpha = DAILY_GOAL_RING_TRACK_ALPHA)
 
     Layout(
@@ -205,9 +245,10 @@ private fun DailyGoalCardPreview() {
                 modifier = Modifier.padding(MaterialTheme.spacing.normal),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             ) {
-                DailyGoalCard(studiedMinutes = 14, goalMinutes = 20, progress = 0.7f, modifier = Modifier.fillMaxWidth())
-                DailyGoalCard(studiedMinutes = 25, goalMinutes = 20, progress = 1f, modifier = Modifier.fillMaxWidth())
-                DailyGoalCard(studiedMinutes = 0, goalMinutes = 20, progress = 0f, modifier = Modifier.fillMaxWidth())
+                DailyGoalCard(studiedMinutes = 14, goalMinutes = 20, percent = 70, isGoalMet = false, modifier = Modifier.fillMaxWidth())
+                DailyGoalCard(studiedMinutes = 19, goalMinutes = 20, percent = 99, isGoalMet = false, modifier = Modifier.fillMaxWidth())
+                DailyGoalCard(studiedMinutes = 28, goalMinutes = 20, percent = 100, isGoalMet = true, modifier = Modifier.fillMaxWidth())
+                DailyGoalCard(studiedMinutes = 0, goalMinutes = 20, percent = 0, isGoalMet = false, modifier = Modifier.fillMaxWidth())
             }
         }
     }

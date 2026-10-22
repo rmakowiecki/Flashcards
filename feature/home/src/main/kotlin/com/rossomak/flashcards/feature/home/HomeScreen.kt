@@ -323,7 +323,8 @@ private fun HomeSections(
                         isStreakAtRisk = isAtRisk,
                         studiedMinutes = studiedMinutes,
                         goalMinutes = goalMinutes,
-                        goalProgress = progress,
+                        goalPercent = goalPercent,
+                        isGoalMet = isGoalMet,
                         modifier = Modifier.padding(
                             start = MaterialTheme.spacing.normal,
                             top = MaterialTheme.spacing.normal,

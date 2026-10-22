@@ -38,6 +38,8 @@ private fun ShowcaseFixtures.homeState(now: Instant) = HomeScreenState(
         isAtRisk = false,
         studiedMinutes = ShowcaseUser.STUDIED_MINUTES_TODAY,
         goalMinutes = ShowcaseUser.DAILY_GOAL_MINUTES,
+        goalPercent = ShowcaseUser.STUDIED_MINUTES_TODAY * 100 / ShowcaseUser.DAILY_GOAL_MINUTES,
+        isGoalMet = false,
     ),
     hasHiddenFavoritesHint = true,
     progressSummary = showcaseProgressSummary,

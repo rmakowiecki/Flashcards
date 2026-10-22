@@ -53,6 +53,7 @@ class ObserveScoringStateUseCase @Inject constructor(
             levelProgress = levelProgress,
             streak = Streak(days = streakDays, best = bestStreak, isAtRisk = daysSinceLastStudy == 1L),
             todayStudiedSeconds = if (daysSinceLastStudy == 0L) studiedSecondsOnLastStudyDate else 0,
+            isDailyGoalMetToday = goalMetDate == today.toString(),
         )
     }
 }

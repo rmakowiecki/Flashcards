@@ -6,12 +6,15 @@ package com.rossomak.flashcards.core.domain.model
  *
  * @param streak `null` for a User who has never studied, Pending Sessions included.
  * @param todayStudiedSeconds every session of today summed, 0 when the last study day is not today.
+ * @param isDailyGoalMetToday today's Daily Goal XP is earned. It stays earned until midnight, whatever the goal
+ * is changed to, because the bonus is awarded once per day.
  */
 data class ObservedScoringState(
     val scoringState: ScoringState,
     val levelProgress: LevelProgress,
     val streak: Streak?,
     val todayStudiedSeconds: Long,
+    val isDailyGoalMetToday: Boolean = false,
 )
 
 /**

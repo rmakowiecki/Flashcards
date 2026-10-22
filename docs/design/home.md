@@ -22,11 +22,12 @@ The card shows the User's avatar and name, their Level number, an XP bar and an 
 Two cards side by side, Streak on the left and Daily Goal on the right, at equal height. They stack into one column when the screen is too narrow for both, decided from width only, never from font size. Neither card is tappable: the Daily Goal is edited in Settings and onboarding only ([settings.md](settings.md)).
 
 - **The Streak card** shows a flame next to the Streak in days, with Best Streak below it. The flame dims while the Streak is at risk.
-- **The Daily Goal card** shows a small ring of today's minutes against the goal, with the percent inside it, next to today's minutes and the goal. The percent rounds down, so it reads 100% only once the minutes reach the goal. The ring grows to fit the percent at large font sizes.
+- **The Daily Goal card** shows a small ring of today's minutes against the goal, with the percent inside it, next to today's minutes and the goal. Once today's Daily Goal XP is earned, the ring fills and turns green and a check replaces the percent. The ring grows to fit the percent at large font sizes, and keeps that size when it shows the check.
 
 Where the figures come from:
 
 - **The Streak, Best Streak and today's minutes** come from the User's scoring state, the same stream as the Level card, so they count Pending Sessions and update while Home stays open, offline too ([session-submission.md](session-submission.md#scoring-state)). One listener feeds both, so the Level card and the row never disagree.
+- **Whether the goal is met** comes from the same scoring state: it is met when the day the Daily Goal XP was last awarded is today, Pending Sessions included.
 - **The Daily Goal** is a device preference ([settings.md](settings.md)). If reading it fails, the row keeps the last goal it read, or the default Daily Goal when it has none, and the failure is logged. A change in Settings updates the row in place.
 
 Rules about today, read against the device's local date:
@@ -34,7 +35,8 @@ Rules about today, read against the device's local date:
 - **The Streak reads 0** once the last study day is before yesterday. **It is at risk** when the last study day is yesterday: it is alive, but today does not count yet.
 - **Best Streak** is never derived from today. It is kept when the Streak reads 0.
 - **Today's minutes read 0** unless the last study day is today. Otherwise they are the day's total seconds, rounded up to whole minutes once, on the total, so two 20-second sessions read 1 minute.
-- **The ring and the percent are capped at full**, while the text shows the real minutes. A full ring never means the goal was met: the server rounds the minutes down when it awards Daily Goal XP, so a day 40 seconds short of the goal rounds up to it and fills the ring without the XP ([session-submission.md](session-submission.md#daily-goal)). The cards have no "goal met" visual for this reason.
+- **A full goal always comes with the check.** Until the goal is met, the minutes stop one short of the goal and the percent, rounded down from the seconds, stops at 99%, so a day 40 seconds short of a 20-minute goal reads 19 minutes and 96%. This also covers minutes past a goal lowered in Settings, which earns the XP only with the next session ([session-submission.md](session-submission.md#daily-goal)). Once met, the text shows the real minutes, past the goal too.
+- **A met goal stays met until midnight.** The Daily Goal XP is awarded once per day, so raising the goal afterwards keeps the check while the text shows the new goal.
 - **Nothing rolls over at midnight.** The figures are read against today only when the scoring state changes, so a Home left open over midnight keeps yesterday's view until the next change, a new Home or a relaunch.
 - **Under-counts are accepted.** The device's day total can be lower than the server's, in the cases the server's own day total leaves out ([session-submission.md](session-submission.md#daily-goal)). A delivery that returns a larger total corrects the ring upward. A delivery that changes nothing does not blink the row.
 

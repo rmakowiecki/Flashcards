@@ -1555,6 +1555,8 @@ class HomeViewModelTest {
         studiedSecondsOnLastStudyDate = seconds,
     )
 
+    private fun ScoringState.metToday() = copy(goalMetDate = today.toString())
+
     private fun HomeStreakState.content(): StreakContent = shouldBeInstanceOf<StreakContent>()
 
     private fun HomeBody.streakArea(): HomeStreakArea = shouldBeInstanceOf<Sections>().streak
@@ -1587,8 +1589,9 @@ class HomeViewModelTest {
                 isAtRisk = false,
                 studiedMinutes = STUDIED_MINUTES,
                 goalMinutes = DailyGoal.DEFAULT_MINUTES,
+                goalPercent = STUDIED_MINUTES * 100 / DailyGoal.DEFAULT_MINUTES,
+                isGoalMet = false,
             )
-            streak.progress shouldBe STUDIED_MINUTES.toFloat() / DailyGoal.DEFAULT_MINUTES
         }
 
     @Test
@@ -1605,28 +1608,81 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `progress past the Daily Goal is capped at 1 while the minutes stay real`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a met Daily Goal shows the check with the minutes past the goal`() = runTest(mainDispatcherRule.testDispatcher) {
         val overGoalMinutes = DailyGoal.DEFAULT_MINUTES + STUDIED_MINUTES
-        scoringStateRepository.emit(studiedToday(seconds = overGoalMinutes * 60L))
+        scoringStateRepository.emit(studiedToday(seconds = overGoalMinutes * 60L).metToday())
 
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         viewModel.state.value.streak.content().run {
             studiedMinutes shouldBe overGoalMinutes
-            progress shouldBe 1f
+            goalPercent shouldBe 100
+            isGoalMet shouldBe true
         }
     }
 
     @Test
-    fun `a Daily Goal that is not positive gives no progress`() = runTest(mainDispatcherRule.testDispatcher) {
-        userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = 0)
-        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS))
+    fun `an unmet Daily Goal in its last minute stops one minute and one percent short`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel()
+        val goalSeconds = DailyGoal.DEFAULT_MINUTES * 60L
+        val shownBySeconds = listOf(
+            goalSeconds - 59 to (DailyGoal.DEFAULT_MINUTES - 1 to 95),
+            goalSeconds - 1 to (DailyGoal.DEFAULT_MINUTES - 1 to 99),
+        )
+
+        shownBySeconds.forEach { (seconds, shown) ->
+            scoringStateRepository.emit(studiedToday(seconds))
+            advanceUntilIdle()
+
+            viewModel.state.value.streak.content().run {
+                studiedMinutes to goalPercent shouldBe shown
+                isGoalMet shouldBe false
+            }
+        }
+    }
+
+    @Test
+    fun `minutes past a Daily Goal not yet met stay one short of it`() = runTest(mainDispatcherRule.testDispatcher) {
+        scoringStateRepository.emit(studiedToday(seconds = (DailyGoal.DEFAULT_MINUTES + STUDIED_MINUTES) * 60L))
 
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        viewModel.state.value.streak.content().progress shouldBe 0f
+        viewModel.state.value.streak.content().run {
+            studiedMinutes shouldBe DailyGoal.DEFAULT_MINUTES - 1
+            goalPercent shouldBe 99
+            isGoalMet shouldBe false
+        }
+    }
+
+    @Test
+    fun `a Daily Goal raised after it was met keeps the check`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = LONGER_GOAL_MINUTES)
+        scoringStateRepository.emit(studiedToday(seconds = DailyGoal.DEFAULT_MINUTES * 60L).metToday())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().run {
+            studiedMinutes shouldBe DailyGoal.DEFAULT_MINUTES
+            goalMinutes shouldBe LONGER_GOAL_MINUTES
+            isGoalMet shouldBe true
+        }
+    }
+
+    @Test
+    fun `a Daily Goal that is not positive gives no progress and no check`() = runTest(mainDispatcherRule.testDispatcher) {
+        userPreferencesRepository.preferences.value = userPreferencesRepository.preferences.value.copy(dailyGoalMinutes = 0)
+        scoringStateRepository.emit(studiedToday(seconds = STUDIED_SECONDS).metToday())
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.state.value.streak.content().run {
+            goalPercent shouldBe 0
+            isGoalMet shouldBe false
+        }
     }
 
     @Test
@@ -1640,7 +1696,7 @@ class HomeViewModelTest {
 
         viewModel.state.value.streak.content().run {
             goalMinutes shouldBe LONGER_GOAL_MINUTES
-            progress shouldBe STUDIED_MINUTES.toFloat() / LONGER_GOAL_MINUTES
+            goalPercent shouldBe STUDIED_MINUTES * 100 / LONGER_GOAL_MINUTES
         }
     }
 

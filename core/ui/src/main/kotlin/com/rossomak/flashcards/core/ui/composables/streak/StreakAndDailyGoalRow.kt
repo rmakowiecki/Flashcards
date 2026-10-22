@@ -33,7 +33,8 @@ fun StreakAndDailyGoalRow(
     isStreakAtRisk: Boolean,
     studiedMinutes: Int,
     goalMinutes: Int,
-    goalProgress: Float,
+    goalPercent: Int,
+    isGoalMet: Boolean,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -42,7 +43,13 @@ fun StreakAndDailyGoalRow(
         if (streakAndDailyGoalCardsStack(availableWidth = maxWidth, cardSpacing = cardSpacing)) {
             Column(verticalArrangement = Arrangement.spacedBy(cardSpacing)) {
                 StreakCard(days = streakDays, bestDays = bestStreakDays, isAtRisk = isStreakAtRisk, modifier = Modifier.fillMaxWidth())
-                DailyGoalCard(studiedMinutes = studiedMinutes, goalMinutes = goalMinutes, progress = goalProgress, modifier = Modifier.fillMaxWidth())
+                DailyGoalCard(
+                    studiedMinutes = studiedMinutes,
+                    goalMinutes = goalMinutes,
+                    percent = goalPercent,
+                    isGoalMet = isGoalMet,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         } else {
             Row(
@@ -58,7 +65,8 @@ fun StreakAndDailyGoalRow(
                 DailyGoalCard(
                     studiedMinutes = studiedMinutes,
                     goalMinutes = goalMinutes,
-                    progress = goalProgress,
+                    percent = goalPercent,
+                    isGoalMet = isGoalMet,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
@@ -88,7 +96,8 @@ private fun PreviewRow(modifier: Modifier = Modifier) {
         isStreakAtRisk = false,
         studiedMinutes = 14,
         goalMinutes = 20,
-        goalProgress = 0.7f,
+        goalPercent = 70,
+        isGoalMet = false,
         modifier = modifier,
     )
 }

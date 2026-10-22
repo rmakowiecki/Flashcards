@@ -133,4 +133,8 @@
         <item quantity="one">Daily goal, %1$d of %2$d minute</item>
         <item quantity="other">Daily goal, %1$d of %2$d minutes</item>
     </plurals>
+    <plurals name="daily_goal_card_met_cd">
+        <item quantity="one">Daily goal met, %1$d of %2$d minute</item>
+        <item quantity="other">Daily goal met, %1$d of %2$d minutes</item>
+    </plurals>
 </resources>

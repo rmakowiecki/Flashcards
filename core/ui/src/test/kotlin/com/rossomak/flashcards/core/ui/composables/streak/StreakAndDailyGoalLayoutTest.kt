@@ -31,22 +31,6 @@ class StreakAndDailyGoalLayoutTest {
         dailyGoalRingDiameter(contentWidth = 100, contentHeight = 1, strokeWidth = 0, minDiameter = 0) shouldBe 101
     }
 
-    @Test
-    fun `dailyGoalPercent rounds down so the goal shows 100 only once reached`() {
-        dailyGoalPercent(studiedMinutes = 19, goalMinutes = 20) shouldBe 95
-        dailyGoalPercent(studiedMinutes = 20, goalMinutes = 20) shouldBe 100
-    }
-
-    @Test
-    fun `dailyGoalPercent past the goal stays at 100`() {
-        dailyGoalPercent(studiedMinutes = 45, goalMinutes = 20) shouldBe 100
-    }
-
-    @Test
-    fun `dailyGoalPercent with no goal is 0`() {
-        dailyGoalPercent(studiedMinutes = 10, goalMinutes = 0) shouldBe 0
-    }
-
     private companion object {
         val CARD_SPACING = 12.dp
         val WIDTH_FOR_TWO_MIN_CARDS = 312.dp
