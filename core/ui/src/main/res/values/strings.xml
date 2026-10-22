@@ -112,7 +112,7 @@
     <string name="level_card_xp_unit_label">XP</string>
 
     <string name="daily_progress_card_count_label" translatable="false">%1$d</string>
-    <string name="streak_card_title">Streak</string>
+    <string name="streak_card_title">Study streak</string>
     <plurals name="streak_card_days_label">
         <item quantity="one">day</item>
         <item quantity="other">days</item>
@@ -122,8 +122,8 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
-    <string name="streak_card_cd">Streak, %1$s, best %2$s</string>
-    <string name="streak_card_at_risk_cd">Streak, %1$s, best %2$s, today not counted yet</string>
+    <string name="streak_card_cd">Study streak, %1$s, best %2$s</string>
+    <string name="streak_card_at_risk_cd">Study streak, %1$s, best %2$s, today not counted yet</string>
 
     <string name="daily_goal_card_title">Daily goal</string>
     <string name="daily_goal_card_goal_label">of %1$d min</string>
