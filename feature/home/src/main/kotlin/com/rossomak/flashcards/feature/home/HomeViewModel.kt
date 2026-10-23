@@ -401,21 +401,22 @@ private fun Flow<ScoringStateFeed>.latestValues(onEndedWithoutValue: () -> Unit)
         .distinctUntilChanged()
 
 /**
- * Rounds the day's total up, so any study shows at least 1 minute. Until the goal is met the minutes stop one
- * short of it and the percent, rounded down, at 99, so a full goal always comes with the check. Once met, the
+ * Rounds the day's total down, as the Daily Goal award counts it. Until the goal is met the minutes stop one short
+ * of it and the percent at 99, so a goal lowered in Settings never reads full without the check. Once met, the
  * minutes may pass the goal.
  */
 private fun Streak.toStreakContent(todayStudiedSeconds: Long, goalMinutes: Int, isDailyGoalMetToday: Boolean): StreakContent {
     val isGoalMet = isDailyGoalMetToday && goalMinutes > 0
-    val roundedUpMinutes = ((todayStudiedSeconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE).toInt()
+    val wholeMinutes = (todayStudiedSeconds / SECONDS_PER_MINUTE).toInt()
     return StreakContent(
         days = days,
         bestDays = best,
         isAtRisk = isAtRisk,
         studiedMinutes = when {
-            isGoalMet || goalMinutes <= 0 -> roundedUpMinutes
-            else -> roundedUpMinutes.coerceAtMost(goalMinutes - 1)
+            isGoalMet || goalMinutes <= 0 -> wholeMinutes
+            else -> wholeMinutes.coerceAtMost(goalMinutes - 1)
         },
+        isStudiedUnderAMinute = todayStudiedSeconds in 1 until SECONDS_PER_MINUTE,
         goalMinutes = goalMinutes,
         goalPercent = when {
             isGoalMet -> PERCENT

@@ -63,11 +63,14 @@ private const val DAILY_GOAL_CHECK_SCALE = 1.5f
 private const val PERCENT = 100
 
 /**
- * Read-only Daily Goal card. The caller passes the minutes and [percent] as they should read; [isGoalMet] means
- * today's Daily Goal XP is earned, and swaps the percent for a check inside a full green ring.
+ * Today's Daily Goal figures as they should read. [isStudiedUnderAMinute] shows the minutes as "<1"; [isGoalMet]
+ * means today's Daily Goal XP is earned, and swaps the percent for a check inside a full green ring.
  */
+data class DailyGoalProgress(val studiedMinutes: Int, val isStudiedUnderAMinute: Boolean, val goalMinutes: Int, val percent: Int, val isGoalMet: Boolean)
+
+/** Read-only Daily Goal card. */
 @Composable
-fun DailyGoalCard(studiedMinutes: Int, goalMinutes: Int, percent: Int, isGoalMet: Boolean, modifier: Modifier = Modifier) {
+fun DailyGoalCard(progress: DailyGoalProgress, modifier: Modifier = Modifier) = with(progress) {
     val animationsEnabled = rememberAnimationsEnabled()
     val shownProgress by animateFloatAsState(
         targetValue = if (isGoalMet) 1f else percent.coerceIn(0, PERCENT).toFloat() / PERCENT,
@@ -86,6 +89,7 @@ fun DailyGoalCard(studiedMinutes: Int, goalMinutes: Int, percent: Int, isGoalMet
     )
     val description = when {
         isGoalMet -> pluralStringResource(R.plurals.daily_goal_card_met_cd, goalMinutes, studiedMinutes, goalMinutes)
+        isStudiedUnderAMinute -> pluralStringResource(R.plurals.daily_goal_card_under_minute_cd, goalMinutes, goalMinutes)
         else -> pluralStringResource(R.plurals.daily_goal_card_cd, goalMinutes, studiedMinutes, goalMinutes)
     }
 
@@ -98,13 +102,16 @@ fun DailyGoalCard(studiedMinutes: Int, goalMinutes: Int, percent: Int, isGoalMet
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DailyGoalRing(progress = { shownProgress }, arcColor = arcColor) {
+            DailyGoalRing(sweep = { shownProgress }, arcColor = arcColor) {
                 DailyGoalRingLabel(percent = if (isGoalMet) PERCENT else percent, checkAlpha = { checkAlpha }, checkColor = arcColor)
             }
             Column {
                 Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxsmall)) {
                     Text(
-                        text = stringResource(R.string.daily_progress_card_count_label, studiedMinutes),
+                        text = when {
+                            isStudiedUnderAMinute -> stringResource(R.string.daily_goal_card_under_minute_count_label)
+                            else -> stringResource(R.string.daily_progress_card_count_label, studiedMinutes)
+                        },
                         modifier = Modifier.alignByBaseline(),
                         style = MaterialTheme.typography.titleLargeEmphasized,
                     )
@@ -155,9 +162,9 @@ private fun DailyGoalRingLabel(percent: Int, checkAlpha: () -> Float, checkColor
     }
 }
 
-/** A round ring that grows to hold [content], never capped, so large text stays inside it; [progress] is read only while drawing, so the sweep never recomposes. */
+/** A round ring that grows to hold [content], never capped, so large text stays inside it; [sweep] is read only while drawing, so it never recomposes. */
 @Composable
-private fun DailyGoalRing(progress: () -> Float, arcColor: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun DailyGoalRing(sweep: () -> Float, arcColor: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val trackColor = arcColor.copy(alpha = DAILY_GOAL_RING_TRACK_ALPHA)
 
     Layout(
@@ -177,7 +184,7 @@ private fun DailyGoalRing(progress: () -> Float, arcColor: Color, modifier: Modi
                     size = arcSize,
                     style = stroke,
                 )
-                val fraction = progress()
+                val fraction = sweep()
                 if (fraction > 0f) {
                     drawArc(
                         color = arcColor,
@@ -245,11 +252,26 @@ private fun DailyGoalCardPreview() {
                 modifier = Modifier.padding(MaterialTheme.spacing.normal),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
             ) {
-                DailyGoalCard(studiedMinutes = 14, goalMinutes = 20, percent = 70, isGoalMet = false, modifier = Modifier.fillMaxWidth())
-                DailyGoalCard(studiedMinutes = 19, goalMinutes = 20, percent = 99, isGoalMet = false, modifier = Modifier.fillMaxWidth())
-                DailyGoalCard(studiedMinutes = 28, goalMinutes = 20, percent = 100, isGoalMet = true, modifier = Modifier.fillMaxWidth())
-                DailyGoalCard(studiedMinutes = 0, goalMinutes = 20, percent = 0, isGoalMet = false, modifier = Modifier.fillMaxWidth())
+                PreviewDailyGoalCard(studiedMinutes = 14, percent = 70)
+                PreviewDailyGoalCard(studiedMinutes = 19, percent = 99)
+                PreviewDailyGoalCard(studiedMinutes = 28, percent = 100, isGoalMet = true)
+                PreviewDailyGoalCard(studiedMinutes = 0, percent = 3, isStudiedUnderAMinute = true)
+                PreviewDailyGoalCard(studiedMinutes = 0, percent = 0)
             }
         }
     }
+}
+
+@Composable
+private fun PreviewDailyGoalCard(studiedMinutes: Int, percent: Int, isGoalMet: Boolean = false, isStudiedUnderAMinute: Boolean = false) {
+    DailyGoalCard(
+        progress = DailyGoalProgress(
+            studiedMinutes = studiedMinutes,
+            isStudiedUnderAMinute = isStudiedUnderAMinute,
+            goalMinutes = 20,
+            percent = percent,
+            isGoalMet = isGoalMet,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

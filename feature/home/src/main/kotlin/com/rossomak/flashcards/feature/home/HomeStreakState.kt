@@ -6,7 +6,10 @@ sealed interface HomeStreakState {
     data object Empty : HomeStreakState
     data object Failed : HomeStreakState
 
-    /** [studiedMinutes] and [goalPercent] read as shown; [isGoalMet] means today's Daily Goal XP is earned. */
+    /**
+     * [studiedMinutes] and [goalPercent] read as shown; [isStudiedUnderAMinute] shows the minutes as under one;
+     * [isGoalMet] means today's Daily Goal XP is earned.
+     */
     data class Content(
         val days: Int,
         val bestDays: Int,
@@ -15,5 +18,6 @@ sealed interface HomeStreakState {
         val goalMinutes: Int,
         val goalPercent: Int,
         val isGoalMet: Boolean,
+        val isStudiedUnderAMinute: Boolean = false,
     ) : HomeStreakState
 }

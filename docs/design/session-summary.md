@@ -36,7 +36,7 @@ The stack scrolls when it does not fit.
 
 **XP total.** The session's signed total, with an info button beside it that opens the XP breakdown dialog ([XP breakdown](#xp-breakdown)). Without a score, the total and its button are left out.
 
-**Stat pills.** The duration in whole minutes, with a short session shown as under a minute. The number of Studied Flashcards. In a Rated session only, the number of Flashcards that ended Mastered.
+**Stat pills.** The duration in whole minutes, rounded down as on its Recent row, with a session under a minute shown as "<1 min". The number of Studied Flashcards. In a Rated session only, the number of Flashcards that ended Mastered.
 
 Fast and Rated differ only in the mastered pill, the tip and the Rated-only breakdown lines.
 

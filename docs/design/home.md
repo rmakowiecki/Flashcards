@@ -34,8 +34,8 @@ Rules about today, read against the device's local date:
 
 - **The Streak reads 0** once the last study day is before yesterday. **It is at risk** when the last study day is yesterday: it is alive, but today does not count yet.
 - **Best Streak** is never derived from today. It is kept when the Streak reads 0.
-- **Today's minutes read 0** unless the last study day is today. Otherwise they are the day's total seconds, rounded up to whole minutes once, on the total, so two 20-second sessions read 1 minute.
-- **A full goal always comes with the check.** Until the goal is met, the minutes stop one short of the goal and the percent, rounded down from the seconds, stops at 99%, so a day 40 seconds short of a 20-minute goal reads 19 minutes and 96%. This also covers minutes past a goal lowered in Settings, which earns the XP only with the next session ([session-submission.md](session-submission.md#daily-goal)). Once met, the text shows the real minutes, past the goal too.
+- **Today's minutes read 0** unless the last study day is today. Otherwise they are the day's total seconds, rounded down to whole minutes once, on the total, the way the Daily Goal award counts them. A day under one minute reads "<1". Recent rows round each session down too, so a day of one session reads the same minutes on both. A day of several sessions can read up to one minute per session more than its Recent rows added up, so two 40-second sessions read 1 minute here and "<1 min" on each row.
+- **A full goal always comes with the check.** Rounding down keeps the minutes below the goal and the percent below 100% until the goal is met. Only a goal lowered in Settings below the day's minutes needs more: it earns the XP only with the next session ([session-submission.md](session-submission.md#daily-goal)), so until then the minutes stop one short of the goal and the percent at 99%. Once met, the text shows the real minutes, past the goal too.
 - **A met goal stays met until midnight.** The Daily Goal XP is awarded once per day, so raising the goal afterwards keeps the check while the text shows the new goal.
 - **Nothing rolls over at midnight.** The figures are read against today only when the scoring state changes, so a Home left open over midnight keeps yesterday's view until the next change, a new Home or a relaunch.
 - **Under-counts are accepted.** The device's day total can be lower than the server's, in the cases the server's own day total leaves out ([session-submission.md](session-submission.md#daily-goal)). A delivery that returns a larger total corrects the ring upward. A delivery that changes nothing does not blink the row.
@@ -59,7 +59,7 @@ A vertical list below Favorites that scrolls with the page. It holds the User's 
 
 - the Category, by its stored name, plus its color and icon when the Category can be read;
 - a title: the Subcategory for a single-subcategory session, otherwise the Quick or Custom label with the number of topics;
-- the card count, minutes and XP;
+- the card count, minutes and XP. The minutes round down, and a session under a minute reads "<1 min";
 - the Study Mode as one icon (a star for Rated, a bolt for Fast), then how long ago the session started, on the Category's line at the top right. A session more than seven days old shows its date in English, as "Oct 6" or, for another year, "Oct 6, 2025".
 
 Rules for the list:

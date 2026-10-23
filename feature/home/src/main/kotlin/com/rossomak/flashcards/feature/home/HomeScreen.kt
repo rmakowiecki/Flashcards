@@ -41,6 +41,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsRevealContent
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
 import com.rossomak.flashcards.core.ui.composables.level.FlashcardsLevelCard
+import com.rossomak.flashcards.core.ui.composables.streak.DailyGoalProgress
 import com.rossomak.flashcards.core.ui.composables.streak.StreakAndDailyGoalRow
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.home.HomeBody.FirstSession
@@ -321,10 +322,13 @@ private fun HomeSections(
                         streakDays = days,
                         bestStreakDays = bestDays,
                         isStreakAtRisk = isAtRisk,
-                        studiedMinutes = studiedMinutes,
-                        goalMinutes = goalMinutes,
-                        goalPercent = goalPercent,
-                        isGoalMet = isGoalMet,
+                        dailyGoal = DailyGoalProgress(
+                            studiedMinutes = studiedMinutes,
+                            isStudiedUnderAMinute = isStudiedUnderAMinute,
+                            goalMinutes = goalMinutes,
+                            percent = goalPercent,
+                            isGoalMet = isGoalMet,
+                        ),
                         modifier = Modifier.padding(
                             start = MaterialTheme.spacing.normal,
                             top = MaterialTheme.spacing.normal,

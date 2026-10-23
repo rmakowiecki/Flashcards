@@ -1562,15 +1562,15 @@ class HomeViewModelTest {
     private fun HomeBody.streakArea(): HomeStreakArea = shouldBeInstanceOf<Sections>().streak
 
     @Test
-    fun `today's seconds round up to whole minutes once`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `today's seconds round down to whole minutes once, with under a minute flagged`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel()
-        val minutesBySeconds = listOf(0L to 0, 1L to 1, 59L to 1, 60L to 1, 61L to 2)
+        val shownBySeconds = listOf(0L to (0 to false), 1L to (0 to true), 59L to (0 to true), 60L to (1 to false), 119L to (1 to false))
 
-        minutesBySeconds.forEach { (seconds, expectedMinutes) ->
+        shownBySeconds.forEach { (seconds, shown) ->
             scoringStateRepository.emit(studiedToday(seconds))
             advanceUntilIdle()
 
-            viewModel.state.value.streak.content().studiedMinutes shouldBe expectedMinutes
+            viewModel.state.value.streak.content().run { studiedMinutes to isStudiedUnderAMinute shouldBe shown }
         }
     }
 
@@ -1619,26 +1619,6 @@ class HomeViewModelTest {
             studiedMinutes shouldBe overGoalMinutes
             goalPercent shouldBe 100
             isGoalMet shouldBe true
-        }
-    }
-
-    @Test
-    fun `an unmet Daily Goal in its last minute stops one minute and one percent short`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = createViewModel()
-        val goalSeconds = DailyGoal.DEFAULT_MINUTES * 60L
-        val shownBySeconds = listOf(
-            goalSeconds - 59 to (DailyGoal.DEFAULT_MINUTES - 1 to 95),
-            goalSeconds - 1 to (DailyGoal.DEFAULT_MINUTES - 1 to 99),
-        )
-
-        shownBySeconds.forEach { (seconds, shown) ->
-            scoringStateRepository.emit(studiedToday(seconds))
-            advanceUntilIdle()
-
-            viewModel.state.value.streak.content().run {
-                studiedMinutes to goalPercent shouldBe shown
-                isGoalMet shouldBe false
-            }
         }
     }
 
