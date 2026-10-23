@@ -45,17 +45,17 @@
     <string name="session_modes_hands_free_banner_message">Both modes can go hands-free — turn on read-aloud in Fast, or Voice Answering in Rated. Great for a walk or commute.</string>
 
     <!-- 5 · Daily goal -->
-    <string name="daily_goal_eyebrow_label">Time goals and streaks</string>
+    <string name="daily_goal_eyebrow_label">Daily time goals and study streaks</string>
     <string name="daily_goal_headline_title">Keep yourself engaged</string>
-    <string name="daily_goal_intro_message">Rome wasn\'t built in a day. Set a time goal and learn consistently. Adjust anytime in the Progress tab.</string>
-    <string name="daily_goal_streak_label">Streak</string>
+    <string name="daily_goal_intro_message">Rome wasn\'t built in a day. Set a time goal and learn consistently. Adjust anytime in Settings.</string>
+    <string name="daily_goal_streak_label">Study streak</string>
     <string name="daily_goal_streak_example_title">8 days</string>
     <string name="daily_goal_streak_example_message">Best: 14 days</string>
     <string name="daily_goal_goal_label">Daily goal</string>
     <string name="daily_goal_unit_label">minutes per day</string>
     <string name="daily_goal_decrease_cd">Decrease daily goal</string>
     <string name="daily_goal_increase_cd">Increase daily goal</string>
-    <string name="daily_goal_xp_banner_message">Hit your goal → earn XP, build your streak</string>
+    <string name="daily_goal_xp_banner_message">Study every day to build your study streak and gain more XP with each day. Hit your daily time goal to earn even more XP.</string>
 
     <!-- 6 · Voice input and privacy -->
     <string name="voice_privacy_eyebrow_label">Real-time voice processing</string>

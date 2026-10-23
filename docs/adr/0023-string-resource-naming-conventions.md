@@ -12,7 +12,7 @@ Accepted.
 - **Role suffix vocabulary (closed set)**: `_label`, `_button`, `_title`, `_hint`, `_error`, `_message`, `_cd` (contentDescription). The suffix always reflects the UI role the string plays, not its meaning — a string reading "Done" is `_button` if it's button text, regardless of what "done" means semantically.
 - **Common strings**: prefixed `common_` instead of a screen name, live in `:core:ui`, same role suffixes. Example: `common_done_button`, `common_cancel_button`, `common_loading_message`.
 - **Promotion rule**: a string starts screen-scoped in its owning feature module. The moment a second feature module needs the identical string verbatim, it is promoted to `:core:ui` as `common_x` and both local duplicates are deleted in favor of the shared one. `:core:ui` is not pre-seeded with a guessed common-string list.
-- **Format args and `<plurals>`**: no separate suffix. A string with `%1$d` is still whatever role it plays (`_label`, `_message`, ...). `<plurals>` resources use a bare descriptive name with no role suffix — the `<plurals>` tag and `quantity` attribute already disambiguate it from a plain `<string>`.
+- **Format args and `<plurals>`**: no separate suffix. A string with `%1$d` is still whatever role it plays (`_label`, `_message`, ...). `<plurals>` resources take a role suffix like any `<string>` (`streak_card_days_label`, `daily_goal_card_cd`): the `<plurals>` tag tells the resource type apart, but not how the text is used, and one element can need both a label and a content description.
 - **Enforcement**: Android Lint's `HardcodedText` check is set to `error`, configured once in the `android-feature.gradle.kts` and `android-core-android.gradle.kts` convention plugins (build-logic), applying to all current and future feature/core modules automatically.
 - **Migration**: incremental, touch-driven. No big-bang extraction PR. A screen's hardcoded strings get extracted when that screen is touched for other work; the lint rule prevents new hardcoded strings from being added anywhere in the meantime.
 
@@ -38,6 +38,7 @@ The codebase has almost no extracted string resources — `app/src/main/res/valu
 - **No fixed role-suffix vocabulary** — rejected; reintroduces the exact ambiguity the original ask flagged (a string's usage context wouldn't be encoded anywhere in its key).
 - **Pre-seeded `:core:ui` common-string starter list** — rejected in favor of demand-driven promotion (see Rationale).
 - **Explicit `_plural`/`_format` suffixes** — rejected; the role suffix already captures what matters (how the string is used), and `<plurals>` is already a distinct XML construct.
+- **Bare `<plurals>` names with no role suffix** — rejected; a bare name loses the usage context the role suffix records, and collides when one element has both a plural label and a plural content description (`streak_card_days_label` and `streak_card_days_cd`).
 - **Big-bang extraction PR** — rejected; low value-per-line, touches nearly the entire UI layer at once for a cosmetic change.
 - **Per-module `lint.xml` for `HardcodedText`** — rejected; duplicates the same rule across every current and future module, the exact duplication convention plugins exist to avoid.
 

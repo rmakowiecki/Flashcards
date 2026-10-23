@@ -97,6 +97,27 @@ class ObserveScoringStateUseCaseTest {
         }
     }
 
+    @Test
+    fun `a Daily Goal met today reads as met`() = runTest {
+        scoringStateRepository.emit(studiedOn(TODAY).copy(goalMetDate = TODAY.toString()))
+
+        useCase().first().isDailyGoalMetToday shouldBe true
+    }
+
+    @Test
+    fun `a Daily Goal met on an earlier day does not read as met today`() = runTest {
+        scoringStateRepository.emit(studiedOn(TODAY).copy(goalMetDate = TODAY.minusDays(1).toString()))
+
+        useCase().first().isDailyGoalMetToday shouldBe false
+    }
+
+    @Test
+    fun `a Daily Goal never met does not read as met`() = runTest {
+        scoringStateRepository.emit(studiedOn(TODAY))
+
+        useCase().first().isDailyGoalMetToday shouldBe false
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `reads today again on each scoring state change`() = runTest {

@@ -1,10 +1,10 @@
 # Home
 
-The Home tab, which is the first tab of the app. It shows the User's Level card, their Favorites carousel and their Recently studied list, and covers how each loads, renders when empty and fails.
+The Home tab, which is the first tab of the app. It shows the User's Level card, their Streak and Daily Goal, their Favorites carousel and their Recently studied list, and covers how each loads, renders when empty and fails.
 
 ## Layout
 
-Home is one vertically scrolling page. The Level card comes first in every state, including the first-session and error states, and scrolls away with the content instead of staying pinned. The Favorites carousel follows it, then the Recently studied list. The first-session and error states are centered in the space the Level card leaves. Each state scrolls instead of clipping when its content is taller than that space, for example at large font sizes.
+Home is one vertically scrolling page. The Level card comes first in every state, including the first-session and error states, and scrolls away with the content instead of staying pinned. The Streak and Daily Goal row follows it, then the Favorites carousel, then the Recently studied list. The first-session and error states are centered in the space the Level card leaves. Each state scrolls instead of clipping when its content is taller than that space, for example at large font sizes.
 
 ## Level card
 
@@ -16,6 +16,33 @@ The card shows the User's avatar and name, their Level number, an XP bar and an 
 - **A failed read of the User** still gives the figures, without a name.
 - **A Level stream that fails or ends before its first value** shows the same skeleton without the shimmer, and the failure is logged. Retry relaunches the card, but Retry is offered only in the error state below. Next to a section with content, the card stays like this until Home is created again.
 - **The bar does not animate when the card first appears.** Later changes pour into it the same way as on the Session Summary, including a rise across Levels, while a lower Level snaps into place ([session-summary.md](session-summary.md#animation-sequence)).
+
+## Streak and Daily Goal
+
+Two cards side by side, Streak on the left and Daily Goal on the right, at equal height. They stack into one column when the screen is too narrow for both, decided from width only, never from font size. Neither card is tappable: the Daily Goal is edited in Settings and onboarding only ([settings.md](settings.md)).
+
+- **The Streak card** shows a flame next to the Streak in days, with Best Streak below it. The flame dims while the Streak is at risk.
+- **The Daily Goal card** shows a small ring of today's minutes against the goal, with the percent inside it, next to today's minutes and the goal. Once today's Daily Goal XP is earned, the ring fills and turns green and a check replaces the percent. The ring grows to fit the percent at large font sizes, and keeps that size when it shows the check.
+
+Where the figures come from:
+
+- **The Streak, Best Streak and today's minutes** come from the User's scoring state, the same stream as the Level card, so they count Pending Sessions and update while Home stays open, offline too ([session-submission.md](session-submission.md#scoring-state)). One listener feeds both, so the Level card and the row never disagree.
+- **Whether the goal is met** comes from the same scoring state: it is met when the day the Daily Goal XP was last awarded is today, Pending Sessions included.
+- **The Daily Goal** is a device preference ([settings.md](settings.md)). If reading it fails, the row keeps the last goal it read, or the default Daily Goal when it has none, and the failure is logged. A change in Settings updates the row in place.
+
+Rules about today, read against the device's local date:
+
+- **The Streak reads 0** once the last study day is before yesterday. **It is at risk** when the last study day is yesterday: it is alive, but today does not count yet.
+- **Best Streak** is never derived from today. It is kept when the Streak reads 0.
+- **Today's minutes read 0** unless the last study day is today. Otherwise they are the day's total seconds, rounded down to whole minutes once, on the total, the way the Daily Goal award counts them. A day under one minute shows as less than one minute. Recent rows round each session down too, so a day of one session reads the same minutes on both. A day of several sessions can read up to one minute per session more than its Recent rows added up, so two 40-second sessions read 1 minute here and less than a minute on each row.
+- **A full goal always comes with the check.** Rounding down keeps the minutes below the goal and the percent below 100% until the goal is met. Only a goal lowered in Settings below the day's minutes needs more: it earns the XP only with the next session ([session-submission.md](session-submission.md#daily-goal)), so until then the minutes stop one short of the goal and the percent at 99%. Once met, the text shows the real minutes, past the goal too.
+- **A met goal stays met until midnight.** The Daily Goal XP is awarded once per day, so raising the goal afterwards keeps the check while the text shows the new goal.
+- **Nothing rolls over at midnight.** The figures are read against today only when the scoring state changes, so a Home left open over midnight keeps yesterday's view until the next change, a new Home or a relaunch.
+- **Under-counts are accepted.** The device's day total can be lower than the server's, in the cases the server's own day total leaves out ([session-submission.md](session-submission.md#daily-goal)). A delivery that returns a larger total corrects the ring upward. A delivery that changes nothing does not blink the row.
+
+**A User who never studied**, Pending Sessions included, sees no row. Their first-session prompt is unchanged.
+
+The row is animated like the Level card: the ring does not animate when the row first appears, and later changes sweep into it.
 
 ## Favorites
 
@@ -32,7 +59,7 @@ A vertical list below Favorites that scrolls with the page. It holds the User's 
 
 - the Category, by its stored name, plus its color and icon when the Category can be read;
 - a title: the Subcategory for a single-subcategory session, otherwise the Quick or Custom label with the number of topics;
-- the card count, minutes and XP;
+- the card count, minutes and XP. The minutes round down, and a session under a minute shows as less than a minute;
 - the Study Mode as one icon (a star for Rated, a bolt for Fast), then how long ago the session started, on the Category's line at the top right. A session more than seven days old shows its date in English, as "Oct 6" or, for another year, "Oct 6, 2025".
 
 Rules for the list:
@@ -43,20 +70,22 @@ Rules for the list:
 
 ## Loading and reveal
 
-Favorites and Recents each load as one of four states:
+The Streak row, Favorites and Recents each load as one of four states:
 
 - **Loading**;
-- **Empty**, when the User has none;
+- **Empty**, when the User has none (for the row: the User never studied);
 - **Failed**, when the section could not be loaded;
 - **Content**.
 
 "Could not be loaded" is never read as "none". Favorites whose items could not all be fetched count as Failed. So does a section whose stream fails or ends before its first result. A failure after a section has loaded keeps what is already shown.
 
-The two sections reveal together once both have resolved. A short ceiling stops one hung read from leaving Home blank. A section still loading when the ceiling runs out is left out, and it joins in place when it arrives.
+The row needs the scoring state and, for a User who studied, the Daily Goal. A User who never studied gets an Empty row without waiting for the Daily Goal.
+
+The three sections reveal together once all have resolved, except that the first-session prompt shows as soon as Favorites and Recents are both Empty, without waiting for the row. A short ceiling stops one hung read from leaving Home blank. A section still loading when the ceiling runs out is left out, and it joins in place when it arrives.
 
 ## Empty states
 
-- **First session** (both sections Empty): a prompt to start a first session, whose button switches to the Study tab.
+- **First session** (Favorites and Recents both Empty): a prompt to start a first session, whose button switches to the Study tab.
 - **Favorites hint** (no Favorites, some Recents): the Favorites heading with a Hide button on its line, then a banner explaining that bookmarking a Category or Topic pins it here, above the Recents.
   - Hiding is permanent on this device. It is a local preference and is never synced.
   - Hiding applies only to this hint. Once a Favorite exists the carousel shows as usual, and removing every Favorite does not bring the hint back.
@@ -68,7 +97,7 @@ A section that Failed shows neither the hint nor the placeholder.
 
 ## Failure and Retry
 
-- **No section has content and at least one Failed:** an error with Retry, centered below the Level card. Retry reloads only the failed sections, restarts the reveal ceiling, and relaunches the Level card when it has no content. A section that arrives later with content replaces the error.
+- **No section has content and at least one Failed:** an error with Retry, centered below the Level card. The Streak row counts as a section here. Retry reloads only the failed sections, restarts the reveal ceiling, and relaunches the Level card when it has no content. The Level card and the row share one stream, so retrying either restarts both. A section that arrives later with content replaces the error.
 - **A section fails next to one with content:** the failed section is hidden and the failure is logged. No banner is shown.
 
 ## Related
