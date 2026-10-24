@@ -27,7 +27,7 @@ object OnboardingMorpheusGraphs {
     fun specFor(step: OnboardingStep): MorpheusGraphSpec = when (step) {
         Welcome -> spec(
             base.copy(
-                shapes = listOf(Bloom(x = 0.5f, y = 0.38f, reach = 0.42f, plateau = 0.35f)),
+                shapes = listOf(Bloom(x = 0.5f, y = 0.38f, reach = 0.54f, plateau = 0.35f)),
                 hotNodeShare = 0.15f,
                 glowStrength = 0.45f,
                 alpha = 0.45f,
@@ -47,9 +47,9 @@ object OnboardingMorpheusGraphs {
         DailyGoal -> spec(base.copy(shapes = listOf(Bloom(x = 0f, y = 1f, reach = 0.65f)), hotNodeShare = 0.1f))
         VoicePrivacy -> spec(
             base.copy(
-                shapes = listOf(Ribbon(center = 0.3f, width = 0.22f, curve = 0.14f)),
-                waveAmplitude = 0.05f,
-                waveSpeed = 0.5f,
+                shapes = listOf(Ribbon(center = 0.3f, width = 0.33f, curve = 0.14f)),
+                waveAmplitude = 0.0425f,
+                waveSpeed = 0.425f,
                 pulseDepth = 0.6f,
                 alpha = 0.3f,
             ),
