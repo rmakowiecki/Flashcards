@@ -3,11 +3,19 @@ package com.rossomak.flashcards.core.ui.animation
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.SharedContentState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.flow.first
 
 /**
  * How long a shared element takes to fly from its old destination to its new one. Exposed so a
@@ -49,14 +57,38 @@ private val SharedElementBoundsTransform = BoundsTransform { _, _ ->
  * [SharedTransitionScope] (previews, screenshot tests) it returns the receiver unchanged.
  */
 @Composable
-fun Modifier.sharedElementByKey(key: Any): Modifier {
+fun Modifier.sharedElementByKey(key: Any): Modifier = sharedElementByState(rememberSharedElementState(key))
+
+/** [sharedElementByKey] for a [state] the caller also reads, as [rememberIsHandedOver] does. */
+@Composable
+fun Modifier.sharedElementByState(state: SharedContentState?): Modifier {
     val sharedTransitionScope = LocalSharedTransitionScope.current ?: return this
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current ?: return this
+    if (state == null) return this
     return with(sharedTransitionScope) {
-        this@sharedElementByKey.sharedElement(
-            rememberSharedContentState(key),
-            animatedVisibilityScope,
-            SharedElementBoundsTransform,
-        )
+        this@sharedElementByState.sharedElement(state, animatedVisibilityScope, SharedElementBoundsTransform)
     }
+}
+
+/** The state of the [key] shared element, for [sharedElementByState]; `null` outside a [SharedTransitionScope]. */
+@Composable
+fun rememberSharedElementState(key: Any): SharedContentState? {
+    val sharedTransitionScope = LocalSharedTransitionScope.current ?: return null
+    return with(sharedTransitionScope) { rememberSharedContentState(key) }
+}
+
+/**
+ * Whether [state]'s element flew in from another destination: true from the first frame its partner is
+ * found, and from then on, after the flight has landed too. Lets a screen reveal the element itself only
+ * when nothing hands it over. Read it while drawing; it is always false for a `null` [state].
+ */
+@Composable
+fun rememberIsHandedOver(state: SharedContentState?): () -> Boolean {
+    var hasBeenHandedOver by remember(state) { mutableStateOf(false) }
+    LaunchedEffect(state) {
+        if (state == null) return@LaunchedEffect
+        snapshotFlow { state.isMatchFound }.first { it }
+        hasBeenHandedOver = true
+    }
+    return { hasBeenHandedOver || state?.isMatchFound == true }
 }
