@@ -2,6 +2,7 @@ package com.rossomak.flashcards.presentation.splash
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
 import androidx.compose.animation.graphics.res.animatedVectorResource
@@ -31,13 +32,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.rossomak.flashcards.R
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.code
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropBox
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropState
+import com.rossomak.flashcards.core.ui.backdrop.rememberLaunchBackdropState
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -48,6 +55,9 @@ private const val GRADIENT_SLIDE_MS = 750
 private const val TEXT_REVEAL_DELAY_MS = 750
 private const val TEXT_REVEAL_DURATION_MS = 500
 private const val ANIMATION_COMPLETE_MS = 2000L
+private const val BLOOM_DELAY_MS = 750
+private const val BLOOM_MS = 1000
+private const val BLOOM_FADE_MS = 400
 
 @Composable
 fun SplashScreen(
@@ -78,13 +88,13 @@ fun SplashContent(
     modifier: Modifier = Modifier,
     onAnimationCompleted: () -> Unit,
 ) {
-    val gradientSlide = remember { Animatable(0f) }
+    val backdrop = rememberLaunchBackdropState(SplashMorpheusGraphs.backdropStart)
     val textReveal = remember { Animatable(0f) }
     var logoAtEnd by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         launch {
-            gradientSlide.animateTo(
+            backdrop.gradientReveal.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
                     durationMillis = GRADIENT_SLIDE_MS,
@@ -103,6 +113,7 @@ fun SplashContent(
                 )
             )
         }
+        launch { backdrop.playBloom() }
         logoAtEnd = true
         delay(ANIMATION_COMPLETE_MS)
         onAnimationCompleted()
@@ -113,21 +124,7 @@ fun SplashContent(
         atEnd = logoAtEnd
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.brandColors.screenGradientBase),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = gradientSlide.value
-                    translationY = (1f - gradientSlide.value) * size.height
-                }
-                .background(MaterialTheme.brandColors.screenGradient)
-        )
+    LaunchBackdropBox(state = backdrop, modifier = modifier, contentAlignment = Alignment.Center) {
         Image(
             painter = logoPainter,
             contentDescription = null,
@@ -149,6 +146,20 @@ fun SplashContent(
                 }
         )
     }
+}
+
+/**
+ * The graph's entrance, overlapping the end of the gradient's slide: it fades in quickly while the
+ * bloom opens from [SplashMorpheusGraphs.backdropStart], zooms in and turns into place, all on one long, soft
+ * settle that lands before the splash hands over.
+ */
+private suspend fun LaunchBackdropState.playBloom() = coroutineScope {
+    delay(BLOOM_DELAY_MS.milliseconds)
+    val settle = tween<Float>(durationMillis = BLOOM_MS, easing = FlashcardsMotion.EmphasizedDecelerateEasing)
+    launch { graphAlpha.animateTo(1f, tween(durationMillis = BLOOM_FADE_MS, easing = LinearOutSlowInEasing)) }
+    launch { graph.animateTo(SplashMorpheusGraphs.bloom, settle) }
+    launch { graphScale.animateTo(1f, settle) }
+    graphRotationDegrees.animateTo(0f, settle)
 }
 
 @Preview(showBackground = true, widthDp = 400, heightDp = 800)

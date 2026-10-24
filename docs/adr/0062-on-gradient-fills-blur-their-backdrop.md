@@ -34,6 +34,8 @@ screen:
   a source the same way. `BrandGradientBackdrop` is a convenience for the gradient case. Given a
   `graph`, it also draws a Morpheus network graph over the gradient inside the same source, so
   on-gradient components blur the graph with the gradient ([ADR-0069](0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
+  The launch screens (Splash, Onboarding and Login) take theirs from `LaunchBackdropBox` instead,
+  which draws the gradient and graph they share as one source ([ADR-0073](0073-launch-screens-share-one-backdrop.md)).
 - `blurBackdrop(shape, enabled)` inside a component. It finds the nearest scope and draws a blur of
   the sources registered in it, clipped to the shape, behind the component's container. It draws the
   blur only: no tint, no fill.

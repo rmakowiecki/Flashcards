@@ -5,7 +5,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,9 +42,12 @@ import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
-import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
-import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
-import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
+import com.rossomak.flashcards.core.ui.animation.rememberIsHandedOver
+import com.rossomak.flashcards.core.ui.animation.rememberSharedElementState
+import com.rossomak.flashcards.core.ui.animation.sharedElementByState
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropBox
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropStart
+import com.rossomak.flashcards.core.ui.backdrop.rememberLaunchBackdropState
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsOutlinedButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
@@ -150,22 +152,33 @@ private fun LoginContent(
     // signed in they fade and sink out, so they never show enabled again while the screen leaves.
     val buttonReveal = remember { Animatable(0f) }
     val hasButtonStartedRevealing by remember { derivedStateOf { buttonReveal.value > 0f } }
+    // The logo is revealed here only when no screen hands it over, as from the end of onboarding.
+    val logoState = rememberSharedElementState(SharedElementKey.APP_LOGO)
+    val isLogoHandedOver = rememberIsHandedOver(logoState)
+    val logoReveal = remember { Animatable(0f) }
     val isInspecting = LocalInspectionMode.current
     val isSignedIn = state.phase is SignedIn
+    // Handed over by Splash or Onboarding, the graph morphs to Login's while the logo arrives. Arriving
+    // with no graph shown, it fades in with the buttons instead. It stays while they fade out once signed in.
+    val backdrop = rememberLaunchBackdropState(LaunchBackdropStart(spec = LoginMorpheusGraphs.graph))
     LaunchedEffect(isSignedIn) {
         when {
             isSignedIn -> buttonReveal.animateTo(0f, tween(durationMillis = BUTTON_HIDE_MS, easing = FastOutSlowInEasing))
-            isInspecting -> buttonReveal.snapTo(1f)
+            isInspecting -> {
+                logoReveal.snapTo(1f)
+                buttonReveal.snapTo(1f)
+            }
             else -> {
+                launch { backdrop.arriveAt(LoginMorpheusGraphs.graph) }
+                launch { logoReveal.animateTo(1f, tween(durationMillis = SHARED_ELEMENT_DURATION_MS, easing = FastOutSlowInEasing)) }
                 delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
+                launch { backdrop.fadeIn(tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing)) }
                 buttonReveal.animateTo(1f, tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
             }
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        // The graph fades in with the buttons, but stays while they fade out once signed in.
-        BrandGradientBackdrop(graph = LoginMorpheusGraphs.graph, graphAlpha = { if (isSignedIn) 1f else buttonReveal.value })
+    LaunchBackdropBox(state = backdrop, modifier = modifier) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
@@ -178,13 +191,18 @@ private fun LoginContent(
                 verticalArrangement = Arrangement.SpaceEvenly,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val buttonRiseDistance = MaterialTheme.spacing.medium
+                val revealRiseDistance = MaterialTheme.spacing.medium
                 Image(
                     painter = painterResource(CoreUiR.drawable.flashcards_white),
                     contentDescription = null,
                     modifier = Modifier
-                        .sharedElementByKey(SharedElementKey.APP_LOGO)
-                        .width(LogoWidth),
+                        .sharedElementByState(logoState)
+                        .width(LogoWidth)
+                        .graphicsLayer {
+                            val reveal = if (isLogoHandedOver()) 1f else logoReveal.value
+                            alpha = reveal
+                            translationY = (1f - reveal) * revealRiseDistance.toPx()
+                        },
                 )
                 LoginButtons(
                     modifier = Modifier
@@ -192,7 +210,7 @@ private fun LoginContent(
                         .padding(horizontal = MaterialTheme.spacing.large)
                         .graphicsLayer {
                             alpha = buttonReveal.value
-                            translationY = (1f - buttonReveal.value) * buttonRiseDistance.toPx()
+                            translationY = (1f - buttonReveal.value) * revealRiseDistance.toPx()
                         },
                     phase = state.phase,
                     // Disabled until they start to appear, so an invisible button can't be tapped.

@@ -60,7 +60,4 @@ object OnboardingMorpheusGraphs {
 
     /** One spec per pager page, in page order. */
     val pages: List<MorpheusGraphSpec> = OnboardingStep.entries.map(::specFor)
-
-    /** [step]'s spec with every layer invisible, which the entrance fades in from. */
-    fun hiddenFor(step: OnboardingStep): MorpheusGraphSpec = BrandMorpheusGraphSpecs.hidden(specFor(step))
 }
