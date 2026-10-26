@@ -63,6 +63,4 @@ object BrandMorpheusGraphSpecs {
 
     /** [layer] should be a copy of [base] to stay in the family. */
     fun spec(layer: MorpheusGraphLayerSpec): MorpheusGraphSpec = MorpheusGraphSpec(seed = SEED, layers = listOf(layer))
-
-    fun hidden(spec: MorpheusGraphSpec): MorpheusGraphSpec = spec.copy(layers = spec.layers.map { it.copy(alpha = 0f) })
 }

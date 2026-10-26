@@ -33,4 +33,7 @@ object FlashcardsMotion {
 
     /** Emphasized easing for expand/reveal interactions. */
     val EmphasizedEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+    /** Emphasized easing for something arriving: fast at first, then a long, soft settle. */
+    val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 }
