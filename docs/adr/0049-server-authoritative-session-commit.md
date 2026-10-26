@@ -80,3 +80,8 @@ consequences above changed. See [ADR-0055](0055-pending-sessions-and-local-progr
   the entry to a dead-letter file.
 - The configuration drift note is replaced. `XpConfig` is a server-owned Firestore document, and the
   server always scores with its current copy (ADR-0047's amendment).
+
+**2026-10-26 — the Summary no longer waits for the server.** The Session Summary always shows the
+score the device computes with `scoreSession`, and the queue delivers the session in the background.
+`submitStudySession` answers with nothing; the session document still records the score. See
+[ADR-0055](0055-pending-sessions-and-local-progress-projection.md).

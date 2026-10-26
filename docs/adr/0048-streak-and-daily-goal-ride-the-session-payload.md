@@ -73,7 +73,7 @@ day's `dailyGoalMet` award.
 
 **2026-09-30 — the client previews the Streak and Daily Goal, and `user-stats` stores the day's
 seconds.** The client ports the Streak and Daily Goal calculation (`calculateStreakAndGoalAwards`),
-checked against the server's by shared test cases, for the Session Summary's fallback preview and the
+checked against the server's by shared test cases, for the Session Summary's score and the
 projection of Pending Sessions. The server stays the authority: only its awards are written.
 
 The Daily Goal needs the day's studied time, and the client has no cached copy of the day's sessions.

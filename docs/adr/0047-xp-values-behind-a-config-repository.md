@@ -32,7 +32,7 @@ first fetch succeeds.
 
 No configuration snapshot is taken when a session starts. The server scores a session with the
 configuration current when the session is delivered, and stores the rates it used on the session
-document, so a session once scored never changes. The Session Summary's fallback preview and the
+document, so a session once scored never changes. The Session Summary's score and the
 projection of Pending Sessions both score with the device's cached copy. No configuration is
 versioned. See [ADR-0055](0055-pending-sessions-and-local-progress-projection.md).
 
