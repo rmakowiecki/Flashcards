@@ -29,12 +29,9 @@ import kotlinx.coroutines.flow.Flow
  */
 interface CardProgressRepository {
     /**
-     * `null` when the User has never studied a card in this Subcategory yet. [excludedSessionId] names a
-     * finished session whose own results to leave out, so the score of that session never builds on itself.
-     *
-     * [cacheOnly] reads only what the device already holds and never waits for the server, so the score
-     * reads the same way online and offline. A Subcategory the device holds no copy of reads as `null`
-     * then, as if never studied: its cards count as new.
+     * `null` when the User has never studied a card in this Subcategory. [excludedSessionId] leaves that
+     * session's own results out. [cacheOnly] reads only what the device holds, never the server: a
+     * Subcategory it holds nothing for reads as `null`, and any other failure fails the read.
      */
     suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<SubcategoryProgressDetails?>
 

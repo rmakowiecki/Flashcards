@@ -19,11 +19,7 @@ class FakeSessionSubmissionRepository : SessionSubmissionRepository {
     /** Every submitted session, in call order. */
     val submittedSessionResults: MutableList<SessionResult> = mutableListOf()
 
-    /**
-     * [yield]s once, then waits [submitDelay], before returning, mirroring
-     * [com.rossomak.flashcards.core.data.repository.DefaultSessionSubmissionRepository]'s genuine
-     * dispatcher hop when it queues the session.
-     */
+    /** [yield]s once, like the real repository's dispatcher hop, then waits [submitDelay]. */
     override suspend fun submitSession(sessionResult: SessionResult): Result<Unit> {
         onSubmit()
         submittedSessionResults.add(sessionResult)

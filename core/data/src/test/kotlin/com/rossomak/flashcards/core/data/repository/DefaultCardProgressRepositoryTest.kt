@@ -327,20 +327,37 @@ class DefaultCardProgressRepositoryTest {
 
     @Test
     fun `getProgress reads a Subcategory the cache holds nothing for as never studied when reading only the cache`() = runTest {
-        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws IllegalStateException("not cached")
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws CACHE_MISS
 
         createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow() shouldBe null
     }
 
     @Test
-    fun `getProgress reads the pending sessions of the cache-only baseline from the cache too`() = runTest {
-        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } returns null
+    fun `getProgress fails when reading only the cache and the read fails other than missing`() = runTest {
+        val error = IllegalStateException("decode failed")
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws error
+
+        createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).exceptionOrNull() shouldBe error
+    }
+
+    @Test
+    fun `getProgress replays pending sessions over a cache miss when reading only the cache`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws CACHE_MISS
         queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
 
         val progress = createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow()
 
         progress?.cards?.getValue(CARD_ID)?.state shouldBe Mastered
         coVerify(exactly = 0) { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getProgress fails under a pending session when reading only the cache and the read fails other than missing`() = runTest {
+        val error = IllegalStateException("decode failed")
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws error
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+
+        createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).exceptionOrNull() shouldBe error
     }
 
     @Test
@@ -476,6 +493,7 @@ class DefaultCardProgressRepositoryTest {
     private fun authUser(uid: String) = AuthUser(uid = uid, email = null, displayName = null, photoUrl = null)
 
     private companion object {
+        val CACHE_MISS = FirebaseFirestoreException("not cached", FirebaseFirestoreException.Code.UNAVAILABLE)
         const val USER_ID = "user-1"
         const val OTHER_USER_ID = "user-2"
         const val SESSION_ONE_ID = "session-1"

@@ -281,7 +281,7 @@ internal fun SummaryLayout(
                 }
             },
         ) { innerPadding ->
-            // The local score usually lands within a frame or two, so only the backdrop covers the wait.
+            // Only the backdrop covers the score's load (ADR-0063's Session Summary exception).
             if (!isLoading) {
                 SummaryBody(
                     state = state,

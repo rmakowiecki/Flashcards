@@ -17,10 +17,8 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
 interface SessionSubmissionRemoteDataSource {
 
     /**
-     * Submits [sessionResult] to the `submitStudySession` callable, which answers with nothing.
-     * [ownerUid] is the User who finished the session; the server rejects the call as
-     * `UNAUTHENTICATED` if it is not the User whose ID token the SDK attached, so a sign-in change
-     * mid-call can never credit one User with another's session.
+     * Submits [sessionResult] to `submitStudySession`. The server rejects it as `UNAUTHENTICATED` unless
+     * [ownerUid], the User who finished it, signed the call, so a mid-call sign-in change credits no one else.
      */
     suspend fun submitSession(ownerUid: String, sessionResult: SessionResult): Result<Unit>
 }

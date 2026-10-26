@@ -53,8 +53,9 @@ then scores it with `scoreSession` and returns that `SessionScore`. The baseline
 session is queued, so the score never counts the session twice. The baseline reads only the Firestore
 cache, never the server: the session's own load read its Card Progress moments before, and the live
 Level streams keep the scoring state cached. A Card Progress document the cache holds nothing for reads
-as no record, so its cards count as new; a scoring state the cache holds nothing for fails the score. Online and offline Summaries are the
-same path. `submitStudySession` answers with nothing: what the server records reaches the device only
+as no record, so its cards count as new. Any other failed read fails the score, a scoring state the
+cache holds nothing for included, so a wrong baseline never shows a wrong score. Online and offline
+Summaries are the same path. `submitStudySession` answers with nothing: what the server records reaches the device only
 through the post-delivery refresh, and every other screen shows it the next time it reads.
 
 A session that could not be queued at all (no signed-in User, a failed local write) gets no score:
@@ -202,4 +203,4 @@ server's score: the wait ran out on most sessions. The worker publishes no deliv
 **2026-10-26 — The Summary's score reads only the cache.** A first session in a Subcategory, finished
 offline, showed no score: the default read of its missing Card Progress document failed offline. The
 score's baseline now reads the Firestore cache only, and a Card Progress document the cache holds
-nothing for reads as no record. See the Decision section and Considered Options above.
+nothing for reads as no record. Any other failed baseline read fails the score. See the Decision section and Considered Options above.

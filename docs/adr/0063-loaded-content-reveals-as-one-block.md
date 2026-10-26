@@ -21,6 +21,9 @@ clipped bounds.
 - Preview keeps its hero through a redraw (`hasDrawnSession`) and publishes the drawn values in one
   update. Its buttons stay enabled during a draw so a cached draw doesn't blink them; Start ignores
   taps until the draw lands.
+- The Session Summary is the one exception. While its local score loads it shows only its backdrop,
+  with no spinner, then its own animation sequence reveals the content. The score usually lands within
+  a frame or two, and a block reveal would fight the sequence.
 
 ## Consequences
 

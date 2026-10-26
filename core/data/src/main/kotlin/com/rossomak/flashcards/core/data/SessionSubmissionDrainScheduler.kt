@@ -36,10 +36,8 @@ import javax.inject.Inject
  *
  * [ExistingWorkPolicy.REPLACE] ([scheduleDrainForFinishedSession], for a just-finished session): a new
  * drain replaces any drain already enqueued or running. It is needed because under `KEEP`, a drain
- * waiting out a retry backoff, or already past its queue read, would not attempt the new session soon.
- * Nothing on screen waits for it, but the sooner the server records the session, the smaller the window
- * in which another device's session or a new XP configuration can make the server's score differ from
- * the one the Session Summary showed. It is safe
+ * waiting out a retry backoff, or already past its queue read, would not attempt the new session soon,
+ * widening the window in which the server's score can drift from the Session Summary's. It is safe
  * because the replaced run loses nothing: the new run re-reads the whole queue, and an entry the
  * replaced run delivered but had not yet removed is resubmitted, which `submitStudySession` answers
  * idempotently per session id.

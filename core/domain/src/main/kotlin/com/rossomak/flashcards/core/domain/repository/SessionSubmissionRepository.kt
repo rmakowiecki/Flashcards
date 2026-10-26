@@ -17,10 +17,6 @@ import com.rossomak.flashcards.core.domain.model.SessionResult
  */
 interface SessionSubmissionRepository {
 
-    /**
-     * Queues [sessionResult] for delivery and starts a delivery run, without waiting for it. A failure
-     * means the session could not be queued, so nothing on the device holds it. Submitting the same
-     * session id again is safe: it is queued once.
-     */
+    /** Queues [sessionResult] once per session id and starts delivery without waiting for it. A failure means it was not queued. */
     suspend fun submitSession(sessionResult: SessionResult): Result<Unit>
 }

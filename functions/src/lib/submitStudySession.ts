@@ -26,8 +26,8 @@ import {
 /**
  * The sole writer of a session's XP, level, progress and Recents entry. Everything this function decides
  * lands in one Firestore transaction, keyed for idempotency on the client-generated `sessionId`: a
- * retry of an already-processed session is a no-op, never a second award. It answers with nothing: the
- * app shows its own score for the session (ADR-0055). See `submitStudySession`'s own doc comment for the transaction's shape.
+ * retry of an already-processed session is a no-op, never a second award. It answers with nothing
+ * (ADR-0055).
  *
  * Deliberately kept out of `index.ts`: `validateSubmitStudySessionRequest` and `submitStudySession`
  * are plain, directly-testable functions (mirroring `lib/entitlement.ts`'s `isPremiumUser`), so a
@@ -93,8 +93,7 @@ const FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore";
 const FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore";
 // The account's Streak right after this session.
 const FIELD_CURRENT_STREAK_AFTER = "currentStreakAfter";
-// The per-line XP rates this session was scored with, which the admin-edited XP configuration may
-// since have moved on from.
+// The per-line XP rates this session was scored with.
 const FIELD_XP_RATES = "xpRates";
 
 // Shared between a card's stored result fields and a card's stored progress fields.

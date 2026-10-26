@@ -508,8 +508,6 @@ class StudySessionSummaryViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        // The score's local reads carry no gating power over whether the session is queued: the
-        // function needs nothing from them.
         sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
     }
 

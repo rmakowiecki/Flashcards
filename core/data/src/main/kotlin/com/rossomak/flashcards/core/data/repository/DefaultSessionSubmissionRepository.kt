@@ -22,9 +22,7 @@ import kotlinx.coroutines.CancellationException
  * [com.rossomak.flashcards.core.data.source.FilePendingSessionSubmissionLocalDataSource] for the local
  * store's shape and concurrency guarantee.
  *
- * A failure to queue is logged and returned as a failure, never thrown: the Session Summary then tells
- * the User the session was not saved. Nothing waits for the delivery itself: the Summary shows its own
- * local score (ADR-0055).
+ * A failure to queue is logged and returned, never thrown.
  */
 class DefaultSessionSubmissionRepository @Inject constructor(
     private val localDataSource: PendingSessionSubmissionLocalDataSource,

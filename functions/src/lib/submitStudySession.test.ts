@@ -38,10 +38,7 @@ const DEFAULT_XP_RATES = {
 
 const TEST_PROJECT_ID = "flashcards-functions-test";
 
-/**
- * Submits [request], then reads back how its session document records the score: the callable answers
- * with nothing, so the stored document is the only place a test can check what was awarded.
- */
+/** Submits [request] and reads the score back from its session document, since the callable answers with nothing. */
 async function submitAndReadStoredScore(db: admin.firestore.Firestore, uid: string, request: ValidatedSubmitStudySessionRequest) {
   await submitStudySession(db, uid, request);
   const stored = (await db.doc(`users/${uid}/sessions/${request.sessionId}`).get()).data() ?? {};

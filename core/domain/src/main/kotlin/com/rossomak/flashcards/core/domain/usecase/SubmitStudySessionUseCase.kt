@@ -17,27 +17,16 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 /**
- * Queues a just-finished session for delivery and scores it on the device for the Session Summary,
- * called once on arrival there. The server-authoritative `submitStudySession` Cloud Function is the sole
- * writer of a session's card progress, progress summary and scoring state, so this use case never writes
- * any of them, and it never waits for the server: the Summary always shows this local score, and the
- * queue delivers the session in the background (ADR-0055).
+ * Queues a just-finished session and scores it on the device for the Session Summary, never waiting for
+ * the server, which records it once the queue delivers it (ADR-0055).
  *
- * Order of work:
- * 1. Reads the score's baseline: the account's [ScoringState] and the prior Card Progress of every
- *    touched Subcategory, all in parallel and from what the device already holds only, so online and
- *    offline score alike and never wait for the server. The session's own load read its Card Progress
- *    moments ago; a Subcategory the device holds no copy of counts its cards as new. Both repositories
- *    include the User's other Pending Sessions, so the score builds on them. This happens **before** queuing, and both reads exclude this session's
- *    own id: after process death the Summary submits again while the session is already queued, and the
- *    baseline must still never include it. Reading after queuing would race the delivery run, whose
- *    cache refresh can already include the session; the scoring-state read then fails, and so does the
- *    score.
- * 2. Queues the session through [SessionSubmissionRepository]. A failure to queue fails with
- *    [SessionNotSavedException]: the session is lost, so no score is offered for XP that will never be
- *    awarded.
- * 3. Scores the session with [scoreSession] from the baseline and the cached XP configuration
- *    ([GetXpConfigUseCase]). A failed baseline read fails the result, but the session stays queued.
+ * 1. Reads the baseline, the [ScoringState] and each touched Subcategory's Card Progress, from the device
+ *    cache only, with the User's other Pending Sessions on top and this session left out (a restored
+ *    Summary submits again after it is queued). It reads before queuing, since the delivery run's cache
+ *    refresh could already include the session.
+ * 2. Queues the session. A failure returns [SessionNotSavedException] and no score.
+ * 3. Scores it with [scoreSession] and the cached XP configuration. A failed baseline read fails the
+ *    score, but the session stays queued.
  */
 class SubmitStudySessionUseCase @Inject constructor(
     private val cardProgressRepository: CardProgressRepository,
@@ -75,7 +64,6 @@ class SubmitStudySessionUseCase @Inject constructor(
             progress?.cards.orEmpty().mapValues { (_, entry) -> entry.state }
         }
 
-    /** The account reads the score needs, taken before the session is queued. */
     private data class ScoreBaseline(
         val priorCardStatesBySubcategory: Map<String, Map<String, FlashcardStudyProgressState>>,
         val scoringState: ScoringState,
