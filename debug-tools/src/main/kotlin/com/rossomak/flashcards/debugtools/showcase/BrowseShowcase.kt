@@ -24,7 +24,7 @@ private val hiddenSearchSubcategoryIds = setOf("android-concurrency", "python-co
 
 private val noOpSearchActions = BrowseSearchActions(onQueryChange = {}, onActivate = {}, onDismiss = {})
 
-/** The results always show, whatever is typed: the query reaches no ViewModel. */
+/** Shows the same results whatever is typed. */
 private fun ShowcaseFixtures.browseState() = BrowseScreenState(
     isLoading = false,
     categories = categories,
@@ -34,7 +34,7 @@ private fun ShowcaseFixtures.browseState() = BrowseScreenState(
     searchStatus = SearchStatus.Results(searchResults()),
 )
 
-/** [SEARCH_QUERY]'s results, ordered and chip-lined as the real search does it. */
+/** Ordered and chip-lined as the real search does it. */
 private fun ShowcaseFixtures.searchResults(): CategorySearchResults {
     val matchedSubcategories = subcategories
         .filter { it.name.startsWith(SEARCH_QUERY, ignoreCase = true) }

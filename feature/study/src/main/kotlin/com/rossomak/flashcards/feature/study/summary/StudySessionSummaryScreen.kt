@@ -246,7 +246,7 @@ private fun StudySessionSummaryScreenState.toSequence(settled: Boolean): Summary
 
 /** Takes the sequence so previews can draw any step. The stack and snackbar pad by the sheet's measured height. */
 @Composable
-internal fun SummaryLayout(
+fun SummaryLayout(
     modifier: Modifier = Modifier,
     state: StudySessionSummaryScreenState,
     sequence: SummarySequence,

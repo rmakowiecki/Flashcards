@@ -37,7 +37,7 @@ private fun ShowcaseFixtures.previewState(): PreviewStudySessionScreenState {
 }
 
 @Composable
-internal fun PreviewStudySessionShowcase(onNavigateBack: () -> Unit) {
+internal fun PreviewStudySessionShowcase(isSettingsSheetOpen: Boolean, onNavigateBack: () -> Unit) {
     val fixtures = LocalShowcaseFixtures.current
     PreviewStudySessionContent(
         state = remember(fixtures) { fixtures.previewState() },
@@ -49,5 +49,6 @@ internal fun PreviewStudySessionShowcase(onNavigateBack: () -> Unit) {
         onOpenAppSettings = {},
         onSwitchToManualAnswering = {},
         onStartSession = {},
+        initiallySettingsSheetOpen = isSettingsSheetOpen,
     )
 }

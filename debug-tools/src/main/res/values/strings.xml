@@ -74,11 +74,16 @@
     <string name="screen_showcase_category_details_label">Category Details</string>
     <string name="screen_showcase_category_details_selection_mode_label">Category Details, Selection Mode</string>
     <string name="screen_showcase_subcategory_details_label">Subcategory Details</string>
+    <string name="screen_showcase_subcategory_details_filters_label">Subcategory Details, Filter dialog</string>
     <string name="screen_showcase_preview_label">Preview Study Session</string>
+    <string name="screen_showcase_preview_settings_label">Preview Study Session, settings</string>
     <string name="screen_showcase_rated_question_label">Rated, question</string>
     <string name="screen_showcase_rated_answer_revealed_label">Rated, answer revealed</string>
     <string name="screen_showcase_rated_voice_answering_label">Rated, voice answering</string>
+    <string name="screen_showcase_rated_voice_graded_label">Rated, voice answer graded</string>
     <string name="screen_showcase_fast_tap_through_label">Fast, tap-through</string>
     <string name="screen_showcase_fast_read_aloud_label">Fast, read-aloud</string>
     <string name="screen_showcase_summary_label">Session Summary</string>
+    <string name="screen_showcase_summary_xp_breakdown_label">Session Summary, XP breakdown</string>
+    <string name="screen_showcase_summary_confetti_label">Session Summary, confetti</string>
 </resources>

@@ -10,12 +10,21 @@ import com.rossomak.flashcards.debugtools.showcase.fixtures.ShowcaseFixtures
 import com.rossomak.flashcards.debugtools.showcase.fixtures.coroutines
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContent
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsContentState
+import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsDialog
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsScreenState
 
-/** Unfiltered, as the screen opens. The count is the Topic's real total; the list is a sample of it. */
-private fun ShowcaseFixtures.subcategoryDetailsState(): SubcategoryDetailsScreenState {
+/** The Filter dialog's draft. */
+private val FILTER_DRAFT_DIFFICULTY = 3..8
+private const val FILTER_DRAFT_TAG_COUNT = 2
+
+/** Unfiltered. The count is the Topic's real total; the list is a sample of it. */
+private fun ShowcaseFixtures.subcategoryDetailsState(isFilterDialogOpen: Boolean): SubcategoryDetailsScreenState {
     val flashcards = flashcardsOf(coroutines.id)
     val tags = flashcards.flatMap { it.tags }.distinct().sorted()
+    val filterDialog = SubcategoryDetailsDialog.Filters(
+        draftState = FlashcardFilters(selectedTags = tags.take(FILTER_DRAFT_TAG_COUNT).toSet(), difficultyRange = FILTER_DRAFT_DIFFICULTY),
+        availableTags = tags,
+    )
     return SubcategoryDetailsScreenState(
         subcategoryId = coroutines.id,
         categoryName = coroutines.categoryName,
@@ -26,14 +35,15 @@ private fun ShowcaseFixtures.subcategoryDetailsState(): SubcategoryDetailsScreen
         availableTags = tags,
         totalCount = coroutines.cardCount,
         isFavorite = true,
+        activeDialog = filterDialog.takeIf { isFilterDialogOpen },
     )
 }
 
 @Composable
-internal fun SubcategoryDetailsShowcase(onNavigateBack: () -> Unit) {
+internal fun SubcategoryDetailsShowcase(isFilterDialogOpen: Boolean, onNavigateBack: () -> Unit) {
     val fixtures = LocalShowcaseFixtures.current
     SubcategoryDetailsContent(
-        state = remember(fixtures) { fixtures.subcategoryDetailsState() },
+        state = remember(fixtures, isFilterDialogOpen) { fixtures.subcategoryDetailsState(isFilterDialogOpen) },
         snackbarHostState = remember { SnackbarHostState() },
         onNavigateBack = onNavigateBack,
         onStartSession = {},
