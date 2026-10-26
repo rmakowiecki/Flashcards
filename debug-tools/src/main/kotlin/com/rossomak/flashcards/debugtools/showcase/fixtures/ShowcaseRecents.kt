@@ -12,33 +12,37 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import java.time.Instant
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-/** Every source type, Study Mode and hands-free delivery, timed relative to [now]. */
-internal fun ShowcaseFixtures.recentItems(now: Instant): List<RecentItem> = listOf(
+private const val LATEST_SESSION_SECONDS = 300
+private const val EARLIER_TODAY_SESSION_SECONDS = 420
+
+/** Every source type, Study Mode and delivery. The first two fall today in [zone], so Home's Daily Goal sums them. */
+internal fun ShowcaseFixtures.recentItems(now: Instant, zone: ZoneId): List<RecentItem> = listOf(
     recent(
         id = "recent-coroutines-voice",
-        startedAt = now.minus(4, ChronoUnit.MINUTES),
+        startedAt = startedToday(now, zone, endedMinutesAgo = 4, durationSeconds = LATEST_SESSION_SECONDS),
         mode = StudyMode.Rated,
         isHandsFree = true,
         sourceType = SingleSubcategory,
         category = kotlin,
         subcategories = listOf(coroutines),
-        durationSeconds = 540,
-        studiedCount = 15,
-        xpTotal = 1_240,
+        durationSeconds = LATEST_SESSION_SECONDS,
+        studiedCount = 8,
+        xpTotal = 560,
     ),
     recent(
         id = "recent-android-quick",
-        startedAt = now.minus(3, ChronoUnit.HOURS),
+        startedAt = startedToday(now, zone, endedMinutesAgo = 180, durationSeconds = EARLIER_TODAY_SESSION_SECONDS),
         mode = StudyMode.Fast,
         isHandsFree = true,
         sourceType = Quick,
         category = android,
         subcategories = listOf(compose, navigation, backgroundWork),
-        durationSeconds = 780,
-        studiedCount = 20,
-        xpTotal = 610,
+        durationSeconds = EARLIER_TODAY_SESSION_SECONDS,
+        studiedCount = 11,
+        xpTotal = 290,
     ),
     recent(
         id = "recent-swift-custom",
@@ -89,6 +93,13 @@ internal fun ShowcaseFixtures.recentItems(now: Instant): List<RecentItem> = list
         xpTotal = 720,
     ),
 )
+
+/** Ended [endedMinutesAgo] before [now], starting no earlier than midnight. */
+private fun startedToday(now: Instant, zone: ZoneId, endedMinutesAgo: Long, durationSeconds: Int): Instant {
+    val startOfToday = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
+    val startedAt = now.minus(endedMinutesAgo, ChronoUnit.MINUTES).minusSeconds(durationSeconds.toLong())
+    return maxOf(startedAt, startOfToday)
+}
 
 @Suppress("LongParameterList")
 private fun recent(
