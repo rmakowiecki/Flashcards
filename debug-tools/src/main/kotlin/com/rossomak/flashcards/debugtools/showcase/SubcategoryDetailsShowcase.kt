@@ -2,7 +2,10 @@ package com.rossomak.flashcards.debugtools.showcase
 
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.debugtools.showcase.fixtures.LocalShowcaseFixtures
@@ -42,15 +45,16 @@ private fun ShowcaseFixtures.subcategoryDetailsState(isFilterDialogOpen: Boolean
 @Composable
 internal fun SubcategoryDetailsShowcase(isFilterDialogOpen: Boolean, onNavigateBack: () -> Unit) {
     val fixtures = LocalShowcaseFixtures.current
+    var state by remember(fixtures, isFilterDialogOpen) { mutableStateOf(fixtures.subcategoryDetailsState(isFilterDialogOpen)) }
     SubcategoryDetailsContent(
-        state = remember(fixtures, isFilterDialogOpen) { fixtures.subcategoryDetailsState(isFilterDialogOpen) },
+        state = state,
         snackbarHostState = remember { SnackbarHostState() },
         onNavigateBack = onNavigateBack,
         onStartSession = {},
         onResetFilters = {},
-        onFavoriteToggle = {},
+        onFavoriteToggle = { state = state.copy(isFavorite = !state.isFavorite) },
         onAddShortcut = {},
         onRetry = {},
-        onDialogEvent = {},
+        onDialogEvent = { event -> state = state.copy(activeDialog = showcaseDialogAfter(event)) },
     )
 }

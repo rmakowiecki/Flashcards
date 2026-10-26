@@ -12,7 +12,7 @@ The list groups its rows by where each screen sits in the app: Onboarding, Home,
 
 - **Real screens only.** Each entry draws the production screen's own stateless content, the same composable the app shows, so the showcase can never drift from the shipped look. It never copies or re-creates a screen.
 - **State is built by hand.** Each entry's screen state is built directly from the domain models and the sample data. No ViewModel, repository, dependency injection, network, sign-in or permission prompt is involved, so an entry always renders the same way on any device.
-- **The screen's own controls still work; its actions do nothing.** Anything the screen handles inside itself, such as paging through onboarding or opening the search bar, works as in the app. Every action the screen reports outward does nothing. The one exception is a screen's own back or close control where the screen would otherwise trap system back, such as Selection Mode on Category Details, whose back leaves Selection Mode: there it returns to the list.
+- **Dialogs and simple switches work; actions that change data do nothing.** Anything the screen handles inside itself, such as paging through onboarding or opening the search bar, works as in the app. Each entry also keeps its screen state locally, so a dialog opens, follows every edit to its draft and closes on back, scrim, Cancel or Confirm. Confirm applies nothing: the screen behind keeps its values, and reopening the dialog starts from them. The Favorite bookmark and Category Details' Selection Mode (entering it, checking rows, select all, leaving it) also work locally. Every other action, such as starting a session, navigating, rating a card or saving a setting, does nothing. Back closes an open dialog or leaves Selection Mode first, then returns to the list.
 - **Live inputs are fixed.** A screen that normally follows a live stream, such as the microphone level or a message stream, gets a fixed value or a stream that never emits.
 - **Animations run.** Entrances, the card reveal and similar motion play as they do in the app. The Session Summary opens already scored, so it shows its settled screen rather than the reveal sequence ([session-summary.md](session-summary.md#animation-sequence)). Its two other entries hold that sequence still on one step instead: the XP breakdown with every tile already listed, and the reveal with one frame of the confetti burst frozen over the total.
 - **The system theme applies.** The showcase follows the device's light or dark setting, like the app.
@@ -36,7 +36,7 @@ The content is real, exported once from Firestore into `:debug-tools`'s raw reso
 |---|---|
 | Onboarding | the gallery on its cover, paged through by hand to reach each step ([onboarding-flow.md](onboarding-flow.md)) |
 | Home | the Streak and Daily Goal row, Favorites and Recents loaded ([home.md](home.md)) |
-| Browse | the Category list, whose search bar shows a fixed set of results for whatever is typed; Category Details; Category Details in Selection Mode; Subcategory Details; Subcategory Details with the Filter dialog open, two Tags selected and Difficulty narrowed ([browse.md](browse.md), [category-search.md](category-search.md)) |
+| Browse | the Category list, whose search bar shows a fixed set of results for whatever is typed; Category Details; Category Details in Selection Mode, with the Category not bookmarked; Subcategory Details; Subcategory Details with the Filter dialog open, two Tags selected and Difficulty narrowed ([browse.md](browse.md), [category-search.md](category-search.md)) |
 | Study session | Preview of a drawn Quick Session; the same Preview with its settings sheet open; Rated at the question; Rated with the answer revealed, on a card with a code block and Extended Context; Rated with Voice Answering listening; Rated with a voice answer graded; Fast tapping through; Fast reading aloud; the Session Summary settled; the Session Summary's XP breakdown; the Session Summary's reveal with confetti ([preview-study-session.md](preview-study-session.md), [rated-mode.md](rated-mode.md), [voice-answering.md](voice-answering.md), [fast-mode.md](fast-mode.md), [session-summary.md](session-summary.md)) |
 
 Splash, Login, Settings and Account are not in the showcase. The Subcategory Details Filter dialog is the one dialog with its own entry; any other dialog of a listed screen is opened by hand.
@@ -55,7 +55,7 @@ A state a screen holds inside itself, such as an onboarding step or an open sear
 1. Make sure the screen's stateless content is public. Widening visibility is the only change allowed in production code: never add a parameter to a production screen for the showcase. A state the screen holds inside itself is reached by operating it by hand.
 2. Build the state from the sample data. New content comes from Firestore into the raw resources, never written by hand.
 3. Add an entry to the showcase list, with its label in `:debug-tools`'s own strings, under the group where the screen sits.
-4. Give every action a no-op, and wire back only where the screen would otherwise trap it.
+4. Hold the state in `mutableStateOf` and pass `showcaseDialogAfter(event)` as the dialog on every dialog event. Handle a simple switch the same way, locally. Give every other action a no-op.
 
 ## Related
 

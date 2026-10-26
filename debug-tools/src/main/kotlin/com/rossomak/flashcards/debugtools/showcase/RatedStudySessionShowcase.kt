@@ -4,7 +4,10 @@ package com.rossomak.flashcards.debugtools.showcase
 
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
@@ -85,8 +88,9 @@ private fun ShowcaseFixtures.ratedState(showcaseState: RatedShowcaseState): Rate
 @Composable
 internal fun RatedStudySessionShowcase(showcaseState: RatedShowcaseState) {
     val fixtures = LocalShowcaseFixtures.current
+    var state by remember(fixtures, showcaseState) { mutableStateOf(fixtures.ratedState(showcaseState)) }
     RatedStudySessionContent(
-        state = remember(fixtures, showcaseState) { fixtures.ratedState(showcaseState) },
+        state = state,
         voiceBarsLevels = if (showcaseState == VoiceAnswering) speakingVoiceBars else silentVoiceBars,
         snackbarHostState = remember { SnackbarHostState() },
         onShowAnswer = {},
@@ -95,6 +99,6 @@ internal fun RatedStudySessionShowcase(showcaseState: RatedShowcaseState) {
         onVoiceNext = {},
         onVoicePrevious = {},
         onVoiceFeedbackSkip = {},
-        onDialogEvent = {},
+        onDialogEvent = { event -> state = state.copy(activeDialog = showcaseDialogAfter(event)) },
     )
 }

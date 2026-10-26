@@ -29,8 +29,8 @@ import com.rossomak.flashcards.debugtools.showcase.fixtures.LocalShowcaseFixture
 import com.rossomak.flashcards.debugtools.showcase.fixtures.ShowcaseFixtures
 
 /**
- * Draws [entry] on the theme background, which Main's scaffold paints under Home and Browse in the app.
- * Only [onNavigateBack] is wired; every other callback is a no-op.
+ * Draws [entry] on the theme background, which Main's scaffold paints in the app. Dialogs and simple
+ * switches work on local state; other actions are no-ops.
  */
 @Suppress("CyclomaticComplexMethod") // one branch per entry, exhaustive over the enum.
 @Composable

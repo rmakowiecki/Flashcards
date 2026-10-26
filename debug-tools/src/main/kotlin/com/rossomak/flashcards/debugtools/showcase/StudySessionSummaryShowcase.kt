@@ -81,11 +81,12 @@ private const val FROZEN_BURST_ELAPSED_MILLIS = 600f
 internal fun StudySessionSummaryShowcase(showcaseState: SummaryShowcaseState, onNavigateBack: () -> Unit) {
     when (showcaseState) {
         Settled -> {
+            var state by remember { mutableStateOf(summaryState) }
             StudySessionSummaryContent(
-                state = summaryState,
+                state = state,
                 onNavigateBack = onNavigateBack,
                 onStudyAgainClick = {},
-                onDialogEvent = {},
+                onDialogEvent = { event -> state = state.copy(activeDialog = showcaseDialogAfter(event)) },
             )
         }
 
