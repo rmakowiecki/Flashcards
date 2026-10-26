@@ -8,7 +8,7 @@ import { sanitizeTranscript, gradeSanitizedTranscript } from "./lib/grading";
 import { handleDeleteAccountCall } from "./lib/deleteAccount";
 import { RequestDeadline } from "./lib/requestDeadline";
 import { handleSubmitBugReportCall } from "./lib/submitBugReport";
-import { SubmitStudySessionResult, handleSubmitStudySessionCall } from "./lib/submitStudySession";
+import { handleSubmitStudySessionCall } from "./lib/submitStudySession";
 
 admin.initializeApp();
 
@@ -140,9 +140,9 @@ export const transcribeAndGradeSpokenAnswer = onCall<
  * a flagged-content signal, so a finished session is submitted, never reported. The wrapper stays thin:
  * the revoked-token guard, payload validation, transaction and scoring logic live in
  * `lib/authGuard.ts`, `lib/submitStudySession.ts` and `lib/xpScoring.ts`, where they can be tested
- * directly without going through this `onCall` wrapper.
+ * directly without going through this `onCall` wrapper. Returns nothing on success.
  */
-export const submitStudySession = onCall<unknown, Promise<SubmitStudySessionResult>>(RUNTIME_OPTIONS, (request) =>
+export const submitStudySession = onCall<unknown, Promise<void>>(RUNTIME_OPTIONS, (request) =>
   handleSubmitStudySessionCall(admin.auth(), admin.firestore(), request),
 );
 

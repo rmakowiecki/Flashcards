@@ -38,6 +38,49 @@ const DEFAULT_XP_RATES = {
 
 const TEST_PROJECT_ID = "flashcards-functions-test";
 
+/**
+ * Submits [request], then reads back how its session document records the score: the callable answers
+ * with nothing, so the stored document is the only place a test can check what was awarded.
+ */
+async function submitAndReadStoredScore(db: admin.firestore.Firestore, uid: string, request: ValidatedSubmitStudySessionRequest) {
+  await submitStudySession(db, uid, request);
+  const stored = (await db.doc(`users/${uid}/sessions/${request.sessionId}`).get()).data() ?? {};
+  const isRated = stored.studyMode === "Rated";
+  return {
+    breakdown: {
+      newCards: stored.newCards,
+      mastered: stored.mastered,
+      partial: stored.partial,
+      masteryDefenseBonus: stored.masteryDefenseBonus,
+      demastered: stored.demastered,
+      sessionCompletionBonus: stored.sessionCompletionBonus,
+      dailyGoalBonus: stored.dailyGoalBonus,
+      streakBonus: stored.streakBonus,
+      xpTotal: stored.xpTotal,
+    },
+    level: stored.levelAfter,
+    xpIntoCurrentLevel: stored.xpIntoCurrentLevelAfter,
+    xpForNextLevel: stored.xpForNextLevelAfter,
+    levelsCrossed: stored.levelsCrossed,
+    levelBefore: stored.levelBefore,
+    xpIntoCurrentLevelBefore: stored.xpIntoCurrentLevelBefore,
+    xpForNextLevelBefore: stored.xpForNextLevelBefore,
+    currentStreak: stored.currentStreakAfter,
+    durationSeconds: stored.durationSeconds,
+    counts: isRated
+      ? {
+          newCardsStudied: stored.newCardsStudied,
+          // cardsMastered counts every card ending Mastered, defended ones included.
+          newlyMastered: stored.cardsMastered - stored.cardsDefended,
+          partial: stored.cardsPartial,
+          defended: stored.cardsDefended,
+          demastered: stored.cardsDemastered,
+        }
+      : { newCardsStudied: stored.newCardsStudied },
+    rates: stored.xpRates,
+  };
+}
+
 before(() => {
   admin.initializeApp({ projectId: TEST_PROJECT_ID });
 });
@@ -275,11 +318,13 @@ describe("requireOwnerMatchesCaller", () => {
 // The revoked-token guard itself is covered in authGuard.test.ts; these only pin that the callable
 // runs it before writing anything. Uses the Auth emulator `npm test` starts alongside Firestore.
 describe("handleSubmitStudySessionCall", () => {
-  it("commits the session of an active caller", async () => {
+  it("commits the session of an active caller and answers with nothing", async () => {
     const uid = (await admin.auth().createUser({ uid: randomUUID() })).uid;
     const data = rawRatedRequest({ ownerUid: uid });
 
-    await handleSubmitStudySessionCall(admin.auth(), admin.firestore(), callableRequestSignedInAt(uid, nowEpochSeconds(), data));
+    const answer = await handleSubmitStudySessionCall(admin.auth(), admin.firestore(), callableRequestSignedInAt(uid, nowEpochSeconds(), data));
+
+    assert.equal(answer, undefined);
 
     const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${data.sessionId}`).get();
     assert.ok(sessionDoc.exists);
@@ -390,11 +435,11 @@ describe("nextRecentEntries", () => {
 });
 
 describe("submitStudySession", () => {
-  it("a first submission writes the session, progress, summary and scoring-state documents and returns the correct breakdown", async () => {
+  it("a first submission writes the session, progress, summary and scoring-state documents with the correct breakdown", async () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.equal(result.breakdown.newCards, 10, "card-1 has no prior progress entry, so it counts as newly studied");
     assert.equal(result.breakdown.mastered, 100);
@@ -435,12 +480,12 @@ describe("submitStudySession", () => {
     assert.equal(scoringDoc.data()?.level, result.level);
   });
 
-  it("a retried submission of an already-processed session is a no-op: same result, no double award", async () => {
+  it("a retried submission of an already-processed session is a no-op: same stored session, no double award", async () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const first = await submitStudySession(admin.firestore(), uid, request);
-    const second = await submitStudySession(admin.firestore(), uid, request);
+    const first = await submitAndReadStoredScore(admin.firestore(), uid, request);
+    const second = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.deepEqual(second, first);
 
@@ -448,14 +493,14 @@ describe("submitStudySession", () => {
     assert.equal(scoringDoc.data()?.xp, first.breakdown.xpTotal, "xp must not be awarded twice");
   });
 
-  it("a retry answers with the stored rates, not the XP configuration in force at retry time", async () => {
+  it("a retry keeps the stored rates, not the XP configuration in force at retry time", async () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
-    const first = await submitStudySession(admin.firestore(), uid, request);
+    const first = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     await xpConfigDocRef(admin.firestore()).set({ ...DEFAULT_XP_CONFIG, cardMastered: 1 });
     try {
-      const second = await submitStudySession(admin.firestore(), uid, request);
+      const second = await submitAndReadStoredScore(admin.firestore(), uid, request);
       assert.deepEqual(second, first);
     } finally {
       await xpConfigDocRef(admin.firestore()).delete();
@@ -468,7 +513,7 @@ describe("submitStudySession", () => {
 
     // Sequential calls (the test above) never race the "does sessionId already exist" check itself —
     // both transactions here start from a state where the session doc genuinely does not exist yet.
-    const [first, second] = await Promise.all([submitStudySession(admin.firestore(), uid, request), submitStudySession(admin.firestore(), uid, request)]);
+    const [first, second] = await Promise.all([submitAndReadStoredScore(admin.firestore(), uid, request), submitAndReadStoredScore(admin.firestore(), uid, request)]);
 
     assert.deepEqual(second, first, "one of the two concurrent calls must retry and observe the other's committed write");
 
@@ -486,7 +531,7 @@ describe("submitStudySession", () => {
     // below race from a ScoringState whose lastStudyDate already equals studyDate — same-day, no
     // further streak advance for either — rather than one of them winning the "first submission ever"
     // streak award and the other not, which would make their award shapes genuinely asymmetric.
-    const warmup = await submitStudySession(
+    const warmup = await submitAndReadStoredScore(
       admin.firestore(),
       uid,
       validateSubmitStudySessionRequest(
@@ -500,7 +545,7 @@ describe("submitStudySession", () => {
       rawRatedRequest({ cardResults: [{ cardId: "card-b", subcategoryId, state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: false }] }),
     );
 
-    const [resultA, resultB] = await Promise.all([submitStudySession(admin.firestore(), uid, requestA), submitStudySession(admin.firestore(), uid, requestB)]);
+    const [resultA, resultB] = await Promise.all([submitAndReadStoredScore(admin.firestore(), uid, requestA), submitAndReadStoredScore(admin.firestore(), uid, requestB)]);
 
     // Whichever transaction Firestore serializes first sees level 1 -> 1 (or crosses into a level
     // the other then starts from); either way, applied together they must sum, never clobber.
@@ -526,7 +571,7 @@ describe("submitStudySession", () => {
     const second = validateSubmitStudySessionRequest(
       rawRatedRequest({ cardResults: [{ cardId, subcategoryId, state: "Mastered", attemptsUsed: 1, wasPreviouslyMastered: true }] }),
     );
-    const result = await submitStudySession(admin.firestore(), uid, second);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, second);
 
     assert.equal(result.breakdown.mastered, 0);
     assert.equal(result.breakdown.masteryDefenseBonus, 50);
@@ -563,7 +608,7 @@ describe("submitStudySession", () => {
       }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.deepEqual(result.counts, { newCardsStudied: 2, newlyMastered: 1, partial: 1, defended: 1, demastered: 1 });
     const counts = result.counts as Required<typeof result.counts>;
@@ -573,7 +618,7 @@ describe("submitStudySession", () => {
     assert.equal(result.breakdown.masteryDefenseBonus, counts.defended * DEFAULT_XP_CONFIG.masteryDefended);
     assert.equal(result.breakdown.demastered, counts.demastered * DEFAULT_XP_CONFIG.cardDemastered);
 
-    const retry = await submitStudySession(admin.firestore(), uid, request);
+    const retry = await submitAndReadStoredScore(admin.firestore(), uid, request);
     assert.deepEqual(retry, result);
   });
 
@@ -589,12 +634,12 @@ describe("submitStudySession", () => {
       }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.deepEqual(result.counts, { newCardsStudied: 2 });
     assert.equal(result.durationSeconds, 125);
     assert.deepEqual(result.rates, DEFAULT_XP_RATES);
-    assert.deepEqual(await submitStudySession(admin.firestore(), uid, request), result);
+    assert.deepEqual(await submitAndReadStoredScore(admin.firestore(), uid, request), result);
   });
 
   it("a card Failed on its first exposure still counts as studied, exactly like a Fast session's Seen card", async () => {
@@ -603,7 +648,7 @@ describe("submitStudySession", () => {
       rawRatedRequest({ cardResults: [{ cardId: "card-1", subcategoryId: "sub-1", state: "Failed", attemptsUsed: 3, wasPreviouslyMastered: false }] }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     // No mastery/demastery XP for a card that was never mastered to begin with — but the flat
     // per-card newCards award still applies: the card was studied this session either way.
@@ -635,7 +680,7 @@ describe("submitStudySession", () => {
       rawRatedRequest({ startedAtEpochMillis: DEFAULT_STARTED_AT_EPOCH_MILLIS, studyDateUtcOffsetMinutes: -MAX_UTC_OFFSET_MINUTES }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get();
     assert.equal(sessionDoc.data()?.studyDate, "2026-08-31", "the offset must shift the derived day, not just be stored inertly");
@@ -685,7 +730,7 @@ describe("submitStudySession — recents/state", () => {
       }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get();
     const entries = (await recentsStateDoc(uid)).data()?.entries;
@@ -723,7 +768,7 @@ describe("submitStudySession — recents/state", () => {
       }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     const entries = (await recentsStateDoc(uid)).data()?.entries;
     assert.deepEqual(Object.keys(entries).sort(), [firstSessionId, request.sessionId].sort());
@@ -779,7 +824,7 @@ describe("submitStudySession — recents/state", () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    await Promise.all([submitStudySession(admin.firestore(), uid, request), submitStudySession(admin.firestore(), uid, request)]);
+    await Promise.all([submitAndReadStoredScore(admin.firestore(), uid, request), submitAndReadStoredScore(admin.firestore(), uid, request)]);
 
     assert.deepEqual(Object.keys((await recentsStateDoc(uid)).data()?.entries), [request.sessionId]);
   });
@@ -849,7 +894,7 @@ describe("submitStudySession — streak and daily goal", () => {
         dailyGoalMinutes: 1,
       }),
     );
-    const firstResult = await submitStudySession(admin.firestore(), uid, first);
+    const firstResult = await submitAndReadStoredScore(admin.firestore(), uid, first);
     assert.equal(firstResult.breakdown.streakBonus, DEFAULT_STREAK_BONUS, "the account's first-ever submission");
     assert.equal(firstResult.breakdown.dailyGoalBonus, DEFAULT_XP_CONFIG.dailyGoalMet, "1 minute studied meets a 1-minute goal");
 
@@ -860,7 +905,7 @@ describe("submitStudySession — streak and daily goal", () => {
         dailyGoalMinutes: 1,
       }),
     );
-    const secondResult = await submitStudySession(admin.firestore(), uid, second);
+    const secondResult = await submitAndReadStoredScore(admin.firestore(), uid, second);
     assert.equal(secondResult.breakdown.streakBonus, 0, "same studyDate as the stored lastStudyDate — no second advance");
     assert.equal(secondResult.breakdown.dailyGoalBonus, 0, "goalMetDate already stamped for this studyDate — no second award");
 
@@ -879,7 +924,7 @@ describe("submitStudySession — streak and daily goal", () => {
         dailyGoalMinutes: 10,
       }),
     );
-    const resultA = await submitStudySession(admin.firestore(), uid, sessionA);
+    const resultA = await submitAndReadStoredScore(admin.firestore(), uid, sessionA);
     assert.equal(resultA.breakdown.dailyGoalBonus, 0, "5 minutes alone does not meet a 10-minute goal");
 
     const sessionB = validateSubmitStudySessionRequest(
@@ -889,7 +934,7 @@ describe("submitStudySession — streak and daily goal", () => {
         dailyGoalMinutes: 10,
       }),
     );
-    const resultB = await submitStudySession(admin.firestore(), uid, sessionB);
+    const resultB = await submitAndReadStoredScore(admin.firestore(), uid, sessionB);
     assert.equal(resultB.breakdown.dailyGoalBonus, DEFAULT_XP_CONFIG.dailyGoalMet, "sessionA's 5 abandoned minutes plus this session's own 5 reach the 10-minute goal");
 
     const sessionBDoc = await admin.firestore().doc(`users/${uid}/sessions/${sessionB.sessionId}`).get();
@@ -932,7 +977,7 @@ describe("submitStudySession — Level position before the session and current S
     }));
   }
 
-  it("a first commit returns the prior user-stats as the before fields and the new Streak, and stores them on the session document", async () => {
+  it("a first commit stores the prior user-stats as the before fields and the new Streak on the session document", async () => {
     const uid = randomUUID();
     await seedScoringState(uid, {
       xp: 1300,
@@ -944,22 +989,16 @@ describe("submitStudySession — Level position before the session and current S
     });
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.equal(result.levelBefore, 2);
     assert.equal(result.xpIntoCurrentLevelBefore, 300);
     assert.equal(result.xpForNextLevelBefore, LEVEL_2_THRESHOLD);
     assert.equal(result.currentStreak, 8, "studying the day after continues the 7-day Streak");
-
-    const sessionDoc = await admin.firestore().doc(`users/${uid}/sessions/${request.sessionId}`).get();
-    assert.equal(sessionDoc.data()?.levelBefore, 2);
-    assert.equal(sessionDoc.data()?.xpIntoCurrentLevelBefore, 300);
-    assert.equal(sessionDoc.data()?.xpForNextLevelBefore, LEVEL_2_THRESHOLD);
-    assert.equal(sessionDoc.data()?.currentStreakAfter, 8);
   });
 
   it("a new account's first session starts from Level 1 with no points and Level 1's threshold", async () => {
-    const result = await submitStudySession(admin.firestore(), randomUUID(), validateSubmitStudySessionRequest(rawRatedRequest()));
+    const result = await submitAndReadStoredScore(admin.firestore(), randomUUID(), validateSubmitStudySessionRequest(rawRatedRequest()));
 
     assert.equal(result.levelBefore, 1);
     assert.equal(result.xpIntoCurrentLevelBefore, 0);
@@ -967,17 +1006,17 @@ describe("submitStudySession — Level position before the session and current S
     assert.equal(result.currentStreak, 1);
   });
 
-  it("a retry answers with the stored before fields and Streak even after another session moved user-stats on", async () => {
+  it("a retry keeps the stored before fields and Streak even after another session moved user-stats on", async () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
-    const first = await submitStudySession(admin.firestore(), uid, request);
+    const first = await submitAndReadStoredScore(admin.firestore(), uid, request);
     await submitStudySession(
       admin.firestore(),
       uid,
       validateSubmitStudySessionRequest(rawRatedRequest({ cardResults: masteredCardResults(3) })),
     );
 
-    const retry = await submitStudySession(admin.firestore(), uid, request);
+    const retry = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.deepEqual(retry, first);
   });
@@ -994,7 +1033,7 @@ describe("submitStudySession — Level position before the session and current S
     });
     const request = validateSubmitStudySessionRequest(rawRatedRequest({ cardResults: masteredCardResults(10) }));
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.equal(result.levelBefore, 1);
     assert.equal(result.xpIntoCurrentLevelBefore, 990);
@@ -1028,7 +1067,7 @@ describe("submitStudySession — Level position before the session and current S
       }),
     );
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.ok(result.breakdown.xpTotal < -50, "the session loses more than the 50 points into Level 2");
     assert.equal(result.levelBefore, 2);
@@ -1086,7 +1125,7 @@ describe("submitStudySession — applied session ids", () => {
     const uid = randomUUID();
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const result = await submitStudySession(admin.firestore(), uid, request);
+    const result = await submitAndReadStoredScore(admin.firestore(), uid, request);
 
     assert.deepEqual((await userStatsDoc(uid)).data(), {
       xp: result.breakdown.xpTotal,
@@ -1130,7 +1169,7 @@ describe("submitStudySession — server-owned XP configuration", () => {
     await xpConfigDocRef(admin.firestore()).set(CUSTOM_XP_CONFIG);
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const result = await submitStudySession(admin.firestore(), randomUUID(), request);
+    const result = await submitAndReadStoredScore(admin.firestore(), randomUUID(), request);
 
     assert.equal(result.breakdown.newCards, CUSTOM_XP_CONFIG.newCardStudied);
     assert.equal(result.breakdown.mastered, CUSTOM_XP_CONFIG.cardMastered);
@@ -1145,7 +1184,7 @@ describe("submitStudySession — server-owned XP configuration", () => {
   it("scores with the bundled default when the document is missing, and still succeeds", async () => {
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const result = await submitStudySession(admin.firestore(), randomUUID(), request);
+    const result = await submitAndReadStoredScore(admin.firestore(), randomUUID(), request);
 
     assert.equal(result.breakdown.xpTotal, 10 + 100 + 100 + DEFAULT_STREAK_BONUS);
     assert.equal(result.xpForNextLevel, 1000);
@@ -1155,7 +1194,7 @@ describe("submitStudySession — server-owned XP configuration", () => {
     await xpConfigDocRef(admin.firestore()).set({ ...CUSTOM_XP_CONFIG, cardDemastered: 17 });
     const request = validateSubmitStudySessionRequest(rawRatedRequest());
 
-    const result = await submitStudySession(admin.firestore(), randomUUID(), request);
+    const result = await submitAndReadStoredScore(admin.firestore(), randomUUID(), request);
 
     assert.equal(result.breakdown.xpTotal, 10 + 100 + 100 + DEFAULT_STREAK_BONUS);
     assert.equal(result.xpForNextLevel, 1000);
