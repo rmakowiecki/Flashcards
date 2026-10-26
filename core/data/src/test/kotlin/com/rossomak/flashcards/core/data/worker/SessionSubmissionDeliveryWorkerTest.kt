@@ -1,15 +1,10 @@
 package com.rossomak.flashcards.core.data.worker
 
 import android.content.Context
-import androidx.work.Data
 import androidx.work.ListenableWorker.Result
-import androidx.work.ProgressUpdater
 import androidx.work.WorkerParameters
-import com.google.common.util.concurrent.ListenableFuture
 import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctionsException
-import com.rossomak.flashcards.core.data.mapper.toDto
-import com.rossomak.flashcards.core.data.model.DeliveredSessionDto
 import com.rossomak.flashcards.core.data.model.PendingFlashcardResultDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
 import com.rossomak.flashcards.core.data.source.CardProgressRemoteDataSource
@@ -19,16 +14,11 @@ import com.rossomak.flashcards.core.data.source.PendingSessionSubmissionLocalDat
 import com.rossomak.flashcards.core.data.source.ScoringStateRemoteDataSource
 import com.rossomak.flashcards.core.data.source.SessionSubmissionRemoteDataSource
 import com.rossomak.flashcards.core.domain.model.AuthUser
-import com.rossomak.flashcards.core.domain.model.SessionScore
-import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
-import com.rossomak.flashcards.core.domain.model.SessionScoreRates
-import com.rossomak.flashcards.core.domain.model.XpBreakdown
 import com.rossomak.flashcards.core.domain.repository.FakeAuthRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.coVerifyOrder
 import io.mockk.coVerifySequence
 import io.mockk.every
 import io.mockk.mockk
@@ -54,23 +44,12 @@ class SessionSubmissionDeliveryWorkerTest {
     private val scoringStateRemoteDataSource: ScoringStateRemoteDataSource = mockk()
     private val cardProgressRemoteDataSource: CardProgressRemoteDataSource = mockk()
     private val authRepository = FakeAuthRepository()
-    private val progressUpdater: ProgressUpdater = mockk()
-
-    /** Every progress [Data] the worker published, in order. */
-    private val publishedProgress = mutableListOf<Data>()
 
     @Before
     fun setUp() {
         authRepository.userToReturn = SIGNED_IN_USER
         coEvery { scoringStateRemoteDataSource.getScoringState(any()) } returns null
         coEvery { cardProgressRemoteDataSource.getProgress(any(), any()) } returns null
-        val completedFuture: ListenableFuture<Void> = mockk()
-        every { completedFuture.isDone } returns true
-        every { completedFuture.get() } returns null
-        every { progressUpdater.updateProgress(any(), any(), any()) } answers {
-            publishedProgress += thirdArg<Data>()
-            completedFuture
-        }
     }
 
     /** [runAttemptCount] defaults to 0 — WorkManager's own count for "this is the first attempt". */
@@ -81,7 +60,6 @@ class SessionSubmissionDeliveryWorkerTest {
         val workerParameters: WorkerParameters = mockk()
         every { workerParameters.runAttemptCount } returns runAttemptCount
         every { workerParameters.id } returns UUID.randomUUID()
-        every { workerParameters.progressUpdater } returns progressUpdater
         return SessionSubmissionDeliveryWorker(
             mockk<Context>(),
             workerParameters,
@@ -131,7 +109,7 @@ class SessionSubmissionDeliveryWorkerTest {
         // Seeded out of start-time order on purpose — the drain must sort, not trust append order.
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         createWorker().doWork()
 
@@ -145,7 +123,7 @@ class SessionSubmissionDeliveryWorkerTest {
     fun `doWork clears every entry that was delivered successfully`() = runTest {
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -167,7 +145,7 @@ class SessionSubmissionDeliveryWorkerTest {
         val foreign = pendingSubmission("session-foreign", startedAtEpochMillis = 1_000L, uid = OTHER_UID)
         localDataSource.seed(foreign)
         localDataSource.seed(own)
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -195,7 +173,7 @@ class SessionSubmissionDeliveryWorkerTest {
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
         coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } coAnswers {
             authRepository.userToReturn = SIGNED_IN_USER.copy(uid = OTHER_UID)
-            kotlin.Result.success(SCORE)
+            kotlin.Result.success(Unit)
         }
 
         val result = createWorker().doWork()
@@ -223,7 +201,7 @@ class SessionSubmissionDeliveryWorkerTest {
         val ownerless = pendingSubmission("session-1", startedAtEpochMillis = 1_000L, uid = "")
         localDataSource.seed(ownerless)
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -242,7 +220,7 @@ class SessionSubmissionDeliveryWorkerTest {
         val malformed = pendingSubmission("session-1", startedAtEpochMillis = 1_000L).copy(mode = "NotARealStudyMode")
         localDataSource.seed(malformed)
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -264,7 +242,7 @@ class SessionSubmissionDeliveryWorkerTest {
             localDataSource.seed(pendingSubmission("session-next-$code", startedAtEpochMillis = 2_000L))
             coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == rejected.id }) } returns
                 kotlin.Result.failure(functionsException(code))
-            coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-next-$code" }) } returns kotlin.Result.success(SCORE)
+            coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-next-$code" }) } returns kotlin.Result.success(Unit)
 
             val result = createWorker().doWork()
 
@@ -329,7 +307,7 @@ class SessionSubmissionDeliveryWorkerTest {
     @Test
     fun `a successful delivery refreshes the scoring state and each touched Subcategory's Card Progress from the server`() = runTest {
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L, subcategoryIds = listOf("sub-1", "sub-2")))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         createWorker().doWork()
 
@@ -341,7 +319,7 @@ class SessionSubmissionDeliveryWorkerTest {
     @Test
     fun `a delivered entry is removed once every refresh read succeeded`() = runTest {
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L, subcategoryIds = listOf("sub-1", "sub-2")))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker().doWork()
 
@@ -350,10 +328,10 @@ class SessionSubmissionDeliveryWorkerTest {
     }
 
     @Test
-    fun `a failed scoring-state refresh keeps the delivered entry, still reports it and returns retry`() = runTest {
+    fun `a failed scoring-state refresh keeps the delivered entry and returns retry`() = runTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         localDataSource.seed(entry)
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
         coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
 
         val result = createWorker().doWork()
@@ -361,7 +339,6 @@ class SessionSubmissionDeliveryWorkerTest {
         result shouldBe Result.retry()
         localDataSource.listAll() shouldBe listOf(entry)
         deadLetterLocalDataSource.listAll() shouldBe emptyList()
-        SessionDeliveryReport.read(publishedProgress.last()) shouldBe mapOf("session-1" to DeliveredSessionDto.Scored(SCORE.toDto()))
     }
 
     @Test
@@ -369,7 +346,7 @@ class SessionSubmissionDeliveryWorkerTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L, subcategoryIds = listOf("sub-1", "sub-2"))
         localDataSource.seed(entry)
         localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
         coEvery { cardProgressRemoteDataSource.getProgress("sub-1", any()) } throws IllegalStateException("offline")
 
         val result = createWorker().doWork()
@@ -382,7 +359,7 @@ class SessionSubmissionDeliveryWorkerTest {
     @Test
     fun `a later run re-submits an entry kept by a failed refresh and removes it`() = runTest {
         localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
         coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
         createWorker().doWork()
         coEvery { scoringStateRemoteDataSource.getScoringState(any()) } returns null
@@ -398,7 +375,7 @@ class SessionSubmissionDeliveryWorkerTest {
     fun `a failed refresh on a high run attempt count never dead-letters the entry`() = runTest {
         val entry = pendingSubmission("session-1", startedAtEpochMillis = 1_000L)
         localDataSource.seed(entry)
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
         coEvery { scoringStateRemoteDataSource.getScoringState(any()) } throws IllegalStateException("offline")
 
         val result = createWorker(runAttemptCount = 1_000).doWork()
@@ -427,7 +404,7 @@ class SessionSubmissionDeliveryWorkerTest {
         val unreliableLocalDataSource: PendingSessionSubmissionLocalDataSource = mockk()
         coEvery { unreliableLocalDataSource.listAll() } returns listOf(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
         coEvery { unreliableLocalDataSource.remove(any()) } throws IOException("queue file unreadable")
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
+        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(Unit)
 
         val result = createWorker(pendingLocalDataSource = unreliableLocalDataSource).doWork()
 
@@ -448,78 +425,6 @@ class SessionSubmissionDeliveryWorkerTest {
         coVerify(exactly = 0) { sessionSubmissionRemoteDataSource.submitSession(any(), any()) }
     }
 
-    @Test
-    fun `a successful run outputs each delivered session's score and each dead-lettered session's rejection`() = runTest {
-        localDataSource.seed(pendingSubmission("session-rejected", startedAtEpochMillis = 1_000L))
-        localDataSource.seed(pendingSubmission("session-scored", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-rejected" }) } returns
-            kotlin.Result.failure(functionsException(FirebaseFunctionsException.Code.INVALID_ARGUMENT))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-scored" }) } returns kotlin.Result.success(SCORE)
-
-        val result = createWorker().doWork()
-
-        SessionDeliveryReport.read(result.outputData) shouldBe mapOf(
-            "session-rejected" to DeliveredSessionDto.Rejected,
-            "session-scored" to DeliveredSessionDto.Scored(SCORE.toDto()),
-        )
-    }
-
-    @Test
-    fun `a session delivered without a score is refreshed, removed and left out of the report without blocking the next entry`() = runTest {
-        localDataSource.seed(pendingSubmission("session-unscored", startedAtEpochMillis = 1_000L))
-        localDataSource.seed(pendingSubmission("session-scored", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-unscored" }) } returns kotlin.Result.success(null)
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-scored" }) } returns kotlin.Result.success(SCORE)
-
-        val result = createWorker().doWork()
-
-        result.shouldBeInstanceOf<Result.Success>()
-        localDataSource.listAll() shouldBe emptyList()
-        deadLetterLocalDataSource.listAll() shouldBe emptyList()
-        coVerify(exactly = 2) { scoringStateRemoteDataSource.getScoringState(Source.SERVER) }
-        SessionDeliveryReport.read(result.outputData) shouldBe mapOf("session-scored" to DeliveredSessionDto.Scored(SCORE.toDto()))
-    }
-
-    @Test
-    fun `progress is published after each entry, before its post-delivery refresh`() = runTest {
-        localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
-        localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
-
-        createWorker().doWork()
-
-        publishedProgress.map { SessionDeliveryReport.read(it).keys } shouldBe listOf(setOf("session-1"), setOf("session-1", "session-2"))
-        coVerifyOrder {
-            progressUpdater.updateProgress(any(), any(), any())
-            scoringStateRemoteDataSource.getScoringState(Source.SERVER)
-        }
-    }
-
-    @Test
-    fun `a session delivered before a later transient failure is still published as progress`() = runTest {
-        localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
-        localDataSource.seed(pendingSubmission("session-2", startedAtEpochMillis = 2_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-1" }) } returns kotlin.Result.success(SCORE)
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), match { it.id == "session-2" }) } returns kotlin.Result.failure(IOException("offline"))
-
-        val result = createWorker().doWork()
-
-        result shouldBe Result.retry()
-        SessionDeliveryReport.read(publishedProgress.last()) shouldBe mapOf("session-1" to DeliveredSessionDto.Scored(SCORE.toDto()))
-    }
-
-    @Test
-    fun `a failure to publish progress never stops the drain`() = runTest {
-        every { progressUpdater.updateProgress(any(), any(), any()) } throws IllegalStateException("database closed")
-        localDataSource.seed(pendingSubmission("session-1", startedAtEpochMillis = 1_000L))
-        coEvery { sessionSubmissionRemoteDataSource.submitSession(any(), any()) } returns kotlin.Result.success(SCORE)
-
-        val result = createWorker().doWork()
-
-        result.shouldBeInstanceOf<Result.Success>()
-        localDataSource.listAll() shouldBe emptyList()
-    }
-
     private companion object {
         const val SIGNED_IN_UID = "uid-1"
         const val OTHER_UID = "uid-2"
@@ -532,25 +437,5 @@ class SessionSubmissionDeliveryWorkerTest {
             FirebaseFunctionsException.Code.PERMISSION_DENIED,
         )
         val TRANSIENT_CODES = FirebaseFunctionsException.Code.entries - PERMANENT_CODES.toSet() - FirebaseFunctionsException.Code.OK
-        val SCORE = SessionScore(
-            breakdown = XpBreakdown(newCards = 10, mastered = 100),
-            level = 1,
-            xpIntoCurrentLevel = 110,
-            xpForNextLevel = 1000,
-            levelsCrossed = emptyList(),
-            levelBefore = 1,
-            xpIntoCurrentLevelBefore = 0,
-            xpForNextLevelBefore = 1000,
-            currentStreak = 1,
-            counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
-            rates = SessionScoreRates(
-                newCardStudied = 10,
-                cardMastered = 100,
-                cardPartial = 25,
-                masteryDefended = 50,
-                cardDemastered = -80,
-                sessionCompleted = 500,
-            ),
-        )
     }
 }

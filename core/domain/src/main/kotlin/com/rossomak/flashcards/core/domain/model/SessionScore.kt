@@ -5,9 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * One session's XP award, line by line, and the account's Level position right before and right after
  * applying it.
- * Comes from the server-authoritative `submitStudySession` Cloud Function for a delivered session, or
- * from the client's own [com.rossomak.flashcards.core.domain.scoring.scoreSession] for the Session
- * Summary's fallback preview; both use the same rules, so the Summary renders either the same way.
+ * Computed on the device by [com.rossomak.flashcards.core.domain.scoring.scoreSession] for the Session
+ * Summary, with the same rules the server-authoritative `submitStudySession` Cloud Function records the
+ * session with.
  *
  * The Summary's Level card draws the Level position ([level], [xpIntoCurrentLevel], [xpForNextLevel]).
  * Only a Summary with no score falls back to the live [LevelProgress] stream that Home's card reads.
@@ -59,7 +59,7 @@ data class SessionScoreCounts(
 )
 
 /**
- * The [XpConfig] rates behind each multiplied [XpBreakdown] line, as the server scored the session.
+ * The [XpConfig] rates behind each multiplied [XpBreakdown] line, as the session was scored.
  * The Streak and Daily Goal awards are not multiplied per item, so they have no rate here.
  */
 @Serializable

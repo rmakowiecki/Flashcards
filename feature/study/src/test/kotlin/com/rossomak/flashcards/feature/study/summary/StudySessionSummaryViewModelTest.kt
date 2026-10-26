@@ -8,9 +8,6 @@ import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.LevelProgress
 import com.rossomak.flashcards.core.domain.model.ObservedScoringState
 import com.rossomak.flashcards.core.domain.model.ScoringState
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
 import com.rossomak.flashcards.core.domain.model.SessionScoreRates
@@ -67,10 +64,8 @@ import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
@@ -338,9 +333,9 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
-    fun `a server score renders the server's lines, counts, Level data before and after and Streak`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a score renders its lines, counts, Level data before and after and Streak`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -354,7 +349,7 @@ class StudySessionSummaryViewModelTest {
                 XpBreakdownLine(XpAwardSource.SessionCompleted, count = null, rate = null, amount = 500),
                 XpBreakdownLine(XpAwardSource.DailyGoal, count = null, rate = null, amount = 1000),
             )
-            xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
+            xpTotal shouldBe SAVED_SCORE.breakdown.xpTotal
             levelsCrossed shouldBe listOf(2, 3)
             levelBefore shouldBe 1
             xpIntoCurrentLevelBefore shouldBe 900L
@@ -365,18 +360,7 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `a resolved server score is saved for a restore`() = runTest(mainDispatcherRule.testDispatcher) {
-        stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
-
-        createViewModel()
-        advanceUntilIdle()
-
-        savedScore() shouldBe SERVER_SCORE
-    }
-
-    @Test
-    fun `a resolved local preview is saved for a restore`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a resolved score is saved for a restore`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
 
         val viewModel = createViewModel()
@@ -386,7 +370,7 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `a failed preview is not saved, so a restore submits again`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `a failed score is not saved, so a restore submits again`() = runTest(mainDispatcherRule.testDispatcher) {
         scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
         stubRoute(ratedRoute())
 
@@ -399,17 +383,17 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a restored ViewModel with a saved score shows it and never submits`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SERVER_SCORE)
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
 
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         with(viewModel.state.value) {
-            xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
+            xpTotal shouldBe SAVED_SCORE.breakdown.xpTotal
             level shouldBe 3
             levelBefore shouldBe 1
             currentStreak shouldBe 8
-            xpLines.size shouldBe SERVER_LINE_COUNT
+            xpLines.size shouldBe SAVED_LINE_COUNT
             scoreStatus shouldBe ScoreResolved
         }
         sessionSubmissionRepository.submittedSessionResults shouldBe emptyList()
@@ -417,29 +401,9 @@ class StudySessionSummaryViewModelTest {
     }
 
     @Test
-    fun `a server score needs none of the local preview's reads`() = runTest(mainDispatcherRule.testDispatcher) {
-        scoringStateRepository.resultToReturn = Result.failure(FIRESTORE_DOWN)
-        stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
-        var messageReceived = false
-
-        val viewModel = createViewModel()
-        val collectJob = launch { viewModel.messages.collect { messageReceived = true } }
-        advanceUntilIdle()
-
-        messageReceived shouldBe false
-        viewModel.state.value.xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
-        collectJob.cancel()
-    }
-
-    @Test
     fun `the score stays Loading until the submission returns`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flow {
-            emit(InFlight)
-            delay(3.seconds)
-            emit(Scored(SERVER_SCORE))
-        }
+        sessionSubmissionRepository.submitDelay = 3.seconds
 
         val viewModel = createViewModel()
         advanceTimeBy(2.seconds)
@@ -450,11 +414,10 @@ class StudySessionSummaryViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.value.scoreStatus shouldBe ScoreResolved
-        viewModel.state.value.xpTotal shouldBe SERVER_SCORE.breakdown.xpTotal
     }
 
     @Test
-    fun `with no server score the summary computes and exposes the local preview's breakdown, total, Level before and after and Streak`() =
+    fun `the summary scores the session locally and exposes its breakdown, total, Level before and after and Streak`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(ratedRoute())
 
@@ -485,7 +448,7 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
-    fun `the local preview's line counts come from the score, so a card Mastered before the session shows as defended`() =
+    fun `the line counts come from the local score, so a card Mastered before the session shows as defended`() =
         runTest(mainDispatcherRule.testDispatcher) {
             // The route says card-0 was not previously Mastered; the prior Card Progress says it was.
             cardProgressRepository.seed(
@@ -511,7 +474,7 @@ class StudySessionSummaryViewModelTest {
         }
 
     @Test
-    fun `the local preview is scored with the cached xp configuration`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `the session is scored with the cached xp configuration`() = runTest(mainDispatcherRule.testDispatcher) {
         xpConfigRepository.resultToReturn = Result.success(XpConfig(cardMastered = 321))
         stubRoute(ratedRoute())
 
@@ -545,8 +508,8 @@ class StudySessionSummaryViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        // Unlike the old client-write path, the preview's own local reads carry no gating power over
-        // whether the session actually gets submitted — the function needs nothing from them.
+        // The score's local reads carry no gating power over whether the session is queued: the
+        // function needs nothing from them.
         sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
     }
 
@@ -569,7 +532,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a session that could not be queued surfaces the save failed message instead of XP unavailable`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            sessionSubmissionRepository.deliveryStatusToReturn = flowOf(NotQueued)
+            sessionSubmissionRepository.submissionResultToReturn = Result.failure(IllegalStateException("queue file unwritable"))
             stubRoute(ratedRoute())
             var receivedMessage: StudySessionSummaryMessage? = null
 
@@ -590,7 +553,7 @@ class StudySessionSummaryViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             authRepository.userToReturn = AUTH_USER
             stubRoute(ratedRoute())
-            sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+            savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
             scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
             val viewModel = createViewModel()
@@ -598,9 +561,9 @@ class StudySessionSummaryViewModelTest {
 
             viewModel.state.assertValue {
                 levelCard shouldBe LevelCardContent(
-                    level = SERVER_SCORE.level,
-                    xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevel,
-                    xpForNextLevel = SERVER_SCORE.xpForNextLevel,
+                    level = SAVED_SCORE.level,
+                    xpIntoCurrentLevel = SAVED_SCORE.xpIntoCurrentLevel,
+                    xpForNextLevel = SAVED_SCORE.xpForNextLevel,
                     photoUrl = AUTH_USER_PHOTO_URL,
                     displayName = AUTH_USER_DISPLAY_NAME,
                 )
@@ -611,7 +574,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a scored Level card stays on the score when the live Level changes`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
         scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -626,7 +589,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a scored Level card waits for the auth user, like Home's`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
 
         val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { awaitCancellation() }))
         advanceUntilIdle()
@@ -640,23 +603,23 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a scored Level card shows the score without a name when the auth user fails`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
 
         val viewModel = createViewModel(observeAuthUser = authUserReturning(flow { error("auth listener failed") }))
         advanceUntilIdle()
 
         viewModel.state.assertValue {
             levelCard shouldBe LevelCardContent(
-                level = SERVER_SCORE.level,
-                xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevel,
-                xpForNextLevel = SERVER_SCORE.xpForNextLevel,
+                level = SAVED_SCORE.level,
+                xpIntoCurrentLevel = SAVED_SCORE.xpIntoCurrentLevel,
+                xpForNextLevel = SAVED_SCORE.xpForNextLevel,
                 photoUrl = null,
                 displayName = null,
             )
             levelCardBefore shouldBe LevelCardContent(
-                level = SERVER_SCORE.levelBefore,
-                xpIntoCurrentLevel = SERVER_SCORE.xpIntoCurrentLevelBefore,
-                xpForNextLevel = SERVER_SCORE.xpForNextLevelBefore,
+                level = SAVED_SCORE.levelBefore,
+                xpIntoCurrentLevel = SAVED_SCORE.xpIntoCurrentLevelBefore,
+                xpForNextLevel = SAVED_SCORE.xpForNextLevelBefore,
                 photoUrl = null,
                 displayName = null,
             )
@@ -750,11 +713,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `the live Level is collected while the score is still loading`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flow {
-            emit(InFlight)
-            delay(3.seconds)
-            emit(Scored(SERVER_SCORE))
-        }
+        sessionSubmissionRepository.submitDelay = 3.seconds
         scoringStateRepository.emit(LIVE_LEVEL_PROGRESS.toScoringState())
 
         val viewModel = createViewModel()
@@ -884,7 +843,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `every source is listed in the dialog order, multiplied lines with count and rate`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(EVERY_SOURCE_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(EVERY_SOURCE_SCORE)
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -904,7 +863,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a source with a zero amount is dropped from the lines`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(SERVER_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -923,7 +882,7 @@ class StudySessionSummaryViewModelTest {
     fun `the Streak line carries the current Streak and the completion and daily goal lines carry neither count nor rate`() =
         runTest(mainDispatcherRule.testDispatcher) {
             stubRoute(ratedRoute())
-            sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(EVERY_SOURCE_SCORE))
+            savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(EVERY_SOURCE_SCORE)
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -940,7 +899,7 @@ class StudySessionSummaryViewModelTest {
     @Test
     fun `a Fast session never lists a Rated-only line`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(fastRoute())
-        sessionSubmissionRepository.deliveryStatusToReturn = flowOf(InFlight, Scored(EVERY_SOURCE_SCORE))
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(EVERY_SOURCE_SCORE)
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -1016,12 +975,10 @@ class StudySessionSummaryViewModelTest {
 
     @Test
     fun `a negative total turns the headline to nice effort once the score lands`() = runTest(mainDispatcherRule.testDispatcher) {
+        // A configuration this punishing is the only way three Mastered cards score below zero.
+        xpConfigRepository.resultToReturn = Result.success(XpConfig(cardMastered = -1000))
         stubRoute(ratedRoute(cardStates = List(3) { FlashcardStudyProgressState.Mastered }))
-        sessionSubmissionRepository.deliveryStatusToReturn = flow {
-            emit(InFlight)
-            delay(3.seconds)
-            emit(Scored(LOSS_SCORE))
-        }
+        sessionSubmissionRepository.submitDelay = 3.seconds
 
         val viewModel = createViewModel()
         advanceTimeBy(2.seconds)
@@ -1031,13 +988,12 @@ class StudySessionSummaryViewModelTest {
         advanceUntilIdle()
 
         viewModel.state.value.headline shouldBe NiceEffort
-        viewModel.state.value.xpTotal shouldBe LOSS_SCORE.breakdown.xpTotal
     }
 
     @Test
     fun `a restored score is Scored from the first frame`() = runTest(mainDispatcherRule.testDispatcher) {
         stubRoute(ratedRoute())
-        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SERVER_SCORE)
+        savedStateHandle[SAVED_SCORE_KEY] = Json.encodeToString(SAVED_SCORE)
 
         val viewModel = createViewModel()
 
@@ -1208,7 +1164,7 @@ class StudySessionSummaryViewModelTest {
 
     private companion object {
         const val SAVED_SCORE_KEY = "savedScore"
-        const val SERVER_LINE_COUNT = 6
+        const val SAVED_LINE_COUNT = 6
         val FIRESTORE_DOWN = IllegalStateException("firestore down")
         val LIVE_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_200L, xpForNextLevel = XpConfig().levelThreshold(5))
         val NEXT_LEVEL_PROGRESS = LevelProgress(level = 5, xpIntoCurrentLevel = 1_900L, xpForNextLevel = XpConfig().levelThreshold(5))
@@ -1220,7 +1176,7 @@ class StudySessionSummaryViewModelTest {
             displayName = AUTH_USER_DISPLAY_NAME,
             photoUrl = AUTH_USER_PHOTO_URL,
         )
-        val SERVER_SCORE = SessionScore(
+        val SAVED_SCORE = SessionScore(
             breakdown = XpBreakdown(
                 newCards = 60,
                 mastered = 200,
@@ -1247,7 +1203,7 @@ class StudySessionSummaryViewModelTest {
                 sessionCompleted = 500,
             ),
         )
-        val EVERY_SOURCE_SCORE = SERVER_SCORE.copy(
+        val EVERY_SOURCE_SCORE = SAVED_SCORE.copy(
             breakdown = XpBreakdown(
                 newCards = 80,
                 mastered = 400,
@@ -1259,10 +1215,6 @@ class StudySessionSummaryViewModelTest {
                 streakBonus = 250,
             ),
             counts = SessionScoreCounts(newCardsStudied = 4, newlyMastered = 2, partial = 1, defended = 1, demastered = 1),
-        )
-        val LOSS_SCORE = SERVER_SCORE.copy(
-            breakdown = XpBreakdown(demastered = -240),
-            counts = SessionScoreCounts(newCardsStudied = 0, newlyMastered = 0, partial = 0, defended = 0, demastered = 3),
         )
     }
 }

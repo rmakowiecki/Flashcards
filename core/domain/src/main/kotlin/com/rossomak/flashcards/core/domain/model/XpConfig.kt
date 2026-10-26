@@ -13,10 +13,10 @@ package com.rossomak.flashcards.core.domain.model
  * They stay identical to the shared default configuration file in `testdata/xp-scoring/` at the repo
  * root, and to the Cloud Functions' own bundled default; a test on each side enforces that.
  *
- * **The client scores with its cached copy.** The Session Summary's fallback preview and the
+ * **The client scores with its cached copy.** The Session Summary's score and the
  * projection of Pending Sessions both read [com.rossomak.flashcards.core.domain.repository.XpConfigRepository]
  * when they score, never a copy captured at session start. The server scores each session with the
- * document current when it is delivered, so a rate changed in between makes the preview differ from
+ * document current when it is delivered, so a rate changed in between makes the Summary's score differ from
  * the recorded award until the server's result is read back.
  *
  * @param newCardStudied per card seeing a card for the first time ever. Both Study Modes.

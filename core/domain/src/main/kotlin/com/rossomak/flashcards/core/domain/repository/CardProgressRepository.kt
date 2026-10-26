@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.Flow
  *   [com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase], which derives each
  *   Rated card's previously-Mastered flag from it
  *   ([com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator]); and
- *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], whose local preview scores
- *   the session against it.
+ *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], which scores the session
+ *   against it.
  * - [observeProgressSummary]: the Studied/Mastered rings on Browse and Category Details.
  *
  * Any future selection that depends on which cards are Mastered (such as Mastery Defense's floor and
@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.Flow
 interface CardProgressRepository {
     /**
      * `null` when the User has never studied a card in this Subcategory yet. [excludedSessionId] names a
-     * finished session whose own results to leave out, so a preview of that session never builds on itself.
+     * finished session whose own results to leave out, so the score of that session never builds on itself.
      */
     suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null): Result<SubcategoryProgressDetails?>
 

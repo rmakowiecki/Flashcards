@@ -9,14 +9,8 @@ import com.google.firebase.functions.HttpsCallableResult
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.SessionScore
-import com.rossomak.flashcards.core.domain.model.SessionScoreCounts
-import com.rossomak.flashcards.core.domain.model.SessionScoreRates
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
-import com.rossomak.flashcards.core.domain.model.XpBreakdown
-import io.kotest.assertions.withClue
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.mockk.CapturingSlot
@@ -94,7 +88,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     fun `submitSession calls the submitStudySession callable with a Rated payload matching the function's field names`() = runTest {
         val session = ratedSessionResult()
         val cardResult = session.cardResults.single()
-        val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
+        val payloadSlot = stubCallable(Tasks.forResult(callableResult(null)))
 
         val result = createApi().submitSession(OWNER_UID, session)
 
@@ -129,7 +123,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     @Test
     fun `submitSession omits attemptsUsed and wasPreviouslyMastered for a Fast card result`() = runTest {
         val session = fastSessionResult()
-        val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
+        val payloadSlot = stubCallable(Tasks.forResult(callableResult(null)))
 
         createApi().submitSession(OWNER_UID, session)
 
@@ -145,7 +139,7 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     @Test
     fun `submitSession sends a Fast session's source type and read-aloud setting without voiceAnswering`() = runTest {
         val session = fastSessionResult()
-        val payloadSlot = stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
+        val payloadSlot = stubCallable(Tasks.forResult(callableResult(null)))
 
         createApi().submitSession(OWNER_UID, session)
 
@@ -169,123 +163,16 @@ class FirebaseSessionSubmissionRemoteDataSourceTest {
     }
 
     @Test
-    fun `submitSession reads a Rated response into the server's score`() = runTest {
-        stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE)))
-
-        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
-
-        result shouldBe Result.success(
-            SessionScore(
-                breakdown = XpBreakdown(
-                    newCards = 10,
-                    mastered = 100,
-                    partial = 0,
-                    masteryDefenseBonus = 0,
-                    demastered = 0,
-                    sessionCompletionBonus = 500,
-                    dailyGoalBonus = 1000,
-                    streakBonus = 250,
-                ),
-                level = 2,
-                xpIntoCurrentLevel = 860L,
-                xpForNextLevel = 6000L,
-                levelsCrossed = listOf(2),
-                levelBefore = 1,
-                xpIntoCurrentLevelBefore = 0L,
-                xpForNextLevelBefore = 1000L,
-                currentStreak = 1,
-                counts = SessionScoreCounts(newCardsStudied = 1, newlyMastered = 1, partial = 0, defended = 0, demastered = 0),
-                rates = SessionScoreRates(
-                    newCardStudied = 10,
-                    cardMastered = 100,
-                    cardPartial = 25,
-                    masteryDefended = 50,
-                    cardDemastered = -80,
-                    sessionCompleted = 500,
-                ),
-            ),
-        )
-    }
-
-    @Test
-    fun `submitSession reads a Fast response without Rated-only counts`() = runTest {
-        stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE + (FIELD_COUNTS to mapOf("newCardsStudied" to 2)))))
-
-        val score = createApi().submitSession(OWNER_UID, fastSessionResult()).getOrThrow().shouldNotBeNull()
-
-        score.counts shouldBe SessionScoreCounts(newCardsStudied = 2, newlyMastered = null, partial = null, defended = null, demastered = null)
-    }
-
-    @Test
-    fun `submitSession succeeds without a score on a response missing any newly required field`() = runTest {
-        listOf(FIELD_LEVEL_BEFORE, FIELD_XP_INTO_CURRENT_LEVEL_BEFORE, FIELD_XP_FOR_NEXT_LEVEL_BEFORE, FIELD_CURRENT_STREAK, FIELD_COUNTS, FIELD_RATES).forEach { field ->
-            stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE - field)))
-
-            val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
-
-            withClue(field) { result shouldBe Result.success(null) }
-        }
-    }
-
-    @Test
-    fun `submitSession succeeds without a score on a response missing a required field`() = runTest {
-        stubCallable(Tasks.forResult(callableResult(RATED_RESPONSE - "level")))
-
-        val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
-
-        result shouldBe Result.success(null)
-    }
-
-    @Test
-    fun `submitSession succeeds without a score on a response that is not an object`() = runTest {
+    fun `submitSession succeeds once the callable returns, whatever it answers`() = runTest {
         stubCallable(Tasks.forResult(callableResult(null)))
 
         val result = createApi().submitSession(OWNER_UID, ratedSessionResult())
 
-        result shouldBe Result.success(null)
+        result shouldBe Result.success(Unit)
     }
 
     private companion object {
         const val SUBMIT_STUDY_SESSION_FUNCTION_NAME = "submitStudySession"
         const val OWNER_UID = "uid-1"
-        const val FIELD_COUNTS = "counts"
-        const val FIELD_RATES = "rates"
-        const val FIELD_LEVEL_BEFORE = "levelBefore"
-        const val FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore"
-        const val FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore"
-        const val FIELD_CURRENT_STREAK = "currentStreak"
-
-        // Shaped as the Functions SDK decodes JSON: small numbers as Int, lists and objects as List and Map.
-        val RATED_RESPONSE: Map<String, Any> = mapOf(
-            "breakdown" to mapOf(
-                "newCards" to 10,
-                "mastered" to 100,
-                "partial" to 0,
-                "masteryDefenseBonus" to 0,
-                "demastered" to 0,
-                "sessionCompletionBonus" to 500,
-                "dailyGoalBonus" to 1000,
-                "streakBonus" to 250,
-                "xpTotal" to 1860,
-            ),
-            "level" to 2,
-            "xpIntoCurrentLevel" to 860,
-            "xpForNextLevel" to 6000,
-            "levelsCrossed" to listOf(2),
-            FIELD_LEVEL_BEFORE to 1,
-            FIELD_XP_INTO_CURRENT_LEVEL_BEFORE to 0,
-            FIELD_XP_FOR_NEXT_LEVEL_BEFORE to 1000,
-            FIELD_CURRENT_STREAK to 1,
-            "durationSeconds" to 60,
-            FIELD_COUNTS to mapOf("newCardsStudied" to 1, "newlyMastered" to 1, "partial" to 0, "defended" to 0, "demastered" to 0),
-            FIELD_RATES to mapOf(
-                "newCardStudied" to 10,
-                "cardMastered" to 100,
-                "cardPartial" to 25,
-                "masteryDefended" to 50,
-                "cardDemastered" to -80,
-                "sessionCompleted" to 500,
-            ),
-        )
     }
 }

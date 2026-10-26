@@ -28,7 +28,7 @@ data class SessionScoring(
 /**
  * Scores [session] the way the `submitStudySession` Cloud Function does when it records it, so the
  * client can show and project a session the server has not scored yet. The client's only scoring
- * code: the Session Summary's fallback preview and the replay of Pending Sessions both call it.
+ * code: the Session Summary's score and the replay of Pending Sessions both call it.
  *
  * Steps, as on the server:
  * 1. [mergeSessionIntoCardProgress] over [priorCardStatesBySubcategory] gives the Card Progress
