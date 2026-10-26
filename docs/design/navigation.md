@@ -42,6 +42,13 @@ Splash routes a device to exactly one of three places, in this order:
 
 Onboarding goes on to Main for a signed-in User and to Login for anyone else. Login goes on to Main when the device has seen onboarding and to Onboarding when it has not. Each launch screen removes itself on the way out, so back from Main never returns to one. See [onboarding-flow.md](onboarding-flow.md).
 
+**One backdrop under the launch screens.** Splash, Onboarding and Login share one gradient and network graph behind the navigation host, while any of them is shown or leaving. The arriving screen morphs the graph to its own shape while the logo flies across ([ADR-0073](../adr/0073-launch-screens-share-one-backdrop.md)).
+
+- **Splash**: the logo writes itself out, the gradient slides up, the tagline rises, and the graph blooms around the logo, fading in, zooming and turning into place before the handover.
+- **Launch screen to launch screen**: the outgoing content fades out fast and stays until the logo lands.
+- **To Main**: Main enters opaque and covers the launch screen at once. The backdrop goes once the launch screen has left.
+- **From outside the launch flow** (sign-in lost): the old screen is removed at once, the backdrop starts afresh, and the arriving screen fades its graph in.
+
 A launcher shortcut tapped while the app is not running is resolved at Splash, and only when Splash is going to Main. Its Category or Subcategory Details opens on top of Main, so back returns to Main's first tab instead of leaving the app. A shortcut that no longer resolves lands on Main as an ordinary launch. See [launcher-shortcuts.md](launcher-shortcuts.md).
 
 ## Tab shell
@@ -79,6 +86,7 @@ Every screen whose ViewModel decides where to go uses these events, even for a t
 
 - [ADR-0019](../adr/0019-navigation-as-one-time-events.md): navigation as one-time events.
 - [ADR-0067](../adr/0067-destinations-navigate-only-from-their-own-back-stack-entry.md): destinations navigate only from their own back-stack entry.
+- [ADR-0073](../adr/0073-launch-screens-share-one-backdrop.md): the launch screens share one backdrop.
 - [ADR-0004](../adr/0004-preview-study-session-screen-owns-card-selection.md): every session goes through Preview.
 - [ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md): separate Rated and Fast session screens.
 - [preview-study-session.md](preview-study-session.md): what each session entry point sends.

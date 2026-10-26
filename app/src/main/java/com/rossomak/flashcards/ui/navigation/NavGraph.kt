@@ -2,13 +2,19 @@ package com.rossomak.flashcards.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -22,6 +28,8 @@ import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropHost
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropStart
 import com.rossomak.flashcards.feature.account.AccountRoute
 import com.rossomak.flashcards.feature.account.AccountScreen
 import com.rossomak.flashcards.feature.account.OpenSourceLicensesRoute
@@ -46,6 +54,7 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionScreen
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScreen
 import com.rossomak.flashcards.presentation.main.MainScreen
 import com.rossomak.flashcards.presentation.main.debugFullScreenDestinations
+import com.rossomak.flashcards.presentation.splash.SplashMorpheusGraphs
 import com.rossomak.flashcards.presentation.splash.SplashScreen
 import com.rossomak.flashcards.ui.permission.PermissionLauncherHost
 import kotlinx.serialization.Serializable
@@ -234,24 +243,32 @@ private fun EntryNavigator.navigateToStudySessionSummary(route: StudySessionSumm
 }
 
 /**
+ * A leaving launch screen shows through the transparent launch screen arriving, so its content fades out
+ * fast but it stays composed until the shared logo has landed.
+ */
+private val LaunchExitTransition: ExitTransition = fadeOut(
+    animationSpec = keyframes {
+        durationMillis = SHARED_ELEMENT_DURATION_MS
+        0f at LAUNCH_CONTENT_FADE_MS
+    },
+)
+
+private const val LAUNCH_CONTENT_FADE_MS = 250
+
+private val DefaultExitTransition: ExitTransition = fadeOut(animationSpec = tween(durationMillis = DEFAULT_EXIT_FADE_MS))
+
+private const val DEFAULT_EXIT_FADE_MS = 700 // Navigation Compose's own default.
+
+private fun NavDestination.isLaunchDestination(): Boolean = hasRoute<Splash>() || hasRoute<AuthRoute>() || hasRoute<OnboardingRoute>()
+
+/**
  * Splash, Login and Onboarding — the three screens a user passes through before reaching [Main].
  * Each pops itself off the back stack on the way out, so [Main] is never reachable "back" into a
  * launch screen. Extracted from [FlashcardsNavGraph] to keep that function readable as the flow
  * grew a third pre-Main step.
  */
 private fun NavGraphBuilder.launchDestinations(navController: NavHostController) {
-    guardedNavComposable<Splash>(
-        navController = navController,
-        // Every launch handoff is one opaque full-screen gradient replacing another, so there is
-        // nothing to cross-fade. Fading them would briefly leave both around half-opaque and let the
-        // white window background bleed through as a flash. Instead the splash holds at full opacity
-        // until the shared logo has landed — it stays composed that long so the element has both
-        // ends to animate between — and is then cut in a single frame, hidden the whole time under
-        // the incoming screen, which enters with no transition at all.
-        exitTransition = {
-            fadeOut(animationSpec = tween(durationMillis = 1, delayMillis = SHARED_ELEMENT_DURATION_MS))
-        },
-    ) { navigator ->
+    guardedNavComposable<Splash>(navController, exitTransition = { LaunchExitTransition }) { navigator ->
         // Splash hands the brand mark to Onboarding or Login as a shared element, so all three
         // publish their AnimatedVisibilityScope for the element to animate against.
         ProvideNavAnimatedVisibilityScope {
@@ -282,7 +299,7 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
             )
         }
     }
-    guardedNavComposable<AuthRoute>(navController, enterTransition = { EnterTransition.None }) { navigator ->
+    guardedNavComposable<AuthRoute>(navController, enterTransition = { EnterTransition.None }, exitTransition = { LaunchExitTransition }) { navigator ->
         ProvideNavAnimatedVisibilityScope {
             LoginScreen(
                 onNavigateToMain = {
@@ -298,7 +315,7 @@ private fun NavGraphBuilder.launchDestinations(navController: NavHostController)
             )
         }
     }
-    guardedNavComposable<OnboardingRoute>(navController, enterTransition = { EnterTransition.None }) { navigator ->
+    guardedNavComposable<OnboardingRoute>(navController, enterTransition = { EnterTransition.None }, exitTransition = { LaunchExitTransition }) { navigator ->
         ProvideNavAnimatedVisibilityScope {
             OnboardingScreen(
                 onNavigateToMain = {
@@ -358,79 +375,99 @@ fun FlashcardsNavGraph(
     // outgoing and the incoming destination, so both have to sit inside the same scope.
     SharedTransitionLayout(modifier = modifier) {
         PermissionLauncherHost(permissionGateway)
+        // No visible entry yet means the NavHost is about to show Splash, its start destination, and the
+        // backdrop must exist on Splash's first frame.
+        val visibleEntries by navController.visibleEntries.collectAsState()
+        val launchDestination = visibleEntries.firstOrNull { entry -> entry.destination.isLaunchDestination() }?.destination
+        val isLaunching = visibleEntries.isEmpty()
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
-            NavHost(
-                navController = navController,
-                startDestination = Splash(pendingRoute = launchRoute),
-                modifier = Modifier.fillMaxSize()
+            LaunchBackdropHost(
+                isShown = isLaunching || launchDestination != null,
+                start = if (isLaunching || launchDestination?.hasRoute<Splash>() == true) {
+                    SplashMorpheusGraphs.backdropStart
+                } else {
+                    LaunchBackdropStart(spec = SplashMorpheusGraphs.seed)
+                },
             ) {
-                launchDestinations(navController)
-                // Only ever reached from one of the three launch screens, all of which hand over
-                // opaquely — see the comment on Splash.
-                guardedNavComposable<Main>(navController, enterTransition = { EnterTransition.None }) { navigator ->
-                    MainScreen(
-                        onNavigateToAccount = {
-                            navigator.navigate(AccountRoute) { launchSingleTop = true }
-                        },
-                        onNavigateToOnboarding = {
-                            navigator.navigate(OnboardingRoute) {
-                                popUpTo(Main) { inclusive = true }
-                            }
-                        },
-                        onNavigateToCategoryDetails = { categoryId, categoryName ->
-                            navigator.navigate(CategoryDetailsRoute(categoryId, categoryName))
-                        },
-                        onNavigateToSubcategoryDetails = navigator::navigateToSubcategoryDetails,
-                        onNavigateToPreviewStudySession = navigator::navigateToPreviewStudySession,
-                        onNavigateToPreviewQuickSession = navigator::navigateToPreviewQuickSession,
-                        onNavigateToPreviewRecentSession = navigator::navigateToPreviewReplay,
-                        onNavigateToDebugTool = { route -> navigator.navigate(route) },
-                    )
-                }
-                // Debug tools that need the whole screen, without the bottom bar; empty in release.
-                debugFullScreenDestinations(navController)
-                accountDestination(navController)
-                openSourceLicensesDestination(navController)
-                guardedNavComposable<CategoryDetailsRoute>(navController) { navigator ->
-                    CategoryDetailsScreen(
-                        onNavigateBack = { navigator.popBackStack() },
-                        onNavigateToSubcategoryDetails = navigator::navigateToSubcategoryDetails,
-                        onNavigateToPreviewStudySession = navigator::navigateToPreviewStudySession,
-                        onNavigateToPreviewStudySessionForCategory = navigator::navigateToPreviewStudySessionForCategory,
-                    )
-                }
-                guardedNavComposable<SubcategoryDetailsRoute>(navController) { navigator ->
-                    SubcategoryDetailsScreen(
-                        onNavigateBack = { navigator.popBackStack() },
-                        onNavigateToPreviewStudySession = navigator::navigateToPreviewStudySessionWithSelection,
-                    )
-                }
-                guardedNavComposable<PreviewStudySessionRoute>(navController) { navigator ->
-                    PreviewStudySessionScreen(
-                        onNavigateBack = { navigator.popBackStack() },
-                        onNavigateToFastStudySession = { route -> navigator.navigate(route) },
-                        onNavigateToRatedStudySession = { route -> navigator.navigate(route) }
-                    )
-                }
-                guardedNavComposable<FastStudySessionRoute>(navController) { navigator ->
-                    FastStudySessionScreen(
-                        onNavigateBack = { navigator.popBackStack() },
-                        onNavigateToSummary = navigator::navigateToStudySessionSummary,
-                    )
-                }
-                guardedNavComposable<RatedStudySessionRoute>(navController) { navigator ->
-                    RatedStudySessionScreen(
-                        onNavigateBack = { navigator.popBackStack() },
-                        onNavigateToSummary = navigator::navigateToStudySessionSummary,
-                    )
-                }
-                guardedNavComposable<StudySessionSummaryRoute>(navController) { navigator ->
-                    StudySessionSummaryScreen(
-                        onNavigateBack = { navigator.popBackStack() },
-                        onNavigateToPreviewStudySession = navigator::navigateToPreviewReplay,
-                    )
-                }
+                FlashcardsNavHost(navController, launchRoute)
             }
+        }
+    }
+}
+
+@Composable
+private fun FlashcardsNavHost(navController: NavHostController, launchRoute: String?) {
+    NavHost(
+        navController = navController,
+        startDestination = Splash(pendingRoute = launchRoute),
+        modifier = Modifier.fillMaxSize(),
+        // Launch screens are transparent, so a screen fading out would show through them.
+        exitTransition = { if (targetState.destination.isLaunchDestination()) ExitTransition.None else DefaultExitTransition },
+    ) {
+        launchDestinations(navController)
+        // Only reached from a launch screen, which it covers at once.
+        guardedNavComposable<Main>(navController, enterTransition = { EnterTransition.None }) { navigator ->
+            MainScreen(
+                onNavigateToAccount = {
+                    navigator.navigate(AccountRoute) { launchSingleTop = true }
+                },
+                onNavigateToOnboarding = {
+                    navigator.navigate(OnboardingRoute) {
+                        popUpTo(Main) { inclusive = true }
+                    }
+                },
+                onNavigateToCategoryDetails = { categoryId, categoryName ->
+                    navigator.navigate(CategoryDetailsRoute(categoryId, categoryName))
+                },
+                onNavigateToSubcategoryDetails = navigator::navigateToSubcategoryDetails,
+                onNavigateToPreviewStudySession = navigator::navigateToPreviewStudySession,
+                onNavigateToPreviewQuickSession = navigator::navigateToPreviewQuickSession,
+                onNavigateToPreviewRecentSession = navigator::navigateToPreviewReplay,
+                onNavigateToDebugTool = { route -> navigator.navigate(route) },
+            )
+        }
+        // Debug tools that need the whole screen, without the bottom bar; empty in release.
+        debugFullScreenDestinations(navController)
+        accountDestination(navController)
+        openSourceLicensesDestination(navController)
+        guardedNavComposable<CategoryDetailsRoute>(navController) { navigator ->
+            CategoryDetailsScreen(
+                onNavigateBack = { navigator.popBackStack() },
+                onNavigateToSubcategoryDetails = navigator::navigateToSubcategoryDetails,
+                onNavigateToPreviewStudySession = navigator::navigateToPreviewStudySession,
+                onNavigateToPreviewStudySessionForCategory = navigator::navigateToPreviewStudySessionForCategory,
+            )
+        }
+        guardedNavComposable<SubcategoryDetailsRoute>(navController) { navigator ->
+            SubcategoryDetailsScreen(
+                onNavigateBack = { navigator.popBackStack() },
+                onNavigateToPreviewStudySession = navigator::navigateToPreviewStudySessionWithSelection,
+            )
+        }
+        guardedNavComposable<PreviewStudySessionRoute>(navController) { navigator ->
+            PreviewStudySessionScreen(
+                onNavigateBack = { navigator.popBackStack() },
+                onNavigateToFastStudySession = { route -> navigator.navigate(route) },
+                onNavigateToRatedStudySession = { route -> navigator.navigate(route) }
+            )
+        }
+        guardedNavComposable<FastStudySessionRoute>(navController) { navigator ->
+            FastStudySessionScreen(
+                onNavigateBack = { navigator.popBackStack() },
+                onNavigateToSummary = navigator::navigateToStudySessionSummary,
+            )
+        }
+        guardedNavComposable<RatedStudySessionRoute>(navController) { navigator ->
+            RatedStudySessionScreen(
+                onNavigateBack = { navigator.popBackStack() },
+                onNavigateToSummary = navigator::navigateToStudySessionSummary,
+            )
+        }
+        guardedNavComposable<StudySessionSummaryRoute>(navController) { navigator ->
+            StudySessionSummaryScreen(
+                onNavigateBack = { navigator.popBackStack() },
+                onNavigateToPreviewStudySession = navigator::navigateToPreviewReplay,
+            )
         }
     }
 }

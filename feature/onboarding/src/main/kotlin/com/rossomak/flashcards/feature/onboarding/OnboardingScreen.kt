@@ -57,9 +57,10 @@ import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.RouteUna
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
-import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
 import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
-import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropBox
+import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropStart
+import com.rossomak.flashcards.core.ui.backdrop.rememberLaunchBackdropState
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
@@ -81,7 +82,6 @@ import com.rossomak.flashcards.feature.onboarding.step.VoicePrivacyStep
 import com.rossomak.flashcards.feature.onboarding.step.WelcomeStep
 import com.rossomak.morpheus.Follow
 import com.rossomak.morpheus.MorpheusGraphMorphState
-import com.rossomak.morpheus.rememberMorpheusGraphMorphState
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -205,9 +205,10 @@ fun OnboardingContent(
     // Read once it flips, not on every frame of the reveal.
     val hasChromeStartedRevealing by remember { derivedStateOf { chromeReveal.value > 0f } }
     val isInspecting = LocalInspectionMode.current
-    // The graph fades in with the copy, on whichever step the pager restored to, then follows the pager.
+    // The graph arrives on whichever step the pager restored to, then follows the pager.
     val entranceStep = currentStep
-    val graphState = rememberOnboardingGraph(pagerState, entranceStep, isInspecting)
+    val backdrop = rememberLaunchBackdropState(LaunchBackdropStart(spec = OnboardingMorpheusGraphs.specFor(entranceStep)))
+    FollowPager(backdrop.graph, pagerState)
     LaunchedEffect(Unit) {
         if (isInspecting) {
             // A static @Preview renders the first frame only, which would be an empty screen.
@@ -215,14 +216,14 @@ fun OnboardingContent(
             chromeReveal.snapTo(1f)
             return@LaunchedEffect
         }
+        launch { backdrop.arriveAt(OnboardingMorpheusGraphs.specFor(entranceStep)) }
         delay(SHARED_ELEMENT_DURATION_MS.toLong().milliseconds)
-        launch { graphState.animateTo(OnboardingMorpheusGraphs.specFor(entranceStep), tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
+        launch { backdrop.fadeIn(tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
         copyReveal.animateTo(1f, tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing))
         chromeReveal.animateTo(1f, tween(durationMillis = CHROME_REVEAL_MS, easing = LinearEasing))
     }
 
-    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop(graphState = graphState)
+    LaunchBackdropBox(state = backdrop, modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -272,12 +273,9 @@ fun OnboardingContent(
 /** The page after the one the pager heads for, so quick Next taps add up instead of repeating the same page. */
 private fun PagerState.pageAfterTarget(): Int = (targetPage + 1).coerceAtMost(OnboardingStep.entries.lastIndex)
 
-/** The background graph: [entranceStep]'s spec, hidden until the entrance unless [isInspecting], then following [pagerState]. */
+/** Keeps [graphState] on the shown step's spec; acts only once the pager moves, so it never fights the entrance. */
 @Composable
-private fun rememberOnboardingGraph(pagerState: PagerState, entranceStep: OnboardingStep, isInspecting: Boolean): MorpheusGraphMorphState {
-    val graphState = rememberMorpheusGraphMorphState(
-        if (isInspecting) OnboardingMorpheusGraphs.specFor(entranceStep) else OnboardingMorpheusGraphs.hiddenFor(entranceStep),
-    )
+private fun FollowPager(graphState: MorpheusGraphMorphState, pagerState: PagerState) {
     graphState.Follow(
         OnboardingMorpheusGraphs.pages,
         // Only Skip's jump uses it; a step-to-step morph is bounded by minMorphDuration.
@@ -287,7 +285,6 @@ private fun rememberOnboardingGraph(pagerState: PagerState, entranceStep: Onboar
     ) {
         pagerState.currentPage + pagerState.currentPageOffsetFraction
     }
-    return graphState
 }
 
 @Composable
