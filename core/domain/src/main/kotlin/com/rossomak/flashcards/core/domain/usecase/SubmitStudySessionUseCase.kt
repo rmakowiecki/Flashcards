@@ -25,8 +25,10 @@ import kotlinx.coroutines.coroutineScope
  *
  * Order of work:
  * 1. Reads the score's baseline: the account's [ScoringState] and the prior Card Progress of every
- *    touched Subcategory, all in parallel. Both repositories include the User's other Pending Sessions,
- *    so the score builds on them. This happens **before** queuing, and both reads exclude this session's
+ *    touched Subcategory, all in parallel and from what the device already holds only, so online and
+ *    offline score alike and never wait for the server. The session's own load read its Card Progress
+ *    moments ago; a Subcategory the device holds no copy of counts its cards as new. Both repositories
+ *    include the User's other Pending Sessions, so the score builds on them. This happens **before** queuing, and both reads exclude this session's
  *    own id: after process death the Summary submits again while the session is already queued, and the
  *    baseline must still never include it. Reading after queuing would race the delivery run, whose
  *    cache refresh can already include the session; the scoring-state read then fails, and so does the
@@ -55,7 +57,7 @@ class SubmitStudySessionUseCase @Inject constructor(
     }
 
     private suspend fun readBaseline(sessionResult: SessionResult): Result<ScoreBaseline> = coroutineScope {
-        val scoringStateRead = async { scoringStateRepository.getScoringState(excludedSessionId = sessionResult.id) }
+        val scoringStateRead = async { scoringStateRepository.getScoringState(excludedSessionId = sessionResult.id, cacheOnly = true) }
         val touchedSubcategoryIds = sessionResult.cardResults.map(FlashcardResult::subcategoryId).distinct()
         val cardStateReads = touchedSubcategoryIds.map { subcategoryId -> async { subcategoryId to readPriorCardStates(subcategoryId, sessionResult.id) } }
         val priorCardStatesBySubcategory = cardStateReads.awaitAll().associate { (subcategoryId, read) ->
@@ -69,7 +71,7 @@ class SubmitStudySessionUseCase @Inject constructor(
 
     /** Card id to its Card Progress state in [subcategoryId] without [sessionId]'s own results; empty when nothing was studied there yet. */
     private suspend fun readPriorCardStates(subcategoryId: String, sessionId: String): Result<Map<String, FlashcardStudyProgressState>> =
-        cardProgressRepository.getProgress(subcategoryId, excludedSessionId = sessionId).map { progress ->
+        cardProgressRepository.getProgress(subcategoryId, excludedSessionId = sessionId, cacheOnly = true).map { progress ->
             progress?.cards.orEmpty().mapValues { (_, entry) -> entry.state }
         }
 

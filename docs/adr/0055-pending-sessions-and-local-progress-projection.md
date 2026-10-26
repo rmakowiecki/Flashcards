@@ -50,7 +50,10 @@ Finishing a session queues it and schedules a drain with `REPLACE`, so a fresh r
 entry even when another drain is running or backing off. Nothing waits for that run.
 `SubmitStudySessionUseCase` reads the score's baseline over the projected reads, queues the session,
 then scores it with `scoreSession` and returns that `SessionScore`. The baseline is read *before* the
-session is queued, so the score never counts the session twice. Online and offline Summaries are the
+session is queued, so the score never counts the session twice. The baseline reads only the Firestore
+cache, never the server: the session's own load read its Card Progress moments before, and the live
+Level streams keep the scoring state cached. A Card Progress document the cache holds nothing for reads
+as no record, so its cards count as new; a scoring state the cache holds nothing for fails the score. Online and offline Summaries are the
 same path. `submitStudySession` answers with nothing: what the server records reaches the device only
 through the post-delivery refresh, and every other screen shows it the next time it reads.
 
@@ -77,6 +80,12 @@ the use case fails with `SessionNotSavedException` and the Summary says the sess
   the spinner.
 - **Making the server fast enough to wait for** (a minimum instance, expedited work, a region near the
   Users). Rejected: it costs money, still guarantees nothing, and the offline path must exist anyway.
+- **Default-source baseline reads for the score.** Built first. Rejected: offline, Firestore's default
+  read of a document the server reported missing fails even though the cache knows it is missing, so a
+  first session in a Subcategory, finished offline, got no score. A default read that falls back to the
+  cache fixes that but still waits for the server on a flaky connection.
+- **Warming the Card Progress cache from Preview.** Rejected: the session's own load already reads it,
+  and a session started offline cannot warm anything.
 - **Delivering in-process from the Summary** instead of through the worker. Rejected: two delivery
   paths for one queue, and the Summary dies with its process.
 - **An app-lifetime snapshot listener on the scoring state**, to keep it cached. Deferred until a
@@ -112,7 +121,10 @@ resolved by [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md
   studying offline on the same day each preview a Streak award that the server pays once.
 - **Empty Card Progress baseline.** Offline, a Subcategory never read on this device has no cached
   document, so a Pending Session's cards replay over no record: they count as new, and a Mastery
-  Defense card counts as newly Mastered.
+  Defense card counts as newly Mastered. The Summary's score does the same for its own session when
+  the session started offline.
+- **The Summary's score misses changes made elsewhere mid-session.** The cache-only baseline does not
+  see progress another device delivered after the session loaded.
 
 ## Amendments
 
@@ -186,3 +198,8 @@ session from the queue to the server state emits nothing.
 **2026-10-26 — The Summary always shows the local score.** The Summary no longer waits for the
 server's score: the wait ran out on most sessions. The worker publishes no delivery report, and
 `submitStudySession` answers with nothing. See the Decision section and Considered Options above.
+
+**2026-10-26 — The Summary's score reads only the cache.** A first session in a Subcategory, finished
+offline, showed no score: the default read of its missing Card Progress document failed offline. The
+score's baseline now reads the Firestore cache only, and a Card Progress document the cache holds
+nothing for reads as no record. See the Decision section and Considered Options above.

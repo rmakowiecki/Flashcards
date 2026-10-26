@@ -36,6 +36,9 @@ class FakeCardProgressRepository : CardProgressRepository {
     /** The excluded session id of every [getProgress] call, in call order. */
     val excludedSessionIds: MutableList<String?> = mutableListOf()
 
+    /** The `cacheOnly` flag of every [getProgress] call, in call order. */
+    val cacheOnlyFlags: MutableList<Boolean> = mutableListOf()
+
     /** Every Subcategory id [getProgress] was actually called with, in call order. */
     val requestedSubcategoryIds: MutableList<String> = mutableListOf()
 
@@ -57,9 +60,10 @@ class FakeCardProgressRepository : CardProgressRepository {
      * genuine `withContext(Dispatchers.IO)` dispatcher hop — the same reasoning as
      * [FakeSessionSubmissionRepository]'s own [yield].
      */
-    override suspend fun getProgress(subcategoryId: String, excludedSessionId: String?): Result<SubcategoryProgressDetails?> {
+    override suspend fun getProgress(subcategoryId: String, excludedSessionId: String?, cacheOnly: Boolean): Result<SubcategoryProgressDetails?> {
         requestedSubcategoryIds.add(subcategoryId)
         excludedSessionIds.add(excludedSessionId)
+        cacheOnlyFlags.add(cacheOnly)
         yield()
         val queuedProgress = progressIncludingQueuedSession.entries.firstOrNull { (sessionId, progress) ->
             sessionId != excludedSessionId && progress.subcategoryId == subcategoryId

@@ -124,6 +124,16 @@ class SubmitStudySessionUseCaseTest {
     }
 
     @Test
+    fun `the score baseline is read only from what the device already holds`() = runTest {
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        createUseCase().invoke(session)
+
+        cardProgressRepository.cacheOnlyFlags shouldBe listOf(true)
+        scoringStateRepository.cacheOnlyFlags shouldBe listOf(true)
+    }
+
+    @Test
     fun `a re-submission whose session is already queued scores the same as the first submission`() = runTest {
         scoringStateRepository.resultToReturn = Result.success(ScoringState(xp = 40, xpIntoCurrentLevel = 40))
         val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))

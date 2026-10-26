@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.data.repository
 import app.cash.turbine.test
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ProgressSummaryDto
@@ -312,6 +313,34 @@ class DefaultCardProgressRepositoryTest {
         val result = createRepository().getProgress(SUBCATEGORY_ID)
 
         result.getOrThrow()?.cards?.getValue(CARD_ID)?.state shouldBe Mastered
+    }
+
+    @Test
+    fun `getProgress reads only the cache when asked to`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } returns remoteProgress(CARD_ID to Mastered)
+
+        val progress = createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow()
+
+        progress?.cards?.getValue(CARD_ID)?.state shouldBe Mastered
+        coVerify(exactly = 0) { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getProgress reads a Subcategory the cache holds nothing for as never studied when reading only the cache`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws IllegalStateException("not cached")
+
+        createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow() shouldBe null
+    }
+
+    @Test
+    fun `getProgress reads the pending sessions of the cache-only baseline from the cache too`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } returns null
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+
+        val progress = createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow()
+
+        progress?.cards?.getValue(CARD_ID)?.state shouldBe Mastered
+        coVerify(exactly = 0) { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.DEFAULT) }
     }
 
     @Test

@@ -31,8 +31,12 @@ interface CardProgressRepository {
     /**
      * `null` when the User has never studied a card in this Subcategory yet. [excludedSessionId] names a
      * finished session whose own results to leave out, so the score of that session never builds on itself.
+     *
+     * [cacheOnly] reads only what the device already holds and never waits for the server, so the score
+     * reads the same way online and offline. A Subcategory the device holds no copy of reads as `null`
+     * then, as if never studied: its cards count as new.
      */
-    suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null): Result<SubcategoryProgressDetails?>
+    suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<SubcategoryProgressDetails?>
 
     /**
      * A live Firestore listener on the summary singleton, not a one-shot read — re-emits on every

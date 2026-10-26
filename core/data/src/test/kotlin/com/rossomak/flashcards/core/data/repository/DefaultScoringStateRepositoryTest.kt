@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.repository
 
 import app.cash.turbine.test
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
@@ -111,6 +112,23 @@ class DefaultScoringStateRepositoryTest {
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+    }
+
+    @Test
+    fun `getScoringState reads only the cache when asked to`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState(Source.CACHE) } returns null
+
+        createRepository().getScoringState(cacheOnly = true).getOrThrow() shouldBe null
+
+        coVerify(exactly = 0) { scoringStateRemoteDataSource.getScoringState(Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getScoringState fails when reading only the cache and it holds nothing`() = runTest {
+        val error = IllegalStateException("not cached")
+        coEvery { scoringStateRemoteDataSource.getScoringState(Source.CACHE) } throws error
+
+        createRepository().getScoringState(cacheOnly = true).exceptionOrNull() shouldBe error
     }
 
     @Test

@@ -24,12 +24,16 @@ interface ScoringStateRepository {
      * builds on itself. When the cached server state already includes that session, it cannot be
      * subtracted, so the read fails.
      *
+     * [cacheOnly] reads only what the device already holds and never waits for the server, so the score
+     * reads the same way online and offline. Unlike a Card Progress read, a scoring state the device
+     * holds no copy of fails the read rather than reading as a new account.
+     *
      * @return `Result.success(null)` for an account with no scoring state document and nothing pending —
      * a genuinely new user, not a failure — leaving it to the caller to start from [ScoringState]'s own
      * defaults. `Result.failure` for a real read failure, which the score must never paper
      * over with a default: guessing a low starting state would show a misleadingly small number.
      */
-    suspend fun getScoringState(excludedSessionId: String? = null): Result<ScoringState?>
+    suspend fun getScoringState(excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<ScoringState?>
 
     /**
      * Follows the signed-in User's [ScoringState] live, emitting only when it changes.

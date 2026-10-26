@@ -10,10 +10,12 @@ On arrival the Summary reads the User's current Daily Goal and seals it into the
 
 The score uses the same rules as the server and the cached XP configuration. It is computed against the User's prior Card Progress and scoring state as the device projects them, the User's other Pending Sessions included and this session excluded. Online and offline, the Summary shows this one kind of score ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
 
+The score reads only what the device already holds and never waits for the server, so it reads the same way online and offline. The session read its Card Progress when it loaded, so the device holds it unless the session started offline. A Subcategory the device holds no Card Progress for counts its cards as new, and a card Mastered there before counts as newly Mastered.
+
 What the Summary shows depends on how scoring ends:
 
 - **Score.** The session is queued and scored.
-- **No score.** The score's reads failed. The session is still queued, and a snackbar says it is saved but its XP could not be calculated.
+- **No score.** The score's reads failed, for example because the device holds no copy of the User's scoring state. The session is still queued, and a snackbar says it is saved but its XP could not be calculated.
 - **Not saved.** The session could not be queued at all. Nothing holds it, so it earns nothing, and a snackbar says it could not be saved.
 
 The shown score is never replaced. It can differ from what the server records: the server may hold a newer XP configuration, a session from another device may land first, or the server may reject the session, in which case the session is moved to the diagnostics file and the shown XP is never awarded ([session-submission.md](session-submission.md)). Home shows the server's numbers once the session is delivered. A score, once shown, survives a rotation and a restore. A Summary restored without a score submits again, and the queue keeps one entry per session.

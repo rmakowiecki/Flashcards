@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.core.data.repository
 
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionDto
@@ -55,6 +56,12 @@ import kotlinx.coroutines.flow.map
  * Baselines are read from the Firestore cache or the server (default source). A Card Progress read
  * that fails (typically offline with no cached copy) projects over no record; see
  * [DefaultCardProgressRepository] for that limitation.
+ *
+ * **Cache-only reads.** The Session Summary's score reads every baseline from the Firestore cache only
+ * ([Source.CACHE]), so it never waits for the server and reads the same online and offline. Offline, a
+ * default read of a document the server reported missing fails even though the cache knows it is
+ * missing; a cache read returns it as missing. A Card Progress document the cache holds nothing for
+ * projects over no record, even with no Pending Session touching it.
  */
 @Singleton
 class PendingSessionProjector @Inject constructor(
@@ -77,17 +84,19 @@ class PendingSessionProjector @Inject constructor(
      *
      * With no such session, this is the plain remote read, failure included. Otherwise a failed remote
      * read projects over no record instead of failing, so the Pending Session results still show.
+     * [cacheOnly] reads the cache only, and a failed read projects over no record either way: a document
+     * the cache holds nothing for counts as never studied.
      *
      * The queue is read before the remote document, so a session delivered in between is replayed over
      * state that already includes it (harmless) rather than missing from both. If the signed-in User
      * changes between the two reads, the queue and the remote document may belong to different Users,
      * so the read fails rather than projecting one User's sessions over the other's progress.
      */
-    suspend fun projectCardProgress(subcategoryId: String, excludedSessionId: String? = null): Result<SubcategoryProgressDetails?> {
+    suspend fun projectCardProgress(subcategoryId: String, excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<SubcategoryProgressDetails?> {
         val uidAtStart = signedInUid()
         val pendingSessions = pendingSessions(excludedSessionId).filter { session -> session.touches(subcategoryId) }
-        val remoteProgress = readRemoteProgress(subcategoryId)
-        if (pendingSessions.isEmpty()) return remoteProgress
+        val remoteProgress = readRemoteProgress(subcategoryId, readSource(cacheOnly))
+        if (pendingSessions.isEmpty()) return if (cacheOnly) Result.success(remoteProgress.orEmptyBaseline(subcategoryId)) else remoteProgress
         if (signedInUid() != uidAtStart) {
             return Result.failure(IllegalStateException("Signed-in User changed while reading Card Progress for $subcategoryId"))
         }
@@ -134,14 +143,18 @@ class PendingSessionProjector @Inject constructor(
      * may belong to different Users, so the read fails rather than projecting one User's sessions over
      * the other's scoring state. A queue that merely changes meanwhile is not checked: a delivery
      * removing an older session during the read must not fail the caller.
+     *
+     * [cacheOnly] reads every document from the cache only. A scoring state the cache holds nothing for
+     * still fails the read.
      */
-    suspend fun projectScoringState(excludedSessionId: String? = null): Result<ScoringState?> = coroutineScope {
+    suspend fun projectScoringState(excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<ScoringState?> = coroutineScope {
         val uidAtStart = signedInUid()
         val pendingSessions = pendingSessions(excludedSessionId)
-        val remoteScoringState = async { readRemoteScoringState().failingIfApplied(excludedSessionId) }
+        val source = readSource(cacheOnly)
+        val remoteScoringState = async { readRemoteScoringState(source).failingIfApplied(excludedSessionId) }
         if (pendingSessions.isEmpty()) return@coroutineScope remoteScoringState.await().map { dto -> dto?.toDomain() }
 
-        val progressBaselines = async { readProgressBaselines(pendingSessions) }
+        val progressBaselines = async { readProgressBaselines(pendingSessions, source) }
         val config = async { xpConfigRepository.getXpConfig().getOrDefault(XpConfig()) }
         val scoringStateDto = remoteScoringState.await().getOrElse { exception -> return@coroutineScope Result.failure(exception) }
         val baselines = progressBaselines.await()
@@ -262,9 +275,9 @@ class PendingSessionProjector @Inject constructor(
     }
 
     /** The cached server Card Progress of every Subcategory [pendingSessions] touch, `null` where unreadable or absent. */
-    private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>): Map<String, SubcategoryProgressDetails?> = coroutineScope {
+    private suspend fun readProgressBaselines(pendingSessions: List<SessionResult>, source: Source = Source.DEFAULT): Map<String, SubcategoryProgressDetails?> = coroutineScope {
         pendingSessions.flatMap { session -> session.touchedSubcategoryIds() }.toSet().map { subcategoryId ->
-            async { subcategoryId to readRemoteProgress(subcategoryId).orEmptyBaseline(subcategoryId) }
+            async { subcategoryId to readRemoteProgress(subcategoryId, source).orEmptyBaseline(subcategoryId) }
         }.awaitAll().toMap()
     }
 
@@ -274,10 +287,11 @@ class PendingSessionProjector @Inject constructor(
         null
     }
 
-    private suspend fun readRemoteProgress(subcategoryId: String): Result<SubcategoryProgressDetails?> =
-        runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId)?.toDomain(subcategoryId) }
+    private suspend fun readRemoteProgress(subcategoryId: String, source: Source = Source.DEFAULT): Result<SubcategoryProgressDetails?> =
+        runCatchingFirestore { cardProgressRemoteDataSource.getProgress(subcategoryId, source)?.toDomain(subcategoryId) }
 
-    private suspend fun readRemoteScoringState(): Result<ScoringStateDto?> = runCatchingFirestore { scoringStateRemoteDataSource.getScoringState() }
+    private suspend fun readRemoteScoringState(source: Source = Source.DEFAULT): Result<ScoringStateDto?> =
+        runCatchingFirestore { scoringStateRemoteDataSource.getScoringState(source) }
 
     /** Fails when the cached scoring state already lists [excludedSessionId] as applied: a baseline cannot subtract it. */
     private fun Result<ScoringStateDto?>.failingIfApplied(excludedSessionId: String?): Result<ScoringStateDto?> {
@@ -317,3 +331,6 @@ class PendingSessionProjector @Inject constructor(
         val xpTotalBySessionId: Map<String, Int>,
     )
 }
+
+/** [Source.CACHE] for a read that must never wait for the server, otherwise the default source. */
+private fun readSource(cacheOnly: Boolean): Source = if (cacheOnly) Source.CACHE else Source.DEFAULT

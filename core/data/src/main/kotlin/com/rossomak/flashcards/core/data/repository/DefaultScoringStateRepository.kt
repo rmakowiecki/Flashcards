@@ -43,7 +43,8 @@ class DefaultScoringStateRepository @Inject constructor(
     private val xpConfigRepository: XpConfigRepository,
 ) : ScoringStateRepository {
 
-    override suspend fun getScoringState(excludedSessionId: String?): Result<ScoringState?> = pendingSessionProjector.projectScoringState(excludedSessionId)
+    override suspend fun getScoringState(excludedSessionId: String?, cacheOnly: Boolean): Result<ScoringState?> =
+        pendingSessionProjector.projectScoringState(excludedSessionId, cacheOnly)
 
     /**
      * Completes, with no further emission, when the remote flow completes (on sign-out), even though
