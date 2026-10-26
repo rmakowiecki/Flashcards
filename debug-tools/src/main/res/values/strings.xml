@@ -67,7 +67,9 @@
     <string name="screen_showcase_onboarding_title">Onboarding</string>
     <string name="screen_showcase_home_title">Home</string>
     <string name="screen_showcase_browse_title">Browse</string>
+    <string name="screen_showcase_preview_title">Session preview</string>
     <string name="screen_showcase_session_title">Study session</string>
+    <string name="screen_showcase_summary_title">Session summary</string>
     <string name="screen_showcase_onboarding_label">Onboarding gallery</string>
     <string name="screen_showcase_home_label">Home</string>
     <string name="screen_showcase_browse_label">Category list and search</string>

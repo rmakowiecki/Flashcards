@@ -6,7 +6,7 @@ A debug-only catalog of the app's real screens, each drawn full screen in a fixe
 
 The debug hub has a Screen showcase row. It opens the showcase list in a screen of its own, outside the tab shell, so no screen in the showcase ever shows the bottom navigation bar, Home and the Study tab included ([navigation.md](navigation.md)). Back from the list returns to the debug hub.
 
-The list groups its rows by where each screen sits in the app: Onboarding, Home, Browse and Study session. Each row is one screen in one state, and tapping it opens that state full screen. Back returns to the list.
+The list groups its rows by where each screen sits in the app: Onboarding, Home, Browse, Session preview, Study session and Session summary. Each row is one screen in one state, and tapping it opens that state full screen. Back returns to the list.
 
 ## Rules
 
@@ -37,7 +37,9 @@ The content is real, exported once from Firestore into `:debug-tools`'s raw reso
 | Onboarding | the gallery on its cover, paged through by hand to reach each step ([onboarding-flow.md](onboarding-flow.md)) |
 | Home | the Streak and Daily Goal row, Favorites and Recents loaded ([home.md](home.md)) |
 | Browse | the Category list, whose search bar shows a fixed set of results for whatever is typed; Category Details; Category Details in Selection Mode, with the Category not bookmarked; Subcategory Details; Subcategory Details with the Filter dialog open, two Tags selected and Difficulty narrowed ([browse.md](browse.md), [category-search.md](category-search.md)) |
-| Study session | Preview of a drawn Quick Session; the same Preview with its settings sheet open; Rated at the question; Rated with the answer revealed, on a card with a code block and Extended Context; Rated with Voice Answering listening; Rated with a voice answer graded; Fast tapping through; Fast reading aloud; the Session Summary settled; the Session Summary's XP breakdown; the Session Summary's reveal with confetti ([preview-study-session.md](preview-study-session.md), [rated-mode.md](rated-mode.md), [voice-answering.md](voice-answering.md), [fast-mode.md](fast-mode.md), [session-summary.md](session-summary.md)) |
+| Session preview | Preview of a drawn Quick Session; the same Preview with its settings sheet open ([preview-study-session.md](preview-study-session.md)) |
+| Study session | Rated at the question; Rated with the answer revealed, on a card with a code block and Extended Context; Rated with Voice Answering listening; Rated with a voice answer graded; Fast tapping through; Fast reading aloud ([rated-mode.md](rated-mode.md), [voice-answering.md](voice-answering.md), [fast-mode.md](fast-mode.md)) |
+| Session summary | the Session Summary settled; its XP breakdown; its reveal with confetti ([session-summary.md](session-summary.md)) |
 
 Splash, Login, Settings and Account are not in the showcase. The Subcategory Details Filter dialog is the one dialog with its own entry; any other dialog of a listed screen is opened by hand.
 
