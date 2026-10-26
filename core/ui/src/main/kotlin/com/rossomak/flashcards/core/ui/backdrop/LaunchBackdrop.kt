@@ -24,11 +24,7 @@ import com.rossomak.morpheus.MorpheusGraphMorphState
 import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.morpheusGraphBackground
 
-/**
- * Where a [LaunchBackdropState] starts: the graph's [spec], whether the gradient is still to slide in,
- * and the transform the graph is drawn with before it settles to unscaled and unturned. The graph
- * always starts invisible.
- */
+/** A [LaunchBackdropState]'s starting pose. The graph always starts invisible. */
 @Immutable
 data class LaunchBackdropStart(
     val spec: MorpheusGraphSpec,
@@ -38,53 +34,36 @@ data class LaunchBackdropStart(
 )
 
 /**
- * The one backdrop the launch screens (Splash, Onboarding and Login) share: the brand gradient over its
- * base color, and a network graph over the gradient. Owned by [LaunchBackdropHost] behind the nav host,
- * so moving between launch screens never swaps it: the graph's clock keeps running and each screen
- * morphs it from whatever is on screen.
- *
- * Besides the graph's spec, it carries what a spec cannot express: how far the gradient has slid in,
- * and the graph's opacity, scale and rotation, which Splash animates for its bloom. Scale and rotation
- * pivot on the center and transform the drawn graph, strokes and nodes included.
+ * The gradient and graph Splash, Onboarding and Login share, so the graph morphs between them instead of
+ * being swapped. Carries the transform a Morpheus spec can't express. See ADR-0073.
  */
 @Stable
 class LaunchBackdropState internal constructor(start: LaunchBackdropStart, graphAlpha: Float = 0f) {
     val graph: MorpheusGraphMorphState = MorpheusGraphMorphState(start.spec)
 
-    /** 0 shows only the base color; 1 the gradient, slid fully into place. */
+    /** 0 shows only the base color; 1 the gradient, slid fully in. */
     val gradientReveal: Animatable<Float, *> = Animatable(if (start.isGradientHidden) 0f else 1f)
     val graphAlpha: Animatable<Float, *> = Animatable(graphAlpha)
     val graphScale: Animatable<Float, *> = Animatable(start.graphScale)
     val graphRotationDegrees: Animatable<Float, *> = Animatable(start.graphRotationDegrees)
 
-    /**
-     * Brings the graph to [spec] for a screen that has just arrived. When a graph is already shown, as
-     * when another launch screen hands over, it morphs there from the screen as it is over
-     * [HandoffAnimationSpec] and returns once it arrives. Otherwise it shows [spec] at once, still
-     * invisible, for [fadeIn] to reveal.
-     */
+    /** Morphs to [spec] when a graph is shown, returning once it arrives; otherwise snaps to it, still invisible, for [fadeIn]. */
     suspend fun arriveAt(spec: MorpheusGraphSpec) {
         if (graphAlpha.targetValue > 0f) graph.animateTo(spec, HandoffAnimationSpec) else graph.snapTo(spec)
     }
 
-    /** Fades the graph in over [animationSpec], unless it is already shown. */
+    /** Does nothing when the graph is already shown, as after a handover. */
     suspend fun fadeIn(animationSpec: AnimationSpec<Float>) {
         if (graphAlpha.targetValue < 1f) graphAlpha.animateTo(1f, animationSpec)
     }
 }
 
-/** The morph from one launch screen's graph to the next one's. */
 private val HandoffAnimationSpec: AnimationSpec<Float> =
     tween(BrandMorpheusGraphSpecs.settleMorphDuration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing)
 
-/** The [LaunchBackdropHost]'s state while it shows one, otherwise `null`. */
 private val LocalLaunchBackdrop = staticCompositionLocalOf<LaunchBackdropState?> { null }
 
-/**
- * Draws the launch backdrop behind [content] while [isShown], and provides its state to the launch
- * screens in [content]. Each time it is shown it starts afresh from [start]. While shown it is also the
- * [blurBackdropScope] for [content], so launch screens blur the graph behind them.
- */
+/** Draws the launch backdrop behind [content] while [isShown], starting afresh from [start] each time. */
 @Composable
 fun LaunchBackdropHost(isShown: Boolean, start: LaunchBackdropStart, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val state = remember(isShown) { if (isShown) LaunchBackdropState(start) else null }
@@ -95,10 +74,8 @@ fun LaunchBackdropHost(isShown: Boolean, start: LaunchBackdropStart, modifier: M
 }
 
 /**
- * The [LaunchBackdropHost]'s state, or, with no host (previews, the screen showcase), one of the
- * screen's own made from [start], for [LaunchBackdropBox] to draw. The host starts from its own
- * [LaunchBackdropStart], so [start] only matters without one. Under inspection the screen's own one is
- * shown settled, since a preview never runs its animations.
+ * The host's state, ignoring [start], or without a host (previews, the showcase) the screen's own from
+ * [start], shown settled under inspection since previews run no animations.
  */
 @Composable
 fun rememberLaunchBackdropState(start: LaunchBackdropStart): LaunchBackdropState {
@@ -113,10 +90,7 @@ fun rememberLaunchBackdropState(start: LaunchBackdropStart): LaunchBackdropState
     }
 }
 
-/**
- * The root of a launch screen. Over the host's backdrop it is a plain full-size box; for a screen's own
- * [state] it draws the backdrop itself, under its own [blurBackdropScope].
- */
+/** A launch screen's root: draws the backdrop itself only when [state] is not the host's. */
 @Composable
 fun LaunchBackdropBox(
     state: LaunchBackdropState,

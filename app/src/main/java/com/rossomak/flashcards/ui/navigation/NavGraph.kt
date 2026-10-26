@@ -243,10 +243,8 @@ private fun EntryNavigator.navigateToStudySessionSummary(route: StudySessionSumm
 }
 
 /**
- * How Splash, Onboarding and Login leave. They draw no background of their own over the shared
- * [LaunchBackdropHost], so the screen going out stays visible under the one coming in: its content
- * fades out quickly, while the screen stays composed until the shared logo has landed, so the element
- * has both ends to fly between. Going to Main it is covered at once, since Main enters opaque.
+ * A leaving launch screen shows through the transparent launch screen arriving, so its content fades out
+ * fast but it stays composed until the shared logo has landed.
  */
 private val LaunchExitTransition: ExitTransition = fadeOut(
     animationSpec = keyframes {
@@ -257,10 +255,9 @@ private val LaunchExitTransition: ExitTransition = fadeOut(
 
 private const val LAUNCH_CONTENT_FADE_MS = 250
 
-/** The NavHost's own default exit, kept for every screen not leaving for a launch screen. */
 private val DefaultExitTransition: ExitTransition = fadeOut(animationSpec = tween(durationMillis = DEFAULT_EXIT_FADE_MS))
 
-private const val DEFAULT_EXIT_FADE_MS = 700
+private const val DEFAULT_EXIT_FADE_MS = 700 // Navigation Compose's own default.
 
 private fun NavDestination.isLaunchDestination(): Boolean = hasRoute<Splash>() || hasRoute<AuthRoute>() || hasRoute<OnboardingRoute>()
 
@@ -378,11 +375,8 @@ fun FlashcardsNavGraph(
     // outgoing and the incoming destination, so both have to sit inside the same scope.
     SharedTransitionLayout(modifier = modifier) {
         PermissionLauncherHost(permissionGateway)
-        // The launch screens share one backdrop behind the NavHost, so their graph morphs from one
-        // screen to the next instead of being swapped. It exists while any of them is shown or still
-        // leaving, and starts with the gradient hidden only when Splash brings it, which slides it in.
-        // Before the NavHost has set its graph no entry is visible yet, and the start destination is
-        // always Splash, so an empty list counts as Splash: the backdrop must exist on Splash's first frame.
+        // No visible entry yet means the NavHost is about to show Splash, its start destination, and the
+        // backdrop must exist on Splash's first frame.
         val visibleEntries by navController.visibleEntries.collectAsState()
         val launchDestination = visibleEntries.firstOrNull { entry -> entry.destination.isLaunchDestination() }?.destination
         val isLaunching = visibleEntries.isEmpty()
@@ -407,13 +401,11 @@ private fun FlashcardsNavHost(navController: NavHostController, launchRoute: Str
         navController = navController,
         startDestination = Splash(pendingRoute = launchRoute),
         modifier = Modifier.fillMaxSize(),
-        // A screen leaving for a launch screen is cut at once: the launch screen draws only its content
-        // over the shared backdrop, so a fading screen would show through it.
+        // Launch screens are transparent, so a screen fading out would show through them.
         exitTransition = { if (targetState.destination.isLaunchDestination()) ExitTransition.None else DefaultExitTransition },
     ) {
         launchDestinations(navController)
-        // Only ever reached from one of the three launch screens, which it covers at once —
-        // see LaunchExitTransition.
+        // Only reached from a launch screen, which it covers at once.
         guardedNavComposable<Main>(navController, enterTransition = { EnterTransition.None }) { navigator ->
             MainScreen(
                 onNavigateToAccount = {

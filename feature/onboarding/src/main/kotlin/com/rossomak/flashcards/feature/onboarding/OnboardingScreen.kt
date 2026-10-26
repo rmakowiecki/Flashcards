@@ -216,8 +216,6 @@ fun OnboardingContent(
             chromeReveal.snapTo(1f)
             return@LaunchedEffect
         }
-        // Handed over by Splash or Login, the graph morphs to this step's while the logo is in flight.
-        // Arriving with no graph shown, it fades in with the copy instead.
         launch { backdrop.arriveAt(OnboardingMorpheusGraphs.specFor(entranceStep)) }
         delay(SHARED_ELEMENT_DURATION_MS.toLong().milliseconds)
         launch { backdrop.fadeIn(tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
@@ -275,10 +273,7 @@ fun OnboardingContent(
 /** The page after the one the pager heads for, so quick Next taps add up instead of repeating the same page. */
 private fun PagerState.pageAfterTarget(): Int = (targetPage + 1).coerceAtMost(OnboardingStep.entries.lastIndex)
 
-/**
- * Keeps [graphState] on the spec of the step [pagerState] shows. It acts only once the pager moves, so
- * it never fights the entrance bringing the graph to the first step's spec.
- */
+/** Keeps [graphState] on the shown step's spec; acts only once the pager moves, so it never fights the entrance. */
 @Composable
 private fun FollowPager(graphState: MorpheusGraphMorphState, pagerState: PagerState) {
     graphState.Follow(

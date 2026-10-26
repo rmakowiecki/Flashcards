@@ -152,14 +152,12 @@ private fun LoginContent(
     // signed in they fade and sink out, so they never show enabled again while the screen leaves.
     val buttonReveal = remember { Animatable(0f) }
     val hasButtonStartedRevealing by remember { derivedStateOf { buttonReveal.value > 0f } }
-    // The logo is revealed here only when no screen hands it over, as from the end of onboarding.
+    // The logo is revealed here only when no screen hands it over.
     val logoState = rememberSharedElementState(SharedElementKey.APP_LOGO)
     val isLogoHandedOver = rememberIsHandedOver(logoState)
     val logoReveal = remember { Animatable(0f) }
     val isInspecting = LocalInspectionMode.current
     val isSignedIn = state.phase is SignedIn
-    // Handed over by Splash or Onboarding, the graph morphs to Login's while the logo arrives. Arriving
-    // with no graph shown, it fades in with the buttons instead. It stays while they fade out once signed in.
     val backdrop = rememberLaunchBackdropState(LaunchBackdropStart(spec = LoginMorpheusGraphs.graph))
     LaunchedEffect(isSignedIn) {
         when {
@@ -169,13 +167,18 @@ private fun LoginContent(
                 buttonReveal.snapTo(1f)
             }
             else -> {
-                launch { backdrop.arriveAt(LoginMorpheusGraphs.graph) }
                 launch { logoReveal.animateTo(1f, tween(durationMillis = SHARED_ELEMENT_DURATION_MS, easing = FastOutSlowInEasing)) }
                 delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
-                launch { backdrop.fadeIn(tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing)) }
                 buttonReveal.animateTo(1f, tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
             }
         }
+    }
+    // Apart from the buttons' effect, so a sign-in during the reveal never freezes the graph mid-fade.
+    LaunchedEffect(backdrop) {
+        if (isInspecting) return@LaunchedEffect
+        launch { backdrop.arriveAt(LoginMorpheusGraphs.graph) }
+        delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
+        backdrop.fadeIn(tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
     }
 
     LaunchBackdropBox(state = backdrop, modifier = modifier) {

@@ -59,7 +59,7 @@ private val SharedElementBoundsTransform = BoundsTransform { _, _ ->
 @Composable
 fun Modifier.sharedElementByKey(key: Any): Modifier = sharedElementByState(rememberSharedElementState(key))
 
-/** [sharedElementByKey] for a [state] the caller also reads, as [rememberIsHandedOver] does. */
+/** [sharedElementByKey] for a [state] the caller also reads, as with [rememberIsHandedOver]. */
 @Composable
 fun Modifier.sharedElementByState(state: SharedContentState?): Modifier {
     val sharedTransitionScope = LocalSharedTransitionScope.current ?: return this
@@ -70,7 +70,7 @@ fun Modifier.sharedElementByState(state: SharedContentState?): Modifier {
     }
 }
 
-/** The state of the [key] shared element, for [sharedElementByState]; `null` outside a [SharedTransitionScope]. */
+/** The [key] element's state for [sharedElementByState], or `null` outside a [SharedTransitionScope]. */
 @Composable
 fun rememberSharedElementState(key: Any): SharedContentState? {
     val sharedTransitionScope = LocalSharedTransitionScope.current ?: return null
@@ -79,8 +79,8 @@ fun rememberSharedElementState(key: Any): SharedContentState? {
 
 /**
  * Whether [state]'s element flew in from another destination: true from the first frame its partner is
- * found, and from then on, after the flight has landed too. Lets a screen reveal the element itself only
- * when nothing hands it over. Read it while drawing; it is always false for a `null` [state].
+ * found and after it lands, false for `null`. Lets a screen reveal the element itself only when nothing
+ * hands it over. Read it while drawing.
  */
 @Composable
 fun rememberIsHandedOver(state: SharedContentState?): () -> Boolean {

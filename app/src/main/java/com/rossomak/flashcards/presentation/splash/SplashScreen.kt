@@ -148,11 +148,7 @@ fun SplashContent(
     }
 }
 
-/**
- * The graph's entrance, overlapping the end of the gradient's slide: it fades in quickly while the
- * bloom opens from [SplashMorpheusGraphs.backdropStart], zooms in and turns into place, all on one long, soft
- * settle that lands before the splash hands over.
- */
+/** Fades the graph in while the bloom opens, zooms and turns into place, settling before the handover. */
 private suspend fun LaunchBackdropState.playBloom() = coroutineScope {
     delay(BLOOM_DELAY_MS.milliseconds)
     val settle = tween<Float>(durationMillis = BLOOM_MS, easing = FlashcardsMotion.EmphasizedDecelerateEasing)
