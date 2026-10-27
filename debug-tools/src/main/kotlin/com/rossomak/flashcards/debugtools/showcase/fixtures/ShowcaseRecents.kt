@@ -12,17 +12,16 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import java.time.Instant
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 private const val LATEST_SESSION_SECONDS = 300
 private const val EARLIER_TODAY_SESSION_SECONDS = 420
 
-/** Every source type, Study Mode and delivery. The first two fall today in [zone], so Home's Daily Goal sums them. */
-internal fun ShowcaseFixtures.recentItems(now: Instant, zone: ZoneId): List<RecentItem> = listOf(
+/** Every source type, Study Mode and delivery. The first two end shortly before [now], so Home's Daily Goal sums whichever of them start after midnight. */
+internal fun ShowcaseFixtures.recentItems(now: Instant): List<RecentItem> = listOf(
     recent(
         id = "recent-coroutines-voice",
-        startedAt = startedToday(now, zone, endedMinutesAgo = 4, durationSeconds = LATEST_SESSION_SECONDS),
+        startedAt = startedBefore(now, endedMinutesAgo = 4, durationSeconds = LATEST_SESSION_SECONDS),
         mode = StudyMode.Rated,
         isHandsFree = true,
         sourceType = SingleSubcategory,
@@ -34,7 +33,7 @@ internal fun ShowcaseFixtures.recentItems(now: Instant, zone: ZoneId): List<Rece
     ),
     recent(
         id = "recent-android-quick",
-        startedAt = startedToday(now, zone, endedMinutesAgo = 180, durationSeconds = EARLIER_TODAY_SESSION_SECONDS),
+        startedAt = startedBefore(now, endedMinutesAgo = 180, durationSeconds = EARLIER_TODAY_SESSION_SECONDS),
         mode = StudyMode.Fast,
         isHandsFree = true,
         sourceType = Quick,
@@ -94,12 +93,9 @@ internal fun ShowcaseFixtures.recentItems(now: Instant, zone: ZoneId): List<Rece
     ),
 )
 
-/** Ended [endedMinutesAgo] before [now], starting no earlier than midnight. */
-private fun startedToday(now: Instant, zone: ZoneId, endedMinutesAgo: Long, durationSeconds: Int): Instant {
-    val startOfToday = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
-    val startedAt = now.minus(endedMinutesAgo, ChronoUnit.MINUTES).minusSeconds(durationSeconds.toLong())
-    return maxOf(startedAt, startOfToday)
-}
+/** Start of a session that ended [endedMinutesAgo] before [now]. */
+private fun startedBefore(now: Instant, endedMinutesAgo: Long, durationSeconds: Int): Instant =
+    now.minus(endedMinutesAgo, ChronoUnit.MINUTES).minusSeconds(durationSeconds.toLong())
 
 @Suppress("LongParameterList")
 private fun recent(

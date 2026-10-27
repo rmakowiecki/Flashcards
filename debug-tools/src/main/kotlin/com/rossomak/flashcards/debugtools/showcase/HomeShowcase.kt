@@ -32,7 +32,7 @@ private fun ShowcaseFixtures.favoriteItems(): List<FavoriteItem> {
 
 /** The Daily Goal sums today's Recents, so the ring matches the rows. */
 private fun ShowcaseFixtures.homeState(now: Instant, zone: ZoneId): HomeScreenState {
-    val recents = recentItems(now, zone)
+    val recents = recentItems(now)
     val startOfToday = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
     val studiedMinutesToday = recents.filter { it.session.startedAt >= startOfToday }.sumOf { it.session.durationSeconds }.seconds.inWholeMinutes.toInt()
     return HomeScreenState(

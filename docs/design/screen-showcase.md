@@ -28,7 +28,7 @@ The content is real, exported once from Firestore into `:debug-tools`'s raw reso
 - **The Session Summary** is a Rated session that crossed into Level 14, ending where Home's Level card stands. Its breakdown has every award but a de-mastery, at the default XP configuration's rates. It carries a Streak award, so it is the day's first session, and it runs longer than the Daily Goal so that it earns the Daily Goal award on its own.
 - **The graded voice answer** is made up: a paraphrased spoken answer to a real card, graded Correct on a second Attempt after a Failed first.
 - **Extra Tags** are the one hand edit to the exported content, made in the raw resource itself, never in code. The cards on screen in the Rated and Fast entries had a single Tag each, so each got two more for a fuller chip row, picked from Tags already used in its Category.
-- **Progress, Favorites and Recents** are filled in, so rings, bookmark badges, the Favorites carousel and the Recently studied list all show content. Recents are timed relative to when the entry opens. The two newest are today's: they end before the entry opens and start no earlier than midnight, and the Daily Goal's minutes are their durations added up, so the ring always matches the rows. It is part done.
+- **Progress, Favorites and Recents** are filled in, so rings, bookmark badges, the Favorites carousel and the Recently studied list all show content. Recents are timed relative to when the entry opens. The two newest end shortly before the entry opens, and the Daily Goal's minutes are the durations of those that start after midnight added up, so the ring always matches the rows. Opened in the first hours after midnight, the older of the two falls on the previous day and the ring counts fewer minutes. It is part done.
 
 ## Entries
 
@@ -47,8 +47,8 @@ Splash, Login, Settings and Account are not in the showcase. The Subcategory Det
 
 **The showcase never changes production code except to widen visibility.** It adds no parameter, overload, branch, flag or hook to a production screen, and it changes no production behavior. What it needs that the app does not is made public, so the showcase can call it from another module:
 
-- `HomeContent`, `OnboardingContent` and `OnboardingActions`.
-- The Session Summary's `SummaryLayout`, `SummarySequence` and `SummaryPhase`, so an entry can hold the sequence on one step, and `drawBurst`, so it can draw one frame of the confetti.
+- The stateless content of Home and of Onboarding, with Onboarding's action set.
+- The Session Summary's layout, reveal sequence and phases, so an entry can hold the sequence on one step, and the confetti burst drawing, so it can draw one frame of the confetti.
 
 A state a screen holds inside itself, such as an onboarding step or an open search bar, is reached by operating the screen by hand. A parameter that already exists, such as the Preview's sheet-open flag kept for IDE previews, may be used.
 
@@ -57,7 +57,7 @@ A state a screen holds inside itself, such as an onboarding step or an open sear
 1. Make sure the screen's stateless content is public. Widening visibility is the only change allowed in production code: never add a parameter to a production screen for the showcase. A state the screen holds inside itself is reached by operating it by hand.
 2. Build the state from the sample data. New content comes from Firestore into the raw resources, never written by hand.
 3. Add an entry to the showcase list, with its label in `:debug-tools`'s own strings, under the group where the screen sits.
-4. Hold the state in `mutableStateOf` and pass `showcaseDialogAfter(event)` as the dialog on every dialog event. Handle a simple switch the same way, locally. Give every other action a no-op.
+4. Keep the entry's state locally and route every dialog event through the showcase's one shared dialog reducer. Handle a simple switch the same way, locally. Give every other action a no-op.
 
 ## Related
 
