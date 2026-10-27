@@ -2,6 +2,7 @@ package com.rossomak.flashcards.core.data.repository
 
 import app.cash.turbine.test
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.mapper.toDomain
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ScoringStateDto
@@ -111,6 +112,43 @@ class DefaultScoringStateRepositoryTest {
         result.isFailure shouldBe true
         result.exceptionOrNull() shouldBe error
         coVerify(exactly = 1) { scoringStateRemoteDataSource.getScoringState() }
+    }
+
+    @Test
+    fun `getScoringState reads only the cache when asked to`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState(Source.CACHE) } returns null
+
+        createRepository().getScoringState(cacheOnly = true).getOrThrow() shouldBe null
+
+        coVerify(exactly = 0) { scoringStateRemoteDataSource.getScoringState(Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getScoringState fails when reading only the cache and it holds nothing`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState(Source.CACHE) } throws CACHE_MISS
+
+        createRepository().getScoringState(cacheOnly = true).exceptionOrNull() shouldBe CACHE_MISS
+    }
+
+    @Test
+    fun `getScoringState reads the pending sessions' Card Progress from the cache too when reading only the cache`() = runTest {
+        coEvery { scoringStateRemoteDataSource.getScoringState(Source.CACHE) } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws CACHE_MISS
+        queue(fastSession(SESSION_ONE_ID, CARD_ID))
+
+        createRepository().getScoringState(cacheOnly = true).isSuccess shouldBe true
+
+        coVerify(exactly = 0) { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID, Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getScoringState fails when reading only the cache and a pending session's Card Progress fails other than missing`() = runTest {
+        val error = IllegalStateException("decode failed")
+        coEvery { scoringStateRemoteDataSource.getScoringState(Source.CACHE) } returns null
+        coEvery { cardProgressRemoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws error
+        queue(fastSession(SESSION_ONE_ID, CARD_ID))
+
+        createRepository().getScoringState(cacheOnly = true).exceptionOrNull() shouldBe error
     }
 
     @Test
@@ -472,6 +510,7 @@ class DefaultScoringStateRepositoryTest {
     private fun authUser(uid: String) = AuthUser(uid = uid, email = null, displayName = null, photoUrl = null)
 
     private companion object {
+        val CACHE_MISS = FirebaseFirestoreException("not cached", FirebaseFirestoreException.Code.UNAVAILABLE)
         const val USER_ID = "user-1"
         const val OTHER_USER_ID = "user-2"
         const val CATEGORY_ID = "cat-1"

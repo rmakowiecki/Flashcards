@@ -16,20 +16,17 @@ import kotlinx.coroutines.flow.Flow
 interface ScoringStateRepository {
 
     /**
-     * A one-shot read, for [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s
-     * fallback preview. A screen that follows the scoring state live collects [observeScoringState]
-     * instead.
+     * A one-shot read for [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase]'s
+     * score; [observeScoringState] follows it live.
      *
-     * [excludedSessionId] names a finished session to leave out, so a preview of that session never
-     * builds on itself. When the cached server state already includes that session, it cannot be
-     * subtracted, so the read fails.
+     * [excludedSessionId] leaves that session out, and fails the read when the cached state already
+     * includes it. [cacheOnly] reads only what the device holds, never the server: a scoring state it holds
+     * nothing for fails the read.
      *
-     * @return `Result.success(null)` for an account with no scoring state document and nothing pending —
-     * a genuinely new user, not a failure — leaving it to the caller to start from [ScoringState]'s own
-     * defaults. `Result.failure` for a real read failure, which the fallback preview must never paper
-     * over with a default: guessing a low starting state would show a misleadingly small number.
+     * @return `null` for a new account with nothing pending. A failure is never replaced by a default,
+     * since a guessed low starting state would show a misleading number.
      */
-    suspend fun getScoringState(excludedSessionId: String? = null): Result<ScoringState?>
+    suspend fun getScoringState(excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<ScoringState?>
 
     /**
      * Follows the signed-in User's [ScoringState] live, emitting only when it changes.

@@ -3,75 +3,50 @@ package com.rossomak.flashcards.core.domain.usecase
 import com.rossomak.flashcards.core.domain.model.FlashcardResult
 import com.rossomak.flashcards.core.domain.model.FlashcardStudyProgressState
 import com.rossomak.flashcards.core.domain.model.ScoringState
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.InFlight
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.NotQueued
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus.Scored
 import com.rossomak.flashcards.core.domain.model.SessionNotSavedException
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult
-import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.LocalPreview
-import com.rossomak.flashcards.core.domain.model.SessionSubmissionResult.ServerScored
+import com.rossomak.flashcards.core.domain.model.SessionScore
 import com.rossomak.flashcards.core.domain.repository.CardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.ScoringStateRepository
 import com.rossomak.flashcards.core.domain.repository.SessionSubmissionRepository
 import com.rossomak.flashcards.core.domain.scoring.scoreSession
 import com.rossomak.flashcards.core.domain.usecase.base.UseCase
 import javax.inject.Inject
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Submits a just-finished session and decides what the Session Summary shows for it, called once on
- * arrival there. The server-authoritative `submitStudySession` Cloud Function is the sole writer of a
- * session's card progress, progress summary and scoring state, so this use case never writes any of them.
+ * Queues a just-finished session and scores it on the device for the Session Summary, never waiting for
+ * the server, which records it once the queue delivers it (ADR-0055).
  *
- * Order of work:
- * 1. Reads the local preview's baseline: the account's [ScoringState] and the prior Card Progress of
- *    every touched Subcategory, all in parallel. Both repositories include the User's other Pending
- *    Sessions, so the preview builds on them. This happens **before** submitting, and both reads exclude
- *    this session's own id: after process death the Summary submits again while the session is already
- *    queued, and the baseline must still never include it. If the cached server state already includes
- *    it, the scoring-state read fails and so does the preview.
- * 2. Submits the session through [SessionSubmissionRepository] and waits at most [SERVER_RESULT_BUDGET]
- *    for a final delivery status. The budget covers only this wait, not the baseline read before it.
- * 3. [SessionDeliveryStatus.Scored] returns [ServerScored]. [SessionDeliveryStatus.NotQueued] fails
- *    with [SessionNotSavedException]: the session is lost, so no preview is offered for XP that will
- *    never be awarded. Any other final status, or the budget running out, returns [LocalPreview],
- *    scored by [scoreSession] from the baseline with the cached XP configuration ([GetXpConfigUseCase]).
- *
- * It returns exactly once and stops observing the delivery, so a server score arriving after the
- * fallback can never replace what the Summary already shows. Unless it failed to queue, the session
- * stays queued either way.
- *
- * A failed baseline read fails the result only when the fallback is needed; the session is submitted
- * regardless, since the function needs nothing from this client's reads.
+ * 1. Reads the baseline, the [ScoringState] and each touched Subcategory's Card Progress, from the device
+ *    cache only, with the User's other Pending Sessions on top and this session left out (a restored
+ *    Summary submits again after it is queued). It reads before queuing, since the delivery run's cache
+ *    refresh could already include the session.
+ * 2. Queues the session. A failure returns [SessionNotSavedException] and no score.
+ * 3. Scores it with [scoreSession] and the cached XP configuration. A failed baseline read fails the
+ *    score, but the session stays queued.
  */
 class SubmitStudySessionUseCase @Inject constructor(
     private val cardProgressRepository: CardProgressRepository,
     private val scoringStateRepository: ScoringStateRepository,
     private val getXpConfig: GetXpConfigUseCase,
     private val sessionSubmissionRepository: SessionSubmissionRepository,
-) : UseCase<SessionResult, Result<SessionSubmissionResult>> {
+) : UseCase<SessionResult, Result<SessionScore>> {
 
-    override suspend operator fun invoke(params: SessionResult): Result<SessionSubmissionResult> {
-        val baseline = readPreviewBaseline(params)
-        val deliveryStatus = sessionSubmissionRepository.submitSession(params)
-        val finalStatus = withTimeoutOrNull(SERVER_RESULT_BUDGET) { deliveryStatus.first { status -> status != InFlight } }
-        if (finalStatus is Scored) return Result.success(ServerScored(finalStatus.score))
-        if (finalStatus == NotQueued) return Result.failure(SessionNotSavedException(params.id))
+    override suspend operator fun invoke(params: SessionResult): Result<SessionScore> {
+        val baseline = readBaseline(params)
+        sessionSubmissionRepository.submitSession(params).onFailure { exception ->
+            return Result.failure(SessionNotSavedException(params.id, exception))
+        }
         return baseline.map { (priorCardStatesBySubcategory, scoringState) ->
-            LocalPreview(scoreSession(priorCardStatesBySubcategory, scoringState, params, getXpConfig()).score)
+            scoreSession(priorCardStatesBySubcategory, scoringState, params, getXpConfig()).score
         }
     }
 
-    private suspend fun readPreviewBaseline(sessionResult: SessionResult): Result<PreviewBaseline> = coroutineScope {
-        val scoringStateRead = async { scoringStateRepository.getScoringState(excludedSessionId = sessionResult.id) }
+    private suspend fun readBaseline(sessionResult: SessionResult): Result<ScoreBaseline> = coroutineScope {
+        val scoringStateRead = async { scoringStateRepository.getScoringState(excludedSessionId = sessionResult.id, cacheOnly = true) }
         val touchedSubcategoryIds = sessionResult.cardResults.map(FlashcardResult::subcategoryId).distinct()
         val cardStateReads = touchedSubcategoryIds.map { subcategoryId -> async { subcategoryId to readPriorCardStates(subcategoryId, sessionResult.id) } }
         val priorCardStatesBySubcategory = cardStateReads.awaitAll().associate { (subcategoryId, read) ->
@@ -80,23 +55,17 @@ class SubmitStudySessionUseCase @Inject constructor(
         val scoringState = scoringStateRead.await()
             .getOrElse { exception -> return@coroutineScope Result.failure(exception) }
             ?: ScoringState()
-        Result.success(PreviewBaseline(priorCardStatesBySubcategory = priorCardStatesBySubcategory, scoringState = scoringState))
+        Result.success(ScoreBaseline(priorCardStatesBySubcategory = priorCardStatesBySubcategory, scoringState = scoringState))
     }
 
     /** Card id to its Card Progress state in [subcategoryId] without [sessionId]'s own results; empty when nothing was studied there yet. */
     private suspend fun readPriorCardStates(subcategoryId: String, sessionId: String): Result<Map<String, FlashcardStudyProgressState>> =
-        cardProgressRepository.getProgress(subcategoryId, excludedSessionId = sessionId).map { progress ->
+        cardProgressRepository.getProgress(subcategoryId, excludedSessionId = sessionId, cacheOnly = true).map { progress ->
             progress?.cards.orEmpty().mapValues { (_, entry) -> entry.state }
         }
 
-    /** The account reads the local preview needs, taken before the session is submitted. */
-    private data class PreviewBaseline(
+    private data class ScoreBaseline(
         val priorCardStatesBySubcategory: Map<String, Map<String, FlashcardStudyProgressState>>,
         val scoringState: ScoringState,
     )
-
-    companion object {
-        /** How long the Session Summary waits for the server's score before showing the local preview. */
-        val SERVER_RESULT_BUDGET: Duration = 6.seconds
-    }
 }

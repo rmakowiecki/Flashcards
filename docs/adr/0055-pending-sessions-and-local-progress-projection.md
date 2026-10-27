@@ -1,4 +1,4 @@
-# Pending Sessions are projected onto cached server state, and the Summary waits for the server first
+# Pending Sessions are projected onto cached server state, and the Summary always shows the local score
 
 > Status: accepted
 
@@ -44,27 +44,22 @@ the client needs no query of the day's sessions.
   queued.) The cache then already holds
   the delivered session when the projection stops replaying it.
 
-### The Session Summary shows the server's score, and falls back to a local preview
+### The Session Summary always shows the local score
 
 Finishing a session queues it and schedules a drain with `REPLACE`, so a fresh run reads the new
-entry even when another drain is running or backing off. The worker publishes each session's server
-score, or a rejection marker, as WorkManager progress and output. `SubmitStudySessionUseCase` watches
-that report and returns one of two results:
+entry even when another drain is running or backing off. Nothing waits for that run.
+`SubmitStudySessionUseCase` reads the score's baseline over the projected reads, queues the session,
+then scores it with `scoreSession` and returns that `SessionScore`. The baseline is read *before* the
+session is queued, so the score never counts the session twice. The baseline reads only the Firestore
+cache, never the server: the session's own load read its Card Progress moments before, and the live
+Level streams keep the scoring state cached. A Card Progress document the cache holds nothing for reads
+as no record, so its cards count as new. Any other failed read fails the score, a scoring state the
+cache holds nothing for included, so a wrong baseline never shows a wrong score. Online and offline
+Summaries are the same path. `submitStudySession` answers with nothing: what the server records reaches the device only
+through the post-delivery refresh, and every other screen shows it the next time it reads.
 
-- **`ServerScored`**, the normal case: the Summary renders every line from the server's score.
-- **`LocalPreview`**: a `SessionScore` computed by `scoreSession` over the projected reads. The use case
-  reads that baseline *before* it queues the session, so the preview never counts the session twice.
-  The fallback comes at the earliest of:
-  1. no internet when the Summary opens;
-  2. `SERVER_RESULT_BUDGET` (6 seconds) passing;
-  3. the server rejecting the session;
-  4. the drain run ending, or going back into retry, without this session's score.
-
-A session that could not be queued at all (no signed-in User, a failed local write) gets no preview:
+A session that could not be queued at all (no signed-in User, a failed local write) gets no score:
 the use case fails with `SessionNotSavedException` and the Summary says the session was not saved.
-
-The use case returns once. A server score arriving after the fallback does not replace it; other
-screens show the server's numbers the next time they read.
 
 ## Considered Options
 
@@ -79,6 +74,19 @@ screens show the server's numbers the next time they read.
   disagree with the server.
 - **A configuration snapshot per session.** Built, then removed for the same reason. The client scores
   with its cached configuration everywhere.
+- **Waiting for the server's score**, with the local score as a fallback. Built first: the Summary
+  waited up to 6 seconds for the drain to report the server's score. Rejected: a cold function, the
+  WorkManager start and the transaction made the wait run out on most sessions, so the Summary showed a
+  spinner and then the fallback anyway, through a second code path. A shorter wait keeps both paths and
+  the spinner.
+- **Making the server fast enough to wait for** (a minimum instance, expedited work, a region near the
+  Users). Rejected: it costs money, still guarantees nothing, and the offline path must exist anyway.
+- **Default-source baseline reads for the score.** Built first. Rejected: offline, Firestore's default
+  read of a document the server reported missing fails even though the cache knows it is missing, so a
+  first session in a Subcategory, finished offline, got no score. A default read that falls back to the
+  cache fixes that but still waits for the server on a flaky connection.
+- **Warming the Card Progress cache from Preview.** Rejected: the session's own load already reads it,
+  and a session started offline cannot warm anything.
 - **Delivering in-process from the Summary** instead of through the worker. Rejected: two delivery
   paths for one queue, and the Summary dies with its process.
 - **An app-lifetime snapshot listener on the scoring state**, to keep it cached. Deferred until a
@@ -92,15 +100,17 @@ Accepted transient inaccuracies, all corrected by the next successful server rea
 resolved by [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md):
 
 - **Under-count after delivery.** Between removal and a cache update (the refresh failed), a
-  delivered session is in neither the queue nor the cache. A fallback preview in that window also
+  delivered session is in neither the queue nor the cache. A Summary score in that window also
   misses it.
 - **Double count after a crash.** A process death between delivery and removal leaves the entry
   queued and replayed over a cache that includes it, until the next drain resubmits it. The function
   is idempotent per session id, so the resubmission changes nothing on the server.
 - **Double count between refresh and removal.** For that brief moment the cache includes the session
   and the queue still holds it.
-- **The fallback race.** The preview's baseline is read before submission, so a drain that delivers an
-  older Pending Session during the wait is not reflected in it.
+- **The Summary's score can differ from the server's record.** The server scores with its current
+  XP configuration and its own Card Progress, and may already hold a session from another device, or
+  reject the session outright. The Summary never corrects itself; Home's Level card and Recents show the
+  server's numbers once the session is delivered.
 - **Daily Goal under-count.** A Pending Session dated before `lastStudyDate` counts only its own
   seconds, and sessions delivered from another device count only once this device reads the scoring
   state again.
@@ -112,7 +122,10 @@ resolved by [ADR-0061](0061-delivered-sessions-applied-once-in-the-projection.md
   studying offline on the same day each preview a Streak award that the server pays once.
 - **Empty Card Progress baseline.** Offline, a Subcategory never read on this device has no cached
   document, so a Pending Session's cards replay over no record: they count as new, and a Mastery
-  Defense card counts as newly Mastered.
+  Defense card counts as newly Mastered. The Summary's score does the same for its own session when
+  the session started offline.
+- **The Summary's score misses changes made elsewhere mid-session.** The cache-only baseline does not
+  see progress another device delivered after the session loaded.
 
 ## Amendments
 
@@ -139,7 +152,7 @@ inside a sharing grace window never restarts a completed upstream.
 - **Stale replays are dropped.** The live replay reads the Card Progress baselines, then checks the
   queue against the snapshot it replays; a changed queue (a delivery, or a User switch) drops the result
   and the change re-emits. The one-shot read keeps its own uid check and has no stale check, so a
-  delivery during the Summary's fallback preview read never fails the save.
+  delivery during the Summary's score read never fails the save.
 - **No false starting state offline.** A cache miss for a missing document is not read as a brand-new
   account: the listener runs with metadata changes, drops a from-cache non-existent snapshot, and emits
   nothing until the server answers. A consumer shows its loading state rather than Level 1.
@@ -165,8 +178,8 @@ delivery, the double count after a crash and the double count between refresh an
 **2026-10-11 — The Summary's Level card follows its score.** A scored Summary draws its Level card
 from the session's score; only a Summary with no score follows the live Level stream. Accepted: a
 scored card can differ from Home's when the server scored with a newer XP configuration than the
-device's cached one, or when the Summary shows a local preview that the server later scores
-differently. The Summary never replaces a score it has shown.
+device's cached one, or when the server scores the session differently from the Summary. The Summary
+never replaces a score it has shown.
 
 **2026-10-22 — One live scoring state stream.** The live flow moved into `ScoringStateRepository`
 (`observeScoringState`, served by `DefaultScoringStateRepository`) and emits the whole projected
@@ -182,3 +195,12 @@ session from the queue to the server state emits nothing.
   and the next emission corrects it.
 - **No midnight re-emission.** Today is read on each upstream value only, so a Streak at risk or
   today's minutes stay as they were across midnight until the scoring state next changes.
+
+**2026-10-26 — The Summary always shows the local score.** The Summary no longer waits for the
+server's score: the wait ran out on most sessions. The worker publishes no delivery report, and
+`submitStudySession` answers with nothing. See the Decision section and Considered Options above.
+
+**2026-10-26 — The Summary's score reads only the cache.** A first session in a Subcategory, finished
+offline, showed no score: the default read of its missing Card Progress document failed offline. The
+score's baseline now reads the Firestore cache only, and a Card Progress document the cache holds
+nothing for reads as no record. Any other failed baseline read fails the score. See the Decision section and Considered Options above.

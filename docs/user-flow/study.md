@@ -187,7 +187,7 @@ flowchart TD
     Studied -->|yes| Summary
 
     %% ── Session Summary ───────────────────────────────────────────
-    Summary(STUDY SESSION SUMMARY SCREEN\nevery session that Studied a card ends here, completed or abandoned\nqueues the session as a Pending Session · the server scores and records it\nshows the server's XP, or a local preview when it can't wait for it\nXP breakdown animated line by line · Level card pour)
+    Summary(STUDY SESSION SUMMARY SCREEN\nevery session that Studied a card ends here, completed or abandoned\nqueues the session as a Pending Session · the server scores and records it in the background\nshows the XP scored on the device\nXP breakdown animated line by line · Level card pour)
     Summary --> StudyAgain[/Study Again/]
     Summary --> GoBack[/Tap 'Back to Home' · or system back/]
 

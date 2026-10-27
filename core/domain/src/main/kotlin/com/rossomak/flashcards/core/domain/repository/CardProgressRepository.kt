@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.Flow
  *   [com.rossomak.flashcards.core.domain.usecase.GetSessionStartDataUseCase], which derives each
  *   Rated card's previously-Mastered flag from it
  *   ([com.rossomak.flashcards.core.domain.session.RatedStudySessionCoordinator]); and
- *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], whose local preview scores
- *   the session against it.
+ *   [com.rossomak.flashcards.core.domain.usecase.SubmitStudySessionUseCase], which scores the session
+ *   against it.
  * - [observeProgressSummary]: the Studied/Mastered rings on Browse and Category Details.
  *
  * Any future selection that depends on which cards are Mastered (such as Mastery Defense's floor and
@@ -29,10 +29,11 @@ import kotlinx.coroutines.flow.Flow
  */
 interface CardProgressRepository {
     /**
-     * `null` when the User has never studied a card in this Subcategory yet. [excludedSessionId] names a
-     * finished session whose own results to leave out, so a preview of that session never builds on itself.
+     * `null` when the User has never studied a card in this Subcategory. [excludedSessionId] leaves that
+     * session's own results out. [cacheOnly] reads only what the device holds, never the server: a
+     * Subcategory it holds nothing for reads as `null`, and any other failure fails the read.
      */
-    suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null): Result<SubcategoryProgressDetails?>
+    suspend fun getProgress(subcategoryId: String, excludedSessionId: String? = null, cacheOnly: Boolean = false): Result<SubcategoryProgressDetails?>
 
     /**
      * A live Firestore listener on the summary singleton, not a one-shot read — re-emits on every

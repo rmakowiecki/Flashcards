@@ -1,8 +1,6 @@
 package com.rossomak.flashcards.core.domain.repository
 
-import com.rossomak.flashcards.core.domain.model.SessionDeliveryStatus
 import com.rossomak.flashcards.core.domain.model.SessionResult
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Delivers a finished session to the server-authoritative `submitStudySession` Cloud Function,
@@ -19,12 +17,6 @@ import kotlinx.coroutines.flow.Flow
  */
 interface SessionSubmissionRepository {
 
-    /**
-     * Queues [sessionResult] for delivery and starts a delivery run, then returns a report on this
-     * session's delivery: [SessionDeliveryStatus.InFlight] while waiting, then exactly one final status,
-     * then completion. Queuing happens before this returns, so cancelling the collection of the
-     * returned flow never un-queues the session. Submitting the same session id again is safe: it is
-     * queued once, and the server answers a repeated submission with the score it already recorded.
-     */
-    suspend fun submitSession(sessionResult: SessionResult): Flow<SessionDeliveryStatus>
+    /** Queues [sessionResult] once per session id and starts delivery without waiting for it. A failure means it was not queued. */
+    suspend fun submitSession(sessionResult: SessionResult): Result<Unit>
 }

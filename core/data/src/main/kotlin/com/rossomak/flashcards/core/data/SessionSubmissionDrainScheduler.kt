@@ -5,13 +5,10 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.rossomak.flashcards.core.common.logd
 import com.rossomak.flashcards.core.data.worker.SessionSubmissionDeliveryWorker
-import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.flow.Flow
 
 /**
  * The one place [SessionSubmissionDeliveryWorker] gets enqueued from. Two call sites
@@ -40,7 +37,7 @@ import kotlinx.coroutines.flow.Flow
  * [ExistingWorkPolicy.REPLACE] ([scheduleDrainForFinishedSession], for a just-finished session): a new
  * drain replaces any drain already enqueued or running. It is needed because under `KEEP`, a drain
  * waiting out a retry backoff, or already past its queue read, would not attempt the new session soon,
- * and the Session Summary waiting on it would fall back to its local preview for nothing. It is safe
+ * widening the window in which the server's score can drift from the Session Summary's. It is safe
  * because the replaced run loses nothing: the new run re-reads the whole queue, and an entry the
  * replaced run delivered but had not yet removed is resubmitted, which `submitStudySession` answers
  * idempotently per session id.
@@ -58,16 +55,11 @@ class SessionSubmissionDrainScheduler @Inject constructor(
         workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, buildDrainRequest())
     }
 
-    /** Schedules a drain for a session just queued, replacing any drain already pending, and returns the new request's id to observe with [observeDrain]. */
-    fun scheduleDrainForFinishedSession(): UUID {
+    /** Schedules a drain for a session just queued, replacing any drain already pending. */
+    fun scheduleDrainForFinishedSession() {
         logd { "Scheduling drain worker (unique work=$UNIQUE_WORK_NAME, policy=REPLACE, requires network)" }
-        val request = buildDrainRequest()
-        workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
-        return request.id
+        workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, buildDrainRequest())
     }
-
-    /** The state, progress and output of the drain request [requestId]; `null` once WorkManager no longer knows it. */
-    fun observeDrain(requestId: UUID): Flow<WorkInfo?> = workManager.getWorkInfoByIdFlow(requestId)
 
     private fun buildDrainRequest(): OneTimeWorkRequest {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()

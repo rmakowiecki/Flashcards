@@ -49,8 +49,8 @@ class DefaultCardProgressRepository @Inject constructor(
 ) : CardProgressRepository {
 
     /** See [PendingSessionProjector.projectCardProgress] for when a failed remote read still succeeds. */
-    override suspend fun getProgress(subcategoryId: String, excludedSessionId: String?): Result<SubcategoryProgressDetails?> =
-        pendingSessionProjector.projectCardProgress(subcategoryId, excludedSessionId)
+    override suspend fun getProgress(subcategoryId: String, excludedSessionId: String?, cacheOnly: Boolean): Result<SubcategoryProgressDetails?> =
+        pendingSessionProjector.projectCardProgress(subcategoryId, excludedSessionId, cacheOnly)
 
     /**
      * Completes when the remote summary flow completes (on sign-out), even though the queue is still

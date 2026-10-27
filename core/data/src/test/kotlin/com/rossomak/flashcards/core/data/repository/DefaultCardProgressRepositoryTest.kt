@@ -3,6 +3,7 @@ package com.rossomak.flashcards.core.data.repository
 import app.cash.turbine.test
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import com.rossomak.flashcards.core.data.model.CardProgressEntryDto
 import com.rossomak.flashcards.core.data.model.PendingSessionSubmissionMapper.toDto
 import com.rossomak.flashcards.core.data.model.ProgressSummaryDto
@@ -315,6 +316,51 @@ class DefaultCardProgressRepositoryTest {
     }
 
     @Test
+    fun `getProgress reads only the cache when asked to`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } returns remoteProgress(CARD_ID to Mastered)
+
+        val progress = createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow()
+
+        progress?.cards?.getValue(CARD_ID)?.state shouldBe Mastered
+        coVerify(exactly = 0) { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getProgress reads a Subcategory the cache holds nothing for as never studied when reading only the cache`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws CACHE_MISS
+
+        createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow() shouldBe null
+    }
+
+    @Test
+    fun `getProgress fails when reading only the cache and the read fails other than missing`() = runTest {
+        val error = IllegalStateException("decode failed")
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws error
+
+        createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).exceptionOrNull() shouldBe error
+    }
+
+    @Test
+    fun `getProgress replays pending sessions over a cache miss when reading only the cache`() = runTest {
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws CACHE_MISS
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+
+        val progress = createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).getOrThrow()
+
+        progress?.cards?.getValue(CARD_ID)?.state shouldBe Mastered
+        coVerify(exactly = 0) { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.DEFAULT) }
+    }
+
+    @Test
+    fun `getProgress fails under a pending session when reading only the cache and the read fails other than missing`() = runTest {
+        val error = IllegalStateException("decode failed")
+        coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID, Source.CACHE) } throws error
+        queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, CARD_ID to Mastered))
+
+        createRepository().getProgress(SUBCATEGORY_ID, cacheOnly = true).exceptionOrNull() shouldBe error
+    }
+
+    @Test
     fun `getProgress keeps the remote document's other cards and stamps under a pending session`() = runTest {
         coEvery { remoteDataSource.getProgress(SUBCATEGORY_ID) } returns remoteProgress(CARD_ID to Mastered)
         queue(ratedSession(SESSION_ONE_ID, SESSION_ONE_START, OTHER_CARD_ID to Failed))
@@ -447,6 +493,7 @@ class DefaultCardProgressRepositoryTest {
     private fun authUser(uid: String) = AuthUser(uid = uid, email = null, displayName = null, photoUrl = null)
 
     private companion object {
+        val CACHE_MISS = FirebaseFirestoreException("not cached", FirebaseFirestoreException.Code.UNAVAILABLE)
         const val USER_ID = "user-1"
         const val OTHER_USER_ID = "user-2"
         const val SESSION_ONE_ID = "session-1"

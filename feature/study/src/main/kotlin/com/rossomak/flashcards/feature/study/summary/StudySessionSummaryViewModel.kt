@@ -154,9 +154,9 @@ class StudySessionSummaryViewModel @Inject constructor(
             val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
 
             submitStudySession(result)
-                .onSuccess { submissionResult ->
-                    savedStateHandle[KEY_SAVED_SCORE] = Json.encodeToString(submissionResult.score)
-                    applyScore(submissionResult.score)
+                .onSuccess { score ->
+                    savedStateHandle[KEY_SAVED_SCORE] = Json.encodeToString(score)
+                    applyScore(score)
                 }
                 .onFailure { exception -> onSubmissionFailed(exception) }
         }

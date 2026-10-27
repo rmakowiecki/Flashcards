@@ -6,20 +6,23 @@ The screen that ends every Study Session that Studied at least one Flashcard, of
 
 The session screen hands the Summary its whole **Session Result** and is removed from the back stack, so the Summary sits directly on top of the tab the session was started from ([study-session.md](study-session.md#session-termination)). A session with no Studied Flashcards never reaches the Summary.
 
-On arrival the Summary reads the User's current Daily Goal and seals it into the result ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). It then queues the result as a **Pending Session** and waits a short while for the server's score. The Summary writes nothing to the server itself: the server scores and records the session in one transaction ([session-submission.md](session-submission.md)). Leaving the Summary, at any moment, never loses a session that reached it.
+On arrival the Summary reads the User's current Daily Goal and seals it into the result ([ADR-0048](../adr/0048-streak-and-daily-goal-ride-the-session-payload.md)). It then queues the result as a **Pending Session** and scores the session on the device, without waiting for the server. The Summary writes nothing to the server itself: the queue delivers the session in the background, and the server scores and records it in one transaction ([session-submission.md](session-submission.md)). Leaving the Summary, at any moment, never loses a session that reached it.
 
-What the Summary shows depends on how the wait ends ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)):
+The score uses the same rules as the server and the cached XP configuration. It is computed against the User's prior Card Progress and scoring state as the device projects them, the User's other Pending Sessions included and this session excluded. Online and offline, the Summary shows this one kind of score ([ADR-0055](../adr/0055-pending-sessions-and-local-progress-projection.md)).
 
-- **Server score.** The server recorded the session in time, so the Summary shows the server's score.
-- **Local preview.** The device is offline, or the server rejected the session, or the delivery run ended without its score, or the wait ran out. The Summary scores the session on the device with the same rules and the cached XP configuration. It scores against the User's prior Card Progress and scoring state as the device projects them, the User's other Pending Sessions included and this session excluded. Whether the session is delivered later depends on why there was no server score. After a network or server failure, or when the wait ran out, the session stays queued and is delivered later. After a permanent rejection it is moved to the diagnostics file and stops being a Pending Session, so the previewed score is never recorded ([session-submission.md](session-submission.md)).
-- **No score.** The preview's reads failed. The session is still queued, and a snackbar says it is saved but its XP could not be calculated.
+The score reads only what the device already holds and never waits for the server, so it reads the same way online and offline. The session read its Card Progress when it loaded, so the device holds it unless the session started offline. A Subcategory the device holds no Card Progress for counts its cards as new, and a card Mastered there before counts as newly Mastered.
+
+What the Summary shows depends on how scoring ends:
+
+- **Score.** The session is queued and scored.
+- **No score.** The score's reads failed, for example because the device holds no copy of the User's scoring state. The session is still queued, and a snackbar says it is saved but its XP could not be calculated.
 - **Not saved.** The session could not be queued at all. Nothing holds it, so it earns nothing, and a snackbar says it could not be saved.
 
-The Summary takes the first answer and keeps it. A server score that arrives after a local preview never replaces it on screen, so a preview can differ from what the server records, for example when the server holds a newer XP configuration. A score, once shown, survives a rotation and a restore. A Summary restored without a score submits again, and the queue keeps one entry per session.
+The shown score is never replaced. It can differ from what the server records: the server may hold a newer XP configuration, a session from another device may land first, or the server may reject the session, in which case the session is moved to the diagnostics file and the shown XP is never awarded ([session-submission.md](session-submission.md)). Home shows the server's numbers once the session is delivered. A score, once shown, survives a rotation and a restore. A Summary restored without a score submits again, and the queue keeps one entry per session.
 
 ## Screen
 
-While the score loads, only a spinner shows.
+While the score loads, only the background shows.
 
 Behind everything, over the brand gradient, a slow animated network graph gathers around the middle of the screen while the score loads and the total counts up. It morphs once, during the animation sequence, out to two opposite corners, clear of the settled content ([Animation sequence](#animation-sequence)). It is the same mesh the session draws ([ADR-0069](../adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
 
@@ -52,10 +55,10 @@ The dialog itemizes the score: one row per XP source, each with its icon, its la
 
 The Summary uses the same Level card as Home ([home.md](home.md)). Its source depends on the score:
 
-- **Scored**, from the server or the local preview: the card shows the score's Level and XP before the session, then the position after it. Like Home's card, it waits for the auth user, and it shows its figures without a name if that read fails.
+- **Scored**: the card shows the score's Level and XP before the session, then the position after it. Like Home's card, it waits for the auth user, and it shows its figures without a name if that read fails.
 - **No score**: the card follows the same live Level and XP stream as Home. It shows a shimmering skeleton until the stream and the auth user have both emitted. It shows the same skeleton without the shimmer if the stream fails or ends before its first value.
 
-A scored card can differ from Home's live one, for the same reasons a local preview can differ from the server's record.
+A scored card can differ from Home's live one, for the same reasons the shown score can differ from the server's record.
 
 ## Animation sequence
 

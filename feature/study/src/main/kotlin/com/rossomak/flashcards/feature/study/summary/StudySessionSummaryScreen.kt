@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -282,16 +281,8 @@ internal fun SummaryLayout(
                 }
             },
         ) { innerPadding ->
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = MaterialTheme.brandColors.onGradientContent)
-                }
-            } else {
+            // Only the backdrop covers the score's load (ADR-0063's Session Summary exception).
+            if (!isLoading) {
                 SummaryBody(
                     state = state,
                     sequence = sequence,

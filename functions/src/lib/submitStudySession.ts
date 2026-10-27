@@ -26,8 +26,8 @@ import {
 /**
  * The sole writer of a session's XP, level, progress and Recents entry. Everything this function decides
  * lands in one Firestore transaction, keyed for idempotency on the client-generated `sessionId`: a
- * retry of an already-processed session is a no-op that returns the same result again, never a
- * second award. See `submitStudySession`'s own doc comment for the transaction's shape.
+ * retry of an already-processed session is a no-op, never a second award. It answers with nothing
+ * (ADR-0055).
  *
  * Deliberately kept out of `index.ts`: `validateSubmitStudySessionRequest` and `submitStudySession`
  * are plain, directly-testable functions (mirroring `lib/entitlement.ts`'s `isPremiumUser`), so a
@@ -82,21 +82,18 @@ const FIELD_READ_ALOUD = "readAloud";
 const FIELD_STUDY_DATE = "studyDate";
 
 // Additive fields written to the session document, beyond what StudySessionRemoteDataSource.kt
-// ever wrote — needed so a retried (idempotent) call can answer from the session document alone,
-// without depending on any other document's current, possibly-since-moved-on state.
+// ever wrote: the record of how the session was scored, which no later session can change.
 const FIELD_LEVELS_CROSSED = "levelsCrossed";
 const FIELD_LEVEL_AFTER = "levelAfter";
 const FIELD_XP_INTO_CURRENT_LEVEL_AFTER = "xpIntoCurrentLevelAfter";
 const FIELD_XP_FOR_NEXT_LEVEL_AFTER = "xpForNextLevelAfter";
-// The account's Level position right before this session, so the Summary can fill the Level bar from
-// where the User stood and animate any Level-up.
+// The account's Level position right before this session.
 const FIELD_LEVEL_BEFORE = "levelBefore";
 const FIELD_XP_INTO_CURRENT_LEVEL_BEFORE = "xpIntoCurrentLevelBefore";
 const FIELD_XP_FOR_NEXT_LEVEL_BEFORE = "xpForNextLevelBefore";
 // The account's Streak right after this session.
 const FIELD_CURRENT_STREAK_AFTER = "currentStreakAfter";
-// The per-line XP rates this session was scored with, so a retried call answers with the same rates
-// even after the admin-edited XP configuration has changed.
+// The per-line XP rates this session was scored with.
 const FIELD_XP_RATES = "xpRates";
 
 // Shared between a card's stored result fields and a card's stored progress fields.
@@ -195,44 +192,11 @@ export interface ValidatedSubmitStudySessionRequest {
   dailyGoalMinutes: number;
 }
 
-/**
- * The count behind each per-card XP line, from the same server-read previously-Mastered state the
- * [XpBreakdown] was scored with: `newlyMastered` cards earned `mastered`, `defended` cards earned
- * `masteryDefenseBonus`. The four Rated-only counts are absent for a Fast session, not zero.
- */
-export interface SubmitStudySessionCounts {
-  newCardsStudied: number;
-  newlyMastered?: number;
-  partial?: number;
-  defended?: number;
-  demastered?: number;
-}
-
 /** The per-unit XP rates behind each [XpBreakdown] line, as configured when the session was scored. */
 export type XpRates = Pick<
   XpConfig,
   "newCardStudied" | "cardMastered" | "cardPartial" | "masteryDefended" | "cardDemastered" | "sessionCompleted"
 >;
-
-export interface SubmitStudySessionResult {
-  breakdown: XpBreakdown;
-  level: number;
-  xpIntoCurrentLevel: number;
-  xpForNextLevel: number;
-  levelsCrossed: number[];
-  /** The account's Level right before this session. */
-  levelBefore: number;
-  /** Points into [levelBefore] right before this session. */
-  xpIntoCurrentLevelBefore: number;
-  /** Points [levelBefore] needs in total before the next Level. */
-  xpForNextLevelBefore: number;
-  /** The account's Streak right after this session. */
-  currentStreak: number;
-  /** The session's wall-clock duration, as submitted and stored. */
-  durationSeconds: number;
-  counts: SubmitStudySessionCounts;
-  rates: XpRates;
-}
 
 /**
  * One session's entry in `recents/state`, keyed there by its `sessionId`, with the same field names and
@@ -526,20 +490,6 @@ function xpBreakdownFields(breakdown: XpBreakdown): Record<string, unknown> {
   };
 }
 
-function readXpBreakdownFields(data: FirebaseFirestore.DocumentData): XpBreakdown {
-  return {
-    newCards: data[FIELD_XP_NEW_CARDS] ?? 0,
-    mastered: data[FIELD_XP_MASTERED] ?? 0,
-    partial: data[FIELD_XP_PARTIAL] ?? 0,
-    masteryDefenseBonus: data[FIELD_XP_MASTERY_DEFENSE_BONUS] ?? 0,
-    demastered: data[FIELD_XP_DEMASTERED] ?? 0,
-    sessionCompletionBonus: data[FIELD_XP_SESSION_COMPLETION_BONUS] ?? 0,
-    dailyGoalBonus: data[FIELD_XP_DAILY_GOAL_BONUS] ?? 0,
-    streakBonus: data[FIELD_XP_STREAK_BONUS] ?? 0,
-    xpTotal: data[FIELD_XP_TOTAL] ?? 0,
-  };
-}
-
 function xpRatesFields(config: XpConfig): XpRates {
   return {
     newCardStudied: config.newCardStudied,
@@ -551,66 +501,23 @@ function xpRatesFields(config: XpConfig): XpRates {
   };
 }
 
-function readSessionCounts(data: FirebaseFirestore.DocumentData): SubmitStudySessionCounts {
-  const newCardsStudied: number = data[FIELD_NEW_CARDS_STUDIED] ?? 0;
-  if (data[FIELD_STUDY_MODE] !== "Rated") return { newCardsStudied };
-  const cardsMastered: number = data[FIELD_CARDS_MASTERED] ?? 0;
-  const cardsDefended: number = data[FIELD_CARDS_DEFENDED] ?? 0;
-  return {
-    newCardsStudied,
-    // cardsMastered counts every card ending Mastered, defended ones included.
-    newlyMastered: cardsMastered - cardsDefended,
-    partial: data[FIELD_CARDS_PARTIAL] ?? 0,
-    defended: cardsDefended,
-    demastered: data[FIELD_CARDS_DEMASTERED] ?? 0,
-  };
-}
-
-/**
- * Builds the response from a session document's stored fields. The first call and every retry of the
- * same session both answer through here, so their responses are identical field for field.
- */
-function resultFromSessionDocument(data: FirebaseFirestore.DocumentData): SubmitStudySessionResult {
-  return {
-    breakdown: readXpBreakdownFields(data),
-    level: data[FIELD_LEVEL_AFTER],
-    xpIntoCurrentLevel: data[FIELD_XP_INTO_CURRENT_LEVEL_AFTER],
-    xpForNextLevel: data[FIELD_XP_FOR_NEXT_LEVEL_AFTER],
-    levelsCrossed: (data[FIELD_LEVELS_CROSSED] as number[]) ?? [],
-    levelBefore: data[FIELD_LEVEL_BEFORE],
-    xpIntoCurrentLevelBefore: data[FIELD_XP_INTO_CURRENT_LEVEL_BEFORE],
-    xpForNextLevelBefore: data[FIELD_XP_FOR_NEXT_LEVEL_BEFORE],
-    currentStreak: data[FIELD_CURRENT_STREAK_AFTER],
-    durationSeconds: data[FIELD_DURATION_SECONDS] ?? 0,
-    counts: readSessionCounts(data),
-    rates: data[FIELD_XP_RATES] as XpRates,
-  };
-}
-
 /**
  * Runs the whole session commit as one Firestore transaction, keyed for idempotency on `sessionId`.
  *
  * 1. Reads `sessions/{sessionId}` first. If it already exists, every other document this function
  *    would otherwise touch was necessarily already written alongside it in that earlier, successful
- *    transaction — so this is a pure cache hit: the session document's own stored fields (its XP
- *    breakdown, rates, line counts, duration, the Level position before the session and the
- *    level/xp-into-level/xp-for-next-level/levels-crossed/streak *as they stood right after that
- *    original commit*) are returned unchanged, with no further reads
- *    or writes at all.
- *    Returning the account's *current* scoring state here instead would break idempotency — other
- *    sessions committed since would have moved it on.
+ *    transaction, so it returns with no further reads or writes at all.
  * 2. Otherwise, reads every touched Subcategory's prior progress, the account's prior
  *    [ScoringState] and `recents/state`, computes the new progress writes, the [XpBreakdown] and the
  *    new [ScoringState] (mirrored by the client's `scoreSession`) with the server-owned XP
  *    configuration (`config/xp`, see `xpConfig.ts`), and writes the session document, every touched
  *    Subcategory's progress, the progress summary's increments, the full scoring-state overwrite (with
  *    this session's id appended to its applied session ids) and,
- *    unless [nextRecentEntries] leaves it unchanged, the full `recents/state` overwrite — before
- *    answering from the session document it just built, through the same [resultFromSessionDocument]
- *    a retry uses. `recents/state` is read in this same transaction, so overwriting it whole loses no
- *    concurrent update.
+ *    unless [nextRecentEntries] leaves it unchanged, the full `recents/state` overwrite.
+ *    `recents/state` is read in this same transaction, so overwriting it whole loses no concurrent
+ *    update.
  */
-export async function submitStudySession(db: Firestore, uid: string, request: ValidatedSubmitStudySessionRequest): Promise<SubmitStudySessionResult> {
+export async function submitStudySession(db: Firestore, uid: string, request: ValidatedSubmitStudySessionRequest): Promise<void> {
   const sessionRef = sessionDocRef(db, uid, request.sessionId);
 
   // A plain read outside the transaction: the configuration is admin-edited, not part of this
@@ -623,7 +530,7 @@ export async function submitStudySession(db: Firestore, uid: string, request: Va
 
   return db.runTransaction(async (transaction) => {
     const sessionSnapshot = await transaction.get(sessionRef);
-    if (sessionSnapshot.exists) return resultFromSessionDocument(sessionSnapshot.data() ?? {});
+    if (sessionSnapshot.exists) return;
 
     const derivedStudyDate = deriveLocalStudyDate(request.startedAtEpochMillis, request.studyDateUtcOffsetMinutes);
 
@@ -781,8 +688,6 @@ export async function submitStudySession(db: Firestore, uid: string, request: Va
     const existingRecentEntries = (recentsSnapshot.data()?.[FIELD_ENTRIES] as Record<string, RecentEntry> | undefined) ?? {};
     const nextEntries = nextRecentEntries(existingRecentEntries, recentEntry, MAX_RECENT_ENTRIES);
     if (nextEntries !== null) transaction.set(recentsRef, { [FIELD_ENTRIES]: nextEntries });
-
-    return resultFromSessionDocument(sessionFields);
   });
 }
 
@@ -792,7 +697,7 @@ export async function submitStudySession(db: Firestore, uid: string, request: Va
  * commits it. Lives here rather than in `index.ts` so the guard's place in front of every write is
  * tested, not just assumed.
  */
-export async function handleSubmitStudySessionCall(auth: Auth, db: Firestore, request: Pick<CallableRequest<unknown>, "auth" | "data">): Promise<SubmitStudySessionResult> {
+export async function handleSubmitStudySessionCall(auth: Auth, db: Firestore, request: Pick<CallableRequest<unknown>, "auth" | "data">): Promise<void> {
   const uid = await requireActiveSession(auth, request);
   const validated = validateSubmitStudySessionRequest(request.data);
   requireOwnerMatchesCaller(uid, validated);

@@ -31,6 +31,9 @@ class FakeScoringStateRepository : ScoringStateRepository {
     /** The excluded session id of every [getScoringState] call, in call order. */
     val excludedSessionIds: MutableList<String?> = mutableListOf()
 
+    /** The `cacheOnly` flag of every [getScoringState] call, in call order. */
+    val cacheOnlyFlags: MutableList<Boolean> = mutableListOf()
+
     /** How many times [getScoringState] was called. */
     var getScoringStateCallCount: Int = 0
         private set
@@ -40,9 +43,10 @@ class FakeScoringStateRepository : ScoringStateRepository {
      * genuine `withContext(Dispatchers.IO)` dispatcher hop — the same reasoning as
      * [FakeSessionSubmissionRepository]'s own [yield].
      */
-    override suspend fun getScoringState(excludedSessionId: String?): Result<ScoringState?> {
+    override suspend fun getScoringState(excludedSessionId: String?, cacheOnly: Boolean): Result<ScoringState?> {
         getScoringStateCallCount++
         excludedSessionIds.add(excludedSessionId)
+        cacheOnlyFlags.add(cacheOnly)
         yield()
         if (excludedSessionId in appliedSessionIds) return Result.failure(IllegalStateException("Session $excludedSessionId is already applied"))
         return resultsIncludingQueuedSession.entries.firstOrNull { (sessionId, _) -> sessionId != excludedSessionId }?.value ?: resultToReturn

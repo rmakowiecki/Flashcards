@@ -45,8 +45,8 @@ Entry format:
   Read when: changing `:debug-tools`'s screen showcase or its sample data, or changing a showcased screen's stateless content signature.
 - [session-submission.md](session-submission.md): What happens to a session once it ends: the Pending Session queue and its delivery, the server's one-transaction commit, and the Streak, Daily Goal and scoring-state rules.
   Read when: changing session submission or delivery, the Pending Session queue, streak, daily goal or session duration.
-- [session-summary.md](session-summary.md): The Session Summary screen: handing the session over, server score versus local preview, the headline and stat pills, the XP breakdown, the Level card and its pour, the animation sequence, Back to Home and Study Again.
-  Read when: changing the Summary screen, its submission or score fallback, its animation, or the Level card pour.
+- [session-summary.md](session-summary.md): The Session Summary screen: handing the session over and scoring it on the device, the headline and stat pills, the XP breakdown, the Level card and its pour, the animation sequence, Back to Home and Study Again.
+  Read when: changing the Summary screen, its submission or local score, its animation, or the Level card pour.
 - [settings.md](settings.md): The Settings tab: its rows and dialogs, saving and save failure, the voice dialog, the other screens that save the same defaults, and how preferences are stored on the device.
   Read when: changing `feature:settings`, study session preferences, or where a default is saved.
 - [study-session.md](study-session.md): What Rated and Fast sessions share: loading, the header, card and dialogs, the dialog hold, spoken sessions (background play, notification, lock-screen and headset controls, audio interruptions, engine failure), leaving a session, and termination.

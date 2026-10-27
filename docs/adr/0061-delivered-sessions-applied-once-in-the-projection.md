@@ -28,7 +28,7 @@ Recents, Progress and the Session Summary must show the same numbers.
 
 `submitStudySession` keeps `appliedSessionIds` on `progress/user-stats`: the ids of the latest 20
 sessions applied to it, oldest first. The commit transaction appends its own id in the same write as
-the scoring fields. A retry answers from the session document and never touches the list. The list
+the scoring fields. A retry finds the session document and never touches the list. The list
 stays out of the shared `ScoringState` type and the XP scoring code: the device reads it only to tell
 which Pending Sessions the cached document already includes.
 
@@ -49,10 +49,10 @@ response: the summary listener sees the commit even though the worker does not.
 
 ### The worker removes an entry only after a complete refresh
 
-After a successful submission, the worker publishes the delivery report, then reads `user-stats` and
+After a successful submission, the worker reads `user-stats` and
 the Card Progress of every Subcategory the session's Flashcard Results touch from the server. It
 removes the entry only if every read succeeded. Otherwise the entry stays queued and the run retries;
-the next run re-submits it, the server answers from its stored session, and that run refreshes and
+the next run re-submits it, the server finds its stored session and writes nothing, and that run refreshes and
 removes it. A failed refresh never dead-letters an entry.
 
 So a session is counted through the queue until the cache includes it, and through the cache once it
@@ -63,12 +63,12 @@ leaves the queue.
 `ScoringStateRepository.getScoringState` and `CardProgressRepository.getProgress` take an
 `excludedSessionId`. The projection leaves that session out of the queue before replaying. If the cached
 `user-stats` already lists it as applied, the scoring-state read fails: the cache includes the session
-and a baseline cannot subtract it, so the Summary shows no preview. `SubmitStudySessionUseCase` passes
+and a baseline cannot subtract it, so the Summary shows no score. `SubmitStudySessionUseCase` passes
 its session's id to both baseline reads.
 
-The Summary saves a resolved score, server or preview, in its `SavedStateHandle`. A ViewModel restored
+The Summary saves a resolved score in its `SavedStateHandle`. A ViewModel restored
 after process death shows the saved score and does not submit again. Only a death before the score
-resolved submits again, and the exclusion covers that. A failed preview is not saved, so a restore
+resolved submits again, and the exclusion covers that. A failed score is not saved, so a restore
 tries again.
 
 ## Considered Options
@@ -88,7 +88,7 @@ tries again.
 
 Residual windows:
 
-- **A partial refresh.** If Card Progress was refreshed but `user-stats` was not, a fallback preview in
+- **A partial refresh.** If Card Progress was refreshed but `user-stats` was not, a Summary score in
   that moment counts this session's cards as already studied. The window closes when the next drain
   retries.
 - **Twenty other sessions.** If twenty other sessions (from other devices) are applied between a
@@ -99,5 +99,5 @@ Residual windows:
   change.
 - **One stale summary emission.** A live summary change emits once with the previous deltas before
   they are recomputed, for the length of one cache read.
-- **A restored Summary with no preview.** If the session was delivered and the cache refreshed before a
+- **A restored Summary with no score.** If the session was delivered and the cache refreshed before a
   process death that came before the score resolved, the restored Summary shows no score.
