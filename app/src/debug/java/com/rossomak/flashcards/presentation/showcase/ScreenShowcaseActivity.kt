@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.window.lockPortraitOnPhones
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntryContent
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseListScreen
@@ -36,6 +37,7 @@ class ScreenShowcaseActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lockPortraitOnPhones()
         enableEdgeToEdge()
         val fixtures = ShowcaseFixtures.load(resources)
         setContent {

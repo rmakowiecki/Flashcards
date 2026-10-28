@@ -74,6 +74,10 @@ Every session starts at the Preview Study Session screen, which owns card select
 
 Losing sign-in, at any time, returns to Login and clears Main and everything above it, so nothing reachable treats a signed-out User as signed in. Signing out and **Account Deletion**, both started from the Account screen ([account.md](account.md)), leave this way, Account Deletion only once the server has finished ([ADR-0060](../adr/0060-account-deletion-completes-on-the-device.md)).
 
+## Orientation
+
+Phones are locked to portrait on every app screen; third-party activities, such as the sign-in pages and debug tools, keep their own orientation. Large screens, with a smallest width of 600dp or more (tablets and unfolded foldables), are never locked and rotate as the User's rotation setting allows, on every Android version. There is no landscape layout yet, so a rotated large screen shows the portrait layout stretched to fit. Folding or unfolding a foldable re-applies the rule for the new screen. Why and how: [ADR-0074](../adr/0074-phones-lock-to-portrait-large-screens-rotate.md).
+
 ## Navigation events
 
 A screen's decision to go somewhere is a **one-time event**, never part of its screen state. The screen collects each event once and calls the matching navigation callback, so navigation can never fire twice on recomposition or after a configuration change, and nothing needs resetting afterwards. An event sent before the screen starts collecting waits to be delivered rather than being dropped. Snackbar messages are a separate kind of transient event and do not share this path. Rationale and the code shape are in [ADR-0019](../adr/0019-navigation-as-one-time-events.md).
@@ -88,6 +92,7 @@ Every screen whose ViewModel decides where to go uses these events, even for a t
 - [ADR-0067](../adr/0067-destinations-navigate-only-from-their-own-back-stack-entry.md): destinations navigate only from their own back-stack entry.
 - [ADR-0073](../adr/0073-launch-screens-share-one-backdrop.md): the launch screens share one backdrop.
 - [ADR-0004](../adr/0004-preview-study-session-screen-owns-card-selection.md): every session goes through Preview.
+- [ADR-0074](../adr/0074-phones-lock-to-portrait-large-screens-rotate.md): phones lock to portrait, large screens rotate.
 - [ADR-0045](../adr/0045-separate-fast-and-rated-session-screens.md): separate Rated and Fast session screens.
 - [preview-study-session.md](preview-study-session.md): what each session entry point sends.
 - [session-summary.md](session-summary.md): leaving the Summary and Study Again.

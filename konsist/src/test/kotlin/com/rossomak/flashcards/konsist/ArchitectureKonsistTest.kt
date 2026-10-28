@@ -176,6 +176,24 @@ class ArchitectureKonsistTest {
             }
     }
 
+    @Test
+    fun `every activity locks portrait on phones from onCreate`() {
+        // ADR-0074: the manifest lock alone would also lock large screens on Android 15 and older.
+        // Konsist can't walk library supertypes, so every activity base class is matched by name.
+        val activityBaseClasses = setOf("Activity", "ComponentActivity", "FragmentActivity", "AppCompatActivity")
+        val commentLine = Regex("""^\s*(//|/\*|\*)""")
+        projectScope
+            .classes()
+            .filter { koClass -> koClass.hasParent(indirectParents = true) { it.name in activityBaseClasses } }
+            .assertTrue { koClass ->
+                koClass.functions().any { function ->
+                    val code = function.text.lines().filterNot { commentLine.containsMatchIn(it) }.joinToString("\n")
+                    val superCall = code.indexOf("super.onCreate(")
+                    function.name == "onCreate" && superCall >= 0 && code.indexOf("lockPortraitOnPhones()", superCall) > superCall
+                }
+            }
+    }
+
     /** Index of the innermost `{` still open at [position], or -1 at the top level. */
     private fun enclosingBraceIndex(text: String, position: Int): Int {
         val openBraces = ArrayDeque<Int>()

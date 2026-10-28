@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.window.lockPortraitOnPhones
 import com.rossomak.flashcards.presentation.startup.AppStartViewModel
 import com.rossomak.flashcards.presentation.startup.AppStartupState
 import com.rossomak.flashcards.ui.navigation.FlashcardsNavGraph
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        lockPortraitOnPhones()
 
         splashScreen.setKeepOnScreenCondition {
             appStartViewModel.startupState.value is AppStartupState.Loading
