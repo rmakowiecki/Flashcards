@@ -17,6 +17,10 @@ versions and rotates them on newer ones, so the same tablet behaves differently 
 **Phones are locked to portrait; large screens are never locked.** The rule is the same on every
 Android version and does not depend on the target SDK.
 
+**Portrait is not a store requirement.** The manifest declares `android.hardware.screen.portrait` with
+`required="false"`, because a declared `portrait` orientation otherwise makes Google Play hide the app
+from devices that only run in landscape, such as some desktop and car screens.
+
 **Manifest plus a runtime decision.** Every app activity declares `android:screenOrientation="portrait"`,
 so a phone is locked before its first frame. Each activity's `onCreate` then calls
 `lockPortraitOnPhones()` from `:core:ui`, which always sets `requestedOrientation`: `portrait` when the

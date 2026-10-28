@@ -8,6 +8,12 @@
     android:minSdkVersion="34" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+  <!-- The portrait lock below would otherwise make Play require a portrait screen; large screens
+       are unlocked and run in any orientation (ADR-0074). -->
+  <uses-feature
+    android:name="android.hardware.screen.portrait"
+    android:required="false" />
+
   <application
     android:name=".FlashcardsApplication"
     android:allowBackup="false"
