@@ -1,7 +1,10 @@
 package com.rossomak.flashcards.debugtools.showcase
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.StudyMode
@@ -37,17 +40,19 @@ private fun ShowcaseFixtures.previewState(): PreviewStudySessionScreenState {
 }
 
 @Composable
-internal fun PreviewStudySessionShowcase(onNavigateBack: () -> Unit) {
+internal fun PreviewStudySessionShowcase(isSettingsSheetOpen: Boolean, onNavigateBack: () -> Unit) {
     val fixtures = LocalShowcaseFixtures.current
+    var state by remember(fixtures) { mutableStateOf(fixtures.previewState()) }
     PreviewStudySessionContent(
-        state = remember(fixtures) { fixtures.previewState() },
+        state = state,
         onNavigateBack = onNavigateBack,
         onRetry = {},
         onReshuffleSubcategories = {},
-        onDialogEvent = {},
+        onDialogEvent = { event -> state = state.copy(activeDialog = showcaseDialogAfter(event)) },
         onResetFilters = {},
         onOpenAppSettings = {},
         onSwitchToManualAnswering = {},
         onStartSession = {},
+        initiallySettingsSheetOpen = isSettingsSheetOpen,
     )
 }

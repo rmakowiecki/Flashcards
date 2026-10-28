@@ -12,7 +12,7 @@ import kotlin.time.Duration
 import kotlinx.coroutines.delay
 
 /** The Summary's sequence steps, in play order. */
-internal enum class SummaryPhase {
+enum class SummaryPhase {
     /** The XP tiles appear one by one and the total counts up with them. */
     Counting,
 
@@ -32,7 +32,7 @@ internal enum class SummaryPhase {
  * lets the Level card show its after position without a pour.
  */
 @Stable
-internal class SummarySequence(
+class SummarySequence(
     val lines: List<XpBreakdownLine>,
     val xpTotal: Int,
     phase: SummaryPhase,

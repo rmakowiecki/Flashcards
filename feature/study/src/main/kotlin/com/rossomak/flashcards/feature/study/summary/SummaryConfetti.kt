@@ -122,7 +122,7 @@ internal fun SummaryConfetti(origin: Offset?, modifier: Modifier = Modifier) {
     }
 }
 
-private fun DrawScope.drawBurst(center: Offset, elapsedMillis: Float) {
+fun DrawScope.drawBurst(center: Offset, elapsedMillis: Float) {
     Particles.forEach { particle ->
         val progress = ((elapsedMillis - particle.delay.inWholeMilliseconds) / particle.duration.inWholeMilliseconds).coerceIn(0f, 1f)
         if (progress <= 0f || progress >= 1f) return@forEach
