@@ -8,6 +8,12 @@
     android:minSdkVersion="34" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+  <!-- The portrait lock below would otherwise make Play require a portrait screen; large screens
+       are unlocked and run in any orientation (ADR-0074). -->
+  <uses-feature
+    android:name="android.hardware.screen.portrait"
+    android:required="false" />
+
   <application
     android:name=".FlashcardsApplication"
     android:allowBackup="false"
@@ -18,10 +24,14 @@
     android:roundIcon="@mipmap/ic_launcher_round"
     android:supportsRtl="true"
     android:theme="@style/Theme.Flashcards">
+    <!-- Portrait locks a phone before its first frame; lockPortraitOnPhones() in onCreate unlocks
+         large screens (ADR-0074), so lint's large-screen orientation warnings don't apply. -->
     <activity
       android:name=".MainActivity"
       android:exported="true"
-      android:theme="@style/Theme.Flashcards.Starting">
+      android:screenOrientation="portrait"
+      android:theme="@style/Theme.Flashcards.Starting"
+      tools:ignore="DiscouragedApi,LockedOrientationActivity">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
 
