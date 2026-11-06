@@ -17,6 +17,7 @@ import com.rossomak.flashcards.debugtools.showcase.RatedShowcaseState.AnswerReve
 import com.rossomak.flashcards.debugtools.showcase.RatedShowcaseState.Question
 import com.rossomak.flashcards.debugtools.showcase.RatedShowcaseState.VoiceAnswering
 import com.rossomak.flashcards.debugtools.showcase.RatedShowcaseState.VoiceGraded
+import com.rossomak.flashcards.debugtools.showcase.RatedShowcaseState.VoiceGrading
 import com.rossomak.flashcards.debugtools.showcase.fixtures.LocalShowcaseFixtures
 import com.rossomak.flashcards.debugtools.showcase.fixtures.ShowcaseFixtures
 import com.rossomak.flashcards.debugtools.showcase.fixtures.functions
@@ -49,7 +50,7 @@ private fun ShowcaseFixtures.ratedState(showcaseState: RatedShowcaseState): Rate
         Question -> { card -> card.questionCode != null }
         AnswerRevealed -> { card -> card.answerCode != null && card.questionCode == null && card.extendedContext != null }
         VoiceAnswering -> { card -> card.questionCode == null && card.answerCode == null }
-        VoiceGraded -> { card -> card.id == VOICE_GRADED_CARD_ID }
+        VoiceGrading, VoiceGraded -> { card -> card.id == VOICE_GRADED_CARD_ID }
     }
     val base = RatedStudySessionScreenState(
         categoryName = kotlin.name,
@@ -68,6 +69,19 @@ private fun ShowcaseFixtures.ratedState(showcaseState: RatedShowcaseState): Rate
             voiceAnswerPhase = VoiceAnswerPhase.Listening,
             isVoiceMicrophoneOpen = true,
             availableTransportCommands = setOf(TransportCommandType.Pause, TransportCommandType.Next, TransportCommandType.Previous),
+        )
+
+        // Second Attempt after a Failed one: speech has ended, so the answer is revealed and the
+        // recognized answer shows while the grade is still on its way.
+        VoiceGrading -> base.copy(
+            currentCardRatings = listOf(FlashcardAttemptRating.Failed),
+            isAnswerRevealed = true,
+            isVoiceAnsweringSession = true,
+            isVoiceActive = true,
+            isVoicePlaying = true,
+            voiceAnswerPhase = VoiceAnswerPhase.Grading,
+            voiceAnswerSanitizedTranscript = voiceGrade.sanitizedTranscript,
+            availableTransportCommands = setOf(TransportCommandType.Pause),
         )
 
         // Second Attempt after a Failed one; the Correct marker shows during the feedback, as in the app.

@@ -14,13 +14,13 @@ import com.rossomak.flashcards.feature.study.fast.FastStudySessionActions
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionContent
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionScreenState
 
-/** Compose, second card: answer shown when tapping through, question playing when read aloud. */
+/** Compose, second card, answer revealed: tapping through, or playing when read aloud. */
 private fun ShowcaseFixtures.fastState(isReadAloud: Boolean) = FastStudySessionScreenState(
     categoryName = android.name,
     subcategoryNameById = mapOf(compose.id to compose.name),
     flashcards = flashcardsOf(compose.id),
     currentCardIndex = 1,
-    isAnswerRevealed = !isReadAloud,
+    isAnswerRevealed = true,
     isReadAloudMode = isReadAloud,
     isVoiceActive = isReadAloud,
     isVoicePlaying = isReadAloud,
