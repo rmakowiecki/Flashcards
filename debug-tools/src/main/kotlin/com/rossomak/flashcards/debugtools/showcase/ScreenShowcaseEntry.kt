@@ -27,6 +27,7 @@ enum class ScreenShowcaseEntry(val group: ScreenShowcaseGroup, @param:StringRes 
     RatedQuestion(ScreenShowcaseGroup.Session, R.string.screen_showcase_rated_question_label),
     RatedAnswerRevealed(ScreenShowcaseGroup.Session, R.string.screen_showcase_rated_answer_revealed_label),
     RatedVoiceAnswering(ScreenShowcaseGroup.Session, R.string.screen_showcase_rated_voice_answering_label),
+    RatedVoiceGrading(ScreenShowcaseGroup.Session, R.string.screen_showcase_rated_voice_grading_label),
     RatedVoiceGraded(ScreenShowcaseGroup.Session, R.string.screen_showcase_rated_voice_graded_label),
     FastTapThrough(ScreenShowcaseGroup.Session, R.string.screen_showcase_fast_tap_through_label),
     FastReadAloud(ScreenShowcaseGroup.Session, R.string.screen_showcase_fast_read_aloud_label),

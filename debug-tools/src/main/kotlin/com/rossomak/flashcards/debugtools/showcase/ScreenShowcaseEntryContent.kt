@@ -20,6 +20,7 @@ import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.RatedAnsw
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.RatedQuestion
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.RatedVoiceAnswering
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.RatedVoiceGraded
+import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.RatedVoiceGrading
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.SessionSummary
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.SessionSummaryConfetti
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry.SessionSummaryXpBreakdown
@@ -50,6 +51,7 @@ fun ScreenShowcaseEntryContent(entry: ScreenShowcaseEntry, fixtures: ShowcaseFix
                 RatedQuestion -> RatedStudySessionShowcase(RatedShowcaseState.Question)
                 RatedAnswerRevealed -> RatedStudySessionShowcase(RatedShowcaseState.AnswerRevealed)
                 RatedVoiceAnswering -> RatedStudySessionShowcase(RatedShowcaseState.VoiceAnswering)
+                RatedVoiceGrading -> RatedStudySessionShowcase(RatedShowcaseState.VoiceGrading)
                 RatedVoiceGraded -> RatedStudySessionShowcase(RatedShowcaseState.VoiceGraded)
                 FastTapThrough -> FastStudySessionShowcase(isReadAloud = false)
                 FastReadAloud -> FastStudySessionShowcase(isReadAloud = true)

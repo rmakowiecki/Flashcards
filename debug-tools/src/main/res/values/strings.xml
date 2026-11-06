@@ -82,6 +82,7 @@
     <string name="screen_showcase_rated_question_label">Rated, question</string>
     <string name="screen_showcase_rated_answer_revealed_label">Rated, answer revealed</string>
     <string name="screen_showcase_rated_voice_answering_label">Rated, voice answering</string>
+    <string name="screen_showcase_rated_voice_grading_label">Rated, voice answer grading</string>
     <string name="screen_showcase_rated_voice_graded_label">Rated, voice answer graded</string>
     <string name="screen_showcase_fast_tap_through_label">Fast, tap-through</string>
     <string name="screen_showcase_fast_read_aloud_label">Fast, read-aloud</string>
