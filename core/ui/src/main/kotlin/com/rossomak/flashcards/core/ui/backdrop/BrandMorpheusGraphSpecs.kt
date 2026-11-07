@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import com.rossomak.morpheus.MorpheusGraphComets
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphLayerSpec
 import com.rossomak.morpheus.MorpheusGraphSpec
@@ -48,7 +49,7 @@ object BrandMorpheusGraphSpecs {
         hotNodeShare = 0.06f,
         glowStrength = 0.3f,
         depthDimming = 0.4f,
-        cometSpark = 0.6f,
+        comets = MorpheusGraphComets(spark = 0.6f),
         alpha = 0.42f,
     )
 

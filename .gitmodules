@@ -1,3 +1,4 @@
 [submodule "morpheus"]
 	path = morpheus
 	url = https://github.com/rmakowiecki/Morpheus.git
+	branch = main
