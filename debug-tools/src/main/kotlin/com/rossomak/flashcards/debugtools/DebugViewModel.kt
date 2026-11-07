@@ -47,4 +47,14 @@ class DebugViewModel @Inject constructor(
                 .onFailure { loge(it) { "Failed to clear onboarding flag for replay" } }
         }
     }
+
+    fun onCrashNowClick(): Unit = throw DebugCrashException("Crash triggered from the debug hub")
+
+    /** Goes through `AppLog`, the same path a real caught failure takes. */
+    fun onRecordNonFatalClick() {
+        loge(DebugCrashException("Non-fatal triggered from the debug hub")) { "Debug hub non-fatal" }
+    }
 }
+
+/** Tells a deliberate debug-hub report apart from a real failure. */
+private class DebugCrashException(message: String) : RuntimeException(message)

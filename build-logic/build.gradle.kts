@@ -14,6 +14,7 @@ dependencies {
     implementation(libs.kotlin.serialization.gradlePlugin)
     implementation(libs.hilt.gradlePlugin)
     implementation(libs.google.services.gradlePlugin)
+    implementation(libs.firebase.crashlytics.gradlePlugin)
     implementation(libs.ksp.gradlePlugin)
     // Static-analysis plugins applied via pluginManager.apply(...) in android-quality.
     implementation(libs.spotless.gradlePlugin)

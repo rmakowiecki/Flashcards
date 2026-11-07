@@ -6,6 +6,8 @@ import androidx.work.Configuration
 import com.rossomak.flashcards.core.data.InterruptedAccountDeletionCompleter
 import com.rossomak.flashcards.core.data.SignedInWorkRunner
 import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
+import com.rossomak.flashcards.crashreporting.CrashReporter
+import com.rossomak.flashcards.crashreporting.CrashlyticsTree
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import timber.log.Timber
@@ -31,6 +33,8 @@ import timber.log.Timber
  * [CurrentActivityHolder] is registered here, before anything else can start an Activity, because
  * GitHub sign-in runs inside the data layer and needs the resumed Activity to open its Custom Tab.
  * Registering it from the Application means it sees every Activity of the process from the first.
+ *
+ * Every crash report carries the git SHA: the version code (a commit count) does not pin a branch.
  */
 @HiltAndroidApp
 class FlashcardsApplication : Application(), Configuration.Provider {
@@ -47,6 +51,9 @@ class FlashcardsApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var currentActivityHolder: CurrentActivityHolder
 
+    @Inject
+    lateinit var crashReporter: CrashReporter
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(hiltWorkerFactory).build()
 
@@ -55,8 +62,14 @@ class FlashcardsApplication : Application(), Configuration.Provider {
         if (BuildConfig.LOGGING_ENABLED) {
             Timber.plant(Timber.DebugTree())
         }
+        crashReporter.setCustomKey(GIT_SHA_KEY, BuildConfig.GIT_SHORT_SHA)
+        Timber.plant(CrashlyticsTree(crashReporter))
         registerActivityLifecycleCallbacks(currentActivityHolder)
         interruptedAccountDeletionCompleter.complete()
         signedInWorkRunner.start()
+    }
+
+    private companion object {
+        const val GIT_SHA_KEY = "git_sha"
     }
 }

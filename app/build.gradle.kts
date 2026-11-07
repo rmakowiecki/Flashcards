@@ -138,6 +138,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.crashlytics)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
