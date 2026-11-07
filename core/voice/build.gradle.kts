@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "com.rossomak.flashcards.core.voice"
+    defaultConfig {
+        consumerProguardFiles("consumer-rules.pro")
+    }
 }
 
 dependencies {
