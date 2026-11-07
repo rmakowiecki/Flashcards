@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Smartphone
@@ -95,6 +96,7 @@ fun DebugScreen(
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
         onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
         onCrashNowClick = viewModel::onCrashNowClick,
+        onNativeCrashClick = viewModel::onNativeCrashClick,
         onRecordNonFatalClick = viewModel::onRecordNonFatalClick,
     )
 }
@@ -116,6 +118,7 @@ private fun DebugContent(
     onReplayOnboardingClick: () -> Unit,
     onMorpheusGraphPrototypeClick: () -> Unit,
     onCrashNowClick: () -> Unit,
+    onNativeCrashClick: () -> Unit,
     onRecordNonFatalClick: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -209,6 +212,14 @@ private fun DebugContent(
                     )
                     add(
                         debugToolRow(
+                            titleRes = R.string.debug_native_crash_label,
+                            messageRes = R.string.debug_native_crash_message,
+                            icon = Icons.Default.Memory,
+                            onClick = onNativeCrashClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
                             titleRes = R.string.debug_record_non_fatal_label,
                             messageRes = R.string.debug_record_non_fatal_message,
                             icon = Icons.Default.ErrorOutline,
@@ -278,6 +289,7 @@ private fun DebugContentPreview() {
             onReplayOnboardingClick = {},
             onMorpheusGraphPrototypeClick = {},
             onCrashNowClick = {},
+            onNativeCrashClick = {},
             onRecordNonFatalClick = {},
         )
     }

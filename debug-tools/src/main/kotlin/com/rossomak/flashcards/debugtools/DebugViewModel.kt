@@ -1,5 +1,6 @@
 package com.rossomak.flashcards.debugtools
 
+import android.os.Process
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rossomak.flashcards.core.common.loge
@@ -50,11 +51,20 @@ class DebugViewModel @Inject constructor(
 
     fun onCrashNowClick(): Unit = throw DebugCrashException("Crash triggered from the debug hub")
 
+    /**
+     * Raises SIGABRT on the app's own process, the signal a JNI abort or a native assertion ends
+     * in. The JVM's uncaught exception handler never runs, so only the Crashlytics NDK handler can
+     * report it.
+     */
+    fun onNativeCrashClick(): Unit = Process.sendSignal(Process.myPid(), SIGABRT)
+
     /** Goes through `AppLog`, the same path a real caught failure takes. */
     fun onRecordNonFatalClick() {
         loge(DebugCrashException("Non-fatal triggered from the debug hub")) { "Debug hub non-fatal" }
     }
 }
+
+private const val SIGABRT = 6
 
 /** Tells a deliberate debug-hub report apart from a real failure. */
 private class DebugCrashException(message: String) : RuntimeException(message)

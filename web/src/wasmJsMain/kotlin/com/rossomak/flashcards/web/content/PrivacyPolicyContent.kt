@@ -23,8 +23,9 @@ val PrivacyPolicyDocument = LegalDocument(
                         "<strong>Content you create.</strong> Private flashcards you write, and problem reports you submit about flashcards.",
                         "<strong>Voice answers (optional).</strong> Only if you turn on Voice answering. See below.",
                         "<strong>Crash diagnostics.</strong> When the app crashes or hits an error, it sends a crash report: the stack " +
-                            "trace, recent app log lines, the app version, and device model and Android version. Reports carry no " +
-                            "account identifier.",
+                            "trace, recent app log lines, the app version, and device model and Android version. For a crash in " +
+                            "native code it also includes a snapshot of the app's memory at the time of the crash. Reports carry " +
+                            "no account identifier.",
                     ),
                 ),
                 Paragraph("Some settings, such as your daily goal and study preferences, are stored only on your device."),

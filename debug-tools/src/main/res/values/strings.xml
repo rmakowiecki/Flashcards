@@ -20,6 +20,8 @@
     <string name="debug_morpheus_graph_prototype_message">PROTOTYPE — animated Morpheus graph canvas background, OnSurface/OnGradient</string>
     <string name="debug_crash_now_label">Crash now</string>
     <string name="debug_crash_now_message">Throws an uncaught exception to test Crashlytics crash reports</string>
+    <string name="debug_native_crash_label">Native crash</string>
+    <string name="debug_native_crash_message">Raises SIGABRT to test Crashlytics NDK crash reports</string>
     <string name="debug_record_non_fatal_label">Record non-fatal</string>
     <string name="debug_record_non_fatal_message">Logs an error through AppLog to test Crashlytics non-fatal reports</string>
     <string name="debug_back_cd">Back to debug tools</string>
