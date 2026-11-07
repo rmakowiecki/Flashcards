@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber") // Spec values are tuning, pasted from the network-graph playground.
+@file:Suppress("MagicNumber") // Tuning values from the Morpheus playground.
 
 package com.rossomak.flashcards.feature.auth
 

@@ -1,7 +1,10 @@
-@file:Suppress("MagicNumber") // Spec values are tuning, pasted from the network-graph playground.
+@file:Suppress("MagicNumber") // Tuning values from the Morpheus playground.
 
 package com.rossomak.flashcards.core.ui.backdrop
 
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -32,6 +35,11 @@ object BrandMorpheusGraphSpecs {
     /** A deliberate jump, such as onboarding's Skip or the Summary settling. */
     val settleMorphDuration: Duration = 1_000.milliseconds
 
+    /** The brand morph easing over [duration]. */
+    fun morphAnimationSpec(duration: Duration): AnimationSpec<Float> = tween(duration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing)
+
+    val settleMorphAnimationSpec: AnimationSpec<Float> = morphAnimationSpec(settleMorphDuration)
+
     private const val SEED = 29
 
     val base: MorpheusGraphLayerSpec = MorpheusGraphLayerSpec(
@@ -52,6 +60,9 @@ object BrandMorpheusGraphSpecs {
         comets = MorpheusGraphComets(spark = 0.6f),
         alpha = 0.42f,
     )
+
+    /** The brighter launch look shared by the splash and onboarding's Welcome, so their handoff only reshapes the graph. */
+    val cover: MorpheusGraphLayerSpec = base.copy(hotNodeShare = 0.15f, glowStrength = 0.45f, alpha = 0.45f)
 
     private val topAppBarBloom = Bloom(reach = 0.9f, plateau = 0.3f)
 

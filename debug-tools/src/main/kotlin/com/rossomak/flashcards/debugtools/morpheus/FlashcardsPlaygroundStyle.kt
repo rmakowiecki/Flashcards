@@ -11,10 +11,9 @@ import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.tuner.MorpheusGraphPlaygroundStyle
 
 /**
- * The playground surface for [style] in Flashcards' colors. Graphs inherit white on
- * [FlashcardsComponentStyle.OnGradient] (the gradient never flips) over the brand gradients, and theme
- * `onSurfaceVariant` on [FlashcardsComponentStyle.OnSurface] over the plain themed surface; a layer
- * with a fill of its own keeps it on both.
+ * The playground surface for [style] in Flashcards' colors, as the app draws it: graphs inherit white on
+ * [FlashcardsComponentStyle.OnGradient] and the theme's primary on [FlashcardsComponentStyle.OnSurface].
+ * A layer with a fill of its own keeps it on both.
  */
 @Composable
 fun flashcardsPlaygroundStyle(style: FlashcardsComponentStyle): MorpheusGraphPlaygroundStyle {
@@ -24,7 +23,7 @@ fun flashcardsPlaygroundStyle(style: FlashcardsComponentStyle): MorpheusGraphPla
         when (style) {
             FlashcardsComponentStyle.OnSurface -> MorpheusGraphPlaygroundStyle(
                 name = "On surface",
-                fill = MorpheusGraphFill.Solid(colorScheme.onSurfaceVariant),
+                fill = MorpheusGraphFill.Solid(colorScheme.primary),
                 barBackground = SolidColor(colorScheme.surfaceContainerHigh),
                 heroBackground = SolidColor(colorScheme.surfaceContainerHigh),
                 contentColor = colorScheme.onSurface,
@@ -33,7 +32,6 @@ fun flashcardsPlaygroundStyle(style: FlashcardsComponentStyle): MorpheusGraphPla
                 name = "On gradient",
                 fill = MorpheusGraphFill.Solid(Color.White),
                 barBackground = brandColors.topBarGradient,
-                // The hero stands in for a full-screen surface, so it gets the full-screen gradient.
                 heroBackground = brandColors.screenGradient,
                 contentColor = brandColors.onGradientContent,
             )

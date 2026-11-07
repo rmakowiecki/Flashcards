@@ -136,7 +136,7 @@ fun BackdropBlurDebugContent(
                             IconButton(onClick = onNavigateBack) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.debug_voice_harness_back_cd),
+                                    contentDescription = stringResource(R.string.debug_back_cd),
                                 )
                             }
                         },

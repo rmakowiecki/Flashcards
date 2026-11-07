@@ -279,7 +279,7 @@ private fun FollowPager(graphState: MorpheusGraphMorphState, pagerState: PagerSt
     graphState.Follow(
         OnboardingMorpheusGraphs.pages,
         // Only Skip's jump uses it; a step-to-step morph is bounded by minMorphDuration.
-        animationSpec = tween(BrandMorpheusGraphSpecs.settleMorphDuration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing),
+        animationSpec = BrandMorpheusGraphSpecs.settleMorphAnimationSpec,
         minMorphDuration = BrandMorpheusGraphSpecs.minMorphDuration,
         target = { pagerState.targetPage },
     ) {

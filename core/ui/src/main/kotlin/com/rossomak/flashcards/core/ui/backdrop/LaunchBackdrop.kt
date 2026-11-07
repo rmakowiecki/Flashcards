@@ -2,8 +2,6 @@ package com.rossomak.flashcards.core.ui.backdrop
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -49,7 +47,7 @@ class LaunchBackdropState internal constructor(start: LaunchBackdropStart, graph
 
     /** Morphs to [spec] when a graph is shown, returning once it arrives; otherwise snaps to it, still invisible, for [fadeIn]. */
     suspend fun arriveAt(spec: MorpheusGraphSpec) {
-        if (graphAlpha.targetValue > 0f) graph.animateTo(spec, HandoffAnimationSpec) else graph.snapTo(spec)
+        if (graphAlpha.targetValue > 0f) graph.animateTo(spec, BrandMorpheusGraphSpecs.settleMorphAnimationSpec) else graph.snapTo(spec)
     }
 
     /** Does nothing when the graph is already shown, as after a handover. */
@@ -57,9 +55,6 @@ class LaunchBackdropState internal constructor(start: LaunchBackdropStart, graph
         if (graphAlpha.targetValue < 1f) graphAlpha.animateTo(1f, animationSpec)
     }
 }
-
-private val HandoffAnimationSpec: AnimationSpec<Float> =
-    tween(BrandMorpheusGraphSpecs.settleMorphDuration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing)
 
 private val LocalLaunchBackdrop = staticCompositionLocalOf<LaunchBackdropState?> { null }
 

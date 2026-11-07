@@ -11,7 +11,7 @@ import com.rossomak.morpheus.morpheusGraphBackground
 
 /** A network graph backdrop, clipped as the bar collapses. */
 @Composable
-fun FlashcardsTopAppBarGraph(
+private fun FlashcardsTopAppBarGraph(
     spec: MorpheusGraphSpec,
     fill: MorpheusGraphFill,
     modifier: Modifier = Modifier,

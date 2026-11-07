@@ -16,15 +16,8 @@ import com.rossomak.flashcards.debugtools.R
 import com.rossomak.morpheus.tuner.MorpheusGraphPlayground
 
 /**
- * PROTOTYPE, throwaway — answers "which animated Morpheus graph background looks best, and on which
- * surfaces". Delete the whole `morpheus` package and the two routing hooks in
- * [com.rossomak.flashcards.debugtools.DebugScreen] / `MainScreenDebugTabs` once a winner is
- * promoted.
- *
- * The lib's [MorpheusGraphPlayground] in Flashcards' brand: [FlashcardsMorpheusGraphPresets] for its pages
- * and decks, one [flashcardsPlaygroundStyle] per [FlashcardsComponentStyle], and a
- * copied spec also printed to logcat. Registered on the app's outer graph, so it runs full-screen
- * without the bottom bar.
+ * The lib's [MorpheusGraphPlayground] in Flashcards' brand, paged through [FlashcardsMorpheusGraphPresets];
+ * a copied spec is also logged. Full screen, without the bottom bar.
  */
 @Composable
 fun MorpheusGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit) {
@@ -38,7 +31,7 @@ fun MorpheusGraphPrototypeScreen(modifier: Modifier = Modifier, onNavigateBack: 
         onSpecExport = { source -> logd { "Morpheus graph spec:\n$source" } },
         navigationIcon = {
             IconButton(onClick = onNavigateBack) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.debug_voice_harness_back_cd))
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.debug_back_cd))
             }
         },
     )

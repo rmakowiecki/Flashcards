@@ -1,7 +1,5 @@
 package com.rossomak.flashcards.core.ui.backdrop
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -34,7 +32,7 @@ fun BoxScope.BrandGradientBackdrop(
     }
     val graphState = rememberMorpheusGraphMorphState(graph)
     LaunchedEffect(graph, graphMorphDuration) {
-        graphState.animateTo(graph, tween(graphMorphDuration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing))
+        graphState.animateTo(graph, BrandMorpheusGraphSpecs.morphAnimationSpec(graphMorphDuration))
     }
     BrandGradientBackdrop(graphState = graphState, modifier = modifier, graphAlpha = graphAlpha)
 }
