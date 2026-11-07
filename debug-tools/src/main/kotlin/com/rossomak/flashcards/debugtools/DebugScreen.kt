@@ -10,8 +10,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Smartphone
@@ -92,6 +95,9 @@ fun DebugScreen(
         onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
         onMorpheusGraphPrototypeClick = onNavigateToMorpheusGraphPrototype,
+        onCrashNowClick = viewModel::onCrashNowClick,
+        onNativeCrashClick = viewModel::onNativeCrashClick,
+        onRecordNonFatalClick = viewModel::onRecordNonFatalClick,
     )
 }
 
@@ -111,6 +117,9 @@ private fun DebugContent(
     onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
     onMorpheusGraphPrototypeClick: () -> Unit,
+    onCrashNowClick: () -> Unit,
+    onNativeCrashClick: () -> Unit,
+    onRecordNonFatalClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val scrollBehavior = rememberFlashcardsTopAppBarScrollBehavior()
@@ -193,6 +202,30 @@ private fun DebugContent(
                             onClick = onMorpheusGraphPrototypeClick,
                         ),
                     )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_crash_now_label,
+                            messageRes = R.string.debug_crash_now_message,
+                            icon = Icons.Default.BugReport,
+                            onClick = onCrashNowClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_native_crash_label,
+                            messageRes = R.string.debug_native_crash_message,
+                            icon = Icons.Default.Memory,
+                            onClick = onNativeCrashClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_record_non_fatal_label,
+                            messageRes = R.string.debug_record_non_fatal_message,
+                            icon = Icons.Default.ErrorOutline,
+                            onClick = onRecordNonFatalClick,
+                        ),
+                    )
                     // Absent when Showkase is not on the classpath, which is every non-debug build
                     // of :core:ui — the row would open nothing.
                     if (showcaseIntent != null) {
@@ -255,6 +288,9 @@ private fun DebugContentPreview() {
             onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},
             onMorpheusGraphPrototypeClick = {},
+            onCrashNowClick = {},
+            onNativeCrashClick = {},
+            onRecordNonFatalClick = {},
         )
     }
 }

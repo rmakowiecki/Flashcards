@@ -94,10 +94,12 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `no file uses Timber directly outside AppLog`() {
-        // the project mandates AppLog (logv/logd/logi/logw/loge) over raw Timber calls
+        // the project mandates AppLog (logv/logd/logi/logw/loge) over raw Timber calls; the files
+        // that plant or implement a Timber tree are the exception
+        val timberFiles = setOf("AppLog.kt", "FlashcardsApplication.kt", "CrashlyticsTree.kt", "CrashlyticsTreeTest.kt")
         projectScope
             .files
-            .filter { !it.path.endsWith("/AppLog.kt") && !it.path.endsWith("/FlashcardsApplication.kt") }
+            .filter { it.path.substringAfterLast('/') !in timberFiles }
             .assertTrue { file ->
                 file.imports.none { import -> import.name.startsWith("timber.log") }
             }

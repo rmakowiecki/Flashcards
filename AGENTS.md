@@ -240,6 +240,8 @@ logd { "App start: scheduling session submission drain for recovery" }
 loge(exception) { "Failed to submit response for card $cardId" }
 ```
 
+`CrashlyticsTree` sends `logi`/`logw`/`loge` to Crashlytics as breadcrumbs, and `loge` with a throwable as a non-fatal report ([ADR-0075](./docs/adr/0075-crash-reporting-through-crashlytics.md)). Never log a uid or other personal data.
+
 Log sparingly. Only at points that matter for diagnosing prod issues: final state of an IO operation (network call result, DB write, file op), errors/exceptions, key lifecycle transitions. Do not log every branch or intermediate step — no logging for its own sake inside ordinary business logic.
 
 ## Static Analysis

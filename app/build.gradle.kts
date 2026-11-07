@@ -1,3 +1,4 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import java.util.Properties
 
 plugins {
@@ -138,6 +139,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.crashlytics.ndk)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
@@ -161,4 +163,16 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.leakcanary.android)
+}
+
+// Native symbols name native crash frames in Crashlytics (ADR-0075). The plugin never runs their
+// upload itself, so it follows packaging, the way the mapping upload does.
+val nativeSymbolBuildTypes = listOf("release", "profiling")
+android.buildTypes.matching { it.name in nativeSymbolBuildTypes }.configureEach {
+    configure<CrashlyticsExtension> { nativeSymbolUploadEnabled = true }
+}
+nativeSymbolBuildTypes.map { it.replaceFirstChar(Char::uppercase) }.forEach { variant ->
+    tasks.matching { it.name == "assemble$variant" || it.name == "bundle$variant" }.configureEach {
+        finalizedBy("uploadCrashlyticsSymbolFile$variant")
+    }
 }

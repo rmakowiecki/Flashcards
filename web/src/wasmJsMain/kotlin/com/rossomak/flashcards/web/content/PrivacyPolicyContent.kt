@@ -6,7 +6,7 @@ import com.rossomak.flashcards.web.content.LegalBlock.Paragraph
 /** The Privacy Policy linked from the Play Console listing and the app's Account screen. */
 val PrivacyPolicyDocument = LegalDocument(
     title = "Flashcards Privacy Policy",
-    subtitle = "Last updated: October 3, 2026",
+    subtitle = "Last updated: November 6, 2026",
     intro = listOf(
         "This policy explains what data the Flashcards Android app (\"the app\", \"we\") collects, why, who processes it, and how you can delete it.",
     ),
@@ -22,6 +22,10 @@ val PrivacyPolicyDocument = LegalDocument(
                             "and how you rated them), per-flashcard progress, XP, level and streak.",
                         "<strong>Content you create.</strong> Private flashcards you write, and problem reports you submit about flashcards.",
                         "<strong>Voice answers (optional).</strong> Only if you turn on Voice answering. See below.",
+                        "<strong>Crash diagnostics.</strong> When the app crashes or hits an error, it sends a crash report: the stack " +
+                            "trace, recent app log lines, the app version, device model and Android version, and a random identifier " +
+                            "for this installation of the app. For a crash in native code it also includes a snapshot of the app's " +
+                            "memory at the time of the crash. Reports carry no account identifier.",
                     ),
                 ),
                 Paragraph("Some settings, such as your daily goal and study preferences, are stored only on your device."),
@@ -57,6 +61,7 @@ val PrivacyPolicyDocument = LegalDocument(
                         "To calculate progress, XP, levels and streaks.",
                         "To grade spoken answers when you use Voice answering.",
                         "To fix flashcards you report as having problems.",
+                        "To find and fix crashes and errors in the app.",
                     ),
                 ),
             ),
@@ -66,7 +71,8 @@ val PrivacyPolicyDocument = LegalDocument(
             blocks = listOf(
                 Paragraph(
                     "Account and study data is stored in Google Firebase (Authentication, Cloud Firestore and Cloud Functions), " +
-                        "operated by Google LLC. Data is encrypted in transit.",
+                        "operated by Google LLC. Crash reports are processed by Firebase Crashlytics, also operated by Google LLC. " +
+                        "Data is encrypted in transit.",
                 ),
             ),
         ),
@@ -76,7 +82,8 @@ val PrivacyPolicyDocument = LegalDocument(
                 Paragraph(
                     "We keep your account and study data for as long as your account exists. You can ask us to delete your account " +
                         "and all associated data by following the steps on our <a href=\"/delete-account\">account deletion page</a>. " +
-                        "We delete it within 30 days of your request.",
+                        "We delete it within 30 days of your request. Crash reports are not linked to your account. Google keeps them " +
+                        "for 90 days, then removes them from its systems.",
                 ),
             ),
         ),
