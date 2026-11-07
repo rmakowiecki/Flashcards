@@ -23,9 +23,9 @@ val PrivacyPolicyDocument = LegalDocument(
                         "<strong>Content you create.</strong> Private flashcards you write, and problem reports you submit about flashcards.",
                         "<strong>Voice answers (optional).</strong> Only if you turn on Voice answering. See below.",
                         "<strong>Crash diagnostics.</strong> When the app crashes or hits an error, it sends a crash report: the stack " +
-                            "trace, recent app log lines, the app version, and device model and Android version. For a crash in " +
-                            "native code it also includes a snapshot of the app's memory at the time of the crash. Reports carry " +
-                            "no account identifier.",
+                            "trace, recent app log lines, the app version, device model and Android version, and a random identifier " +
+                            "for this installation of the app. For a crash in native code it also includes a snapshot of the app's " +
+                            "memory at the time of the crash. Reports carry no account identifier.",
                     ),
                 ),
                 Paragraph("Some settings, such as your daily goal and study preferences, are stored only on your device."),
@@ -82,8 +82,8 @@ val PrivacyPolicyDocument = LegalDocument(
                 Paragraph(
                     "We keep your account and study data for as long as your account exists. You can ask us to delete your account " +
                         "and all associated data by following the steps on our <a href=\"/delete-account\">account deletion page</a>. " +
-                        "We delete it within 30 days of your request. Crash reports are not linked to your account and are deleted " +
-                        "automatically after 90 days.",
+                        "We delete it within 30 days of your request. Crash reports are not linked to your account. Google keeps them " +
+                        "for 90 days, then removes them from its systems.",
                 ),
             ),
         ),

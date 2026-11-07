@@ -1,6 +1,5 @@
 package com.rossomak.flashcards.crashreporting
 
-import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
@@ -30,7 +29,19 @@ class CrashlyticsTreeTest {
         Timber.e(failure, LOG_MESSAGE)
 
         verifyOrder {
-            crashReporter.log("E: $LOG_MESSAGE\njava.lang.IllegalStateException: $FAILURE_MESSAGE")
+            crashReporter.log(ERROR_BREADCRUMB)
+            crashReporter.recordException(failure)
+        }
+    }
+
+    @Test
+    fun `assert with throwable records the exception after its breadcrumb`() {
+        val failure = IllegalStateException(FAILURE_MESSAGE)
+
+        Timber.wtf(failure, LOG_MESSAGE)
+
+        verifyOrder {
+            crashReporter.log("A: $LOG_MESSAGE\njava.lang.IllegalStateException: $FAILURE_MESSAGE")
             crashReporter.recordException(failure)
         }
     }
@@ -78,22 +89,15 @@ class CrashlyticsTreeTest {
 
     @Test
     fun `breadcrumb drops the stack frames Timber appends`() {
-        val loggedLines = mutableListOf<String>()
-        val capturingReporter = object : CrashReporter {
-            override fun recordException(throwable: Throwable) = Unit
+        val failure = IllegalStateException(FAILURE_MESSAGE, RuntimeException(CAUSE_MESSAGE))
 
-            override fun log(message: String) {
-                loggedLines += message
-            }
+        Timber.e(failure, LOG_MESSAGE)
 
-            override fun setCustomKey(key: String, value: String) = Unit
+        verify(exactly = 1) { crashReporter.log(any()) }
+        verifyOrder {
+            crashReporter.log(ERROR_BREADCRUMB)
+            crashReporter.recordException(failure)
         }
-        Timber.uprootAll()
-        Timber.plant(CrashlyticsTree(capturingReporter))
-
-        Timber.e(IllegalStateException(FAILURE_MESSAGE, RuntimeException(CAUSE_MESSAGE)), LOG_MESSAGE)
-
-        loggedLines shouldBe listOf("E: $LOG_MESSAGE\njava.lang.IllegalStateException: $FAILURE_MESSAGE")
     }
 
     private companion object {
@@ -101,5 +105,6 @@ class CrashlyticsTreeTest {
         const val FAILURE_MESSAGE = "network down"
         const val CAUSE_MESSAGE = "socket closed"
         const val TAG = "Submission"
+        const val ERROR_BREADCRUMB = "E: $LOG_MESSAGE\njava.lang.IllegalStateException: $FAILURE_MESSAGE"
     }
 }

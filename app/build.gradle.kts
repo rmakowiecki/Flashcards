@@ -73,9 +73,6 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("Boolean", "LOGGING_ENABLED", "false")
-            // Names the frames of native crashes in Crashlytics. The ONNX Runtime JNI library ships
-            // with its symbol table, so its frames resolve. See ADR-0075.
-            configure<CrashlyticsExtension> { nativeSymbolUploadEnabled = true }
         }
         // Release performance with debug conveniences: R8-optimized and not debuggable, so ART
         // honors baseline profiles, but unobfuscated, logging, carrying the debug hub, and
@@ -88,8 +85,6 @@ android {
             proguardFile("proguard-rules-profiling.pro")
             buildConfigField("Boolean", "LOGGING_ENABLED", "true")
             matchingFallbacks += "release"
-            // initWith does not copy the Crashlytics extension.
-            configure<CrashlyticsExtension> { nativeSymbolUploadEnabled = true }
         }
     }
     // The debug-hub wiring (Debug tab + its nav graph) is shared with profiling; release keeps its
@@ -170,9 +165,13 @@ dependencies {
     debugImplementation(libs.leakcanary.android)
 }
 
-// The Crashlytics plugin registers the native symbol upload but never runs it on its own, so every
-// build of a variant that enables it uploads right after packaging, the way the mapping file does.
-listOf("Release", "Profiling").forEach { variant ->
+// Native symbols name native crash frames in Crashlytics (ADR-0075). The plugin never runs their
+// upload itself, so it follows packaging, the way the mapping upload does.
+val nativeSymbolBuildTypes = listOf("release", "profiling")
+android.buildTypes.matching { it.name in nativeSymbolBuildTypes }.configureEach {
+    configure<CrashlyticsExtension> { nativeSymbolUploadEnabled = true }
+}
+nativeSymbolBuildTypes.map { it.replaceFirstChar(Char::uppercase) }.forEach { variant ->
     tasks.matching { it.name == "assemble$variant" || it.name == "bundle$variant" }.configureEach {
         finalizedBy("uploadCrashlyticsSymbolFile$variant")
     }

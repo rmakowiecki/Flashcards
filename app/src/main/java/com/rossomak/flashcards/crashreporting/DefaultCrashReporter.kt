@@ -7,7 +7,7 @@ import javax.inject.Singleton
 @Singleton
 class DefaultCrashReporter @Inject constructor() : CrashReporter {
 
-    private val crashlytics: FirebaseCrashlytics by lazy { FirebaseCrashlytics.getInstance() }
+    private val crashlytics: FirebaseCrashlytics = FirebaseCrashlytics.getInstance()
 
     override fun recordException(throwable: Throwable) {
         crashlytics.recordException(throwable)

@@ -4,8 +4,7 @@ import android.util.Log
 import timber.log.Timber
 
 /**
- * Sends `AppLog` output to crash reporting. Info, warning and error lines become breadcrumbs; an
- * error with a throwable is also recorded as a non-fatal. Debug and verbose lines are dropped.
+ * Sends `AppLog` lines from info up as breadcrumbs, and an error with a throwable as a non-fatal.
  * Breadcrumbs drop the stack frames Timber appends, keeping the exception line.
  */
 class CrashlyticsTree(private val crashReporter: CrashReporter) : Timber.Tree() {
@@ -20,7 +19,8 @@ class CrashlyticsTree(private val crashReporter: CrashReporter) : Timber.Tree() 
     }
 
     private fun breadcrumb(priority: Int, tag: String?, message: String): String {
-        val prefix = tag?.let { "${priorityLetter(priority)}/$it" } ?: priorityLetter(priority)
+        val letter = priorityLetter(priority)
+        val prefix = tag?.let { "$letter/$it" } ?: letter
         return "$prefix: ${message.substringBefore(STACK_FRAME_START).trimEnd()}"
     }
 
