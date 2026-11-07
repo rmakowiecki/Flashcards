@@ -13,28 +13,27 @@ private val BrandIndigo = Color(0xFF2A2E8F)
 
 /**
  * The prototype screen's pages: the lib's [MorpheusGraphPresets] with Flashcards' brand applied, plus
- * the fake onboarding decks and the app's screen graphs. New presets come from the playground's "copy spec" button, pasted here.
+ * the fake onboarding decks and the app's screen graphs. New presets come from the playground's "Copy spec as Kotlin" button.
  */
 object FlashcardsMorpheusGraphPresets {
 
-    /** [MorpheusGraphPresets.cornerBloom] in brand indigo on a plain surface. */
-    private val cornerBloom = LabeledMorpheusGraphPresets.all.first { it.spec == MorpheusGraphPresets.cornerBloom }.let { preset ->
-        preset.copy(
-            note = "${preset.note}; brand indigo on surface",
-            spec = preset.spec.copy(layers = preset.spec.layers.map { layer -> layer.copy(fill = MorpheusGraphFill.Solid(BrandIndigo)) }),
-        )
+    /** The lib's presets, with [MorpheusGraphPresets.cornerBloom] in brand indigo on a plain surface. */
+    val all: List<MorpheusGraphPreset> = LabeledMorpheusGraphPresets.all.map { preset ->
+        if (preset.spec == MorpheusGraphPresets.cornerBloom) preset.inBrandIndigo() else preset
     }
 
-    val all: List<MorpheusGraphPreset> = LabeledMorpheusGraphPresets.all.map { preset ->
-        if (preset.spec == MorpheusGraphPresets.cornerBloom) cornerBloom else preset
-    }
+    private fun MorpheusGraphPreset.inBrandIndigo() = copy(
+        note = "$note; brand indigo on surface",
+        spec = spec.copy(layers = spec.layers.map { layer -> layer.copy(fill = MorpheusGraphFill.Solid(BrandIndigo)) }),
+    )
 
     val morphFamily: List<MorpheusGraphPreset> = LabeledMorpheusGraphPresets.morphFamily
 
     private fun morphVariantNamed(name: String) = morphFamily.first { it.name == name }
 
     /** The fake onboarding pager's backgrounds, one per page. */
-    val onboardingPages: List<MorpheusGraphPreset> = listOf(morphFamily[0], morphFamily[2], morphFamily[3])
+    val onboardingPages: List<MorpheusGraphPreset> =
+        listOf("Uniform field", "Ribbon, high and narrow", "Corner bloom").map(::morphVariantNamed)
 
     /**
      * The second fake onboarding pager's backgrounds: one shape splitting in two, two primitives of one
