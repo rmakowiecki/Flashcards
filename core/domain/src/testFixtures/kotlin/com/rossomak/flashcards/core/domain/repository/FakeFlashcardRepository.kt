@@ -3,7 +3,9 @@ package com.rossomak.flashcards.core.domain.repository
 import com.rossomak.flashcards.core.domain.model.Category
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.Subcategory
+import kotlin.time.Duration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 
 class FakeFlashcardRepository : FlashcardRepository {
     var categoriesToReturn: Result<List<Category>> = Result.success(emptyList())
@@ -38,6 +40,9 @@ class FakeFlashcardRepository : FlashcardRepository {
     /** When set, [fetchFlashcards] suspends until it completes, so a test can observe state mid-draw. */
     var fetchFlashcardsGate: CompletableDeferred<Unit>? = null
 
+    /** How long [fetchCategoriesByIds] and [fetchSubcategoriesByIds] take, so a test can outlast a lookup timeout. */
+    var byIdsFetchDelay: Duration = Duration.ZERO
+
     override suspend fun fetchCategories(): Result<List<Category>> = categoriesToReturn
 
     override suspend fun fetchSubcategories(categoryId: String): Result<List<Subcategory>> {
@@ -47,10 +52,14 @@ class FakeFlashcardRepository : FlashcardRepository {
 
     override suspend fun fetchCategoriesByIds(ids: Set<String>): Result<List<Category>> {
         fetchedCategoryIds += ids
+        delay(byIdsFetchDelay)
         return categoriesByIdsToReturn
     }
 
-    override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> = subcategoriesByIdsToReturn
+    override suspend fun fetchSubcategoriesByIds(ids: Set<String>): Result<List<Subcategory>> {
+        delay(byIdsFetchDelay)
+        return subcategoriesByIdsToReturn
+    }
 
     override suspend fun searchSubcategories(namePrefix: String): Result<List<Subcategory>> {
         searchedPrefixes += namePrefix

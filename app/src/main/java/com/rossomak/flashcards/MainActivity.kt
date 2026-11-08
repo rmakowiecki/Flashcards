@@ -1,5 +1,6 @@
 package com.rossomak.flashcards
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,11 +41,7 @@ class MainActivity : ComponentActivity() {
             splashView.remove()
         }
 
-        // Only a launcher-shortcut's own Intent carries this action; an ordinary launcher-icon tap
-        // (or a warm-started MainActivity handing this same Intent back on process recreation)
-        // does not, so this stays null on every other cold start.
-        val launchRoute = intent.takeIf { it.action == AppShortcutsRepository.ACTION_OPEN_ROUTE }
-            ?.getStringExtra(AppShortcutsRepository.EXTRA_ROUTE)
+        val launchRoute = intent.shortcutRoute()
 
         enableEdgeToEdge()
         setContent {
@@ -55,8 +52,21 @@ class MainActivity : ComponentActivity() {
                     permissionGateway = permissionGateway,
                     modifier = Modifier.fillMaxSize(),
                     launchRoute = launchRoute,
+                    shortcutEvents = appStartViewModel.shortcutEvents,
+                    onNavigationStateChange = appStartViewModel::onNavigationStateChange,
                 )
             }
         }
     }
+
+    // singleTop: a shortcut tapped while this activity is on top arrives here instead of starting a second copy.
+    // Any other intent, such as the session notification's tap, only brings the app forward.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.shortcutRoute()?.let(appStartViewModel::onShortcutTap)
+    }
+
+    // Only a launcher shortcut's own intent carries this action; an ordinary launcher-icon tap does not.
+    private fun Intent.shortcutRoute(): String? =
+        takeIf { it.action == AppShortcutsRepository.ACTION_OPEN_ROUTE }?.getStringExtra(AppShortcutsRepository.EXTRA_ROUTE)
 }

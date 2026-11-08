@@ -1,19 +1,28 @@
 package com.rossomak.flashcards.presentation.startup
 
+import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
+import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.usecase.ClearDynamicShortcutsUseCase
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.IsSignedInUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveAuthUserUseCase
 import com.rossomak.flashcards.core.domain.usecase.SyncDynamicShortcutsUseCase
 import com.rossomak.flashcards.core.domain.usecase.SyncFlashcardCacheGenerationUseCase
+import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
+import com.rossomak.flashcards.presentation.shortcut.ShortcutDestination
+import com.rossomak.flashcards.presentation.shortcut.shortcutCategory
+import com.rossomak.flashcards.presentation.shortcut.shortcutRouteResolver
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -41,15 +50,28 @@ class AppStartViewModelTest {
         coEvery { this@mockk() } returns Unit
     }
 
+    private val flashcardRepository = FakeFlashcardRepository().apply {
+        categoriesByIdsToReturn = Result.success(listOf(shortcutCategory(id = ANDROID_ID, name = ANDROID_NAME)))
+    }
+
     private val testUser = AuthUser("u1", "a@b.com", "Alex", null)
 
     private fun createViewModel(): AppStartViewModel = AppStartViewModel(
-        getCurrentAuthUserUseCase,
+        IsSignedInUseCase(getCurrentAuthUserUseCase),
         observeAuthUserUseCase,
         syncFlashcardCacheGenerationUseCase,
         syncDynamicShortcutsUseCase,
         clearDynamicShortcutsUseCase,
+        shortcutRouteResolver(flashcardRepository),
     )
+
+    private fun createWarmViewModel(
+        state: AppNavigationState = AppNavigationState(top = TopDestination.Other),
+        authUser: AuthUser? = testUser,
+    ): AppStartViewModel {
+        coEvery { getCurrentAuthUserUseCase() } returns authUser
+        return createViewModel().apply { onNavigationStateChange(state) }
+    }
 
     @Test
     fun `startupState initial value is Loading`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -78,20 +100,6 @@ class AppStartViewModelTest {
         advanceUntilIdle()
 
         viewModel.startupState.value shouldBe AppStartupState.Ready(authenticated = false)
-    }
-
-    @Test
-    fun `auth timeout emits Ready with false after 1000ms`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { getCurrentAuthUserUseCase() } coAnswers {
-            delay(Long.MAX_VALUE)
-            null
-        }
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.startupState.value shouldBe AppStartupState.Ready(authenticated = false)
-        testScheduler.currentTime shouldBe 1000L
     }
 
     @Test
@@ -190,4 +198,96 @@ class AppStartViewModelTest {
             coVerify(exactly = 2) { syncDynamicShortcutsUseCase() }
             coVerify(exactly = 0) { clearDynamicShortcutsUseCase() }
         }
+
+    // region warm shortcut tap
+
+    @Test
+    fun `a resolvable shortcut tap while signed in opens its Details`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createWarmViewModel()
+
+        viewModel.shortcutEvents.test {
+            viewModel.onShortcutTap(CATEGORY_ROUTE)
+
+            awaitItem() shouldBe ShortcutDestination.ToCategoryDetails(CategoryDetailsRoute(categoryId = ANDROID_ID, categoryName = ANDROID_NAME))
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `a shortcut tap from a Guest is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        assertShortcutTapDropped(createWarmViewModel(authUser = testUser.copy(isAnonymous = true)))
+    }
+
+    @Test
+    fun `a shortcut tap while signed out is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        assertShortcutTapDropped(createWarmViewModel(authUser = null))
+    }
+
+    @Test
+    fun `a shortcut tap at a launch screen is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        assertShortcutTapDropped(createWarmViewModel(AppNavigationState(top = TopDestination.Launch)))
+    }
+
+    @Test
+    fun `a shortcut tap before the nav host reports anything is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { getCurrentAuthUserUseCase() } returns testUser
+
+        assertShortcutTapDropped(createViewModel())
+    }
+
+    @Test
+    fun `a shortcut tap during a Study Session is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        assertShortcutTapDropped(createWarmViewModel(AppNavigationState(top = TopDestination.Other, isStudySessionInBackStack = true)))
+    }
+
+    @Test
+    fun `a shortcut tap whose target no longer resolves is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.categoriesByIdsToReturn = Result.success(emptyList())
+
+        assertShortcutTapDropped(createWarmViewModel())
+    }
+
+    @Test
+    fun `a shortcut tap whose lookup times out is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.byIdsFetchDelay = 2.seconds
+
+        assertShortcutTapDropped(createWarmViewModel())
+    }
+
+    @Test
+    fun `a shortcut tap whose target is already on top is dropped`() = runTest(mainDispatcherRule.testDispatcher) {
+        assertShortcutTapDropped(createWarmViewModel(AppNavigationState(top = TopDestination.CategoryDetails(ANDROID_ID))))
+    }
+
+    @Test
+    fun `a shortcut tap is dropped when a Study Session starts while it resolves`() = runTest(mainDispatcherRule.testDispatcher) {
+        flashcardRepository.byIdsFetchDelay = 0.5.seconds
+        val viewModel = createWarmViewModel()
+
+        viewModel.shortcutEvents.test {
+            viewModel.onShortcutTap(CATEGORY_ROUTE)
+            runCurrent()
+            viewModel.onNavigationStateChange(AppNavigationState(top = TopDestination.Other, isStudySessionInBackStack = true))
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+    }
+
+    private suspend fun TestScope.assertShortcutTapDropped(viewModel: AppStartViewModel) {
+        viewModel.shortcutEvents.test {
+            viewModel.onShortcutTap(CATEGORY_ROUTE)
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+    }
+
+    // endregion
+
+    private companion object {
+        const val ANDROID_ID = "android"
+        const val ANDROID_NAME = "Android"
+        const val CATEGORY_ROUTE = "/study/category/$ANDROID_ID"
+    }
 }

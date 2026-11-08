@@ -4,7 +4,7 @@
 
 Category Details and Subcategory Details each have **one route type**, registered once in the root `NavHost` next to `Main`, not inside any tab's graph. Home, the Study tab and launcher shortcuts all navigate to the same route, and the screen opens full-screen above Main, with no bottom navigation bar.
 
-Launcher shortcuts carry their target as an internal route string, `/study/category/{id}` or `/study/category/{id}/subcategory/{id}`. It is not a Navigation deep link: `SplashViewModel` parses it with `ShortcutRoute` and navigates to the typed route itself. The `/study/` prefix is fixed only because shortcuts already pinned on a device carry it. It does not mean the screen opens in the Study tab.
+Launcher shortcuts carry their target as an internal route string, `/study/category/{id}` or `/study/category/{id}/subcategory/{id}`. It is not a Navigation deep link: `ShortcutRouteResolver` parses it with `ShortcutRoute`, and the app navigates to the typed route itself. The `/study/` prefix is fixed only because shortcuts already pinned on a device carry it. It does not mean the screen opens in the Study tab.
 
 ## Why
 

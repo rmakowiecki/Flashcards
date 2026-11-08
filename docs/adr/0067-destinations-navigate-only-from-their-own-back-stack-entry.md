@@ -19,11 +19,12 @@ screen or popped one too many. Only a few ViewModels had in-flight flags.
 - The check runs once per call, so a callback makes at most one navigator call. A multi-call sequence
   is its own method: `navigateStacked(base, baseBuilder, route)`, used by Splash to open a shortcut's
   Details screen above Main.
-- The bottom bar's tab switch is the one raw controller call: it has no entry, and `launchSingleTop`
-  makes a repeated tap harmless.
+- Two raw controller calls have no entry to guard: the bottom bar's tab switch, where `launchSingleTop`
+  makes a repeated tap harmless, and `pushFromHost` in `NavGraph.kt`, the nav host's own push for
+  navigation no screen asks for, such as a warm launcher-shortcut tap.
 - `ArchitectureKonsistTest` enforces it: only `GuardedNavComposable.kt` imports Navigation Compose's
   `composable`; production code calls no `navigate`, `popBackStack` or `navigateUp` on a
-  `NavController` except the tab switch; a callback makes at most one `navigator.` call.
+  `NavController` except the tab switch and `pushFromHost`; a callback makes at most one `navigator.` call.
 
 ## Alternatives considered
 
