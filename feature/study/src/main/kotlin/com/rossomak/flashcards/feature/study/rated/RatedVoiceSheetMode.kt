@@ -37,7 +37,7 @@ sealed interface RatedVoiceSheetMode {
     /** The user's sanitized [transcript] is known and is being graded. */
     data class GradingWithTranscript(val transcript: String) : RatedVoiceSheetMode
 
-    /** The grade is being read aloud: the [rating] it maps to and the grader's [rationale]. */
+    /** The grade being read aloud: its [rating] and the on-screen [rationale] (see [VoiceAnswerGrade.feedback]). */
     data class Graded(val rating: FlashcardAttemptRating, val rationale: String) : RatedVoiceSheetMode
 }
 

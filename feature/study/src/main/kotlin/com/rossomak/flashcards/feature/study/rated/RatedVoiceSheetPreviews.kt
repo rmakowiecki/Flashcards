@@ -90,11 +90,9 @@ private const val PREVIEW_LONG_TRANSCRIPT = "remember keeps a value across recom
     "recreated, for example on rotation. rememberSaveable stores the value in the saved instance state bundle, so it " +
     "survives configuration changes and even process death, as long as the type can be saved into a Bundle or has a " +
     "custom Saver. That is why text field input usually goes into rememberSaveable."
-private const val PREVIEW_SHORT_RATIONALE = "You named the key difference."
-private const val PREVIEW_LONG_RATIONALE = "You explained that remember only survives recomposition and that " +
-    "rememberSaveable also survives configuration changes, which is the core of the answer. You did not mention " +
-    "process death or that rememberSaveable needs a Bundle-compatible type or a custom Saver, so the answer is not " +
-    "complete. Mentioning where the value is stored would also have made the distinction clearer."
+private const val PREVIEW_SHORT_RATIONALE = "Missed that `rememberSaveable` also survives process death."
+private const val PREVIEW_LONG_RATIONALE = "Missed process death, and that `rememberSaveable` needs a Bundle-compatible type " +
+    "or a custom Saver to store the value outside the composition."
 private const val PREVIEW_CORRECT_PERCENT = 90
 private const val PREVIEW_PARTIAL_PERCENT = 60
 private const val PREVIEW_FAILED_PERCENT = 20
@@ -104,7 +102,12 @@ private fun RatedStudySessionVoiceGradedPreview(gradePercent: Int, rationale: St
     RatedStudySessionVoicePreview(
         state = RatedStudySessionScreenState(
             voiceAnswerPhase = VoiceAnswerPhase.SpeakingNotice,
-            lastVoiceAnswerGrade = VoiceAnswerGrade(sanitizedTranscript = PREVIEW_SHORT_TRANSCRIPT, gradePercent = gradePercent, feedback = rationale),
+            lastVoiceAnswerGrade = VoiceAnswerGrade(
+                sanitizedTranscript = PREVIEW_SHORT_TRANSCRIPT,
+                gradePercent = gradePercent,
+                feedback = rationale,
+                spokenFeedback = rationale,
+            ),
         ),
     )
 }
@@ -137,6 +140,12 @@ private fun RatedStudySessionVoiceGradingLongPreview() {
             voiceAnswerSanitizedTranscript = PREVIEW_LONG_TRANSCRIPT,
         ),
     )
+}
+
+@Preview
+@Composable
+private fun RatedStudySessionVoiceGradedCorrectNoRationalePreview() {
+    RatedStudySessionVoiceGradedPreview(gradePercent = PREVIEW_CORRECT_PERCENT, rationale = "")
 }
 
 @Preview

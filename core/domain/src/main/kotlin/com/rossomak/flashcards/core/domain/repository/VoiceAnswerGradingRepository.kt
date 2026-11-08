@@ -17,11 +17,15 @@ interface VoiceAnswerGradingRepository {
      * (ADR-0014: no per-card Firestore writes during a session). A failure ends the flow with a
      * terminal [VoiceAnswerGradingEvent.Failed] carrying its classified cause, not an exception;
      * only cancellation propagates.
+     *
+     * [spokenAnswer] is the card's hand-written spoken form of [expectedAnswer], if it has one; the
+     * grader words its spoken feedback from it.
      */
     fun transcribeAndGradeSpokenAnswer(
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         obfuscatedAnswerWav: ByteArray,
     ): Flow<VoiceAnswerGradingEvent>
 

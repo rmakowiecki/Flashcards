@@ -14,9 +14,9 @@ import com.rossomak.flashcards.core.domain.model.TransportCommandType.Play
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Previous
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.PreviousCard
 import com.rossomak.flashcards.core.domain.model.TransportCommandType.Stop
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.AdvanceHoldRequested
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.CaptureFailed
 import com.rossomak.flashcards.core.domain.session.RatedSessionInput.GradingFailed
@@ -67,7 +67,9 @@ class TransportCommandAvailabilityTest {
 
     private val listening = questionBeingRead.after(QuestionFinished("card-1"))
     private val grading = listening.after(SpeechStarted, SpeechEnded, UtteranceCaptured(byteArrayOf(1)))
-    private val feedback = grading.after(VoiceAnswerGraded(VoiceAnswerGrade(sanitizedTranscript = "answer", gradePercent = 90, feedback = "Right.")))
+    private val correctGrade = voiceAnswerGrade(gradePercent = 90)
+
+    private val feedback = grading.after(VoiceAnswerGraded(correctGrade))
 
     private fun RatedSessionState.paused(): RatedSessionState = after(PauseRequested, playing(false))
 
@@ -119,7 +121,7 @@ class TransportCommandAvailabilityTest {
     @Test
     fun `paused after the feedback offers play and next`() {
         feedback.paused().availableTransportCommands shouldBe setOf(Play, Next)
-        grading.paused().after(VoiceAnswerGraded(VoiceAnswerGrade(sanitizedTranscript = "answer", gradePercent = 90, feedback = "Right.")))
+        grading.paused().after(VoiceAnswerGraded(correctGrade))
             .availableTransportCommands shouldBe setOf(Play, Next)
     }
 

@@ -51,10 +51,11 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         obfuscatedAnswerWav: ByteArray,
     ): Flow<VoiceAnswerGradingEvent> = flow {
         val completed = withTimeoutOrNull(GRADING_TIME_BUDGET) {
-            emitAll(streamGradingEvents(cardId, question, expectedAnswer, obfuscatedAnswerWav))
+            emitAll(streamGradingEvents(cardId, question, expectedAnswer, spokenAnswer, obfuscatedAnswerWav))
         }
         if (completed == null) {
             loge { "Voice answer grading exceeded $GRADING_TIME_BUDGET" }
@@ -66,10 +67,11 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         obfuscatedAnswerWav: ByteArray,
     ): Flow<VoiceAnswerGradingEvent> = flow {
         var sanitizedTranscript: String? = null
-        voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, obfuscatedAnswerWav)
+        voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, obfuscatedAnswerWav)
             .collect { event ->
                 when (event) {
                     is VoiceGradingStreamEventDto.TranscriptChunk -> {
@@ -85,6 +87,7 @@ class DefaultVoiceAnswerGradingRepository internal constructor(
                             sanitizedTranscript = transcript,
                             gradePercent = event.gradePercent,
                             feedback = event.feedback,
+                            spokenFeedback = event.spokenFeedback,
                         )
                         emit(VoiceAnswerGradingEvent.Graded(grade))
                     }

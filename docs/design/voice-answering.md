@@ -11,7 +11,7 @@ Each card on screen goes through one round:
 1. **Question.** The question is read aloud through the same speech engine Fast mode uses, with the card's spoken version when it has one. The reading stops after the question, and the answer is never read ([ADR-0031](../adr/0031-voice-answering-shared-tts-engine-silence-timeout-grade-bands.md)).
 2. **Listening.** Only once the question has finished does the app open the microphone, so it never hears its own voice. A short cue plays when the microphone really records. If no speech starts within the silence timeout, the round counts as a silence. Once speech starts, the app listens until the User stops speaking.
 3. **Grading.** When the User stops speaking, the card's answer is revealed, so the User can check what they missed while grading runs ([ADR-0026](../adr/0026-voice-grade-unifies-with-rating-reveal-tied-to-speech-end.md)). The answer, once obfuscated, is sent to the server. The recognized answer arrives first, and shows until the grade does, for at least a moment so it can be read ([ADR-0053](../adr/0053-voice-answer-sheet-states-and-live-input-level.md)).
-4. **Feedback.** The grade is applied as the card's Rating at once, exactly as a manual tap would. The card stays on screen while its feedback is spoken: the Rating's name, then the grader's rationale. A Failed or Partial rationale says what was missed and includes the full expected answer, so this is where the User hears the right answer. A Correct one is a short affirmation. The grade's percentage is never shown or spoken.
+4. **Feedback.** The grade is applied as the card's Rating at once, exactly as a manual tap would. The card stays on screen while its feedback is spoken: the Rating's name ("Correct", "Partially correct" or "Failed"), then the grader's rationale. The rationale is as short as it can be and never repeats the whole expected answer, which is already revealed on the card. A Correct one is empty, or names the one minor point missed. A Partial one names only what was missing or wrong. A Failed one says what was wrong and gives the key correct idea in a clause. A non-answer, such as "I don't know", gets a condensed version of the expected answer instead, so this is where the User hears it. The grade's percentage is never shown or spoken.
 5. **Next card.** After the feedback and a short pause, the session reaches its auto-advance point and reads the next question. An open dialog holds the session there ([study-session.md](study-session.md#dialogs)).
 
 A grade that arrives for a card that is no longer on screen keeps no Rating, but its feedback is still spoken.
@@ -24,7 +24,7 @@ The bottom panel shows one thing at a time:
 - a live microphone indicator while listening;
 - a progress disc while the microphone is being prepared, while grading runs without a transcript, and during any short notice;
 - the progress disc beside the recognized answer once it arrives;
-- the Rating and the grader's rationale while the feedback is spoken.
+- the Rating ("Correct", "Partial" or "Failed") and the grader's rationale while the feedback is spoken. The rationale on screen may show short code as inline code. The spoken one says the code in words instead. An empty rationale shows the Rating alone.
 
 Voice settings can be changed only from the transport row, never mid-round. The indicator follows the real microphone level, of any sound and not only speech, to show that the microphone hears the User. The level is computed on the device and is never logged, stored or uploaded. How the level is measured, shaped and drawn is in [voice-capture-indicator.md](voice-capture-indicator.md).
 
@@ -74,9 +74,9 @@ Each answer is one call to a streaming Firebase callable function, which carries
 2. transcribes the audio with ElevenLabs Scribe;
 3. has a language model clean the transcript: filler words and repetitions are normalized, and personal details the User happened to say are removed;
 4. streams that cleaned transcript back at once, so the app can show it before grading ends;
-5. has a language model grade the cleaned answer against the question and the expected answer, as a percentage and a one-sentence rationale, and returns them.
+5. has a language model grade the cleaned answer against the question and the expected answer, as a percentage and a rationale in two forms, one to show and one to speak, and returns them. The app also sends the card's spoken answer when it has one, so the spoken rationale reuses its wording. The server strips any markdown the model wrote, except short inline code in the shown form.
 
-Both model steps use Gemini on Vertex AI. The app maps the percentage to a Rating: below 40 is Failed, 40 to 79 is Partial, 80 and above is Correct ([ADR-0031](../adr/0031-voice-answering-shared-tts-engine-silence-timeout-grade-bands.md)).
+Both model steps use Gemini on Vertex AI. The app maps the percentage to a Rating: below 30 is Failed, 30 to 74 is Partial, 75 and above is Correct ([ADR-0031](../adr/0031-voice-answering-shared-tts-engine-silence-timeout-grade-bands.md)).
 
 The whole call runs within one time budget, with no retry, because a retry would upload the answer again inside the same budget. A call that runs out of time, or fails for lack of a connection, is a no-connection failure. The server gives up just before the app does, with its own error, so a slow service reads as a service problem. Every other failure, including a missing entitlement, is a service problem.
 

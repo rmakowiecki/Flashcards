@@ -19,10 +19,10 @@ import com.rossomak.flashcards.core.domain.model.SessionSourceType.SingleSubcate
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -317,7 +317,7 @@ class RatedStudySessionCoordinatorInterruptionTest {
         gradingRepository.gradingFlow = flow {
             emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
             gradeGate.await()
-            emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
+            emit(VoiceAnswerGradingEvent.Graded(voiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
         }
         val coordinator = startCoordinator()
         captureAnswer()
@@ -340,7 +340,7 @@ class RatedStudySessionCoordinatorInterruptionTest {
     fun `an interruption during the feedback cuts it without a finish, and the resume reads it again`() = runTest {
         gradingRepository.gradingFlow = flow {
             emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
-            emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
+            emit(VoiceAnswerGradingEvent.Graded(voiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
         }
         val coordinator = startCoordinator()
         captureAnswer()

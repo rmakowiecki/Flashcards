@@ -1,10 +1,10 @@
 package com.rossomak.flashcards.core.domain.session
 
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent.Graded
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent.TranscriptReady
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration
@@ -24,7 +24,7 @@ import org.junit.Test
 class HoldGradedUntilTranscriptShownTest {
 
     private val transcriptReady = TranscriptReady(sanitizedTranscript = "state hoisting")
-    private val graded = Graded(VoiceAnswerGrade(sanitizedTranscript = "state hoisting", gradePercent = 90, feedback = "Spot on."))
+    private val graded = Graded(voiceAnswerGrade(sanitizedTranscript = "state hoisting", gradePercent = 90))
 
     @Test
     fun `graded 300 ms after transcript is held until 1000 ms`() = runTest {

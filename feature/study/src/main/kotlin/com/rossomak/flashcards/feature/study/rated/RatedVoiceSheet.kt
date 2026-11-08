@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.designsystem.theme.spacing
@@ -53,10 +54,10 @@ import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.ui.R as CoreUiR
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButton
-import com.rossomak.flashcards.core.ui.composables.rating.labelRes
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicator
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceProgressDisc
+import com.rossomak.flashcards.core.ui.composables.withInlineCode
 import com.rossomak.flashcards.feature.study.R
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.Graded
 import com.rossomak.flashcards.feature.study.rated.RatedVoiceSheetMode.GradingWithTranscript
@@ -259,7 +260,7 @@ private const val BADGE_SLIDE_DURATION_MS = FlashcardsMotion.DURATION_LONG_MS
 private fun ratedVoiceRoundDescription(voiceSheetMode: RatedVoiceSheetMode): String? = when (voiceSheetMode) {
     Listening -> stringResource(CoreUiR.string.common_voice_capture_listening_cd)
     Pending, is GradingWithTranscript -> stringResource(R.string.study_session_voice_answer_grading_label)
-    is Graded -> stringResource(voiceSheetMode.rating.labelRes)
+    is Graded -> stringResource(voiceSheetMode.rating.voiceLabelRes)
     Transport -> null
 }
 
@@ -279,7 +280,7 @@ private val RatedVoiceSheetMode.badgeContent: RatedVoiceBadgeContent?
 private val RatedVoiceSheetMode.badgeLabelRes: Int?
     get() = when (this) {
         is GradingWithTranscript -> R.string.study_session_voice_answer_grading_label
-        is Graded -> rating.labelRes
+        is Graded -> rating.voiceLabelRes
         Transport, Listening, Pending -> null
     }
 
@@ -327,6 +328,9 @@ private fun RatedVoiceBadge(voiceSheetMode: RatedVoiceSheetMode, lookaheadScope:
     }
 }
 
+/** The sheet's paragraph: a transcript shows exactly what was heard, a rationale renders its inline code. */
+private data class RoundParagraph(val text: String, val hasInlineCode: Boolean)
+
 @Composable
 private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDelayMillis: Int, modifier: Modifier = Modifier) {
     val titleRes = when (voiceSheetMode) {
@@ -335,8 +339,8 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDe
         Transport, Listening, Pending -> null
     }
     val paragraph = when (voiceSheetMode) {
-        is GradingWithTranscript -> voiceSheetMode.transcript
-        is Graded -> voiceSheetMode.rationale
+        is GradingWithTranscript -> RoundParagraph(voiceSheetMode.transcript, hasInlineCode = false)
+        is Graded -> voiceSheetMode.rationale.takeIf { it.isNotBlank() }?.let { RoundParagraph(it, hasInlineCode = true) }
         Transport, Listening, Pending -> null
     }
     Column(
@@ -366,7 +370,7 @@ private fun RatedVoiceRoundText(voiceSheetMode: RatedVoiceSheetMode, textEnterDe
         ) { shownParagraph ->
             if (shownParagraph != null) {
                 Text(
-                    text = shownParagraph,
+                    text = if (shownParagraph.hasInlineCode) shownParagraph.text.withInlineCode() else AnnotatedString(shownParagraph.text),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,

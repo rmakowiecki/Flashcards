@@ -38,7 +38,7 @@ class FakeVoiceGradingRemoteDataSourceTest {
     fun `transcribeAndGradeSpokenAnswer throws entitlement exception when premium simulation is off`() = runTest {
         fakeApi.simulatePremiumEntitlement = false
 
-        fakeApi.transcribeAndGradeSpokenAnswer("card-1", question, expectedAnswer, ByteArray(64)).test {
+        fakeApi.transcribeAndGradeSpokenAnswer("card-1", question, expectedAnswer, spokenAnswer = null, ByteArray(64)).test {
             (awaitError() is VoiceGradingEntitlementException) shouldBe true
         }
     }
@@ -48,7 +48,7 @@ class FakeVoiceGradingRemoteDataSourceTest {
         val longExpectedAnswer = "a foreground service keeps running with a persistent notification " +
             "shown to the user even when the app itself is no longer visible on screen"
 
-        fakeApi.transcribeAndGradeSpokenAnswer("card-1", question, longExpectedAnswer, ByteArray(64_000)).test {
+        fakeApi.transcribeAndGradeSpokenAnswer("card-1", question, longExpectedAnswer, spokenAnswer = null, ByteArray(64_000)).test {
             val chunk = awaitItem() as VoiceGradingStreamEventDto.TranscriptChunk
             chunk.sanitizedTranscript.isNotBlank() shouldBe true
 

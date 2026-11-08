@@ -7,7 +7,7 @@ package com.rossomak.flashcards.core.domain.model
  */
 sealed interface SpokenNotice {
 
-    /** The grade: the Rating's name and the grader's [rationale]. Never the percentage. */
+    /** The Rating's name, then the spoken [rationale] if any (see [VoiceAnswerGrade.spokenFeedback]). Never the percentage. */
     data class Feedback(val rating: FlashcardAttemptRating, val rationale: String) : SpokenNotice
 
     /** Nothing was heard; the card is put back and the session moves on. */

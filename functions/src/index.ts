@@ -40,6 +40,8 @@ interface TranscribeAndGradeRequest {
   card_id?: string;
   question?: string;
   expected_answer?: string;
+  /** Optional hand-written spoken form of the expected answer, used to word the spoken feedback. */
+  spoken_answer?: string;
   audio_base64?: string;
 }
 
@@ -48,13 +50,14 @@ interface TranscribeAndGradeChunk {
 }
 
 /**
- * Terminal result. Full mode (question + expected_answer present) returns `{ grade, feedback }`;
- * debug mode (both absent) returns an empty object — the grade LLM never runs because there is
+ * Terminal result. Full mode (question + expected_answer present) returns
+ * `{ grade, feedback, spoken_feedback }` (see `GradeResult`); debug mode (both absent) returns an empty object — the grade LLM never runs because there is
  * structurally nothing to grade (ADR-0029 §3).
  */
 interface TranscribeAndGradeResult {
   grade?: number;
   feedback?: string;
+  spoken_feedback?: string;
 }
 
 /**
@@ -63,7 +66,8 @@ interface TranscribeAndGradeResult {
  * then the terminal `Result`. The mode is inferred from the payload, not a flag (ADR-0029 §3):
  *   - `audio_base64` is always required.
  *   - `question` + `expected_answer` are both-or-neither; exactly one present → `invalid-argument`.
- *   - Full mode (both present): terminal `{ grade, feedback }`.
+ *   - `spoken_answer` is optional and only read in full mode.
+ *   - Full mode (both present): terminal `{ grade, feedback, spoken_feedback }`.
  *   - Debug mode (both absent): terminal `{}`; grade LLM skipped.
  * Must be `onCall`, not `onRequest` — that's what gives streaming (`request.acceptsStreaming`,
  * `response.sendChunk`) and automatic Firebase Auth ID-token verification (`request.auth`).
@@ -78,7 +82,12 @@ export const transcribeAndGradeSpokenAnswer = onCall<
     const deadline = new RequestDeadline(VOICE_GRADING_DEADLINE_MS);
     await requirePremiumCaller(admin.auth(), admin.firestore(), request);
 
-    const { question, expected_answer: expectedAnswer, audio_base64: audioBase64 } = request.data;
+    const {
+      question,
+      expected_answer: expectedAnswer,
+      spoken_answer: spokenAnswer,
+      audio_base64: audioBase64,
+    } = request.data;
     if (typeof audioBase64 !== "string" || audioBase64.length === 0) {
       throw new HttpsError("invalid-argument", "Missing or invalid audio_base64");
     }
@@ -101,6 +110,9 @@ export const transcribeAndGradeSpokenAnswer = onCall<
       }
       if (typeof expectedAnswer !== "string" || expectedAnswer.trim().length === 0) {
         throw new HttpsError("invalid-argument", "expected_answer must be a non-empty string");
+      }
+      if (spokenAnswer !== undefined && (typeof spokenAnswer !== "string" || spokenAnswer.trim().length === 0)) {
+        throw new HttpsError("invalid-argument", "spoken_answer must be a non-empty string when present");
       }
     }
 
@@ -125,10 +137,11 @@ export const transcribeAndGradeSpokenAnswer = onCall<
     const grade = await gradeSanitizedTranscript(
       question!,
       expectedAnswer!,
+      spokenAnswer,
       sanitizedTranscript,
       deadline.stepTimeoutMs(LLM_CALL_TIMEOUT_MS),
     );
-    return { grade: grade.gradePercent, feedback: grade.feedback };
+    return { grade: grade.gradePercent, feedback: grade.feedback, spoken_feedback: grade.spokenFeedback };
   },
 );
 
