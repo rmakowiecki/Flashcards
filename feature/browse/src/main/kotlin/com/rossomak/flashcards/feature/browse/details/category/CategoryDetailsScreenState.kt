@@ -19,8 +19,8 @@ import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), `null` until
  * [isProgressResolved] — and possibly still `null` after, for a User who has never finished a
  * session. Never read directly by the screen; go through [progressFor].
- * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
- * failed read leaves it `false` forever rather than surfacing an error, per the ticket's "no error,
+ * @param isProgressResolved `false` until the summary read succeeds. A failed read leaves it `false`,
+ * so the rings stay unresolved and no error is shown; the list still shows
  * [CategoryDetailsContentState.SubcategoriesList] as soon as it loads, independent of the progress read.
  */
 data class CategoryDetailsScreenState(

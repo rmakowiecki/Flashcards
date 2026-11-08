@@ -85,8 +85,8 @@ sealed interface SearchStatus {
  * possibly still `null` after, for a User who has never finished a session. Never read directly by
  * the screen; go through [progressFor]. Mirrors [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressSummary] — one
  * summary document serves both screens' rings.
- * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
- * failed read leaves it `false` forever rather than surfacing an error, same as
+ * @param isProgressResolved `false` until the summary read succeeds. A failed read leaves it `false`,
+ * so the rings stay unresolved and no error is shown, same as
  * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.isProgressResolved]. Search results themselves never wait on this.
  */
 data class BrowseScreenState(
