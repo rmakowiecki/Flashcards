@@ -1,6 +1,6 @@
 # User Flow — Launcher Shortcuts
 
-Pinning a shortcut, keeping shortcuts in sync with favorites, and opening the app via a shortcut tap. Grilled 2026-09-16 (tickets 01–05 ready-for-agent; two edge cases below are NYI, design pending).
+Pinning a shortcut, keeping shortcuts in sync with favorites, and opening the app via a shortcut tap. Cases marked NYI in the diagram are not built yet.
 
 ## Pinning a shortcut
 
