@@ -436,6 +436,38 @@ class BrowseViewModelTest {
             viewModel.state.value.favorites.subcategoryIds.keys shouldBe setOf(coroutines.id)
         }
 
+    @Test
+    fun `a failing progress stream leaves rings unresolved instead of crashing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            flashcardRepository.searchResultsByPrefix["compose"] = Result.success(listOf(compose))
+            cardProgressRepository.summaryReadFailure = IllegalStateException("malformed progress document")
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onSearchQueryChange("compose")
+            advanceTimeBy(DEBOUNCE_MILLIS + 1)
+            advanceUntilIdle()
+
+            viewModel.state.value.categories shouldContainExactly listOf(android)
+            viewModel.state.value.isProgressResolved shouldBe false
+            viewModel.state.value.progressFor(compose.id) shouldBe SubcategoryProgressState.Unresolved
+            val status = viewModel.state.value.searchStatus
+            status.shouldBeInstanceOf<SearchStatus.Results>()
+            status.results.subcategories.map { it.subcategory } shouldContainExactly listOf(compose)
+        }
+
+    @Test
+    fun `a failing favorites stream leaves badges off instead of crashing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.categories shouldContainExactly listOf(android)
+            viewModel.state.value.favorites shouldBe UserFavorites.EMPTY
+        }
+
     private companion object {
         const val DEBOUNCE_MILLIS = 500L
     }

@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.browse.details.category
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Custom
@@ -22,6 +23,7 @@ import com.rossomak.flashcards.feature.browse.details.DetailsMessage.RemovedFrom
 import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinFailed
 import com.rossomak.flashcards.feature.browse.details.DetailsMessage.ShortcutPinUnsupported
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -30,6 +32,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -59,7 +64,7 @@ class CategoryDetailsViewModel @Inject constructor(
     init {
         loadSubcategories()
         collectProgressSummary()
-        observeFavorites()
+        collectFavorites()
     }
 
     /**
@@ -170,18 +175,9 @@ class CategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * No optimistic flip: [CategoryDetailsScreenState.isFavorite] derives from the favorites
-     * listener, and Firestore's latency compensation delivers the local write to it immediately.
-     */
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
-        viewModelScope.launch {
-            val result = setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
-            if (result.isSuccess) {
-                _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites)
-            }
-        }
+        setFavorite(isFavorite) { _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites) }
     }
 
     /**
@@ -190,8 +186,32 @@ class CategoryDetailsViewModel @Inject constructor(
      * would invert a later, unrelated toggle. Emits no message of its own.
      */
     fun onFavoriteUndo(restoreTo: Boolean) {
+        setFavorite(restoreTo)
+    }
+
+    /**
+     * Shows [isFavorite] at once instead of waiting for the favorites listener, so the bookmark still
+     * answers a tap after that listener has failed, then writes it. A failed write puts the bookmark
+     * back; a live listener confirms the stored value either way.
+     */
+    private fun setFavorite(isFavorite: Boolean, onSuccess: () -> Unit = {}) {
+        showFavorite(isFavorite)
         viewModelScope.launch {
-            setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, restoreTo))
+            setCategoryFavorite(SetCategoryFavoriteUseCase.Params(route.categoryId, isFavorite))
+                .onSuccess { onSuccess() }
+                .onFailure { showFavorite(!isFavorite) }
+        }
+    }
+
+    private fun showFavorite(isFavorite: Boolean) {
+        _state.update { state ->
+            val categoryIds = state.favorites.categoryIds
+            val updatedCategoryIds = if (isFavorite) {
+                categoryIds + (route.categoryId to (categoryIds[route.categoryId] ?: Instant.now()))
+            } else {
+                categoryIds - route.categoryId
+            }
+            state.copy(favorites = state.favorites.copy(categoryIds = updatedCategoryIds))
         }
     }
 
@@ -206,17 +226,17 @@ class CategoryDetailsViewModel @Inject constructor(
     }
 
     /**
-     * The screen's one favorites listener: it drives both the top app bar's bookmark
-     * ([CategoryDetailsScreenState.isFavorite]) and each subcategory row's badge. The list itself
-     * never waits on this to render, same rule as [collectProgressSummary]. [ObserveUserFavoritesUseCase] is a live Firestore listener
-     * too, re-attaching on its own after a network drop, so a screen left open through a
-     * connectivity blip still gets its bookmark badges filled in without any retry wiring here.
+     * The screen's one favorites listener, driving the top app bar's bookmark
+     * ([CategoryDetailsScreenState.isFavorite]) and each subcategory row's badge; the list never
+     * waits on it. A thrown failure ends it for good and keeps the last Favorites delivered.
      */
-    private fun observeFavorites() {
+    private fun collectFavorites() {
         viewModelScope.launch {
-            observeUserFavorites().collect { favorites ->
-                _state.update { it.copy(favorites = favorites) }
-            }
+            flow { emitAll(observeUserFavorites()) }
+                .catch { error -> loge(error) { "Observing the user's Favorites failed" } }
+                .collect { favorites ->
+                    _state.update { it.copy(favorites = favorites) }
+                }
         }
     }
 
@@ -248,16 +268,16 @@ class CategoryDetailsViewModel @Inject constructor(
     }
 
     /**
-     * Runs independently of [loadSubcategories] so a slow progress read never gates the
-     * subcategory list. [ObserveProgressSummaryUseCase] is a live Firestore listener, not a
-     * one-shot read: it re-attaches on its own after a network drop, so a screen left open through
-     * a connectivity blip still gets its rings filled in without any retry wiring here.
+     * Runs independently of [loadSubcategories], so a slow progress read never gates the list. A
+     * thrown failure ends it for good and leaves the rings unresolved.
      */
     private fun collectProgressSummary() {
         viewModelScope.launch {
-            observeProgressSummary().collect { summary ->
-                _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
-            }
+            flow { emitAll(observeProgressSummary()) }
+                .catch { error -> loge(error) { "Observing the progress summary failed" } }
+                .collect { summary ->
+                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+                }
         }
     }
 }

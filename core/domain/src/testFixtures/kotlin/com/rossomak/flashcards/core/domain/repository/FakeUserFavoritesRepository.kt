@@ -24,8 +24,21 @@ class FakeUserFavoritesRepository : UserFavoritesRepository {
      */
     var favoritesReadGate: CompletableDeferred<Unit>? = null
 
-    /** When set, [observeFavorites] throws this before its first emission, like a failing snapshot listener. */
+    /**
+     * When set, [observeFavorites] throws this after [favoritesEmissionsBeforeFailure] emissions,
+     * like a failing snapshot listener.
+     */
     var favoritesReadFailure: Throwable? = null
+
+    /** How many values [observeFavorites] emits before throwing [favoritesReadFailure]. */
+    var favoritesEmissionsBeforeFailure: Int = 0
+
+    /** When set, every favorite write fails with this and stores nothing. */
+    var favoriteWriteFailure: Throwable? = null
+
+    /** What the writes have stored, readable even while [favoritesReadFailure] is set. */
+    val storedFavorites: UserFavorites
+        get() = favorites.value
 
     /**
      * When set, [observeFavorites] completes after this many emissions, like a listener torn down on permission
@@ -35,7 +48,10 @@ class FakeUserFavoritesRepository : UserFavoritesRepository {
 
     override fun observeFavorites(): Flow<UserFavorites> = flow {
         favoritesReadGate?.await() ?: yield()
-        favoritesReadFailure?.let { throw it }
+        favoritesReadFailure?.let { failure ->
+            if (favoritesEmissionsBeforeFailure > 0) emitAll(favorites.take(favoritesEmissionsBeforeFailure))
+            throw failure
+        }
         when (val limit = favoritesEmissionLimit) {
             null -> emitAll(favorites)
             0 -> Unit
@@ -44,6 +60,7 @@ class FakeUserFavoritesRepository : UserFavoritesRepository {
     }
 
     override suspend fun setCategoryFavorite(categoryId: String, isFavorite: Boolean): Result<Unit> {
+        favoriteWriteFailure?.let { return Result.failure(it) }
         favorites.update { current ->
             current.copy(
                 categoryIds = if (isFavorite) {
@@ -57,6 +74,7 @@ class FakeUserFavoritesRepository : UserFavoritesRepository {
     }
 
     override suspend fun setSubcategoryFavorite(subcategoryId: String, isFavorite: Boolean): Result<Unit> {
+        favoriteWriteFailure?.let { return Result.failure(it) }
         favorites.update { current ->
             current.copy(
                 subcategoryIds = if (isFavorite) {

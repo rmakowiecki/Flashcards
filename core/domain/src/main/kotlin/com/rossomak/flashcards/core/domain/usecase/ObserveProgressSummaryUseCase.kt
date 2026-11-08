@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.Flow
  * Thin wrapper around [CardProgressRepository.observeProgressSummary], mirroring
  * [GetSubcategoryProgressDetailsUseCase]'s shape. Category Details and Browse each collect this once per
  * screen open to draw every subcategory's ring and subtitle from the one summary document, rather
- * than reading each subcategory's packed progress document individually.
+ * than reading each subcategory's packed progress document individually. A live listener: it
+ * re-attaches on its own after a network drop.
  */
 class ObserveProgressSummaryUseCase @Inject constructor(
     private val repository: CardProgressRepository,

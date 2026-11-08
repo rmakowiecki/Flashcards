@@ -19,9 +19,9 @@ import com.rossomak.flashcards.core.domain.model.subcategoryProgressFor
  * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), `null` until
  * [isProgressResolved] — and possibly still `null` after, for a User who has never finished a
  * session. Never read directly by the screen; go through [progressFor].
- * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
- * failed read leaves it `false` forever rather than surfacing an error, per the ticket's "no error,
- * [CategoryDetailsContentState.SubcategoriesList] as soon as it loads, independent of the progress read.
+ * @param isProgressResolved `false` until the first summary arrives. A failed read leaves it `false`
+ * for good, so the rings stay unknown and no error shows; [CategoryDetailsContentState.SubcategoriesList]
+ * never waits on it.
  */
 data class CategoryDetailsScreenState(
     val categoryId: String = "",
@@ -38,7 +38,7 @@ data class CategoryDetailsScreenState(
 
     /**
      * Derived from [favorites] rather than held separately, so the bookmark and the row badges
-     * share one live listener. Written via [CategoryDetailsViewModel.onFavoriteToggle].
+     * share one listener. [CategoryDetailsViewModel.onFavoriteToggle] updates [favorites] at once.
      */
     val isFavorite: Boolean
         get() = favorites.categoryIds.containsKey(categoryId)

@@ -80,14 +80,10 @@ sealed interface SearchStatus {
  * hasn't happened yet — there is no separate flag for it. Defaulting [isLoading] to `true` keeps
  * that from flashing on the very first composition, before [categories] loads.
  *
- * @param progressSummary the User's per-Subcategory progress rollup (ADR-0016), backing the ring
- * and subtitle on every matched subcategory in [searchStatus]. `null` until [isProgressResolved] — and
- * possibly still `null` after, for a User who has never finished a session. Never read directly by
- * the screen; go through [progressFor]. Mirrors [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressSummary] — one
- * summary document serves both screens' rings.
- * @param isProgressResolved `false` until the summary read completes, success or failure alike — a
- * failed read leaves it `false` forever rather than surfacing an error, same as
- * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.isProgressResolved]. Search results themselves never wait on this.
+ * @param progressSummary backs the ring and subtitle on every matched subcategory in [searchStatus];
+ * same as [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsScreenState.progressSummary].
+ * @param isProgressResolved `false` until the first summary arrives, and for good after a failed
+ * read. Search results never wait on it.
  */
 data class BrowseScreenState(
     val isLoading: Boolean = true,

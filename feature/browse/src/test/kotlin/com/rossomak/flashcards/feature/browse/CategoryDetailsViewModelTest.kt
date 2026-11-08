@@ -786,4 +786,86 @@ class CategoryDetailsViewModelTest {
 
         viewModel.state.value.progressFor("sub-1") shouldBe progressBeforeSelection
     }
+
+    // --- failed streams ---
+
+    @Test
+    fun `a failing progress stream leaves rings unresolved instead of crashing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategoryId = "sub-1"
+            val subcategories = listOf(subcategory(subcategoryId))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            cardProgressRepository.summaryReadFailure = IllegalStateException("malformed progress document")
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
+                isProgressResolved shouldBe false
+                progressFor(subcategoryId) shouldBe SubcategoryProgressState.Unresolved
+            }
+        }
+
+    @Test
+    fun `a failing favorites stream leaves badges off instead of crashing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val subcategories = listOf(subcategory("sub-1"))
+            flashcardRepository.subcategoriesToReturn = Result.success(subcategories)
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.assertValue {
+                content shouldBe CategoryDetailsContentState.SubcategoriesList(subcategories)
+                favorites shouldBe UserFavorites.EMPTY
+            }
+        }
+
+    @Test
+    fun `a favorites stream failing after a value keeps that value`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.setCategoryFavorite(route.categoryId, isFavorite = true)
+            userFavoritesRepository.favoritesEmissionsBeforeFailure = 1
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.state.value.isFavorite shouldBe true
+        }
+
+    @Test
+    fun `toggling after the favorites stream failed flips the bookmark and writes it`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onFavoriteToggle()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe DetailsMessage.AddedToFavorites
+            }
+            viewModel.state.value.isFavorite shouldBe true
+            userFavoritesRepository.storedFavorites.categoryIds.keys shouldBe setOf(route.categoryId)
+        }
+
+    @Test
+    fun `a failed favorite write puts the bookmark back without a message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoriteWriteFailure = IllegalStateException("offline")
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.messages.test {
+                viewModel.onFavoriteToggle()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.isFavorite shouldBe false
+        }
 }

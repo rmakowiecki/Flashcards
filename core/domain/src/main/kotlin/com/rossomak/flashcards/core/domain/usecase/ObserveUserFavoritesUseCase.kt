@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Raw [UserFavorites] ids, for consumers that only need to check membership (e.g. badging list
- * rows) and don't need the full joined objects [ObserveFavoriteItemsUseCase] resolves.
+ * rows) and don't need the full joined objects [ObserveFavoriteItemsUseCase] resolves. A live
+ * listener: it re-attaches on its own after a network drop.
  */
 class ObserveUserFavoritesUseCase @Inject constructor(
     private val userFavoritesRepository: UserFavoritesRepository,
