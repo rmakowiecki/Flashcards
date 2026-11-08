@@ -35,7 +35,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.LookaheadScope
@@ -174,7 +177,12 @@ private fun RatedVoiceRoundSheet(
     val isFeedbackSkippable = voiceSheetMode is Graded && isNextAvailable
     val skipFeedbackLabel = stringResource(R.string.study_session_voice_feedback_skip_cd)
     val isListening = voiceSheetMode == Listening
-    val isBadgeCentered = voiceSheetMode !is GradingWithTranscript && voiceSheetMode !is Graded
+    // Transport shows here only while this sheet fades out, so the badge keeps the side of the last
+    // round mode instead of jumping its label to the center over the fading paragraph.
+    val lastRoundMode = remember { mutableStateOf(voiceSheetMode) }
+    SideEffect { if (voiceSheetMode != Transport) lastRoundMode.value = voiceSheetMode }
+    val badgeSideMode = if (voiceSheetMode == Transport) lastRoundMode.value else voiceSheetMode
+    val isBadgeCentered = badgeSideMode == Listening || badgeSideMode == Pending
     val roundDescription = ratedVoiceRoundDescription(voiceSheetMode)
     // Straight from Pending to Graded no transcript has moved the badge yet, so its slide to the
     // left runs first and the text fades in once it ends. Every other change runs them together.
