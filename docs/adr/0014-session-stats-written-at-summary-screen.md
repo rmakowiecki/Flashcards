@@ -79,19 +79,10 @@ card as a Rated one, and the "genuinely new card" scoring bonus reads for both m
 is only *mastery* (`cardsMastered`/`cardsPartial`/`cardsDefended`/`cardsDemastered`, and the
 Terminal-State-derived `state` values above) that Fast has no concept of.
 
-> **Scope note:** `newCardsStudied`, `cardsDefended` and `cardsDemastered` are all present in the
-> schema above from the PR that introduces this collection, but not all computed for real from day
-> one. `newCardsStudied` is written as zero until the PR that adds card-progress persistence, which is
-> what reads prior state and can tell a new card from a returning one — the field exists from the
-> start so no later PR has to add a column, but the value is a placeholder until that read exists.
-> `cardsDefended`/`cardsDemastered` are written as zero the same way, until the PR that adds Mastery
-> Defense actually produces a defended or de-mastered card. Neither is the omission this ADR describes
-> above for a *Fast* document — that omission is permanent and structural (Fast has no mastery to
-> report, ever); this is a temporary zero on a field that will hold real Rated data once its
-> producing PR lands. The commit batch itself grows by one further write only once a later PR adds the
-> account-wide scoring state — see "The commit is one batch" below. Which of these compute for real at
-> any given point is a property of which PRs have landed, not of this ADR — check the current
-> implementation tickets, not this document alone, for what is true today.
+> **Computed from prior Card Progress:** `newCardsStudied`, `cardsDefended` and `cardsDemastered` all
+> depend on what the User held before this session, so the server computes them while it merges the
+> session into the stored Card Progress. A defended or de-mastered card is one that was Mastered
+> before the session and ended Mastered or Failed in it.
 
 The names are denormalized so a Recents card renders from a single `orderBy(startTimestamp,
 DESCENDING).limit(n)` query with no joins. That query's cost is the limit, not the collection size,

@@ -12,9 +12,8 @@ import java.time.Instant
 import org.junit.Test
 
 /**
- * Not an encoding test (the spec is explicit that route-argument encoding is not what's being
- * asserted) — this only checks that flattening onto [StudySessionSummaryRoute] and reading it back
- * loses nothing.
+ * Not an encoding test: it only checks that flattening onto [StudySessionSummaryRoute] and reading
+ * it back loses nothing.
  */
 class SessionResultRouteMappingTest {
 

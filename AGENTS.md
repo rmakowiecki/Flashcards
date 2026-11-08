@@ -255,7 +255,7 @@ Four tools, one job each, wired via the `android-quality` convention plugin (app
 | **Konsist** | Architecture rules (layer deps, naming) — `:konsist` module, runs as JUnit tests | Rules scoped to pass |
 | **Android Lint** | Android correctness | Frozen in per-module `lint-baseline.xml` |
 
-Commands (local only — CI wiring is a later PR):
+Commands (run locally and in the Bitrise `pr-check` workflow):
 ```shell
 ./gradlew staticAnalysis   # spotlessCheck + detekt + :konsist:test + lint (the gate)
 ./gradlew formatCode       # spotlessApply — autofix formatting

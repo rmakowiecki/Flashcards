@@ -1,6 +1,6 @@
 # Overrides layered on top of detekt's default config (buildUponDefaultConfig = true).
 # Formatting is intentionally NOT enabled here — Spotless/ktlint owns formatting.
-# Keep this lean; tighten in the type-resolution follow-up PR.
+# Keep this lean.
 
 build:
   maxIssues: 0 # any NEW (non-baselined) finding fails the task
