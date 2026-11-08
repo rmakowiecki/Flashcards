@@ -10,14 +10,19 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.toRoute
 import com.rossomak.flashcards.R
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
@@ -30,6 +35,7 @@ import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
 import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropHost
 import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropStart
+import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.account.AccountRoute
 import com.rossomak.flashcards.feature.account.AccountScreen
 import com.rossomak.flashcards.feature.account.OpenSourceLicensesRoute
@@ -54,9 +60,14 @@ import com.rossomak.flashcards.feature.study.rated.RatedStudySessionScreen
 import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScreen
 import com.rossomak.flashcards.presentation.main.MainScreen
 import com.rossomak.flashcards.presentation.main.debugFullScreenDestinations
+import com.rossomak.flashcards.presentation.shortcut.ShortcutDestination
 import com.rossomak.flashcards.presentation.splash.SplashMorpheusGraphs
 import com.rossomak.flashcards.presentation.splash.SplashScreen
+import com.rossomak.flashcards.presentation.startup.AppNavigationState
+import com.rossomak.flashcards.presentation.startup.TopDestination
 import com.rossomak.flashcards.ui.permission.PermissionLauncherHost
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.Serializable
 
 /**
@@ -370,7 +381,11 @@ fun FlashcardsNavGraph(
     permissionGateway: PermissionGateway,
     modifier: Modifier = Modifier,
     launchRoute: String? = null,
+    shortcutEvents: Flow<ShortcutDestination> = emptyFlow(),
+    onNavigationStateChange: (AppNavigationState) -> Unit = {},
 ) {
+    ReportNavigationState(navController, onNavigationStateChange)
+    observeAsEvents(shortcutEvents) { destination -> pushFromHost(navController, destination.route) }
     // One SharedTransitionLayout around the whole NavHost: a shared element is matched between the
     // outgoing and the incoming destination, so both have to sit inside the same scope.
     SharedTransitionLayout(modifier = modifier) {
@@ -471,6 +486,41 @@ private fun FlashcardsNavHost(navController: NavHostController, launchRoute: Str
         }
     }
 }
+
+/** Reports the back stack's top screen and whether a Study Session sits in it, on every change. */
+@Composable
+private fun ReportNavigationState(navController: NavController, onNavigationStateChange: (AppNavigationState) -> Unit) {
+    val currentOnNavigationStateChange by rememberUpdatedState(onNavigationStateChange)
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            currentOnNavigationStateChange(
+                AppNavigationState(
+                    top = entry.toTopDestination(),
+                    isStudySessionInBackStack = navController.hasBackStackEntry<RatedStudySessionRoute>() ||
+                        navController.hasBackStackEntry<FastStudySessionRoute>(),
+                ),
+            )
+        }
+    }
+}
+
+/**
+ * The nav host's own push, for navigation no screen asks for, so no `EntryNavigator` can carry it
+ * (ADR-0067). It pushes onto the back stack as it stands, so back returns to what was showing.
+ */
+private fun pushFromHost(hostNavController: NavController, route: Any) {
+    hostNavController.navigate(route)
+}
+
+private fun NavBackStackEntry.toTopDestination(): TopDestination = when {
+    destination.isLaunchDestination() -> TopDestination.Launch
+    destination.hasRoute<CategoryDetailsRoute>() -> TopDestination.CategoryDetails(toRoute<CategoryDetailsRoute>().categoryId)
+    destination.hasRoute<SubcategoryDetailsRoute>() -> TopDestination.SubcategoryDetails(toRoute<SubcategoryDetailsRoute>().subcategoryId)
+    else -> TopDestination.Other
+}
+
+// getBackStackEntry is the public way to ask; it throws when no entry has the route.
+private inline fun <reified T : Any> NavController.hasBackStackEntry(): Boolean = runCatching { getBackStackEntry<T>() }.isSuccess
 
 /** Publishes this destination's scope, so a shared element inside it has an end to animate against. */
 @Composable

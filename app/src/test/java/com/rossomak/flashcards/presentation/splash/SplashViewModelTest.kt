@@ -3,15 +3,16 @@ package com.rossomak.flashcards.presentation.splash
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
-import com.rossomak.flashcards.core.domain.model.Category
-import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
 import com.rossomak.flashcards.core.domain.repository.FakeUserPreferencesRepository
 import com.rossomak.flashcards.core.domain.usecase.GetCurrentAuthUserUseCase
+import com.rossomak.flashcards.core.domain.usecase.IsSignedInUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveUserPreferencesUseCase
 import com.rossomak.flashcards.core.ui.navigation.RouteDecoder
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
-import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
+import com.rossomak.flashcards.presentation.shortcut.ShortcutDestination
+import com.rossomak.flashcards.presentation.shortcut.shortcutCategory
+import com.rossomak.flashcards.presentation.shortcut.shortcutRouteResolver
 import com.rossomak.flashcards.testutil.MainDispatcherRule
 import com.rossomak.flashcards.ui.navigation.Splash
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -59,9 +60,9 @@ class SplashViewModelTest {
         every { RouteDecoder.decode(any<() -> Splash>()) } returns Splash(pendingRoute = pendingRoute)
         return SplashViewModel(
             savedStateHandle,
-            getCurrentAuthUserUseCase,
+            IsSignedInUseCase(getCurrentAuthUserUseCase),
             ObserveUserPreferencesUseCase(userPreferencesRepository),
-            flashcardRepository,
+            shortcutRouteResolver(flashcardRepository),
         )
     }
 
@@ -113,9 +114,9 @@ class SplashViewModelTest {
 
         val viewModel = SplashViewModel(
             savedStateHandle,
-            getCurrentAuthUserUseCase,
+            IsSignedInUseCase(getCurrentAuthUserUseCase),
             neverEmittingPreferences,
-            flashcardRepository,
+            shortcutRouteResolver(flashcardRepository),
         )
         viewModel.onAnimationCompleted()
 
@@ -208,41 +209,18 @@ class SplashViewModelTest {
     }
 
     @Test
-    fun `authenticated user with a category shortcut route emits ToCategoryDetails`() =
+    fun `authenticated user with a resolvable shortcut route opens it`() =
         runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getCurrentAuthUserUseCase() } returns testUser
             flashcardRepository.categoriesByIdsToReturn =
-                Result.success(listOf(category(id = "android", name = "Android")))
+                Result.success(listOf(shortcutCategory(id = ANDROID_ID, name = ANDROID_NAME)))
 
-            val viewModel = createViewModel(pendingRoute = "/study/category/android")
+            val viewModel = createViewModel(pendingRoute = CATEGORY_ROUTE)
             viewModel.onAnimationCompleted()
 
             viewModel.events.test {
-                awaitItem() shouldBe SplashDestination.ToCategoryDetails(
-                    CategoryDetailsRoute(categoryId = "android", categoryName = "Android"),
-                )
-            }
-        }
-
-    @Test
-    fun `authenticated user with a subcategory shortcut route emits ToSubcategoryDetails`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { getCurrentAuthUserUseCase() } returns testUser
-            flashcardRepository.subcategoriesByIdsToReturn = Result.success(
-                listOf(subcategory(id = "kotlin-coroutines", categoryId = "android", categoryName = "Android", name = "Coroutines")),
-            )
-
-            val viewModel = createViewModel(pendingRoute = "/study/category/android/subcategory/kotlin-coroutines")
-            viewModel.onAnimationCompleted()
-
-            viewModel.events.test {
-                awaitItem() shouldBe SplashDestination.ToSubcategoryDetails(
-                    SubcategoryDetailsRoute(
-                        categoryId = "android",
-                        categoryName = "Android",
-                        subcategoryId = "kotlin-coroutines",
-                        subcategoryName = "Coroutines",
-                    ),
+                awaitItem() shouldBe SplashDestination.OpenShortcut(
+                    ShortcutDestination.ToCategoryDetails(CategoryDetailsRoute(categoryId = ANDROID_ID, categoryName = ANDROID_NAME)),
                 )
             }
         }
@@ -262,27 +240,11 @@ class SplashViewModelTest {
         }
 
     @Test
-    fun `authenticated user with a subcategory route whose category id mismatches falls back to Main silently`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { getCurrentAuthUserUseCase() } returns testUser
-            flashcardRepository.subcategoriesByIdsToReturn = Result.success(
-                listOf(subcategory(id = "kotlin-coroutines", categoryId = "android", categoryName = "Android", name = "Coroutines")),
-            )
-
-            val viewModel = createViewModel(pendingRoute = "/study/category/wrong/subcategory/kotlin-coroutines")
-            viewModel.onAnimationCompleted()
-
-            viewModel.events.test {
-                awaitItem() shouldBe SplashDestination.Main
-            }
-        }
-
-    @Test
     fun `unauthenticated user with a shortcut route still emits plain Login, route dropped`() =
         runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getCurrentAuthUserUseCase() } returns null
 
-            val viewModel = createViewModel(pendingRoute = "/study/category/android")
+            val viewModel = createViewModel(pendingRoute = CATEGORY_ROUTE)
             viewModel.onAnimationCompleted()
 
             viewModel.events.test {
@@ -290,22 +252,9 @@ class SplashViewModelTest {
             }
         }
 
-    private fun category(id: String, name: String) = Category(
-        id = id,
-        name = name,
-        order = 0,
-        subcategoryCount = 0,
-        iconSvg = null,
-        color = null,
-        featuredSubcategoryNames = emptyList(),
-    )
-
-    private fun subcategory(id: String, categoryId: String, categoryName: String, name: String) = Subcategory(
-        id = id,
-        name = name,
-        categoryId = categoryId,
-        categoryName = categoryName,
-        order = 0,
-        cardCount = 0,
-    )
+    private companion object {
+        const val ANDROID_ID = "android"
+        const val ANDROID_NAME = "Android"
+        const val CATEGORY_ROUTE = "/study/category/$ANDROID_ID"
+    }
 }

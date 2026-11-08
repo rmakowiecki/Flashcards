@@ -33,7 +33,13 @@ A shortcut carries an id-based route to its target, read by the app at launch. I
 
 A route that no longer resolves lands on Main as an ordinary launch, with no error. This covers a deleted target, a Subcategory that now sits under a different Category than the route names, and a lookup that does not answer in time. A pinned shortcut to deleted content stays on the launcher until the User removes it, because content deletion is a rare admin action.
 
-A shortcut tapped while the app is already running never discards what the User is doing, a running Study Session included: the target opens on top of the current screen.
+### While the app is running
+
+A shortcut tapped while the app is already running brings the running app forward; it never starts a second copy and never shows Splash again. Its target opens on top of whatever is showing, so back returns to the screen that was showing. A second tap while the first is still resolving replaces it.
+
+- **During a Study Session** the session comes forward and the shortcut is dropped, so a tap can never start a second session or push a screen over the running one.
+- **Dropped silently** when no User is signed in or the User is a Guest, when the app is still at Splash, Onboarding or Login, when the target no longer resolves or the lookup takes longer than a second, and when the target is already the screen on top.
+- **A launcher that clears the task** on a shortcut tap restarts the app from Splash and ends a running Study Session. The app cannot prevent this.
 
 ## Related
 

@@ -151,8 +151,8 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `production code navigates only through an EntryNavigator`() {
-        // The bottom bar's tab switch has no back-stack entry, so it is the one raw call.
-        val sanctionedRawCalls = listOf("tabNavController.navigate(route, tabNavOptions)")
+        // Neither has a back-stack entry to guard: the bottom bar's tab switch, and the host's own push.
+        val sanctionedRawCalls = listOf("tabNavController.navigate(route, tabNavOptions)", "hostNavController.navigate(route)")
         val rawControllerCall = Regex("""\b\w*[nN]avController\s*\.\s*(navigate|popBackStack|navigateUp)\b""")
         projectScope
             .files

@@ -49,7 +49,9 @@ Onboarding goes on to Main for a signed-in User and to Login for anyone else. Lo
 - **To Main**: Main enters opaque and covers the launch screen at once. The backdrop goes once the launch screen has left.
 - **From outside the launch flow** (sign-in lost): the old screen is removed at once, the backdrop starts afresh, and the arriving screen fades its graph in.
 
-A launcher shortcut tapped while the app is not running is resolved at Splash, and only when Splash is going to Main. Its Category or Subcategory Details opens on top of Main, so back returns to Main's first tab instead of leaving the app. A shortcut that no longer resolves lands on Main as an ordinary launch. See [launcher-shortcuts.md](launcher-shortcuts.md).
+A launcher shortcut tapped while the app is not running is resolved at Splash, and only when Splash is going to Main. Its Category or Subcategory Details opens on top of Main, so back returns to Main's first tab instead of leaving the app. A shortcut that no longer resolves lands on Main as an ordinary launch.
+
+A shortcut tapped while the app is running reaches the running app, which never starts again. No screen asks for this navigation, so the nav host pushes the Details screen itself, on top of the current back stack, so back returns to the screen that was showing. It is dropped during a Study Session and at a launch screen. See [launcher-shortcuts.md](launcher-shortcuts.md).
 
 ## Tab shell
 

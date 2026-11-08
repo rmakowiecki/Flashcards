@@ -52,6 +52,10 @@ SignedIn2 -->|no| LoginScreen(LOGIN SCREEN)
 LoginScreen -->|signs in| Home2(HOME SCREEN\npendingRoute not resolved after sign-in NYI)
 
 
-ShortcutTap -.->|"app already running\n(warm start)"| WarmNYI{{Tapping a shortcut while the app\nis already open does nothing special yet\nNYI}}
-DirectOpen -.->|"a study session is\nalready in progress"| SessionNYI{{Should instead return to the running\nsession + explain why — NYI}}
+ShortcutTap -->|"app already running\n(warm start)"| Forward[Running app comes forward]
+Forward --> InSession{Study session\nrunning?}
+InSession -->|yes| Session(STUDY SESSION\nshortcut dropped)
+InSession -->|no| WarmCheck{Signed in, past Login,\ntarget resolves and\nis not already on top?}
+WarmCheck -->|no| Unchanged([Current screen stays,\nshortcut dropped])
+WarmCheck -->|yes| WarmOpen([Category/Subcategory Details\nopens on top, back returns])
 ```

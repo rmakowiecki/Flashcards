@@ -3,7 +3,7 @@ package com.rossomak.flashcards.core.domain.model
 /**
  * Single source of truth for the ADR-0003 shortcut route shape (`/study/category/{id}` or
  * `/study/category/{id}/subcategory/{id}`) — [PinCategoryShortcutUseCase]/[PinSubcategoryShortcutUseCase]
- * build a [ShortcutTarget.route] with these, `SplashViewModel` parses one back with these, and
+ * build a [ShortcutTarget.route] with these, `ShortcutRouteResolver` in `:app` parses one back with these, and
  * both sides move together if the shape ever changes.
  */
 object ShortcutRoute {

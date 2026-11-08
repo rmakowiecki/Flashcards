@@ -43,6 +43,8 @@ import com.rossomak.flashcards.core.ui.backdrop.rememberLaunchBackdropState
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsRoute
 import com.rossomak.flashcards.feature.browse.details.subcategory.SubcategoryDetailsRoute
+import com.rossomak.flashcards.presentation.shortcut.ShortcutDestination.ToCategoryDetails
+import com.rossomak.flashcards.presentation.shortcut.ShortcutDestination.ToSubcategoryDetails
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -74,8 +76,10 @@ fun SplashScreen(
             SplashDestination.Main -> onNavigateToMain()
             SplashDestination.Onboarding -> onNavigateToOnboarding()
             SplashDestination.Login -> onNavigateToLogin()
-            is SplashDestination.ToCategoryDetails -> onNavigateToCategoryDetails(destination.route)
-            is SplashDestination.ToSubcategoryDetails -> onNavigateToSubcategoryDetails(destination.route)
+            is SplashDestination.OpenShortcut -> when (val target = destination.target) {
+                is ToCategoryDetails -> onNavigateToCategoryDetails(target.route)
+                is ToSubcategoryDetails -> onNavigateToSubcategoryDetails(target.route)
+            }
         }
     }
 
