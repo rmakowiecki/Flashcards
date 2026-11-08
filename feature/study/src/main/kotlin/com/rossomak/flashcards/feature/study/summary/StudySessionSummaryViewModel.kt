@@ -28,6 +28,7 @@ import com.rossomak.flashcards.feature.study.summary.StudySessionSummaryScoreSta
 import com.rossomak.flashcards.feature.study.toSessionResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /**
@@ -147,18 +149,22 @@ class StudySessionSummaryViewModel @Inject constructor(
     /**
      * The Daily Goal is read once here and baked into the result, never re-read at delivery (ADR-0048).
      * A failure is not saved, so a restore submits again.
+     *
+     * Non-cancellable, so leaving the Summary still queues the session.
      */
     private fun submitSession() {
         viewModelScope.launch {
-            val dailyGoalMinutes = observeUserPreferences().first().dailyGoalMinutes
-            val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
+            withContext(NonCancellable) {
+                val dailyGoalMinutes = observeUserPreferences().first().dailyGoalMinutes
+                val result = route.toSessionResult(dailyGoalMinutes = dailyGoalMinutes)
 
-            submitStudySession(result)
-                .onSuccess { score ->
-                    savedStateHandle[KEY_SAVED_SCORE] = Json.encodeToString(score)
-                    applyScore(score)
-                }
-                .onFailure { exception -> onSubmissionFailed(exception) }
+                submitStudySession(result)
+                    .onSuccess { score ->
+                        savedStateHandle[KEY_SAVED_SCORE] = Json.encodeToString(score)
+                        applyScore(score)
+                    }
+                    .onFailure { exception -> onSubmissionFailed(exception) }
+            }
         }
     }
 

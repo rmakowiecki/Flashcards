@@ -16,6 +16,9 @@ import com.rossomak.flashcards.core.domain.repository.FakeXpConfigRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.time.Instant
+import java.util.concurrent.TimeoutException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -105,6 +108,18 @@ class SubmitStudySessionUseCaseTest {
         val result = createUseCase().invoke(session)
 
         result.exceptionOrNull().shouldBeInstanceOf<SessionNotSavedException>()
+    }
+
+    @Test
+    fun `a score baseline read that times out still queues the session and fails the score`() = runTest {
+        scoringStateRepository.scoringStateReadGate = CompletableDeferred()
+        val session = ratedSessionResult(cardResults = listOf(ratedEntry(state = FlashcardStudyProgressState.Mastered)))
+
+        val result = createUseCase().invoke(session)
+
+        sessionSubmissionRepository.submittedSessionResults shouldBe listOf(session)
+        result.exceptionOrNull().shouldBeInstanceOf<TimeoutException>()
+        currentTime shouldBe SubmitStudySessionUseCase.BASELINE_TIMEOUT.inWholeMilliseconds
     }
 
     @Test
