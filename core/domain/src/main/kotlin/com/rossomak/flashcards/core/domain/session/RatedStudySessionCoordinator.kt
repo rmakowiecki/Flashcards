@@ -540,6 +540,7 @@ class RatedStudySessionCoordinator @Inject constructor(
                     cardId = effect.card.id,
                     question = effect.card.question,
                     expectedAnswer = effect.card.answer,
+                    spokenAnswer = effect.card.answerSpoken?.takeIf { it.isNotBlank() },
                     obfuscatedAnswerWav = effect.obfuscatedWav,
                 )
                 .holdGradedUntilTranscriptShown(timeSource = timeSource)

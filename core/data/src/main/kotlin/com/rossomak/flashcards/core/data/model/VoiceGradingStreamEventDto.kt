@@ -8,5 +8,5 @@ package com.rossomak.flashcards.core.data.model
  */
 sealed interface VoiceGradingStreamEventDto {
     data class TranscriptChunk(val sanitizedTranscript: String) : VoiceGradingStreamEventDto
-    data class Graded(val gradePercent: Int, val feedback: String) : VoiceGradingStreamEventDto
+    data class Graded(val gradePercent: Int, val feedback: String, val spokenFeedback: String) : VoiceGradingStreamEventDto
 }

@@ -14,11 +14,11 @@ import com.rossomak.flashcards.core.domain.model.InterruptionEpisode
 import com.rossomak.flashcards.core.domain.model.InterruptionTier
 import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerRound
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelSilenceTimer
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.Emit
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.PausePlayback
@@ -122,7 +122,7 @@ class RatedSessionReducerInterruptionTest {
 
     private fun RatedSessionState.silenceSkipNotice(): RatedSessionState = listening().after(SilenceTimedOut)
 
-    private fun grade() = VoiceAnswerGrade(sanitizedTranscript = TRANSCRIPT, gradePercent = CORRECT_PERCENT, feedback = RATIONALE)
+    private fun grade() = voiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)
 
     // Blips
 

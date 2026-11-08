@@ -30,14 +30,16 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         wavBytes: ByteArray,
     ): Flow<VoiceGradingStreamEventDto> {
-        val payload = mapOf(
-            FIELD_CARD_ID to cardId,
-            FIELD_QUESTION to question,
-            FIELD_EXPECTED_ANSWER to expectedAnswer,
-            FIELD_AUDIO_BASE64 to encodeWav(wavBytes),
-        )
+        val payload = buildMap {
+            put(FIELD_CARD_ID, cardId)
+            put(FIELD_QUESTION, question)
+            put(FIELD_EXPECTED_ANSWER, expectedAnswer)
+            spokenAnswer?.let { put(FIELD_SPOKEN_ANSWER, it) }
+            put(FIELD_AUDIO_BASE64, encodeWav(wavBytes))
+        }
         return streamCallable(payload)
             .map { response -> response.toStreamEventDto() }
             .catch { throwable -> throw throwable.mapEntitlementRejection() }
@@ -88,9 +90,12 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
                 ?: error("transcribeAndGradeSpokenAnswer result missing grade: ${result.data}")
             val feedback = data[FIELD_FEEDBACK] as? String
                 ?: error("transcribeAndGradeSpokenAnswer result missing feedback: ${result.data}")
+            val spokenFeedback = data[FIELD_SPOKEN_FEEDBACK] as? String
+                ?: error("transcribeAndGradeSpokenAnswer result missing spoken feedback: ${result.data}")
             VoiceGradingStreamEventDto.Graded(
                 gradePercent = gradePercent,
                 feedback = feedback,
+                spokenFeedback = spokenFeedback,
             )
         }
         // StreamResponse isn't a Kotlin `sealed class` at the bytecode level (just `abstract`),
@@ -115,9 +120,11 @@ class FirebaseVoiceGradingRemoteDataSource @Inject constructor(
         const val FIELD_CARD_ID = "card_id"
         const val FIELD_QUESTION = "question"
         const val FIELD_EXPECTED_ANSWER = "expected_answer"
+        const val FIELD_SPOKEN_ANSWER = "spoken_answer"
         const val FIELD_AUDIO_BASE64 = "audio_base64"
         const val FIELD_SANITIZED_TRANSCRIPT = "sanitized_transcript"
         const val FIELD_GRADE = "grade"
         const val FIELD_FEEDBACK = "feedback"
+        const val FIELD_SPOKEN_FEEDBACK = "spoken_feedback"
     }
 }

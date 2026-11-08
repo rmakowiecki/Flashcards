@@ -28,12 +28,14 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     private val cardId = "card-1"
     private val question = "What is a foreground service?"
     private val expectedAnswer = "A service with a persistent notification"
+    private val spokenAnswer = "A service that shows a notification the whole time"
     private val wavBytes = byteArrayOf(1, 2, 3)
     private val sanitizedTranscript = "A service with a notification"
     private val expectedGrade = VoiceAnswerGrade(
         sanitizedTranscript = sanitizedTranscript,
         gradePercent = 80,
-        feedback = "Mostly right",
+        feedback = "Missed `startForeground`",
+        spokenFeedback = "Missed calling start foreground",
     )
 
     private fun TestScope.createRepository(): DefaultVoiceAnswerGradingRepository =
@@ -41,16 +43,16 @@ class DefaultVoiceAnswerGradingRepositoryTest {
 
     private fun successfulStream() = flow {
         emit(VoiceGradingStreamEventDto.TranscriptChunk(sanitizedTranscript))
-        emit(VoiceGradingStreamEventDto.Graded(expectedGrade.gradePercent, expectedGrade.feedback))
+        emit(VoiceGradingStreamEventDto.Graded(expectedGrade.gradePercent, expectedGrade.feedback, expectedGrade.spokenFeedback))
     }
 
     @Test
     fun `transcribeAndGradeSpokenAnswer streams transcript then grade`() = runTest {
         every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         } returns successfulStream()
 
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes).test {
             awaitItem() shouldBe VoiceAnswerGradingEvent.TranscriptReady(sanitizedTranscript)
             awaitItem() shouldBe VoiceAnswerGradingEvent.Graded(expectedGrade)
             awaitComplete()
@@ -60,25 +62,25 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     @Test
     fun `transcribeAndGradeSpokenAnswer ends an io failure with a no-connection failure after one call`() = runTest {
         every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> { throw IOException("network down") }
 
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes).test {
             awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
             awaitComplete()
         }
         coVerify(exactly = 1) {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         }
     }
 
     @Test
     fun `transcribeAndGradeSpokenAnswer ends an io failure the SDK wrapped in its own exception with a no-connection failure`() = runTest {
         every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> { throw IllegalStateException("request failed", IOException("timeout")) }
 
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes).test {
             awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
             awaitComplete()
         }
@@ -87,13 +89,13 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     @Test
     fun `transcribeAndGradeSpokenAnswer ends a call still running after 20 seconds with a no-connection failure`() = runTest {
         every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         } returns flow {
             emit(VoiceGradingStreamEventDto.TranscriptChunk(sanitizedTranscript))
             awaitCancellation()
         }
 
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes).test {
             awaitItem() shouldBe VoiceAnswerGradingEvent.TranscriptReady(sanitizedTranscript)
             awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.NoConnection)
             awaitComplete()
@@ -104,25 +106,25 @@ class DefaultVoiceAnswerGradingRepositoryTest {
     @Test
     fun `transcribeAndGradeSpokenAnswer ends an entitlement rejection with a service-error failure, without retrying`() = runTest {
         every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         } returns flow<VoiceGradingStreamEventDto> { throw VoiceGradingEntitlementException() }
 
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes).test {
             awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.ServiceError)
             awaitComplete()
         }
         coVerify(exactly = 1) {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
         }
     }
 
     @Test
     fun `transcribeAndGradeSpokenAnswer ends a grade that arrives before any transcript with a service-error failure`() = runTest {
         every {
-            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes)
-        } returns flow { emit(VoiceGradingStreamEventDto.Graded(expectedGrade.gradePercent, expectedGrade.feedback)) }
+            voiceGradingRemoteDataSource.transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes)
+        } returns flow { emit(VoiceGradingStreamEventDto.Graded(expectedGrade.gradePercent, expectedGrade.feedback, expectedGrade.spokenFeedback)) }
 
-        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, wavBytes).test {
+        createRepository().transcribeAndGradeSpokenAnswer(cardId, question, expectedAnswer, spokenAnswer, wavBytes).test {
             awaitItem() shouldBe VoiceAnswerGradingEvent.Failed(GradingFailureReason.ServiceError)
             awaitComplete()
         }

@@ -22,12 +22,12 @@ import com.rossomak.flashcards.core.domain.model.StudySessionConfig
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import com.rossomak.flashcards.core.domain.repository.CurationRepository
 import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
@@ -1105,7 +1105,7 @@ class RatedStudySessionViewModelTest {
 
         emitGradeNotice(gradePercent = CORRECT_GRADE_PERCENT)
 
-        viewModel.state.value.lastVoiceAnswerGrade shouldBe VoiceAnswerGrade(SPOKEN_TRANSCRIPT, CORRECT_GRADE_PERCENT, GRADE_RATIONALE)
+        viewModel.state.value.lastVoiceAnswerGrade shouldBe voiceAnswerGrade(SPOKEN_TRANSCRIPT, CORRECT_GRADE_PERCENT, GRADE_RATIONALE)
     }
 
     @Test
@@ -1208,22 +1208,22 @@ class RatedStudySessionViewModelTest {
 
     @Test
     fun `voice sheet mode is Graded as Failed just below the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
-        voiceSheetModeWhileSpeakingGrade(gradePercent = 39) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Failed, GRADE_RATIONALE)
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 29) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Failed, GRADE_RATIONALE)
     }
 
     @Test
     fun `voice sheet mode is Graded as Partial at the bottom of the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
-        voiceSheetModeWhileSpeakingGrade(gradePercent = 40) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 30) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
     }
 
     @Test
     fun `voice sheet mode is Graded as Partial at the top of the Partial band`() = runTest(mainDispatcherRule.testDispatcher) {
-        voiceSheetModeWhileSpeakingGrade(gradePercent = 79) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 74) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.PartiallyCorrect, GRADE_RATIONALE)
     }
 
     @Test
     fun `voice sheet mode is Graded as Correct at the bottom of the Correct band`() = runTest(mainDispatcherRule.testDispatcher) {
-        voiceSheetModeWhileSpeakingGrade(gradePercent = 80) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Correct, GRADE_RATIONALE)
+        voiceSheetModeWhileSpeakingGrade(gradePercent = 75) shouldBe RatedVoiceSheetMode.Graded(FlashcardAttemptRating.Correct, GRADE_RATIONALE)
     }
 
     @Test
@@ -1518,7 +1518,7 @@ class RatedStudySessionViewModelTest {
         answer(
             flow {
                 emit(VoiceAnswerGradingEvent.TranscriptReady(SPOKEN_TRANSCRIPT))
-                emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(SPOKEN_TRANSCRIPT, gradePercent, GRADE_RATIONALE)))
+                emit(VoiceAnswerGradingEvent.Graded(voiceAnswerGrade(SPOKEN_TRANSCRIPT, gradePercent, GRADE_RATIONALE)))
             },
         )
         advanceTimeBy(MIN_TRANSCRIPT_DISPLAY)
