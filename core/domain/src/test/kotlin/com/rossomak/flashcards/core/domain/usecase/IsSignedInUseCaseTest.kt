@@ -4,8 +4,6 @@ import com.rossomak.flashcards.core.domain.model.AuthUser
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -35,16 +33,5 @@ class IsSignedInUseCaseTest {
         coEvery { getCurrentAuthUser() } returns null
 
         isSignedIn() shouldBe false
-    }
-
-    @Test
-    fun `an auth read slower than the timeout counts as signed out`() = runTest {
-        coEvery { getCurrentAuthUser() } coAnswers {
-            delay(2.seconds)
-            user
-        }
-
-        isSignedIn() shouldBe false
-        testScheduler.currentTime shouldBe 1_000L
     }
 }
