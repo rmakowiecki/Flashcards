@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.feature.study.summary
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
 import app.cash.turbine.test
 import com.rossomak.flashcards.core.domain.model.AuthUser
 import com.rossomak.flashcards.core.domain.model.CardProgressEntry
@@ -62,14 +63,17 @@ import io.mockk.unmockkObject
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.After
@@ -510,6 +514,39 @@ class StudySessionSummaryViewModelTest {
 
         sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
     }
+
+    @Test
+    fun `leaving the summary while the score baseline is still being read still queues the session`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val baselineRead = CompletableDeferred<Unit>()
+            scoringStateRepository.scoringStateReadGate = baselineRead
+            stubRoute(ratedRoute())
+
+            val viewModel = createViewModel()
+            runCurrent()
+            viewModel.viewModelScope.cancel()
+            baselineRead.complete(Unit)
+            advanceUntilIdle()
+
+            sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
+        }
+
+    @Test
+    fun `a score baseline read that times out queues the session and shows the score unavailable`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            scoringStateRepository.scoringStateReadGate = CompletableDeferred()
+            stubRoute(ratedRoute())
+            var receivedMessage: StudySessionSummaryMessage? = null
+
+            val viewModel = createViewModel()
+            val collectJob = launch { viewModel.messages.collect { message -> receivedMessage = message } }
+            advanceUntilIdle()
+
+            sessionSubmissionRepository.submittedSessionResults.size shouldBe 1
+            viewModel.state.value.scoreStatus shouldBe Unavailable
+            receivedMessage shouldBe StudySessionSummaryMessage.XpUnavailable
+            collectJob.cancel()
+        }
 
     @Test
     fun `a failed scoring-state read surfaces the XP unavailable message without clearing results`() =

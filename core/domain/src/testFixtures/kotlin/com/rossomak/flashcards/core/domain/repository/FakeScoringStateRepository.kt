@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.domain.repository
 
 import com.rossomak.flashcards.core.domain.model.ScoringState
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emitAll
@@ -34,6 +35,9 @@ class FakeScoringStateRepository : ScoringStateRepository {
     /** The `cacheOnly` flag of every [getScoringState] call, in call order. */
     val cacheOnlyFlags: MutableList<Boolean> = mutableListOf()
 
+    /** When set, [getScoringState] suspends on it before returning. `null` only [yield]s. */
+    var scoringStateReadGate: CompletableDeferred<Unit>? = null
+
     /** How many times [getScoringState] was called. */
     var getScoringStateCallCount: Int = 0
         private set
@@ -47,7 +51,7 @@ class FakeScoringStateRepository : ScoringStateRepository {
         getScoringStateCallCount++
         excludedSessionIds.add(excludedSessionId)
         cacheOnlyFlags.add(cacheOnly)
-        yield()
+        scoringStateReadGate?.await() ?: yield()
         if (excludedSessionId in appliedSessionIds) return Result.failure(IllegalStateException("Session $excludedSessionId is already applied"))
         return resultsIncludingQueuedSession.entries.firstOrNull { (sessionId, _) -> sessionId != excludedSessionId }?.value ?: resultToReturn
     }
