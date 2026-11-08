@@ -1,6 +1,6 @@
 # CI/CD (Bitrise)
 
-Operational reference for the Bitrise pipeline. Rationale and alternatives considered: [ADR-0032](adr/0032-bitrise-cicd-gitflow.md). This doc changes as the pipeline evolves (e.g. the Play Store step in Phase 6 below) — the ADR does not.
+Operational reference for the Bitrise pipeline. Rationale and alternatives considered: [ADR-0032](adr/0032-bitrise-cicd-gitflow.md). This doc changes as the pipeline evolves (e.g. the Play Store step, not built yet) — the ADR does not.
 
 ## Branch flow
 
@@ -13,7 +13,7 @@ feature/*  --PR-->  develop  --PR-->  main  --(future PR)-->  release/*
 |---|---|---|
 | PR into `develop` or `main` | `pr-check` | `./gradlew staticAnalysis` + `./gradlew test`. Required GitHub status check — merge is blocked on failure. Branch protection requires the PR to be up to date with base and disallows admin bypass, so this is the *only* Bitrise build per PR — no separate post-merge check. |
 | Push to `main` | `deploy-internal` | Builds debug + release APKs, signs release, pushes debug to Firebase App Distribution's `internal-debug` group and release to `internal-release`. |
-| Push to `release/*` | *(not yet implemented — see Phase 6)* | Will build an AAB and upload to Play Store. |
+| Push to `release/*` | *(not built yet)* | Will build an AAB and upload to Play Store. |
 
 No instrumented (`androidTest`) tests exist yet, so no emulator step is configured. Add one to `pr-check` if/when instrumented tests land.
 

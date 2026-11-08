@@ -548,7 +548,7 @@ private fun ScopeHeroBody(
                     onClick = {
                         // Quick's subcategory count is the SubcategoryCountRange setting; Custom's
                         // subcategories are hand-picked outside this screen, so no dialog matches
-                        // them — the badge falls back to just revealing the sheet (ticket per grill).
+                        // them — the badge falls back to just revealing the sheet.
                         if (state.isQuickSession) {
                             onOpenSettingsDialog(QuickSessionSubcategoryCountRange(draftState = state.config.subcategoryCountRange))
                         } else {

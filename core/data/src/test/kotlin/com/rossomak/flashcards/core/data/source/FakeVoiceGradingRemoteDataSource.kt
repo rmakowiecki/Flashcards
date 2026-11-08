@@ -39,6 +39,7 @@ class FakeVoiceGradingRemoteDataSource : VoiceGradingRemoteDataSource {
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         wavBytes: ByteArray,
     ): Flow<VoiceGradingStreamEventDto> = flow {
         simulateNetworkCall()
@@ -49,7 +50,8 @@ class FakeVoiceGradingRemoteDataSource : VoiceGradingRemoteDataSource {
 
         simulateNetworkCall()
         val gradePercent = grade(expectedAnswer, sanitizedTranscript)
-        emit(VoiceGradingStreamEventDto.Graded(gradePercent, feedbackFor(gradePercent)))
+        val feedback = feedbackFor(gradePercent)
+        emit(VoiceGradingStreamEventDto.Graded(gradePercent, feedback, feedback))
     }
 
     override suspend fun transcribeAndSanitize(wavBytes: ByteArray): Result<String> = try {

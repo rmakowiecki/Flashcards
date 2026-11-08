@@ -18,12 +18,12 @@ import com.rossomak.flashcards.core.domain.model.SpokenNotice
 import com.rossomak.flashcards.core.domain.model.SubcategoryProgressDetails
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerGradingEvent
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoiceSettings
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import com.rossomak.flashcards.core.domain.repository.FakeAudioInterruptionGateway
 import com.rossomak.flashcards.core.domain.repository.FakeCardProgressRepository
 import com.rossomak.flashcards.core.domain.repository.FakeFlashcardRepository
@@ -172,7 +172,7 @@ class RatedStudySessionCoordinatorTest {
 
     private fun gradedFlow(gradePercent: Int = CORRECT_PERCENT) = flow {
         emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
-        emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, gradePercent, RATIONALE)))
+        emit(VoiceAnswerGradingEvent.Graded(voiceAnswerGrade(TRANSCRIPT, gradePercent, RATIONALE)))
     }
 
     // Start
@@ -370,7 +370,7 @@ class RatedStudySessionCoordinatorTest {
         gradingRepository.gradingFlow = flow {
             emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
             delay(200.milliseconds)
-            emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
+            emit(VoiceAnswerGradingEvent.Graded(voiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
         }
         val coordinator = startCoordinator()
         captureAnswer()
@@ -408,7 +408,7 @@ class RatedStudySessionCoordinatorTest {
 
         captureAnswer()
 
-        gradingRepository.requests shouldBe listOf(FakeVoiceAnswerGradingRepository.Request("card-1", "q-card-1", "a-card-1"))
+        gradingRepository.requests shouldBe listOf(FakeVoiceAnswerGradingRepository.Request("card-1", "q-card-1", "a-card-1", null))
     }
 
     @Test
@@ -499,7 +499,7 @@ class RatedStudySessionCoordinatorTest {
         gradingRepository.gradingFlow = flow {
             emit(VoiceAnswerGradingEvent.TranscriptReady(TRANSCRIPT))
             gradeGate.await()
-            emit(VoiceAnswerGradingEvent.Graded(VoiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
+            emit(VoiceAnswerGradingEvent.Graded(voiceAnswerGrade(TRANSCRIPT, CORRECT_PERCENT, RATIONALE)))
         }
         val coordinator = startCoordinator()
         captureAnswer()

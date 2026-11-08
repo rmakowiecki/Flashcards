@@ -19,12 +19,14 @@ interface VoiceGradingRemoteDataSource {
     /**
      * Full pipeline call, streamed over one Firebase Callable connection (ADR-0028): obfuscated
      * WAV in, a [VoiceGradingStreamEventDto.TranscriptChunk] out as soon as STT + sanitize finish,
-     * then a [VoiceGradingStreamEventDto.Graded] out once grading finishes.
+     * then a [VoiceGradingStreamEventDto.Graded] out once grading finishes. [spokenAnswer] is sent
+     * only when the card has one.
      */
     fun transcribeAndGradeSpokenAnswer(
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         wavBytes: ByteArray,
     ): Flow<VoiceGradingStreamEventDto>
 

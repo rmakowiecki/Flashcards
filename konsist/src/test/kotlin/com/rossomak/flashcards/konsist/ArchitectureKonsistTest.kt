@@ -10,8 +10,8 @@ import org.junit.Test
 
 /**
  * Architecture rules enforced across the whole project (ADR-0020 arg-order stays in the
- * Python script for now). Rules are intentionally conservative in this first pass so the
- * suite is green on existing code; tighten in follow-up PRs.
+ * Python script for now). Rules are intentionally conservative so the suite passes on existing
+ * code.
  */
 class ArchitectureKonsistTest {
 

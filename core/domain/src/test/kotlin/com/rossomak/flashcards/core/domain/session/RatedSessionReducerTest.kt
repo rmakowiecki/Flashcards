@@ -6,11 +6,11 @@ import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.RatedSessionState
 import com.rossomak.flashcards.core.domain.model.SessionPauseReason
 import com.rossomak.flashcards.core.domain.model.SpokenNotice
-import com.rossomak.flashcards.core.domain.model.VoiceAnswerGrade
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPauseReason
 import com.rossomak.flashcards.core.domain.model.VoiceAnswerPhase
 import com.rossomak.flashcards.core.domain.model.VoiceCaptureFailureReason
 import com.rossomak.flashcards.core.domain.model.VoicePlaybackState
+import com.rossomak.flashcards.core.domain.model.voiceAnswerGrade
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelGrading
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelReleaseLinger
 import com.rossomak.flashcards.core.domain.session.RatedSessionEffect.CancelSilenceTimer
@@ -133,7 +133,7 @@ class RatedSessionReducerTest {
         return state.after(NoticeTailElapsed)
     }
 
-    private fun grade(gradePercent: Int) = VoiceAnswerGrade(sanitizedTranscript = TRANSCRIPT, gradePercent = gradePercent, feedback = RATIONALE)
+    private fun grade(gradePercent: Int) = voiceAnswerGrade(TRANSCRIPT, gradePercent, RATIONALE, SPOKEN_RATIONALE)
 
     // Manual ratings
 
@@ -359,7 +359,7 @@ class RatedSessionReducerTest {
 
         val transition = reducer.reduce(grading.after(TranscriptReady(TRANSCRIPT)), VoiceAnswerGraded(grade(PARTIAL_PERCENT)))
 
-        transition.effects shouldBe listOf(SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.PartiallyCorrect, RATIONALE)))
+        transition.effects shouldBe listOf(SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.PartiallyCorrect, SPOKEN_RATIONALE)))
         with(transition.state) {
             round.transcript shouldBe TRANSCRIPT
             round.phase shouldBe VoiceAnswerPhase.SpeakingNotice
@@ -402,7 +402,7 @@ class RatedSessionReducerTest {
 
         transition.state.terminalStates shouldBe stale.terminalStates
         transition.state.isSyncPending shouldBe false
-        transition.effects shouldBe listOf(SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE)))
+        transition.effects shouldBe listOf(SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, SPOKEN_RATIONALE)))
     }
 
     @Test
@@ -764,7 +764,7 @@ class RatedSessionReducerTest {
         play.effects shouldBe listOf(ResumeWithoutReading)
         play.state.isPausedWhileGrading shouldBe false
         reducer.reduce(play.state, VoiceAnswerGraded(grade(CORRECT_PERCENT))).effects shouldContain
-            SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE))
+            SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, SPOKEN_RATIONALE))
     }
 
     @Test
@@ -824,7 +824,7 @@ class RatedSessionReducerTest {
 
         val play = reducer.reduce(paused, PlayRequested)
 
-        play.effects shouldBe listOf(ResumeWithoutReading, SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, RATIONALE)))
+        play.effects shouldBe listOf(ResumeWithoutReading, SpeakNotice(SpokenNotice.Feedback(FlashcardAttemptRating.Correct, SPOKEN_RATIONALE)))
         play.state.currentCardRatings shouldBe paused.currentCardRatings
         play.state.isPausedAfterFeedback shouldBe false
         play.state.after(PlaybackChanged(VoicePlaybackState(isActive = true, isPlaying = true))).noticesOver().currentCard?.id shouldBe "card-2"
@@ -966,6 +966,7 @@ class RatedSessionReducerTest {
         const val PARTIAL_PERCENT = 60
         const val TRANSCRIPT = "state hoisting"
         const val RATIONALE = "Close."
+        const val SPOKEN_RATIONALE = "Missing the reason, a function returning null."
         val WAV = byteArrayOf(1, 2, 3)
     }
 }

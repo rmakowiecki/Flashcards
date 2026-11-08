@@ -39,7 +39,8 @@ private val voiceGrade = VoiceAnswerGrade(
     sanitizedTranscript = "So apply gives you back the object itself, not whatever the lambda returns. " +
         "You'd use it to configure something, like set a few properties and then keep using that same object.",
     gradePercent = 92,
-    feedback = "Spot on: apply returns its receiver, and configuring an object is exactly its canonical use.",
+    feedback = "Missed that `also` passes the object as it.",
+    spokenFeedback = "Missed that also passes the object as it.",
 )
 
 private val silentVoiceBars: StateFlow<ImmutableList<Float>> = MutableStateFlow(persistentListOf())

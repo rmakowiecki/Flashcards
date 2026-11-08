@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.emptyFlow
 class FakeVoiceAnswerGradingRepository : VoiceAnswerGradingRepository {
 
     /** One grading call, without the audio. */
-    data class Request(val cardId: String, val question: String, val expectedAnswer: String)
+    data class Request(val cardId: String, val question: String, val expectedAnswer: String, val spokenAnswer: String?)
 
     /** What the next grading calls return. Never completes on its own unless the flow does. */
     var gradingFlow: Flow<VoiceAnswerGradingEvent> = emptyFlow()
@@ -18,9 +18,10 @@ class FakeVoiceAnswerGradingRepository : VoiceAnswerGradingRepository {
         cardId: String,
         question: String,
         expectedAnswer: String,
+        spokenAnswer: String?,
         obfuscatedAnswerWav: ByteArray,
     ): Flow<VoiceAnswerGradingEvent> {
-        requests += Request(cardId, question, expectedAnswer)
+        requests += Request(cardId, question, expectedAnswer, spokenAnswer)
         return gradingFlow
     }
 

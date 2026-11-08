@@ -130,7 +130,7 @@ internal fun RatedTransitionBuilder.onVoiceAnswerGraded(grade: VoiceAnswerGrade)
         state = state.copy(isPausedAfterFeedback = true, isPlaying = false)
         emit(RatedSessionEffect.PausePlayback)
     } else {
-        speakNotice(SpokenNotice.Feedback(rating, grade.feedback))
+        speakNotice(SpokenNotice.Feedback(rating, grade.spokenFeedback))
     }
 }
 
@@ -262,7 +262,7 @@ internal fun RatedTransitionBuilder.replayFeedback() {
     val grade = state.round.grade ?: return
     state = state.copy(isPausedAfterFeedback = false)
     emit(RatedSessionEffect.ResumeWithoutReading)
-    speakNotice(SpokenNotice.Feedback(grade.toFlashcardAttemptRating(), grade.feedback))
+    speakNotice(SpokenNotice.Feedback(grade.toFlashcardAttemptRating(), grade.spokenFeedback))
 }
 
 /** The feedback leaves [RatedSessionState.speakingNotices] here, since a stopped feedback never reports finished. */

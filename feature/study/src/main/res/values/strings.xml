@@ -3,6 +3,12 @@
     <string name="study_session_voice_answer_grading_label">Grading</string>
     <string name="study_session_voice_answer_transcript_title">Your answer</string>
     <string name="study_session_voice_answer_rating_title">Your answer rating</string>
+    <string name="study_session_voice_answer_correct_label">Correct</string>
+    <string name="study_session_voice_answer_partial_label">Partial</string>
+    <string name="study_session_voice_answer_failed_label">Failed</string>
+    <string name="study_session_voice_answer_correct_spoken_message">Correct</string>
+    <string name="study_session_voice_answer_partial_spoken_message">Partially correct</string>
+    <string name="study_session_voice_answer_failed_spoken_message">Failed</string>
     <string name="study_session_voice_answer_offline_message">Couldn\'t reach grading — check your connection.</string>
     <string name="study_session_voice_answer_service_error_message">Grading service had a problem.</string>
     <string name="study_session_voice_answer_mic_permission_revoked_message">Microphone access was turned off — ending session</string>
