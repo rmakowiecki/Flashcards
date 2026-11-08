@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
  * [GetSubcategoryProgressDetailsUseCase]'s shape. Category Details and Browse each collect this once per
  * screen open to draw every subcategory's ring and subtitle from the one summary document, rather
  * than reading each subcategory's packed progress document individually. A live listener: it
- * re-attaches on its own after a network drop.
+ * survives a network drop and retries transient Firestore failures; any other failure ends it.
  */
 class ObserveProgressSummaryUseCase @Inject constructor(
     private val repository: CardProgressRepository,
