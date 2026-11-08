@@ -10,10 +10,10 @@ Two tunable constants:
 - **8 seconds** of continuous silence after the question finishes → declare no-answer, speak an audible skip notice, advance without a grade for that card.
 - **1000ms** fixed delay after the grade-feedback notice finishes speaking → advance to the next card.
 
-Grade-percent bands, used both for feedback tone and the Failed/Partial/Correct mapping: **Failed < 30, Partial 30-74, Correct ≥ 75**. The grader judges ideas rather than wording and does not penalize a small missing detail heavily.
+Grade-percent bands, used both for feedback tone and the Failed/Partial/Correct mapping: **Failed < 30, Partial 30-74, Correct ≥ 75**. The grader judges ideas rather than wording, and grades against the core: the ideas the question directly asks for. Every core idea right is Correct however much supporting detail is missing (examples, further items of an example list, exceptions, where something comes from, how it works inside, why it matters); a list is core only when the question asks for the list or a count. Some core ideas right, or one only half right, is Partial; none right is Failed.
 
 Feedback is as short as it can be while still useful, and never repeats the whole expected answer:
-- **Correct**: empty, or the one minor point missed in a few words.
+- **Correct**: empty, or the one supporting point missed in a few words.
 - **Partial**: only what was missing or wrong.
 - **Failed with a real attempt**: what was wrong, plus the key correct idea in one clause.
 - **Non-answer** ("I don't know", off-topic): grade 0 and a condensed version of the expected answer, key points only. This is where the user hears the real answer in this mode.

@@ -79,19 +79,25 @@ Spoken answer (already sanitized): ${sanitizedTranscript}
 
 Return a single JSON object described by the response schema with three fields:
 
-1. "grade": an integer 0-100 for how completely and correctly the spoken answer answers the
-   question, judged against the expected answer. Judge the ideas, not the wording: accept
-   paraphrases, synonyms and a different order, and do not penalize a small missing detail
-   heavily. Give partial credit for partially correct or incomplete answers; do not default to
-   round numbers just because they look tidy. Bands: below ${PARTIAL_GRADE_THRESHOLD} is failed,
-   ${PARTIAL_GRADE_THRESHOLD}-${CORRECT_GRADE_THRESHOLD - 1} is partial, ${CORRECT_GRADE_THRESHOLD} and above is correct.
+1. "grade": an integer 0-100 for how well the spoken answer answers the question. First find the
+   core: the one or few ideas the question directly asks for. Everything else in the expected
+   answer is supporting detail: examples, further items of an example list, exceptions and
+   caveats, where something comes from, how it works inside, and why it matters. A list is core
+   only when the question asks for the list itself or a count of its items. Judge the ideas, not
+   the wording: accept paraphrases, synonyms, a different order and less precise terms.
+   - Every core idea right: ${CORRECT_GRADE_THRESHOLD} or above, however much supporting detail is
+     missing. Missing supporting detail only decides where in ${CORRECT_GRADE_THRESHOLD}-100 it lands.
+   - Some core ideas right, or a core idea only vague or half right: ${PARTIAL_GRADE_THRESHOLD}-${CORRECT_GRADE_THRESHOLD - 1}.
+   - No core idea right: below ${PARTIAL_GRADE_THRESHOLD}.
+   Do not default to round numbers.
 
 2. "feedback": shown on screen. Never repeat or paraphrase the whole expected answer, never
    restate what the user already got right, and never open with "The correct answer is" or
    similar. Use exactly one of these cases:
    - Correct, nothing meaningful missed: an empty string.
-   - Correct, a minor point missed: name only that point, at most 8 words.
-   - Partial: name only what was missing or wrong, at most 25 words.
+   - Correct, a supporting point missed: name only that point, at most 8 words.
+   - Partial: name only the core ideas that were missing or wrong, not supporting detail, at most
+     25 words.
    - Failed, with a real but wrong attempt: say what was wrong, then the key correct idea in one
      short clause, at most 25 words.
    - Non-answer (the user says they don't know, gives up, or says something unrelated to the
