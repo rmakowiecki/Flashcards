@@ -39,7 +39,7 @@ The top app bar carries the following:
 - a bookmark action that adds or removes the Category as a Favorite;
 - an action that pins a launcher shortcut to the Category ([launcher-shortcuts.md](launcher-shortcuts.md)).
 
-The bookmark and the shortcut action move into an overflow menu only when the bar has no room. A successful bookmark change shows a snackbar with Undo. Undo restores the value the change moved away from, so it never flips a later change.
+The bookmark and the shortcut action move into an overflow menu only when the bar has no room. The bookmark changes at once, and a failed change puts it back. A successful bookmark change shows a snackbar with Undo. Undo restores the value the change moved away from, so it never flips a later change.
 
 A failed load, or a read that returns no Subcategories, shows an error with Retry. A Category always contains at least one Subcategory.
 
@@ -78,7 +78,7 @@ All of them read the User's progress summary, which is one document for every Su
 
 - **The list never waits on the summary.** Rows appear first, and the rings fill in when it arrives.
 - **Unknown is not zero.** Until the summary arrives, a ring shows only its track, with no percentage. A Subcategory the User has never studied shows an empty ring at zero percent.
-- **A failed read** leaves the rings unknown and is logged. It never affects the list. Bookmark badges follow the same rule for a failed Favorites read: they stay off.
+- **A failed read** leaves the rings unknown and is logged. It never affects the list. A failed Favorites read is logged too: bookmark badges keep the last Favorites delivered, or stay off if none arrived, and the bookmark actions keep their value and still work.
 - **The denominator** is the Subcategory's card count from the taxonomy, which excludes Private Flashcards. The card count shown beside a ring is the same figure.
 - **The ring is capped at full**, because Pending Sessions counted on the device can briefly add up to more Studied Flashcards than the Subcategory holds.
 

@@ -2,6 +2,8 @@ package com.rossomak.flashcards.feature.browse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.catchAndLog
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
@@ -43,7 +45,7 @@ class BrowseViewModel @Inject constructor(
         loadCategories()
         observeSearchQuery()
         collectProgressSummary()
-        observeFavorites()
+        collectFavorites()
     }
 
     fun onCategoriesRefresh() {
@@ -211,32 +213,30 @@ class BrowseViewModel @Inject constructor(
 
     /**
      * Runs independently of [loadCategories] and any search, so a slow progress read never gates
-     * the category list or search results — same rule as
-     * [com.rossomak.flashcards.feature.browse.details.category.CategoryDetailsViewModel.collectProgressSummary].
-     * [ObserveProgressSummaryUseCase] is a live Firestore listener, not a one-shot read: it
-     * re-attaches on its own after a network drop, so a search that only succeeded because
-     * connectivity came back also gets its progress rings filled in, with no extra wiring here.
+     * the category list or search results. A thrown failure ends it for good and leaves the rings
+     * unresolved.
      */
     private fun collectProgressSummary() {
         viewModelScope.launch {
-            observeProgressSummary().collect { summary ->
-                _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
-            }
+            flowFrom { observeProgressSummary() }
+                .catchAndLog { "Observing the progress summary failed" }
+                .collect { summary ->
+                    _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
+                }
         }
     }
 
     /**
-     * Badges list rows reactively — the list itself never waits on this to render, same rule as
-     * [collectProgressSummary]. [ObserveUserFavoritesUseCase] is backed by the same kind of live
-     * Firestore listener as [ObserveProgressSummaryUseCase], with the same reconnect-after-drop
-     * behavior, so search results that only came back because connectivity returned still get their
-     * bookmark badges filled in, with no extra wiring here.
+     * Badges list rows; the list never waits on it. A thrown failure ends it for good and keeps the
+     * last Favorites delivered.
      */
-    private fun observeFavorites() {
+    private fun collectFavorites() {
         viewModelScope.launch {
-            observeUserFavorites().collect { favorites ->
-                _state.update { it.copy(favorites = favorites) }
-            }
+            flowFrom { observeUserFavorites() }
+                .catchAndLog { "Observing the user's Favorites failed" }
+                .collect { favorites ->
+                    _state.update { it.copy(favorites = favorites) }
+                }
         }
     }
 

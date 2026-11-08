@@ -2,6 +2,7 @@ package com.rossomak.flashcards.feature.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.domain.model.AppPermission
 import com.rossomak.flashcards.core.domain.model.DailyGoal
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
@@ -43,8 +44,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -82,7 +81,7 @@ class OnboardingViewModel @Inject constructor(
      * played-back recording while playing. Kept out of [state] so each update recomposes only the
      * indicator.
      */
-    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = flow { emitAll(observeRawVoiceLevel()) }.stateInVoiceBarsLevels(viewModelScope)
+    val voiceBarsLevels: StateFlow<ImmutableList<Float>> = flowFrom { observeRawVoiceLevel() }.stateInVoiceBarsLevels(viewModelScope)
 
     private var permissionStatusJob: Job? = null
 

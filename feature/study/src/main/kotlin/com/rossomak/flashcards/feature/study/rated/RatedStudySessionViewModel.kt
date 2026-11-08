@@ -3,6 +3,7 @@ package com.rossomak.flashcards.feature.study.rated
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.domain.model.GradingFailureReason
 import com.rossomak.flashcards.core.domain.model.RatedSessionStateSnapshot.LoadFailed
@@ -54,8 +55,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -100,7 +99,7 @@ class RatedStudySessionViewModel @Inject constructor(
      * stream never recomposes the rest of the screen.
      */
     val voiceBarsLevels: StateFlow<ImmutableList<Float>> =
-        flow { emitAll(observeVoiceAnswerLevel()) }.stateInVoiceBarsLevels(viewModelScope)
+        flowFrom { observeVoiceAnswerLevel() }.stateInVoiceBarsLevels(viewModelScope)
 
     // Identifies the report submission in flight, so a result closes only the dialog it was sent from.
     private var reportSubmissionId = 0

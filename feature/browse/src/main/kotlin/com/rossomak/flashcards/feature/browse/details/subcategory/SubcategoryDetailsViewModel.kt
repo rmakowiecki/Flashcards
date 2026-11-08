@@ -3,6 +3,8 @@ package com.rossomak.flashcards.feature.browse.details.subcategory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.catchAndLog
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference
@@ -98,7 +100,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
             _state.update { it.copy(sortOrder = defaults.sortOrder) }
             loadFlashcards()
         }
-        observeFavoriteState()
+        collectFavoriteState()
     }
 
     /** Single entry point for every dialog on this screen (ADR-0036). */
@@ -130,13 +132,7 @@ class SubcategoryDetailsViewModel @Inject constructor(
 
     fun onFavoriteToggle() {
         val isFavorite = !_state.value.isFavorite
-        _state.update { it.copy(isFavorite = isFavorite) }
-        viewModelScope.launch {
-            val result = setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, isFavorite))
-            if (result.isSuccess) {
-                _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites)
-            }
-        }
+        setFavorite(isFavorite) { _messages.tryEmit(if (isFavorite) AddedToFavorites else RemovedFromFavorites) }
     }
 
     /**
@@ -145,9 +141,16 @@ class SubcategoryDetailsViewModel @Inject constructor(
      * would invert a later, unrelated toggle. Emits no message of its own.
      */
     fun onFavoriteUndo(restoreTo: Boolean) {
-        _state.update { it.copy(isFavorite = restoreTo) }
+        setFavorite(restoreTo)
+    }
+
+    /** Shows [isFavorite] at once, then writes it. A failed write puts the bookmark back. */
+    private fun setFavorite(isFavorite: Boolean, onSuccess: () -> Unit = {}) {
+        _state.update { it.copy(isFavorite = isFavorite) }
         viewModelScope.launch {
-            setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, restoreTo))
+            setSubcategoryFavorite(SetSubcategoryFavoriteUseCase.Params(route.subcategoryId, isFavorite))
+                .onSuccess { onSuccess() }
+                .onFailure { _state.update { it.copy(isFavorite = !isFavorite) } }
         }
     }
 
@@ -161,11 +164,17 @@ class SubcategoryDetailsViewModel @Inject constructor(
         }
     }
 
-    private fun observeFavoriteState() {
+    /**
+     * A thrown failure ends it for good and keeps the last value delivered; [onFavoriteToggle] still
+     * writes on its own.
+     */
+    private fun collectFavoriteState() {
         viewModelScope.launch {
-            observeSubcategoryFavoriteState(route.subcategoryId).collect { isFavorite ->
-                _state.update { it.copy(isFavorite = isFavorite) }
-            }
+            flowFrom { observeSubcategoryFavoriteState(route.subcategoryId) }
+                .catchAndLog { "Observing the Subcategory's Favorite state failed" }
+                .collect { isFavorite ->
+                    _state.update { it.copy(isFavorite = isFavorite) }
+                }
         }
     }
 

@@ -388,6 +388,62 @@ class SubcategoryDetailsViewModelTest {
             }
         }
 
+    // --- failed favorite stream ---
+
+    @Test
+    fun `a failing favorite stream leaves the bookmark off instead of crashing`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+
+            val viewModel = startedViewModel()
+
+            cards(viewModel.state.value) shouldBe listOf("1", "2", "3")
+            viewModel.state.value.isFavorite shouldBe false
+        }
+
+    @Test
+    fun `a favorite stream failing after a value keeps that value`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.setSubcategoryFavorite(route.subcategoryId, isFavorite = true)
+            userFavoritesRepository.favoritesEmissionsBeforeFailure = 1
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+
+            val viewModel = startedViewModel()
+
+            viewModel.state.value.isFavorite shouldBe true
+        }
+
+    @Test
+    fun `toggling after the favorite stream failed still writes the favorite`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoritesReadFailure = IllegalStateException("malformed favorites document")
+            val viewModel = startedViewModel()
+
+            viewModel.messages.test {
+                viewModel.onFavoriteToggle()
+                advanceUntilIdle()
+
+                awaitItem() shouldBe DetailsMessage.AddedToFavorites
+            }
+            viewModel.state.value.isFavorite shouldBe true
+            userFavoritesRepository.storedFavorites.subcategoryIds.keys shouldBe setOf(route.subcategoryId)
+        }
+
+    @Test
+    fun `a failed favorite write puts the bookmark back without a message`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            userFavoritesRepository.favoriteWriteFailure = IllegalStateException("offline")
+            val viewModel = startedViewModel()
+
+            viewModel.messages.test {
+                viewModel.onFavoriteToggle()
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+            viewModel.state.value.isFavorite shouldBe false
+        }
+
     // --- shortcut pinning ---
 
     @Test

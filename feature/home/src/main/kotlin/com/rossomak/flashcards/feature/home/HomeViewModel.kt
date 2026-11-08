@@ -2,6 +2,8 @@ package com.rossomak.flashcards.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rossomak.flashcards.core.common.catchAndLog
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.common.loge
 import com.rossomak.flashcards.core.common.logw
 import com.rossomak.flashcards.core.domain.model.Category
@@ -49,9 +51,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
@@ -221,11 +221,11 @@ class HomeViewModel @Inject constructor(
             val scoringStateFeed = MutableStateFlow(ScoringStateFeed())
             launch { collectLevelCard(scoringStateFeed) }
             launch { collectStreak(scoringStateFeed) }
-            flow { emitAll(observeScoringState()) }
+            flowFrom { observeScoringState() }
                 .onCompletion { cause ->
                     if (cause == null && scoringStateFeed.value.latest == null) logw { "Observing the scoring state completed before its first emission" }
                 }
-                .catch { error -> loge(error) { "Observing the scoring state failed" } }
+                .catchAndLog { "Observing the scoring state failed" }
                 .collect { observedScoringState -> scoringStateFeed.update { it.copy(latest = observedScoringState) } }
             scoringStateFeed.update { it.copy(hasEnded = true) }
         }
@@ -240,7 +240,7 @@ class HomeViewModel @Inject constructor(
         val levelProgressFlow = scoringStateFeed.latestValues(onEndedWithoutValue = ::failLevelCardIfLoading)
             .map { observedScoringState -> observedScoringState.levelProgress }
             .distinctUntilChanged()
-        val authUserFlow = flow { emitAll(observeAuthUser()) }
+        val authUserFlow = flowFrom { observeAuthUser() }
             .catch { error ->
                 logw(error) { "Observing the auth user for the Level card failed, showing it without a name" }
                 emit(null)
@@ -270,7 +270,7 @@ class HomeViewModel @Inject constructor(
      * read that fails keeps the last goal, or [DailyGoal.DEFAULT_MINUTES] when none was read.
      */
     private suspend fun collectStreak(scoringStateFeed: Flow<ScoringStateFeed>) {
-        val dailyGoalMinutesFlow = flow<Int?> { emitAll(observeUserPreferences().map { preferences -> preferences.dailyGoalMinutes }) }
+        val dailyGoalMinutesFlow = flowFrom<Int?> { observeUserPreferences().map { preferences -> preferences.dailyGoalMinutes } }
             .catch { error -> logw(error) { "Observing the Daily Goal failed" } }
             .onEmpty { emit(DailyGoal.DEFAULT_MINUTES) }
             .onStart { emit(null) }
@@ -303,7 +303,7 @@ class HomeViewModel @Inject constructor(
     private fun collectFavoriteItems() {
         favoritesJob?.cancel()
         favoritesJob = viewModelScope.launch {
-            flow { emitAll(observeFavoriteItems()) }
+            flowFrom { observeFavoriteItems() }
                 .onCompletion { cause -> if (cause == null) failFavoritesIfLoading { "Observing Favorites completed before its first emission" } }
                 .catch { error ->
                     loge(error) { "Observing Favorites failed" }
@@ -333,8 +333,8 @@ class HomeViewModel @Inject constructor(
      */
     private fun collectProgressSummary() {
         viewModelScope.launch {
-            flow { emitAll(observeProgressSummary()) }
-                .catch { error -> loge(error) { "Observing the progress summary failed" } }
+            flowFrom { observeProgressSummary() }
+                .catchAndLog { "Observing the progress summary failed" }
                 .collect { summary ->
                     _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
                 }
@@ -349,7 +349,7 @@ class HomeViewModel @Inject constructor(
     private fun collectRecentSessions() {
         recentsJob?.cancel()
         recentsJob = viewModelScope.launch {
-            flow { emitAll(observeRecentSessions()) }
+            flowFrom { observeRecentSessions() }
                 .onCompletion { cause -> if (cause == null) failRecentsIfLoading { "Observing Recents completed before its first emission" } }
                 .catch { error ->
                     loge(error) { "Observing Recents failed" }
@@ -370,8 +370,8 @@ class HomeViewModel @Inject constructor(
      */
     private fun collectFavoritesHintPreference() {
         viewModelScope.launch {
-            flow { emitAll(observeUserPreferences()) }
-                .catch { error -> loge(error) { "Observing the Favorites hint preference failed" } }
+            flowFrom { observeUserPreferences() }
+                .catchAndLog { "Observing the Favorites hint preference failed" }
                 .collect { preferences ->
                     _state.update {
                         it.copy(hasHiddenFavoritesHint = it.hasHiddenFavoritesHint == true || preferences.hasHiddenFavoritesHint)
