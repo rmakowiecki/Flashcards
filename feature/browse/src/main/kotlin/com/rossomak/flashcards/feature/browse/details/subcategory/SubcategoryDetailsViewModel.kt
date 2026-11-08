@@ -3,7 +3,8 @@ package com.rossomak.flashcards.feature.browse.details.subcategory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.catchAndLog
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.domain.model.Flashcard
 import com.rossomak.flashcards.core.domain.model.PinShortcutResult
 import com.rossomak.flashcards.core.domain.model.StudySessionPreference
@@ -37,10 +38,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -172,8 +170,8 @@ class SubcategoryDetailsViewModel @Inject constructor(
      */
     private fun collectFavoriteState() {
         viewModelScope.launch {
-            flow { emitAll(observeSubcategoryFavoriteState(route.subcategoryId)) }
-                .catch { error -> loge(error) { "Observing the Subcategory's Favorite state failed" } }
+            flowFrom { observeSubcategoryFavoriteState(route.subcategoryId) }
+                .catchAndLog { "Observing the Subcategory's Favorite state failed" }
                 .collect { isFavorite ->
                     _state.update { it.copy(isFavorite = isFavorite) }
                 }

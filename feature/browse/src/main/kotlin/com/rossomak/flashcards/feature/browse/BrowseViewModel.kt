@@ -2,7 +2,8 @@ package com.rossomak.flashcards.feature.browse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rossomak.flashcards.core.common.loge
+import com.rossomak.flashcards.core.common.catchAndLog
+import com.rossomak.flashcards.core.common.flowFrom
 import com.rossomak.flashcards.core.domain.model.Subcategory
 import com.rossomak.flashcards.core.domain.usecase.GetCategoriesUseCase
 import com.rossomak.flashcards.core.domain.usecase.ObserveProgressSummaryUseCase
@@ -17,12 +18,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -220,8 +218,8 @@ class BrowseViewModel @Inject constructor(
      */
     private fun collectProgressSummary() {
         viewModelScope.launch {
-            flow { emitAll(observeProgressSummary()) }
-                .catch { error -> loge(error) { "Observing the progress summary failed" } }
+            flowFrom { observeProgressSummary() }
+                .catchAndLog { "Observing the progress summary failed" }
                 .collect { summary ->
                     _state.update { it.copy(progressSummary = summary, isProgressResolved = true) }
                 }
@@ -234,8 +232,8 @@ class BrowseViewModel @Inject constructor(
      */
     private fun collectFavorites() {
         viewModelScope.launch {
-            flow { emitAll(observeUserFavorites()) }
-                .catch { error -> loge(error) { "Observing the user's Favorites failed" } }
+            flowFrom { observeUserFavorites() }
+                .catchAndLog { "Observing the user's Favorites failed" }
                 .collect { favorites ->
                     _state.update { it.copy(favorites = favorites) }
                 }
