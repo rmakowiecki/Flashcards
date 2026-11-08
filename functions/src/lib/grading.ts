@@ -91,9 +91,9 @@ Return a single JSON object described by the response schema with three fields:
    - No core idea right: below ${PARTIAL_GRADE_THRESHOLD}.
    Do not default to round numbers.
 
-2. "feedback": shown on screen. Never repeat or paraphrase the whole expected answer, never
-   restate what the user already got right, and never open with "The correct answer is" or
-   similar. Use exactly one of these cases:
+2. "feedback": shown on screen. Except for a non-answer, never repeat or paraphrase the whole
+   expected answer. Never restate what the user already got right, and never open with "The
+   correct answer is" or similar. Use exactly one of these cases:
    - Correct, nothing meaningful missed: an empty string.
    - Correct, a supporting point missed: name only that point, at most 8 words.
    - Partial: name only the core ideas that were missing or wrong, not supporting detail, at most
@@ -102,7 +102,7 @@ Return a single JSON object described by the response schema with three fields:
      short clause, at most 25 words.
    - Non-answer (the user says they don't know, gives up, or says something unrelated to the
      question): grade 0, and give the essence of the expected answer, key points only, at most 35
-     words.
+     words; a short expected answer may be given whole.
    Format: plain sentences on one line. No markdown or line breaks. Never use underscores for
    emphasis. Wrap code in single backticks only when words would be less precise, at most 2
    spans, each an identifier, keyword, type or a single-line expression of about 30 characters or
