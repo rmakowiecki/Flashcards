@@ -103,20 +103,6 @@ class AppStartViewModelTest {
     }
 
     @Test
-    fun `auth timeout emits Ready with false after 1000ms`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { getCurrentAuthUserUseCase() } coAnswers {
-            delay(Long.MAX_VALUE)
-            null
-        }
-
-        val viewModel = createViewModel()
-        advanceUntilIdle()
-
-        viewModel.startupState.value shouldBe AppStartupState.Ready(authenticated = false)
-        testScheduler.currentTime shouldBe 1000L
-    }
-
-    @Test
     fun `startup runs the cache generation sync alongside the auth check`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { getCurrentAuthUserUseCase() } returns testUser
 

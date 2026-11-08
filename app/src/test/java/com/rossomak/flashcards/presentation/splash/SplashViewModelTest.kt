@@ -150,7 +150,7 @@ class SplashViewModelTest {
     }
 
     @Test
-    fun `auth timeout alone without animation completing emits no event`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `auth resolving without animation completing emits no event`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { getCurrentAuthUserUseCase() } returns null
 
         val viewModel = createViewModel()
@@ -159,7 +159,7 @@ class SplashViewModelTest {
 
         viewModel.events.test {
             scheduler.advanceUntilIdle()
-            // Auth resolves to false after 1000ms timeout, but animation hasn't completed,
+            // Auth resolves to false, but animation hasn't completed,
             // so combine never produces a destination and nothing is emitted.
             expectNoEvents()
         }
@@ -195,7 +195,7 @@ class SplashViewModelTest {
     }
 
     @Test
-    fun `onAnimationCompleted called after timeout emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `onAnimationCompleted called after auth resolves emits Login`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { getCurrentAuthUserUseCase() } returns null
 
         val viewModel = createViewModel()
