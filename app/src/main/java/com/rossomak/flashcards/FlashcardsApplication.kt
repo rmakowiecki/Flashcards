@@ -3,6 +3,9 @@ package com.rossomak.flashcards
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.google.firebase.Firebase
+import com.google.firebase.appcheck.appCheck
+import com.rossomak.flashcards.appcheck.appCheckProviderFactory
 import com.rossomak.flashcards.core.data.InterruptedAccountDeletionCompleter
 import com.rossomak.flashcards.core.data.SignedInWorkRunner
 import com.rossomak.flashcards.core.data.activity.CurrentActivityHolder
@@ -35,6 +38,9 @@ import timber.log.Timber
  * Registering it from the Application means it sees every Activity of the process from the first.
  *
  * Every crash report carries the git SHA: the version code (a commit count) does not pin a branch.
+ *
+ * The App Check provider is installed first in `onCreate`, so the first callable request already
+ * carries a token (ADR-0076).
  */
 @HiltAndroidApp
 class FlashcardsApplication : Application(), Configuration.Provider {
@@ -59,6 +65,7 @@ class FlashcardsApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        Firebase.appCheck.installAppCheckProviderFactory(appCheckProviderFactory())
         if (BuildConfig.LOGGING_ENABLED) {
             Timber.plant(Timber.DebugTree())
         }

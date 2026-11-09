@@ -23,6 +23,27 @@ the caller's Firebase ID token automatically. There is **no** `VOICE_GRADING_BAS
 and no `Authorization` header to manage by hand — `request.auth` is populated (and verified) by the
 callable runtime, or the call is rejected `unauthenticated` before any code runs.
 
+## App Check
+
+The app attaches a Firebase App Check token to every callable request (ADR-0076): Play Integrity in
+release builds, a debug token in debug and profiling builds. The callables do not enforce it yet.
+The `onCall` runtime, not our code, logs each request's verdict (`app: "VALID"`, `"MISSING"` or
+`"INVALID"`) in the Cloud Functions logs. Passed checks log at DEBUG severity, so include DEBUG in
+the Logs Explorer severity filter.
+
+**Registering a debug token** (once per debug or profiling install):
+
+1. Install a debug or profiling build and launch it once.
+2. Run `adb logcat -s DebugAppCheckProvider` and copy the secret from the
+   `Enter this debug secret into the allow list in the Firebase Console for your project:` line.
+3. Firebase console → App Check → Apps → `com.rossomak.flashcards.debug` → ⋮ → Manage debug tokens →
+   Add debug token. Name it after the device.
+
+Debug and profiling builds share the `.debug` package and the token, and App Distribution updates
+keep it. Register again after an uninstall, a "clear data" or on a new device or emulator.
+
+Release builds attest only when installed from a Google Play track.
+
 ## Layout
 
 ```
