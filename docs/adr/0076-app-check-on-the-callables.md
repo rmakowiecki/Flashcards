@@ -15,9 +15,11 @@ who is calling, not that the call comes from this app.
 token; once enforced, a call without a valid one is rejected as `unauthenticated`.
 
 **Play Integrity in release builds.** A release build attests through `PlayIntegrityAppCheckProviderFactory`.
-Only a copy installed from Google Play, signed with the Play app-signing key, on a device that passes
-Firebase's default device-integrity verdict, gets a token. Rooted devices, custom ROMs and devices
-without Google Play services lose the callables.
+App Check requires the `PLAY_RECOGNIZED` app verdict, its default, and the `MEETS_DEVICE_INTEGRITY`
+device verdict, which it does not check by default. Only a copy Google Play recognizes, signed with the
+Play app-signing key, on a device that meets device integrity, gets a token. Rooted devices, custom
+ROMs, emulators and devices without Google Play services lose the callables. The `LICENSED` verdict is
+not required: the app is free, so anyone can hold a license.
 
 **Debug tokens in debug and profiling builds.** Both use `DebugAppCheckProviderFactory`; each
 install's secret is registered by hand under the `.debug` app and is lost on uninstall or "clear
@@ -38,9 +40,10 @@ client that has not yet learned to send them.
 test, and enforcement turns on once unverified requests stay near zero. Sign-in itself does not
 require App Check.
 
-**No replay protection.** A token is reused for its lifetime (1 hour, refreshed automatically). It
-is bound to an attested install and expires within the hour, while consuming one per call would
-double the attestation cost.
+**No replay protection.** A token is a bearer credential reused for its lifetime (1 hour, refreshed
+automatically): a leaked one works from any client until it expires, but still needs a valid ID token
+beside it. Consuming one per call would cost an attestation per callable request, against a
+10,000-a-day quota.
 
 ## Alternatives considered
 
@@ -53,11 +56,12 @@ double the attestation cost.
 
 ## Consequences
 
-- A release build installed outside Google Play (sideloaded, `installRelease`, internal app sharing)
-  fails every callable. Release builds are tested only through a Play track.
+- A release build Google Play does not recognize (`installRelease`, internal app sharing) fails every
+  callable. Release builds are tested only through a Play track. A copy of the Play build sideloaded
+  onto another device that meets device integrity still gets a token.
 - A new developer device fails every callable until its debug token is registered: Pending Sessions
   stay queued, and Voice Answering, Bug Reports and Account Deletion fail.
 - An App Check rejection reaches the User through the same error paths as any other
   `unauthenticated` failure, with no message of its own.
-- Play Integrity's standard tier allows 10,000 attestations a day; each install attests about once an
-  hour while in use.
+- Play Integrity's standard tier allows 10,000 attestations a day; each install attests about twice an
+  hour while in use, since the SDK refreshes a token at about half its 1-hour lifetime.

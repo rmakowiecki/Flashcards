@@ -34,15 +34,25 @@ the Logs Explorer severity filter.
 **Registering a debug token** (once per debug or profiling install):
 
 1. Install a debug or profiling build and launch it once.
-2. Run `adb logcat -s DebugAppCheckProvider` and copy the secret from the
-   `Enter this debug secret into the allow list in the Firebase Console for your project:` line.
+2. Run `adb logcat | grep "Firebase App Check debug token"` and copy the token after
+   `Firebase App Check debug token:`. The same log entry prints a ready
+   `firebase appcheck:debugtokens:create` command, an alternative to step 3.
 3. Firebase console → App Check → Apps → `com.rossomak.flashcards.debug` → ⋮ → Manage debug tokens →
    Add debug token. Name it after the device.
 
 Debug and profiling builds share the `.debug` package and the token, and App Distribution updates
 keep it. Register again after an uninstall, a "clear data" or on a new device or emulator.
 
-Release builds attest only when installed from a Google Play track.
+**Release setup** (once, after the first Play upload):
+
+1. Play Console → Test and release → App integrity → Play Integrity API: link the Cloud project of
+   this Firebase project.
+2. Firebase console → App Check → Apps → `com.rossomak.flashcards`: register the Play Integrity
+   provider with the Play app-signing SHA-256, and set device integrity to `MEETS_DEVICE_INTEGRITY`.
+
+See the [Firebase setup guide](https://firebase.google.com/docs/app-check/android/play-integrity-provider).
+Release builds then attest only when Google Play recognizes the copy and the device meets device
+integrity, so test them through a Play track on a real device.
 
 ## Layout
 
