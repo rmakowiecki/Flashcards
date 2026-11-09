@@ -46,7 +46,7 @@ No instrumented (`androidTest`) tests exist yet, so no emulator step is configur
 ## Debug/release package split
 
 - `buildTypes.debug` sets `applicationIdSuffix = ".debug"`, so debug installs as `com.rossomak.flashcards.debug` alongside a release install of `com.rossomak.flashcards` on the same device — same signing-cert mismatch that would otherwise block co-installing them is sidestepped by using distinct package names instead.
-- This requires **two Firebase Android apps** under the one Firebase project: `com.rossomak.flashcards` (release, pre-existing) and `com.rossomak.flashcards.debug` (added for this). Each needs its own SHA-1 (and SHA-256 only if Dynamic Links/App Check are ever added) registered against it in the Firebase console.
+- This requires **two Firebase Android apps** under the one Firebase project: `com.rossomak.flashcards` (release, pre-existing) and `com.rossomak.flashcards.debug` (added for this). Each needs its own SHA-1 registered against it in the Firebase console. The release app also needs the Play app-signing SHA-1 and SHA-256, for sign-in and App Check's Play Integrity provider (ADR-0076).
 - Both apps' config lives in the single `google-services.json` (keyed internally by `package_name`) — one file, no per-build-type file swapping needed.
 - `app/src/debug/res/values/strings.xml` overrides `app_name` to "Flashcards Debug" so the two are visually distinguishable on-device too.
 

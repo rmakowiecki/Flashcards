@@ -23,6 +23,37 @@ the caller's Firebase ID token automatically. There is **no** `VOICE_GRADING_BAS
 and no `Authorization` header to manage by hand — `request.auth` is populated (and verified) by the
 callable runtime, or the call is rejected `unauthenticated` before any code runs.
 
+## App Check
+
+The app attaches a Firebase App Check token to every callable request (ADR-0076): Play Integrity in
+release builds, a debug token in debug and profiling builds. The callables do not enforce it yet.
+The `onCall` runtime, not our code, logs each request's verdict (`app: "VALID"`, `"MISSING"` or
+`"INVALID"`) in the Cloud Functions logs. Passed checks log at DEBUG severity, so include DEBUG in
+the Logs Explorer severity filter.
+
+**Registering a debug token** (once per debug or profiling install):
+
+1. Install a debug or profiling build and launch it once.
+2. Run `adb logcat | grep "Firebase App Check debug token"` and copy the token after
+   `Firebase App Check debug token:`. The same log entry prints a ready
+   `firebase appcheck:debugtokens:create` command, an alternative to step 3.
+3. Firebase console → App Check → Apps → `com.rossomak.flashcards.debug` → ⋮ → Manage debug tokens →
+   Add debug token. Name it after the device.
+
+Debug and profiling builds share the `.debug` package and the token, and App Distribution updates
+keep it. Register again after an uninstall, a "clear data" or on a new device or emulator.
+
+**Release setup** (once, after the first Play upload):
+
+1. Play Console → Test and release → App integrity → Play Integrity API: link the Cloud project of
+   this Firebase project.
+2. Firebase console → App Check → Apps → `com.rossomak.flashcards`: register the Play Integrity
+   provider with the Play app-signing SHA-256, and set device integrity to `MEETS_DEVICE_INTEGRITY`.
+
+See the [Firebase setup guide](https://firebase.google.com/docs/app-check/android/play-integrity-provider).
+Release builds then attest only when Google Play recognizes the copy and the device meets device
+integrity, so test them through a Play track on a real device.
+
 ## Layout
 
 ```
