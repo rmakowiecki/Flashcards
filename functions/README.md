@@ -31,7 +31,11 @@ release builds, a debug token in debug and profiling builds. Every callable enfo
 `unauthenticated` before the handler runs. To lift enforcement, remove `enforceAppCheck` and
 redeploy the functions; no app release is needed. The `onCall` runtime, not our code, logs each
 request's verdict (`app: "VALID"`, `"MISSING"` or `"INVALID"`) in the Cloud Functions logs. Passed
-checks log at DEBUG severity, so include DEBUG in the Logs Explorer severity filter.
+checks log at DEBUG severity, so include DEBUG in the Logs Explorer severity filter. Only an
+`INVALID` token logs "Callable request verification failed": a call with no token (`MISSING`), such
+as one from a build without App Check, logs "Callable request verification passed" and is still
+rejected with HTTP 401. To find rejected calls, filter on `jsonPayload.verifications.app!="VALID"`,
+not on the message.
 
 **Registering a debug token** (once per debug or profiling install):
 
