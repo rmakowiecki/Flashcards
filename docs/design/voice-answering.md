@@ -70,7 +70,7 @@ Capture runs only inside the session's foreground playback service, never outsid
 
 Each answer is one call to a streaming Firebase callable function, which carries the signed-in User's identity ([ADR-0029](../adr/0029-voice-grading-two-callables-payload-inferred-debug-mode.md)). The function:
 
-1. rejects a caller who is not **Premium**, or is a Guest ([Entitlement](#entitlement)), and an empty or oversized recording;
+1. rejects a call without a valid App Check token ([ADR-0076](../adr/0076-app-check-on-the-callables.md)), a caller who is not **Premium**, or is a Guest ([Entitlement](#entitlement)), and an empty or oversized recording;
 2. transcribes the audio with ElevenLabs Scribe;
 3. has a language model clean the transcript: filler words and repetitions are normalized, and personal details the User happened to say are removed;
 4. streams that cleaned transcript back at once, so the app can show it before grading ends;

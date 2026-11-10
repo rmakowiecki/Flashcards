@@ -26,10 +26,12 @@ callable runtime, or the call is rejected `unauthenticated` before any code runs
 ## App Check
 
 The app attaches a Firebase App Check token to every callable request (ADR-0076): Play Integrity in
-release builds, a debug token in debug and profiling builds. The callables do not enforce it yet.
-The `onCall` runtime, not our code, logs each request's verdict (`app: "VALID"`, `"MISSING"` or
-`"INVALID"`) in the Cloud Functions logs. Passed checks log at DEBUG severity, so include DEBUG in
-the Logs Explorer severity filter.
+release builds, a debug token in debug and profiling builds. Every callable enforces it
+(`enforceAppCheck` in `RUNTIME_OPTIONS`): a call without a valid token is rejected as
+`unauthenticated` before the handler runs. To lift enforcement, remove `enforceAppCheck` and
+redeploy the functions; no app release is needed. The `onCall` runtime, not our code, logs each
+request's verdict (`app: "VALID"`, `"MISSING"` or `"INVALID"`) in the Cloud Functions logs. Passed
+checks log at DEBUG severity, so include DEBUG in the Logs Explorer severity filter.
 
 **Registering a debug token** (once per debug or profiling install):
 
