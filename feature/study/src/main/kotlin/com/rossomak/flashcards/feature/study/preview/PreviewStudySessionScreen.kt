@@ -264,18 +264,9 @@ fun PreviewStudySessionContent(
         pendingBadgeDialog = dialog
     }
 
-    // A plain, unaligned sibling of Scaffold — deliberately *not* docked inside its content slot,
-    // unlike an earlier version of this screen. Scaffold's default contentWindowInsets reserve the
-    // bottom safe-drawing (gesture nav) inset into innerPadding, shrinking whatever sits inside its
-    // content lambda short of the true screen bottom by that inset's height. FlashcardsBottomSheet
-    // wants the opposite: it already handles the bottom system-bar inset internally (see its own
-    // doc) and expects to own the real screen bottom itself. Nesting it inside Scaffold's
-    // inset-shrunk content double-counted that inset — the sheet's hidden position landed short of
-    // the true bottom (a gesture-bar-height sliver stayed visible, "peeking") and its expanded
-    // position gapped, showing this screen's gradient background beneath the sheet. Docking the
-    // sheet out here instead, outside Scaffold entirely, lets it reach the true screen bottom
-    // uncontested. [ReadyContent] (below, inside Scaffold's own content) still wants that inset —
-    // its Start button must stay clear of the gesture bar — so Scaffold itself is untouched.
+    // The settings sheet is an unaligned sibling of Scaffold, not inside it: Scaffold's content
+    // insets would double the bottom inset the sheet already handles (FlashcardsBottomSheet, ADR-0043).
+    // ReadyContent, inside Scaffold, keeps that inset so its Start button clears the nav bar.
     Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
         BrandGradientBackdrop(graph = StudyMorpheusGraphs.preview)
         Scaffold(

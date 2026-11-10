@@ -3,32 +3,23 @@ package com.rossomak.flashcards.feature.study.rated
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Flip
-import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -41,15 +32,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
-import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.rating.FlashcardsRatingButtonRow
 import com.rossomak.flashcards.core.ui.composables.voice.FlashcardsVoiceCaptureIndicatorDefaults
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.study.R
-import com.rossomak.flashcards.feature.study.StudyMorpheusGraphs
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -60,6 +48,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
+import com.rossomak.flashcards.feature.study.chrome.StudySessionScaffold
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionDestination.Back
 import com.rossomak.flashcards.feature.study.rated.RatedStudySessionDestination.Summary
@@ -78,8 +67,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-internal val SHEET_PEEK_HEIGHT_VOICE: Dp = 176.dp
-private val SHEET_PEEK_HEIGHT_MANUAL: Dp = 150.dp
+internal val VOICE_SHEET_CONTENT_HEIGHT: Dp = 144.dp
+private val MANUAL_SHEET_CONTENT_HEIGHT: Dp = 118.dp
 
 /** The presented card is always the queue's head. */
 private const val PRESENTED_CARD_INDEX = 0
@@ -152,7 +141,6 @@ fun RatedStudySessionScreen(
 }
 
 @Suppress("LongParameterList") // one callback per hoisted ViewModel action; a holder class would only rename the sprawl.
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RatedStudySessionContent(
     modifier: Modifier = Modifier,
@@ -167,71 +155,59 @@ fun RatedStudySessionContent(
     onVoiceFeedbackSkip: () -> Unit,
     onDialogEvent: (StudySessionDialogEvent) -> Unit,
 ) {
-    val scaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(skipHiddenState = true),
-    )
-
-    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop(graph = StudyMorpheusGraphs.session)
-        BottomSheetScaffold(
-            modifier = Modifier.fillMaxSize(),
-            scaffoldState = scaffoldState,
-            containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            sheetSwipeEnabled = false,
-            sheetPeekHeight = if (state.isVoiceAnsweringSession) SHEET_PEEK_HEIGHT_VOICE else SHEET_PEEK_HEIGHT_MANUAL,
-            sheetDragHandle = {},
-            topBar = {
-                StudySessionHeader(
-                    title = studySessionCardTitle(
-                        categoryName = state.categoryName,
-                        currentCard = state.currentCard,
-                        subcategoryNameById = state.subcategoryNameById,
-                        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
-                    ),
-                    reportableCard = state.currentCard,
-                    progress = ratedStudySessionProgress(state),
-                    onClose = { onDialogEvent(Open(ExitSession)) },
-                    onReportProblem = { card ->
-                        onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
-                    },
+    StudySessionScaffold(
+        modifier = modifier,
+        snackbarHostState = snackbarHostState,
+        topBar = {
+            StudySessionHeader(
+                title = studySessionCardTitle(
+                    categoryName = state.categoryName,
+                    currentCard = state.currentCard,
+                    subcategoryNameById = state.subcategoryNameById,
+                    separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+                ),
+                reportableCard = state.currentCard,
+                progress = ratedStudySessionProgress(state),
+                onClose = { onDialogEvent(Open(ExitSession)) },
+                onReportProblem = { card ->
+                    onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
+                },
+            )
+        },
+        sheetContent = {
+            if (state.isVoiceAnsweringSession) {
+                RatedVoiceSheetContent(
+                    state = state,
+                    voiceBarsLevels = voiceBarsLevels,
+                    onVoicePlayPause = onVoicePlayPause,
+                    onVoiceNext = onVoiceNext,
+                    onVoicePrevious = onVoicePrevious,
+                    onVoiceFeedbackSkip = onVoiceFeedbackSkip,
+                    onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
                 )
-            },
-            sheetContent = {
-                if (state.isVoiceAnsweringSession) {
-                    RatedVoiceSheetContent(
-                        state = state,
-                        voiceBarsLevels = voiceBarsLevels,
-                        onVoicePlayPause = onVoicePlayPause,
-                        onVoiceNext = onVoiceNext,
-                        onVoicePrevious = onVoicePrevious,
-                        onVoiceFeedbackSkip = onVoiceFeedbackSkip,
-                        onVoiceSettingsCogClick = { onDialogEvent(Open(SessionVoiceSettings())) },
-                    )
-                } else {
-                    RatedManualSheetContent(
-                        isAnswerRevealed = state.isAnswerRevealed,
-                        onShowAnswer = onShowAnswer,
-                        onAttemptRating = onAttemptRating,
-                    )
-                }
-            },
-        ) { innerPadding ->
-            StudySessionBody(
-                isLoading = state.isLoading,
-                flashcards = state.flashcards,
-                currentCardIndex = PRESENTED_CARD_INDEX,
-                isAnswerRevealed = state.isAnswerRevealed,
-                innerPadding = innerPadding,
-                attemptSlots = state.attemptSlots,
-                onExtendedContextClick = { onDialogEvent(Open(CurrentCardExtendedContext(it))) },
-            )
+            } else {
+                RatedManualSheetContent(
+                    isAnswerRevealed = state.isAnswerRevealed,
+                    onShowAnswer = onShowAnswer,
+                    onAttemptRating = onAttemptRating,
+                )
+            }
+        },
+    ) { innerPadding ->
+        StudySessionBody(
+            isLoading = state.isLoading,
+            flashcards = state.flashcards,
+            currentCardIndex = PRESENTED_CARD_INDEX,
+            isAnswerRevealed = state.isAnswerRevealed,
+            innerPadding = innerPadding,
+            attemptSlots = state.attemptSlots,
+            onExtendedContextClick = { onDialogEvent(Open(CurrentCardExtendedContext(it))) },
+        )
 
-            StudySessionDialogHost(
-                activeDialog = state.activeDialog,
-                onDialogEvent = onDialogEvent,
-            )
-        }
+        StudySessionDialogHost(
+            activeDialog = state.activeDialog,
+            onDialogEvent = onDialogEvent,
+        )
     }
 }
 
@@ -251,9 +227,7 @@ private fun RatedManualSheetContent(isAnswerRevealed: Boolean, onShowAnswer: () 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(SHEET_PEEK_HEIGHT_MANUAL)
-            .padding(horizontal = MaterialTheme.spacing.normal)
-            .padding(top = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.medium),
+            .height(MANUAL_SHEET_CONTENT_HEIGHT),
     ) {
         if (!isAnswerRevealed) {
             Text(
@@ -304,7 +278,6 @@ private fun AttemptRatingButtons(onAttemptRating: (FlashcardAttemptRating) -> Un
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Preview
 @Composable
 private fun RatedStudySessionManualPreview() {
