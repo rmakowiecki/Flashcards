@@ -6,7 +6,7 @@ import com.rossomak.flashcards.web.content.LegalBlock.Paragraph
 /** The Privacy Policy linked from the Play Console listing and the app's Account screen. */
 val PrivacyPolicyDocument = LegalDocument(
     title = "Flashcards Privacy Policy",
-    subtitle = "Last updated: November 11, 2026",
+    subtitle = "Last updated: November 12, 2026",
     intro = listOf(
         "This policy explains what data the Flashcards Android app (\"the app\", \"we\") collects, why, who processes it, and how you can delete it.",
     ),
@@ -93,7 +93,8 @@ val PrivacyPolicyDocument = LegalDocument(
                     "Account and study data, problem reports and bug reports are stored in Google Firebase (Authentication, " +
                         "Cloud Firestore and Cloud Functions), operated by Google LLC. Crash reports are processed by Firebase " +
                         "Crashlytics, and device integrity checks by Firebase App Check and Google Play Integrity, all operated by " +
-                        "Google LLC. Support emails are kept in our Gmail inbox. Data is encrypted in transit.",
+                        "Google LLC. Firebase records your IP address when you sign in and call our server, to protect it from " +
+                        "abuse. Support emails are kept in our Gmail inbox. Data is encrypted in transit.",
                 ),
             ),
         ),

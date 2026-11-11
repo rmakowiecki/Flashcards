@@ -22,7 +22,8 @@ val DeleteAccountDocument = LegalDocument(
                     ),
                 ),
                 Paragraph(
-                    "Your account and data are deleted as soon as you confirm. If deletion fails, the app tells you and you can try again.",
+                    "The app deletes your account and data when you confirm, and tells you when it is done. If deletion fails, " +
+                        "try again. If it fails again, sign out, sign back in and retry, or email us.",
                 ),
             ),
         ),
@@ -60,6 +61,10 @@ val DeleteAccountDocument = LegalDocument(
                     "We keep no account or study data after deletion. We never store your voice answers or their transcripts, so we hold none to delete.",
                 ),
                 Paragraph("Support emails you sent us stay in our inbox until you ask us to delete them."),
+                Paragraph(
+                    "A copy of your study data cached on your device stays there until the app clears it over time. Uninstalling " +
+                        "the app or clearing its storage removes it at once.",
+                ),
                 Paragraph("Settings stored only on your device, such as your daily goal, are removed when you uninstall the app."),
                 Paragraph("<a href=\"/privacy\">Privacy Policy</a>"),
             ),
