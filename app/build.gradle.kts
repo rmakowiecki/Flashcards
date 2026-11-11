@@ -27,8 +27,11 @@ val gitShortSha: String = providers.exec {
     commandLine("git", "rev-parse", "--short", "HEAD")
 }.standardOutput.asText.get().trim()
 
+// The version of the next release, hand-edited: develop carries it from the moment the previous
+// release branch is cut (docs/release-flow.md).
 val versionMajor = 0
-val versionMinor = 1
+val versionMinor = 2
+val versionPatch = 0
 
 android {
     namespace = "com.rossomak.flashcards"
@@ -51,7 +54,7 @@ android {
     defaultConfig {
         applicationId = "com.rossomak.flashcards"
         versionCode = gitCommitCount
-        versionName = "$versionMajor.$versionMinor.$gitCommitCount"
+        versionName = "$versionMajor.$versionMinor.$versionPatch"
 
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         buildConfigField("String", "GIT_SHORT_SHA", "\"$gitShortSha\"")
@@ -60,7 +63,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            versionNameSuffix = "-debug.$gitCommitCount"
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("Boolean", "LOGGING_ENABLED", "true")
         }
@@ -80,7 +83,7 @@ android {
         create("profiling") {
             initWith(getByName("release"))
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-profiling"
+            versionNameSuffix = "-profiling.$gitCommitCount"
             signingConfig = signingConfigs.getByName("debug")
             proguardFile("proguard-rules-profiling.pro")
             buildConfigField("Boolean", "LOGGING_ENABLED", "true")

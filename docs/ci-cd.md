@@ -2,18 +2,15 @@
 
 Operational reference for the Bitrise pipeline. Rationale and alternatives considered: [ADR-0032](adr/0032-bitrise-cicd-gitflow.md). This doc changes as the pipeline evolves (e.g. the Play Store step, not built yet) — the ADR does not.
 
-## Branch flow
+## Workflows
 
-```
-feature/*  --PR-->  develop  --PR-->  main  --(future PR)-->  release/*
-              [gate]           [gate]
-```
+Which branch holds what, and how a release and a hotfix move between branches: [release-flow.md](release-flow.md).
 
 | Event | Workflow | What runs |
 |---|---|---|
-| PR into `develop` or `main` | `pr-check` | `./gradlew staticAnalysis` + `./gradlew test`. Required GitHub status check — merge is blocked on failure. Branch protection requires the PR to be up to date with base and disallows admin bypass, so this is the *only* Bitrise build per PR — no separate post-merge check. |
-| Push to `main` | `deploy-internal` | Builds debug + release APKs, signs release, pushes debug to Firebase App Distribution's `internal-debug` group and release to `internal-release`. |
-| Push to `release/*` | *(not built yet)* | Will build an AAB and upload to Play Store. |
+| PR into `develop`, `main` or `release/*` | `pr-check` | `./gradlew staticAnalysis`, `./gradlew test` and the website build. Required GitHub status check — merge is blocked on failure. Branch protection requires the PR to be up to date with base and disallows admin bypass, so this is the *only* Bitrise build per PR — no separate post-merge check. |
+| PR into `develop`, `main` or `release/*`, or push to `develop`, touching `functions/`, `firestore-tests/`, `firestore.rules`, `firebase.json` or `bitrise.yml` | `backend-check` | Cloud Functions unit tests and Firestore rules tests against the emulators. |
+| Push to `release/*` | *(planned)* | Will build a signed release AAB and upload it to the Play internal track (ADR-0077). Until then each candidate is built locally from the release branch head and uploaded by hand. |
 
 No instrumented (`androidTest`) tests exist yet, so no emulator step is configured. Add one to `pr-check` if/when instrumented tests land.
 
@@ -22,26 +19,22 @@ No instrumented (`androidTest`) tests exist yet, so no emulator step is configur
 | Name | Type | Purpose |
 |---|---|---|
 | `google-services.json` | Generic File Storage | Firebase config for the Android app. Contains both the release app (`com.rossomak.flashcards`) and debug app (`com.rossomak.flashcards.debug`) entries. Gitignored, per-dev/CI. |
-| `release.keystore` | Generic File Storage | Release signing key. **Back up outside Bitrise too** (password manager) — unrecoverable if lost, no Play App Signing fallback configured. |
+| `release.keystore` | Generic File Storage | Release signing key, which is the Play upload key: Google Play re-signs the published app with its own app-signing key (Play App Signing). Not used by any workflow until the planned `release/*` build. **Back up outside Bitrise too** (password manager): a lost upload key can be reset through Play support, but that takes days and blocks every upload meanwhile. |
 | `RELEASE_STORE_FILE` | Secret env var / Gradle `-P` | Path to `release.keystore` once placed on the CI runner. |
 | `RELEASE_STORE_PASSWORD` | Secret env var | Release keystore store password. |
 | `RELEASE_KEY_ALIAS` | Secret env var | Release key alias (`flashcards-release`). |
 | `RELEASE_KEY_PASSWORD` | Secret env var | Release key password. Same value as `RELEASE_STORE_PASSWORD` — keystore is PKCS12, which requires store and key password to match. |
 | `GOOGLE_WEB_CLIENT_ID` | Secret env var | Currently only in local `local.properties`; needed in CI for the same `buildConfigField`. |
-| Firebase App Distribution service account JSON | Generic File Storage | Dedicated service account, scoped to App Distribution admin only — **not** the same credential `functions/` uses for its own deploys. |
 
 ## Versioning
 
-- `versionCode` = `git rev-list --count HEAD` — total commit count, monotonic, no tagging required.
-- `versionName` = `MAJOR.MINOR.<commit count>` — `MAJOR`/`MINOR` are hand-edited constants in `app/build.gradle.kts`; the patch segment is the same commit count as `versionCode` and climbs across the whole repo history (doesn't reset per release).
-- To cut a new `MAJOR`/`MINOR`: edit the constants directly in `app/build.gradle.kts`.
-- Non-release build types append a `versionNameSuffix`: `-debug` or `-profiling` (e.g. `0.1.1234-profiling`); release has none. The Debug tab's hub shows version name/code and the short commit SHA (`BuildConfig.GIT_SHORT_SHA`) under its title while the app bar is expanded.
+`versionCode` is the commit count, and `versionName` is the hand-edited `MAJOR.MINOR.PATCH` in `app/build.gradle.kts`, with a build-type suffix and the commit count on debug and profiling builds (`0.2.0-debug.2450`). When to bump which number: [release-flow.md](release-flow.md#versions). The Debug tab's hub shows the version name and code and the short commit SHA (`BuildConfig.GIT_SHORT_SHA`) under its title while the app bar is expanded.
 
 ## Signing
 
 - `app/build.gradle.kts` `signingConfigs.release` reads `storeFile`/`storePassword`/`keyAlias`/`keyPassword` via a `releaseSigningProperty()` helper: Gradle `-P` flags first (what Bitrise passes), falling back to `local.properties` (what local dev uses, same pattern as `GOOGLE_WEB_CLIENT_ID`). No repo-committed defaults either way — `assembleRelease` without either source set will fail by design.
 - Debug builds use the default debug keystore (unchanged, no setup needed).
-- **If the release keystore is ever regenerated**, its new SHA-1 must be re-registered in the Firebase console (Project settings → Your apps), or Google Sign-In (`feature:auth`) breaks on release-signed builds.
+- **If the release keystore is ever regenerated**, its new SHA-1 must be re-registered in the Firebase console (Project settings → Your apps), or Google Sign-In (`feature:auth`) breaks on locally installed release-signed builds. Installs from Google Play are signed with the Play app-signing key, whose fingerprints are registered separately (see below).
 
 ## Debug/release package split
 
@@ -74,7 +67,7 @@ Release and profiling are minified. Firestore's reflection-based `toObject()` ma
 
 ## Local WIP distribution (dev-only, outside Bitrise)
 
-Separate from everything above — no Bitrise workflow, no git push required.
+The only Firebase App Distribution path — no Bitrise workflow, no git push required.
 Lets a dev build the *current, possibly-uncommitted* working tree and ship
 it straight to a device for a mid-feature progress check. No PR, no
 review, no static analysis; just "does it compile, ship it."
@@ -96,11 +89,10 @@ review, no static analysis; just "does it compile, ship it."
   on the multi-minute Gradle build, then tails the background output for
   the final `SUCCESS:`/`FAILED:` line and relays it verbatim via
   `PushNotification` + in-session.
-- Both variants use the **same** debug app id / debug signing /
-  `.debug`-suffixed package as `deploy-internal` above, and the same
-  `firebase-app-distribution-service-account.json` — but their own tester
-  groups (`wip-debug` / `wip-profiling`, distinct from `internal-debug`) so ad-hoc WIP noise
-  never mixes with "latest clean push to main."
+- Both variants use the debug signing and the `.debug`-suffixed package,
+  authenticate with the local
+  `firebase-app-distribution-service-account.json`, and upload to their own
+  tester groups (`wip-debug` / `wip-profiling`).
 - WIP snapshots get no versioning of their own — the distinguishing marker
   between them is the Firebase release notes (timestamp + short commit
   hash); the build type shows in the `versionNameSuffix` and on the Debug
@@ -127,5 +119,7 @@ review, no static analysis; just "does it compile, ship it."
 
 ## GitHub integration
 
-- Bitrise GitHub App installed on `Haydart/Flashcards`.
-- Branch protection on `develop` and `main`: `pr-check` status check required before merge.
+- Bitrise GitHub App installed on `rmakowiecki/Flashcards`.
+- Branch protection on `develop`, `main` and `release/*`: pull requests only, `pr-check` status check required before merge, up to date with base, no admin bypass. `release/*` branches may be created and deleted.
+- Merge commits only: squash and rebase merges are disabled for the repository, since the commit count is the `versionCode`.
+- `v*` tags cannot be deleted or moved.
