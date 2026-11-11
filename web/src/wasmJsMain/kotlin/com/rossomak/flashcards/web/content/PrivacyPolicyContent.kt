@@ -6,7 +6,7 @@ import com.rossomak.flashcards.web.content.LegalBlock.Paragraph
 /** The Privacy Policy linked from the Play Console listing and the app's Account screen. */
 val PrivacyPolicyDocument = LegalDocument(
     title = "Flashcards Privacy Policy",
-    subtitle = "Last updated: November 6, 2026",
+    subtitle = "Last updated: November 11, 2026",
     intro = listOf(
         "This policy explains what data the Flashcards Android app (\"the app\", \"we\") collects, why, who processes it, and how you can delete it.",
     ),
@@ -16,25 +16,42 @@ val PrivacyPolicyDocument = LegalDocument(
             blocks = listOf(
                 BulletList(
                     listOf(
-                        "<strong>Account data.</strong> When you sign in with Google, we receive your Google account's user ID, email " +
-                            "address, display name and profile photo URL through Firebase Authentication.",
+                        "<strong>Account data.</strong> When you sign in with Google or GitHub, we receive that account's user ID, " +
+                            "email address, display name and profile photo URL through Firebase Authentication. If you pick favorite " +
+                            "topics during setup before signing in, the app first creates an anonymous account to save them. It " +
+                            "becomes your account when you sign in, or is discarded if you sign in to an account you already have.",
                         "<strong>Study data.</strong> Your favorites, study sessions (dates, durations, which flashcards you studied " +
                             "and how you rated them), per-flashcard progress, XP, level and streak.",
-                        "<strong>Content you create.</strong> Private flashcards you write, and problem reports you submit about flashcards.",
+                        "<strong>Problem reports.</strong> Reports you submit about a flashcard's content.",
+                        "<strong>Bug reports.</strong> When you report a bug, we receive your description, the severity you pick, " +
+                            "the app version, device model and Android version, linked to your account. Please do not include " +
+                            "personal information in the description.",
+                        "<strong>Support emails.</strong> Contact support opens an email draft that starts with your account ID, " +
+                            "the app version, device model and Android version. You choose whether to send it.",
                         "<strong>Voice answers (optional).</strong> Only if you turn on Voice answering. See below.",
+                        "<strong>Device integrity check.</strong> To confirm that requests to our server come from a genuine copy " +
+                            "of the app, the app gets an attestation from Google Play Integrity through Firebase App Check.",
                         "<strong>Crash diagnostics.</strong> When the app crashes or hits an error, it sends a crash report: the stack " +
                             "trace, recent app log lines, the app version, device model and Android version, and a random identifier " +
                             "for this installation of the app. For a crash in native code it also includes a snapshot of the app's " +
                             "memory at the time of the crash. Reports carry no account identifier.",
                     ),
                 ),
-                Paragraph("Some settings, such as your daily goal and study preferences, are stored only on your device."),
+                Paragraph(
+                    "Some data is stored only on your device: settings such as your daily goal and study preferences, a cache " +
+                        "of flashcards, and study sessions waiting to be sent to our server. Uninstalling the app removes it.",
+                ),
                 Paragraph("The app does not show ads, does not use analytics or advertising SDKs, and does not sell your data."),
             ),
         ),
         LegalSection(
-            title = "Voice answering",
+            title = "Microphone and voice answering",
             blocks = listOf(
+                Paragraph(
+                    "The app uses the microphone only for the voice test during setup and for Voice answering, and asks for " +
+                        "your permission first. The voice test records you, changes your voice and plays it back, all on your " +
+                        "device: nothing from it leaves the device.",
+                ),
                 Paragraph(
                     "Voice answering is off by default. When you use it, the app records your spoken answer through the microphone " +
                         "and transforms the voice audio on your device before it leaves the device. The transformed audio is then sent " +
@@ -61,6 +78,9 @@ val PrivacyPolicyDocument = LegalDocument(
                         "To calculate progress, XP, levels and streaks.",
                         "To grade spoken answers when you use Voice answering.",
                         "To fix flashcards you report as having problems.",
+                        "To investigate and fix bugs you report.",
+                        "To answer your support requests.",
+                        "To protect our server from requests that do not come from the app.",
                         "To find and fix crashes and errors in the app.",
                     ),
                 ),
@@ -70,9 +90,10 @@ val PrivacyPolicyDocument = LegalDocument(
             title = "Where data is stored",
             blocks = listOf(
                 Paragraph(
-                    "Account and study data is stored in Google Firebase (Authentication, Cloud Firestore and Cloud Functions), " +
-                        "operated by Google LLC. Crash reports are processed by Firebase Crashlytics, also operated by Google LLC. " +
-                        "Data is encrypted in transit.",
+                    "Account and study data, problem reports and bug reports are stored in Google Firebase (Authentication, " +
+                        "Cloud Firestore and Cloud Functions), operated by Google LLC. Crash reports are processed by Firebase " +
+                        "Crashlytics, and device integrity checks by Firebase App Check and Google Play Integrity, all operated by " +
+                        "Google LLC. Support emails are kept in our Gmail inbox. Data is encrypted in transit.",
                 ),
             ),
         ),
@@ -80,10 +101,15 @@ val PrivacyPolicyDocument = LegalDocument(
             title = "Data retention and deletion",
             blocks = listOf(
                 Paragraph(
-                    "We keep your account and study data for as long as your account exists. You can ask us to delete your account " +
-                        "and all associated data by following the steps on our <a href=\"/delete-account\">account deletion page</a>. " +
-                        "We delete it within 30 days of your request. Crash reports are not linked to your account. Google keeps them " +
-                        "for 90 days, then removes them from its systems.",
+                    "We keep your account data, study data, problem reports and bug reports for as long as your account exists.",
+                ),
+                Paragraph(
+                    "You can delete your account and all of this data in the app, or without the app by email. Our " +
+                        "<a href=\"/delete-account\">account deletion page</a> has the steps for both.",
+                ),
+                Paragraph(
+                    "We delete your support emails when you ask us to. Crash reports are not linked to your account. Google keeps " +
+                        "them for 90 days, then removes them from its systems.",
                 ),
             ),
         ),

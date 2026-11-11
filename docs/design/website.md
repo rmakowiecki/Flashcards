@@ -11,7 +11,7 @@ design tokens as the app ([ADR-0068](../adr/0068-website-is-a-compose-multiplatf
 |---|---|
 | `/` | Home: the logo, the app's tagline, and links to the two legal pages |
 | `/privacy` | The Privacy Policy |
-| `/delete-account` | How to request Account Deletion by email, what is deleted and what is kept |
+| `/delete-account` | How to delete the account in the app or request Account Deletion by email, what is deleted and what is kept |
 
 - Every address is served the same page; the site reads the path and shows the matching page.
 - A trailing slash and the `.html` ending of the original static pages are accepted.
