@@ -293,6 +293,7 @@ Creating a new `git worktree` gives you a checkout without the gitignored local 
 
 - `docs/adr/` — architecture decision records: decisions and rejected alternatives. Look up rationale through Graphify.
 - `docs/user-flow/` — per-screen action flows (taps, decisions, entry points) as Mermaid diagrams. Read the matching file when changing a screen's actions or entry points.
+- `docs/release-flow.md` — branches, releases, hotfixes and versions. Read before cutting a release branch, opening a release or hotfix PR, or changing the version.
 - `CONTEXT.md` — domain vocabulary glossary
 - `TESTING.md` — testing conventions
 
