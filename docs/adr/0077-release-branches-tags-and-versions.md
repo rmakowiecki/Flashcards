@@ -23,7 +23,8 @@ production. `develop` holds everything accepted, released or not.
 **A release is stabilized on its own branch.** `release/x.y` is cut from `develop` and takes only fixes,
 each by pull request; `develop` stays open for new work. Each fix is merged back into `develop` by pull
 request. A hotfix is `release/x.y.z`, cut from the tag of the release it fixes, and follows the same
-cycle.
+cycle. Once it ships, it is merged by pull request into `develop` and into every release branch still
+stabilizing, each merge producing a new candidate.
 
 **Every merge into a release branch is a candidate, and only release branches upload to Google Play.**
 A candidate is a signed release AAB uploaded to the internal track and promoted to the closed track for
@@ -32,7 +33,9 @@ changes become candidates. Builds from `develop` never go to Play.
 
 **What ships is the tested candidate.** The candidate that passed closed testing is promoted to
 production in Play Console, never rebuilt. Its commit gets an annotated `vx.y.z` tag; internal and
-closed uploads get none.
+closed uploads get none. Only a candidate built from the release branch's current head is promoted, and
+nothing merges into the branch after that until it reaches `main`, so `main` receives exactly what
+shipped. A promoted candidate must also contain the latest production tag.
 
 **The release reaches `main` through a pull request with a merge commit.** The release branch's pull
 request into `main` merges after promotion and tagging, and the branch is then deleted. `main`'s tip
@@ -80,6 +83,9 @@ App Check (ADR-0076).
 
 ## Consequences
 
+- A candidate built before a hotfix shipped is never promoted: it lacks the latest production tag, and
+  its `versionCode` could be lower than the hotfix's. Containing that tag makes every promoted
+  candidate's commit count, and so its `versionCode`, higher than any build already in production.
 - Two release branches open at once (a hotfix while the next release stabilizes) can reach the same
   commit count. Play rejects the duplicate `versionCode` at upload; a new commit on the branch fixes it.
 - A build from `develop` on a Play track would usually outnumber the candidate and hide it from testers
