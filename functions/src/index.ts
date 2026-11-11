@@ -20,6 +20,9 @@ const RUNTIME_OPTIONS = {
   // never sees the SDK give up while the function still runs.
   timeoutSeconds: 60,
   memory: "512MiB" as const,
+  // A call without a valid App Check token is rejected as `unauthenticated` before the handler runs
+  // (ADR-0076).
+  enforceAppCheck: true,
 };
 
 // Guard against oversized uploads before allocating a decode buffer or paying for downstream STT.
