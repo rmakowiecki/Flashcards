@@ -20,18 +20,13 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -39,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -52,15 +46,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.backdrop.BrandGradientBackdrop
-import com.rossomak.flashcards.core.ui.backdrop.blurBackdropScope
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsButtonIconPosition
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledIconButton
 import com.rossomak.flashcards.core.ui.dialog.DialogEvent.Open
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
 import com.rossomak.flashcards.feature.study.R
-import com.rossomak.flashcards.feature.study.StudyMorpheusGraphs
 import com.rossomak.flashcards.feature.study.StudySessionSummaryRoute
 import com.rossomak.flashcards.feature.study.chrome.StudySessionBody
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialog.CurrentCardExtendedContext
@@ -71,6 +62,7 @@ import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogEvent
 import com.rossomak.flashcards.feature.study.chrome.StudySessionDialogHost
 import com.rossomak.flashcards.feature.study.chrome.StudySessionHeader
 import com.rossomak.flashcards.feature.study.chrome.StudySessionProgress
+import com.rossomak.flashcards.feature.study.chrome.StudySessionScaffold
 import com.rossomak.flashcards.feature.study.chrome.studySessionCardTitle
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionDestination.Back
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionDestination.Summary
@@ -79,8 +71,8 @@ import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.PlayIg
 import com.rossomak.flashcards.feature.study.fast.FastStudySessionMessage.VoicePlaybackUnavailable
 import kotlinx.coroutines.launch
 
-private val SHEET_PEEK_HEIGHT_READ_ALOUD: Dp = 175.dp
-private val SHEET_PEEK_HEIGHT_DEFAULT: Dp = 150.dp
+private val READ_ALOUD_SHEET_CONTENT_HEIGHT: Dp = 143.dp
+private val DEFAULT_SHEET_CONTENT_HEIGHT: Dp = 118.dp
 
 @Composable
 fun FastStudySessionScreen(
@@ -174,7 +166,6 @@ data class FastStudySessionActions(
     val onDialogEvent: (StudySessionDialogEvent) -> Unit,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FastStudySessionContent(
     modifier: Modifier = Modifier,
@@ -182,69 +173,57 @@ fun FastStudySessionContent(
     snackbarHostState: SnackbarHostState,
     actions: FastStudySessionActions,
 ) {
-    val scaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(skipHiddenState = true),
-    )
-
-    Box(modifier = modifier.fillMaxSize().blurBackdropScope()) {
-        BrandGradientBackdrop(graph = StudyMorpheusGraphs.session)
-        BottomSheetScaffold(
-            modifier = Modifier.fillMaxSize(),
-            scaffoldState = scaffoldState,
-            containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            sheetSwipeEnabled = false,
-            sheetPeekHeight = if (state.isReadAloudMode) SHEET_PEEK_HEIGHT_READ_ALOUD else SHEET_PEEK_HEIGHT_DEFAULT,
-            sheetDragHandle = {},
-            topBar = {
-                StudySessionHeader(
-                    title = studySessionCardTitle(
-                        categoryName = state.categoryName,
-                        currentCard = state.currentCard,
-                        subcategoryNameById = state.subcategoryNameById,
-                        separator = stringResource(CoreUiR.string.common_middle_dot_separator),
-                    ),
-                    reportableCard = state.currentCard,
-                    progress = if (state.flashcards.isNotEmpty()) {
-                        StudySessionProgress(
-                            label = stringResource(R.string.fast_study_session_progress_label),
-                            completedCount = state.currentCardIndex + 1,
-                            totalCount = state.flashcards.size,
-                        )
-                    } else {
-                        null
-                    },
-                    onClose = { actions.onDialogEvent(Open(ExitSession)) },
-                    onReportProblem = { card ->
-                        actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
-                    },
-                )
-            },
-            sheetContent = {
-                FastStudySessionSheetContent(
-                    state = state,
-                    onShowAnswer = actions.onShowAnswer,
-                    onNextCard = actions.onNextCard,
-                    onVoicePlayPause = actions.onVoicePlayPause,
-                    onVoiceNext = actions.onVoiceNext,
-                    onVoicePrevious = actions.onVoicePrevious,
-                    onVoiceSettingsCogClick = { actions.onDialogEvent(Open(SessionVoiceSettings())) },
-                )
-            },
-        ) { innerPadding ->
-            StudySessionBody(
-                isLoading = state.isLoading,
-                flashcards = state.flashcards,
-                currentCardIndex = state.currentCardIndex,
-                isAnswerRevealed = state.isAnswerRevealed,
-                innerPadding = innerPadding,
-                onExtendedContextClick = { actions.onDialogEvent(Open(CurrentCardExtendedContext(it))) },
+    StudySessionScaffold(
+        modifier = modifier,
+        snackbarHostState = snackbarHostState,
+        topBar = {
+            StudySessionHeader(
+                title = studySessionCardTitle(
+                    categoryName = state.categoryName,
+                    currentCard = state.currentCard,
+                    subcategoryNameById = state.subcategoryNameById,
+                    separator = stringResource(CoreUiR.string.common_middle_dot_separator),
+                ),
+                reportableCard = state.currentCard,
+                progress = if (state.flashcards.isNotEmpty()) {
+                    StudySessionProgress(
+                        label = stringResource(R.string.fast_study_session_progress_label),
+                        completedCount = state.currentCardIndex + 1,
+                        totalCount = state.flashcards.size,
+                    )
+                } else {
+                    null
+                },
+                onClose = { actions.onDialogEvent(Open(ExitSession)) },
+                onReportProblem = { card ->
+                    actions.onDialogEvent(Open(ReportCurrentCardProblem(cardId = card.id, subcategoryId = card.subcategoryId)))
+                },
             )
-            StudySessionDialogHost(
-                activeDialog = state.activeDialog,
-                onDialogEvent = actions.onDialogEvent,
+        },
+        sheetContent = {
+            FastStudySessionSheetContent(
+                state = state,
+                onShowAnswer = actions.onShowAnswer,
+                onNextCard = actions.onNextCard,
+                onVoicePlayPause = actions.onVoicePlayPause,
+                onVoiceNext = actions.onVoiceNext,
+                onVoicePrevious = actions.onVoicePrevious,
+                onVoiceSettingsCogClick = { actions.onDialogEvent(Open(SessionVoiceSettings())) },
             )
-        }
+        },
+    ) { innerPadding ->
+        StudySessionBody(
+            isLoading = state.isLoading,
+            flashcards = state.flashcards,
+            currentCardIndex = state.currentCardIndex,
+            isAnswerRevealed = state.isAnswerRevealed,
+            innerPadding = innerPadding,
+            onExtendedContextClick = { actions.onDialogEvent(Open(CurrentCardExtendedContext(it))) },
+        )
+        StudySessionDialogHost(
+            activeDialog = state.activeDialog,
+            onDialogEvent = actions.onDialogEvent,
+        )
     }
 }
 
@@ -263,9 +242,7 @@ private fun FastStudySessionSheetContent(
         horizontalAlignment = Alignment.End,
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (state.isReadAloudMode) SHEET_PEEK_HEIGHT_READ_ALOUD else SHEET_PEEK_HEIGHT_DEFAULT)
-            .padding(horizontal = MaterialTheme.spacing.normal)
-            .padding(top = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.medium)
+            .height(if (state.isReadAloudMode) READ_ALOUD_SHEET_CONTENT_HEIGHT else DEFAULT_SHEET_CONTENT_HEIGHT)
     ) {
         if (state.isReadAloudMode) {
             FastVoiceTransportControls(
@@ -373,7 +350,6 @@ private fun FastVoiceTransportControls(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Preview
 @Composable
 private fun FastStudySessionVoiceActivePreview() {
@@ -398,7 +374,6 @@ private fun FastStudySessionVoiceActivePreview() {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Preview
 @Composable
 private fun FastStudySessionManualRevealedPreview() {

@@ -24,7 +24,7 @@ The screen stays on while a session runs.
 
 **Background.** Over the brand gradient, a slow animated network graph spreads from the top centre, behind the header, and thins out over the card. Rated and Fast draw the same graph ([ADR-0069](../adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)).
 
-**Bottom panel.** A fixed panel below the card whose content depends on the Study Mode and its delivery.
+**Bottom panel.** A fixed panel below the card whose content depends on the Study Mode and its delivery. Its content always sits above the system navigation bar, whether that is gesture navigation or buttons, and a snackbar message shows above the panel, never over it.
 
 ## Dialogs
 

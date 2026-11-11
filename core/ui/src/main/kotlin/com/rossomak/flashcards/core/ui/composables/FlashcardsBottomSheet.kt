@@ -59,9 +59,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  *   `androidx.compose.material3.internal.DraggableAnchors` (M3 1.5.0-alpha23): doing so bottom-aligns
  *   the small *reported* size on top of the sheet's own internal bottom offset — a double offset that
  *   pushes the real content roughly `2×(fullHeight - sheetHeight)` down, off-screen or clipped
- *   depending on content height. This was a real, reproduced bug in this codebase (not an M3 bug) —
- *   every sheet built on this component had it from the first commit, and no amount of tuning the
- *   *content*'s size ever could have fixed a bug at the call site.
+ *   depending on content height.
  * - The `Box`'s own height must actually be bounded (e.g. `fillMaxSize()` inside a bounded parent,
  *   not `wrapContentHeight()`) — `fullHeight` above comes from that constraint, not the sheet's
  *   content.
@@ -75,16 +73,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  *   study session screen).
  * - **Non-dismissible**: no gestures, no back-dismiss, and no drag handle at all — a handle that
  *   can't do anything is worse than none. This is the permanently-docked-panel shape
- *   (`RatedStudySessionScreen`'s card/rating panel is a named future consumer).
- *
- * An earlier version of this component took `dismissible` (and a separate `draggable`) as
- * independent parameters on *both* [FlashcardsBottomSheet] and the state builder. Review found
- * that unsound — verified against M3 1.5.0-alpha23 source, a `state` built non-dismissible
- * combined with this composable's own `dismissible = true` made the predictive-back handler call
- * `state.hide()` unconditionally, which throws once hidden is excluded from `enabledValues`. Two
- * independent copies of the same fact with nothing keeping them in sync. [FlashcardsBottomSheetState]
- * exists so there is exactly one flag, set once, at the state builder — this composable only reads
- * it back.
+ *   (the Rated and Fast session panels and the Session Summary panel).
  *
  * Everything else this component adds on top of a bare `BottomSheet` call is the app's own design
  * tokens — top-rounded [MaterialTheme.cornerRadius.large] shape,
@@ -103,9 +92,8 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  * composable, deliberately *outside* the `BottomSheet` call it wraps: `BottomSheet`'s own internal
  * `draggableAnchors` modifier (see the placement note above) relaxes the height constraint it hands
  * its content down to effectively unbounded, so it can measure that content's true natural height
- * for its anchor math — measuring *inside* that point (as an earlier, reverted attempt did, with a
- * bare `verticalScroll` and no cap) crashes with Compose's "measured with infinity maximum height"
- * exception the moment content exceeds the viewport. Reading [BoxWithConstraints.maxHeight] here
+ * for its anchor math — measuring *inside* that point crashes with Compose's "measured with infinity
+ * maximum height" exception the moment content exceeds the viewport. Reading [BoxWithConstraints.maxHeight] here
  * instead, above that relaxation point, sees the real bounded height the caller's own outer
  * `Box(Modifier.fillMaxSize())` provides (see the placement note above) — `Modifier.heightIn(max = ...)`
  * against that concrete value clamps correctly even where the inner measurement is later relaxed to

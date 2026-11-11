@@ -84,3 +84,17 @@ provides. `maxHeightFraction` (default `0.8f`) is multiplied against that bound 
 where the constraint it's intersected against is later relaxed to infinity downstream — the piece the
 first attempt was missing. `content` shorter than the cap is unaffected; `verticalScroll` only
 engages once actual content exceeds it.
+
+## Addendum: the session panels use it too
+
+The Rated and Fast session panels were built on `BottomSheetScaffold` as fixed, non-swipeable panels.
+That broke in two ways. `BottomSheetScaffold` pads no window inset into its sheet, so 3-button
+navigation covered the panel's buttons. And because the content's height equalled
+`sheetPeekHeight`, M3 created no `PartiallyExpanded` anchor, so the sheet settled `Expanded` and the
+scaffold placed snackbars at the screen bottom, over the panel.
+
+Both panels now use a non-dismissible `FlashcardsBottomSheet` through `StudySessionScaffold`, the
+same shape as the Session Summary panel: the sheet is an unaligned sibling of a plain `Scaffold`, and
+its measured height pads the body and the `SnackbarHost`. No screen uses `BottomSheetScaffold` any
+more.
+

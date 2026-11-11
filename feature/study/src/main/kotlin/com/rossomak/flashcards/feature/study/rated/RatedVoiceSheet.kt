@@ -98,9 +98,7 @@ internal fun RatedVoiceSheetContent(
         targetState = voiceSheetMode.group,
         modifier = Modifier
             .fillMaxWidth()
-            .height(SHEET_PEEK_HEIGHT_VOICE)
-            .padding(horizontal = MaterialTheme.spacing.normal)
-            .padding(top = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.medium),
+            .height(VOICE_SHEET_CONTENT_HEIGHT),
         transitionSpec = {
             fadeIn(tween(FlashcardsMotion.DURATION_MEDIUM_MS)) togetherWith fadeOut(tween(FlashcardsMotion.DURATION_MEDIUM_MS))
         },
