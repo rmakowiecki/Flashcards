@@ -112,6 +112,10 @@ val PrivacyPolicyDocument = LegalDocument(
                     "We delete your support emails when you ask us to. Crash reports are not linked to your account. Google keeps " +
                         "them for 90 days, then removes them from its systems.",
                 ),
+                Paragraph(
+                    "Firebase keeps the IP address records for a few weeks, and our server's request logs keep them for 30 days. " +
+                        "Deleting your account does not remove them sooner.",
+                ),
             ),
         ),
         LegalSection(

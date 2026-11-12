@@ -62,8 +62,8 @@ val DeleteAccountDocument = LegalDocument(
                 ),
                 Paragraph("Support emails you sent us stay in our inbox until you ask us to delete them."),
                 Paragraph(
-                    "A copy of your study data cached on your device stays there until the app clears it over time. Uninstalling " +
-                        "the app or clearing its storage removes it at once.",
+                    "A copy of your study data cached on your device can stay there until you uninstall the app or clear its " +
+                        "storage. Either removes it at once.",
                 ),
                 Paragraph("Settings stored only on your device, such as your daily goal, are removed when you uninstall the app."),
                 Paragraph("<a href=\"/privacy\">Privacy Policy</a>"),
