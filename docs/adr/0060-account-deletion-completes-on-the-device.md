@@ -60,8 +60,8 @@ reset of Firestore's cache and Credential Manager's state.
 - A Firestore write still pending when the deletion starts, such as an offline Favorite, can
   re-create a document under `users/{uid}` once it reaches the server.
 - The deleted User's cached Firestore documents stay on the device, as after an ordinary sign-out.
-  They are out of reach of another User's queries, and Firestore's cache eviction removes them over
-  time.
+  They are out of reach of another User's queries. Firestore's size-based cache eviction may never
+  remove them; uninstalling the app or clearing its storage does.
 - Credential Manager may offer the deleted Google account first at the next sign-in. Signing in with
   it creates a fresh User.
 - Device-wide preferences, such as study settings and the Daily Goal, are kept.
