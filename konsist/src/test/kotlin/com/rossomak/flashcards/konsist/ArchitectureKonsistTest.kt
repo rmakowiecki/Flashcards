@@ -384,6 +384,30 @@ class ArchitectureKonsistTest {
     }
 
     @Test
+    fun `feature modules never import core data`() {
+        // Features reach data only through core:domain interfaces; :app wires the implementations with Hilt.
+        projectScope
+            .files
+            .filter { it.path.contains("/feature/") && it.path.contains("/src/") }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name.startsWith("com.rossomak.flashcards.core.data.") }
+            }
+    }
+
+    @Test
+    fun `only the study feature imports core voice`() {
+        // feature:study hosts the spoken-session runtime (capture session, TextToSpeech, MediaSession service)
+        // next to its only user, so it uses core:voice directly. Every other feature goes through core:domain.
+        projectScope
+            .files
+            .filter { it.path.contains("/feature/") && it.path.contains("/src/") }
+            .filter { !it.path.contains("/feature/study/") }
+            .assertTrue { file ->
+                file.imports.none { import -> import.name.startsWith("com.rossomak.flashcards.core.voice.") }
+            }
+    }
+
+    @Test
     fun `only debug-only sources import the debug-tools module`() {
         // :debug-tools reaches :app only through debugImplementation and profilingImplementation, so an
         // import of it from any other source set compiles in debug but breaks the release build. This

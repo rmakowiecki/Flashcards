@@ -3,7 +3,7 @@ package com.rossomak.flashcards.core.data.preview
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import com.rossomak.flashcards.core.common.loge
-import com.rossomak.flashcards.core.data.voice.VoiceCuration
+import com.rossomak.flashcards.core.common.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.repository.VoicePreviewGateway
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
