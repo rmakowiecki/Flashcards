@@ -9,21 +9,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin 2.4">
+  <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
   <img src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white" alt="Jetpack Compose">
   <img src="https://img.shields.io/badge/Material%203-757575?logo=materialdesign&logoColor=white" alt="Material 3">
-  <img src="https://img.shields.io/badge/Hilt-DI-2196F3" alt="Hilt">
-  <img src="https://img.shields.io/badge/Media3-MediaSession-3DDC84?logo=android&logoColor=white" alt="Media3 MediaSession">
-  <img src="https://img.shields.io/badge/min%20SDK-26-3DDC84?logo=android&logoColor=white" alt="min SDK 26">
+  <img src="https://img.shields.io/badge/Vertex%20AI-4285F4?logo=googlecloud&logoColor=white" alt="Vertex AI">
+  <img src="https://img.shields.io/badge/ElevenLabs-000000?logo=elevenlabs&logoColor=white" alt="ElevenLabs">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0 license">
   <br>
-  <img src="https://img.shields.io/badge/Firebase%20Auth-FFCA28?logo=firebase&logoColor=black" alt="Firebase Auth">
-  <img src="https://img.shields.io/badge/Firestore-FFCA28?logo=firebase&logoColor=black" alt="Firestore">
-  <img src="https://img.shields.io/badge/Cloud%20Functions-TypeScript-3178C6?logo=typescript&logoColor=white" alt="Cloud Functions in TypeScript">
-  <img src="https://img.shields.io/badge/App%20Check-Play%20Integrity-FFCA28?logo=firebase&logoColor=black" alt="App Check with Play Integrity">
-  <img src="https://img.shields.io/badge/Crashlytics-FFCA28?logo=firebase&logoColor=black" alt="Crashlytics">
-  <img src="https://img.shields.io/badge/Gemini-Vertex%20AI-8E75B2?logo=googlegemini&logoColor=white" alt="Gemini on Vertex AI">
-  <img src="https://img.shields.io/badge/ElevenLabs-Scribe-000000?logo=elevenlabs&logoColor=white" alt="ElevenLabs Scribe">
+  <img src="https://img.shields.io/badge/Firebase-Auth%20%C2%B7%20Firestore%20%C2%B7%20Cloud%20Functions%20%C2%B7%20App%20Check%20%C2%B7%20Crashlytics%20%C2%B7%20Hosting-FFCA28?logo=firebase&logoColor=black" alt="Firebase: Auth, Firestore, Cloud Functions, App Check, Crashlytics, Hosting">
 </p>
 
 An Android app with curated flashcards for developers: Kotlin, Android, Swift, Python, Machine Learning and more.
@@ -35,14 +28,11 @@ In closed testing on Google Play. Website and privacy policy:
 
 ## How it's built
 
+**System overview** (C4 container level):
+
 ```mermaid
 flowchart LR
-    subgraph App["Android app"]
-        UI["feature:*<br/>Compose screens, ViewModels"]
-        Domain["core:domain<br/>session coordinators, use cases"]
-        Data["core:data<br/>repositories, Pending Session queue,<br/>WorkManager delivery"]
-        Voice["core:voice<br/>mic capture, voice obfuscation"]
-    end
+    App["Android app<br/>Kotlin, Jetpack Compose<br/>Pending Session queue, voice obfuscation"]
     Integrity["Play Integrity"]
     subgraph Firebase
         Auth["Auth<br/>Google, GitHub"]
@@ -57,15 +47,12 @@ flowchart LR
     Gemini["Gemini on Vertex AI"]
     Seed["Seed scripts<br/>(admin)"]
 
-    UI --> Domain
-    Domain --> Data
-    Domain --> Voice
     App -- "crash reports" --> Crashlytics
-    Data -- "sign-in" --> Auth
-    Data -- "attestation" --> Integrity
+    App -- "sign-in" --> Auth
+    App -- "attestation" --> Integrity
     Integrity --> AppCheck
-    Data -- "reads content, progress, Recents, Premium;<br/>writes Favorites, Curation Requests" --> Firestore
-    Data -- "callables with App Check token;<br/>obfuscated answer audio" --> Functions
+    App -- "reads content, progress, Recents, Premium;<br/>writes Favorites, Curation Requests" --> Firestore
+    App -- "callables with App Check token;<br/>obfuscated answer audio" --> Functions
     AppCheck -. "enforced on" .-> Functions
     Functions -- "sessions, Card Progress, XP, Streak,<br/>Recents, Bug Reports, Account Deletion" --> Firestore
     Functions -- "audio" --> Scribe
@@ -75,7 +62,7 @@ flowchart LR
     Seed -. "flashcard content" .-> Firestore
 ```
 
-One Voice Answering round:
+**One Voice Answering round** (sequence diagram):
 
 ```mermaid
 sequenceDiagram
@@ -137,13 +124,6 @@ sequenceDiagram
 | AI | ElevenLabs Scribe for speech-to-text, Gemini on Vertex AI for transcript cleanup and grading |
 | Website | Compose Multiplatform for the browser (wasm) |
 | Tooling and CI | Bitrise, Spotless with ktlint, detekt, Android Lint, Konsist, Firebase emulators for the Functions and security rules tests |
-
-### Also in this repo
-
-- **Website** (`:web`): the public site and privacy pages, written in Compose Multiplatform for the browser (wasm)
-  and sharing the app's design tokens. [ADR-0068](docs/adr/0068-website-is-a-compose-multiplatform-wasm-app.md)
-- **[Morpheus](https://github.com/rmakowiecki/Morpheus)**: the animated graph background, a separate library of mine
-  consumed as a versioned git submodule. [ADR-0069](docs/adr/0069-morpheus-is-an-external-library-built-from-a-submodule.md)
 
 ## Features
 
