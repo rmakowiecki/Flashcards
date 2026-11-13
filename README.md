@@ -68,14 +68,15 @@ flowchart LR
 sequenceDiagram
     participant User
     participant App as App (device)
-    participant Fn as transcribeAndGradeSpokenAnswer
+    participant Fn as Cloud Run Functions
     participant Scribe as ElevenLabs Scribe
     participant Gemini as Gemini on Vertex AI
 
     App->>User: Read the question aloud (TextToSpeech)
     User->>App: Speak the answer
-    App->>App: Detect end of speech, reveal the answer
-    App->>App: Obfuscate the voice (pitch and formant shift)
+    App->>App: Detect end of speech (on-device Silero VAD), trim long pauses, drop a noise-only clip
+    App->>User: Reveal the card's answer
+    App->>App: Obfuscate the voice (pitch and formant shift), wipe the raw audio
     App->>Fn: Obfuscated audio, question, expected answer (App Check token)
     Fn->>Fn: Check App Check, Premium and payload
     Fn->>Scribe: Transcribe
@@ -89,7 +90,31 @@ sequenceDiagram
     Fn-->>App: Grade
     App->>App: Map the percentage to a Rating
     App->>User: Speak the Rating and the rationale
+    App->>User: After a short pause, read the next question
 ```
+
+**Android app modules**: features depend only on `core:ui` and `core:domain`; `core:data` and `core:voice` implement the domain interfaces and are wired in by `:app` with Hilt.
+
+- `:app`: MainActivity, navigation graph, splash and startup, launcher shortcuts, Crashlytics logging, Hilt application
+- Feature modules
+  - `feature:auth`: Login with Google or GitHub
+  - `feature:onboarding`: first-run gallery and the on-device voice test
+  - `feature:home`: Level, Streak, Daily Goal, Favorites and Recents
+  - `feature:browse`: Categories, search, Category and Subcategory Details, Selection Mode
+  - `feature:study`: Preview, Rated and Fast sessions, Session Summary, and the spoken-session runtime (TextToSpeech, MediaSession service, voice capture)
+  - `feature:settings`: study defaults and voice settings
+  - `feature:account`: Account, Account Deletion, Report a bug, open-source licenses
+- Core modules
+  - `core:domain`: pure Kotlin models, use cases, repository and gateway interfaces, session reducers and coordinators, XP scoring
+  - `core:data`: Firestore and Cloud Functions data sources, DataStore, the Pending Session queue and its WorkManager delivery, sign-in
+  - `core:voice`: microphone capture, Silero VAD on ONNX Runtime, voice obfuscation, Bluetooth routing
+  - `core:ui`: shared Compose components, dialogs, backdrop blur, navigation helpers
+  - `core:designsystem`: theme and design tokens, shared with the website
+  - `core:common`: logging and shared helpers
+- `:debug-tools`: screen showcase and debug panels, in debug and profiling builds only
+- Morpheus (git submodule): the animated graph background
+
+**Highlights**:
 
 - **Server-authoritative session commit.** A finished session is scored and recorded by a Cloud Function in one
   Firestore transaction: the session, Card Progress, XP, Level, Streak and Daily Goal move together or not at all.
@@ -121,7 +146,7 @@ sequenceDiagram
 | UI | Kotlin 2.4, Jetpack Compose, Material 3, Navigation Compose, Coil, Haze (backdrop blur) |
 | Platform | Hilt, Coroutines and Flow, Kotlinx Serialization, WorkManager, DataStore, Credential Manager, Android TextToSpeech, Media3 and MediaSession, min SDK 26, target SDK 36 |
 | Backend | Firebase Auth (Google, GitHub), Firestore, Cloud Functions (TypeScript, Node 22), App Check with Play Integrity, Crashlytics (with NDK), Hosting |
-| AI | ElevenLabs Scribe for speech-to-text, Gemini on Vertex AI for transcript cleanup and grading |
+| AI | ElevenLabs Scribe for speech-to-text, Gemini on Vertex AI for transcript cleanup and grading, Silero VAD on ONNX Runtime for on-device end-of-speech detection |
 | Website | Compose Multiplatform for the browser (wasm) |
 | Tooling and CI | Bitrise, Spotless with ktlint, detekt, Android Lint, Konsist, Firebase emulators for the Functions and security rules tests |
 
