@@ -1,4 +1,4 @@
-package com.rossomak.flashcards.core.data.voice
+package com.rossomak.flashcards.core.common.voice
 
 import android.speech.tts.Voice
 

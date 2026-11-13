@@ -8,7 +8,6 @@ android {
 
 dependencies {
     implementation(project(":core:domain"))
-    implementation(project(":core:data"))
     implementation(project(":core:ui"))
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)

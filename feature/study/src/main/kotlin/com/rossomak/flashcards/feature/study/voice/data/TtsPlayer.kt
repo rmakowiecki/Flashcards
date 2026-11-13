@@ -13,7 +13,7 @@ import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.rossomak.flashcards.core.common.logd
-import com.rossomak.flashcards.core.data.voice.VoiceCuration
+import com.rossomak.flashcards.core.common.voice.VoiceCuration
 import com.rossomak.flashcards.core.domain.model.PlaybackEvent
 import com.rossomak.flashcards.core.domain.model.TransportCommand
 import com.rossomak.flashcards.core.domain.model.TransportCommandType
