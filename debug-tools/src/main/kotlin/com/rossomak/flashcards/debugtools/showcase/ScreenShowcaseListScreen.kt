@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -20,6 +19,7 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarBackB
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenScroll
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -50,8 +50,7 @@ fun ScreenShowcaseListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = MaterialTheme.spacing.normal),
+                .flashcardsScreenScroll(rememberScrollState()),
         ) {
             ScreenShowcaseGroup.entries.forEach { group ->
                 FlashcardsOverlineLabel(text = stringResource(group.titleRes))

@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -53,7 +52,7 @@ import com.rossomak.flashcards.core.ui.composables.dialogs.partialRatingCardRequ
 import com.rossomak.flashcards.core.ui.composables.dialogs.readAloudLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.speechRateLabel
 import com.rossomak.flashcards.core.ui.composables.dialogs.voiceAnsweringLabel
-import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenScroll
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -148,9 +147,7 @@ private fun SettingsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .flashcardsScrollFade(scrollState)
-                .verticalScroll(scrollState)
-                .padding(bottom = MaterialTheme.spacing.small),
+                .flashcardsScreenScroll(scrollState),
         ) {
             FlashcardsOverlineLabel(text = stringResource(R.string.settings_study_sessions_label))
             FlashcardsListGroup(

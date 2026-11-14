@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BugReport
@@ -53,7 +52,7 @@ import com.rossomak.flashcards.core.domain.model.InstallationInfo
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
-import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenScroll
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -194,9 +193,7 @@ private fun AccountContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .flashcardsScrollFade(scrollState)
-                .verticalScroll(scrollState)
-                .padding(bottom = MaterialTheme.spacing.small),
+                .flashcardsScreenScroll(scrollState),
         ) {
             FlashcardsOverlineLabel(text = stringResource(R.string.account_support_label))
             FlashcardsListGroup(
