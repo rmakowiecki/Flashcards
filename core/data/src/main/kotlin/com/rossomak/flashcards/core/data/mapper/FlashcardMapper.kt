@@ -46,6 +46,7 @@ fun OnboardingSubcategoryDto.toDomain(): OnboardingSubcategory? {
         categoryName = resolvedCategoryName,
         order = order,
         iconSvg = iconSvg,
+        color = color,
     )
 }
 

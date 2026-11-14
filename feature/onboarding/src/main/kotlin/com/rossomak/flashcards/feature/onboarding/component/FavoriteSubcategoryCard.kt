@@ -34,6 +34,7 @@ import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.DEFAULT_CONTAINER_ALPHA
 import com.rossomak.flashcards.core.ui.composables.FlashcardsInlineCategoryGlyph
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
+import com.rossomak.flashcards.core.ui.theme.rememberCategoryColor
 
 /**
  * Side of this card's leading glyph tile — smaller than the shared
@@ -45,10 +46,14 @@ private val SubcategoryIconTileSize = 28.dp
 /** Fixed card size used only in the previews below — the real grid sizes cards via [Modifier.weight]. */
 private val PreviewCardWidth = 140.dp
 private val PreviewCardHeight = 96.dp
+private const val PREVIEW_CATEGORY_COLOR = "#7F52FF"
 
 /**
  * A subcategory the user can favourite during onboarding: a leading category glyph, the subcategory name, its
  * parent category, and a trailing bookmark that fills once picked.
+ *
+ * A picked card tints its glyph tile with the parent category's [color] (`#RRGGBB`), falling back to the
+ * themed default when it is missing or malformed; an unselected card ignores it.
  *
  * Unselected cards sit in the same translucent-on-gradient treatment as
  * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsInfoBanner]'s `OnGradient` style,
@@ -67,6 +72,7 @@ internal fun FavoriteSubcategoryCard(
     name: String,
     categoryName: String,
     iconSvg: String?,
+    color: String?,
     selected: Boolean,
     onSelectedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -102,7 +108,13 @@ internal fun FavoriteSubcategoryCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 if (selected) {
-                    SubcategoryIconTile(iconSvg = iconSvg)
+                    SubcategoryIconTile(
+                        iconSvg = iconSvg,
+                        contentColor = rememberCategoryColor(
+                            hex = color,
+                            fallback = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ),
+                    )
                 } else {
                     SubcategoryIconTile(
                         iconSvg = iconSvg,
@@ -179,6 +191,7 @@ private fun FavoriteSubcategoryCardPreview() {
                 name = "Coroutines",
                 categoryName = "Kotlin",
                 iconSvg = null,
+                color = PREVIEW_CATEGORY_COLOR,
                 selected = false,
                 onSelectedChange = {},
                 modifier = Modifier.size(PreviewCardWidth, PreviewCardHeight),
@@ -187,6 +200,16 @@ private fun FavoriteSubcategoryCardPreview() {
                 name = "Coroutines",
                 categoryName = "Kotlin",
                 iconSvg = null,
+                color = PREVIEW_CATEGORY_COLOR,
+                selected = true,
+                onSelectedChange = {},
+                modifier = Modifier.size(PreviewCardWidth, PreviewCardHeight),
+            )
+            FavoriteSubcategoryCard(
+                name = "Coroutines",
+                categoryName = "Kotlin",
+                iconSvg = null,
+                color = null,
                 selected = true,
                 onSelectedChange = {},
                 modifier = Modifier.size(PreviewCardWidth, PreviewCardHeight),

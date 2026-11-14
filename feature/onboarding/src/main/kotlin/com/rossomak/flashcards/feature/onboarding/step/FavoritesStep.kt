@@ -130,6 +130,7 @@ private fun FavoritesGrid(
                 name = option.name,
                 categoryName = option.categoryName,
                 iconSvg = option.iconSvg,
+                color = option.color,
                 selected = option.id in selectedIds,
                 onSelectedChange = { onSubcategoryToggle(option.id) },
             )

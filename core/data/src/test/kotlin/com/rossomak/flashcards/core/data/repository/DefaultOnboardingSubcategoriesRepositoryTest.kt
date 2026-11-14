@@ -18,13 +18,14 @@ class DefaultOnboardingSubcategoriesRepositoryTest {
     private fun createRepository(): DefaultOnboardingSubcategoriesRepository =
         DefaultOnboardingSubcategoriesRepository(remoteDataSource)
 
-    private fun onboardingSubcategoryDto(subcategoryId: String) = OnboardingSubcategoryDto(
+    private fun onboardingSubcategoryDto(subcategoryId: String, color: String? = null) = OnboardingSubcategoryDto(
         order = 0,
         categoryId = "android",
         categoryName = "Android",
         subcategoryId = subcategoryId,
         subcategoryName = "Compose",
         iconSvg = "<svg/>",
+        color = color,
     )
 
     @Test
@@ -36,6 +37,27 @@ class DefaultOnboardingSubcategoriesRepositoryTest {
 
         result.isSuccess shouldBe true
         result.getOrThrow().single().id shouldBe "android-compose"
+    }
+
+    @Test
+    fun `fetchOnboardingSubcategories maps the dto color to the domain model`() = runTest {
+        val categoryColor = "#3DDC84"
+        coEvery { remoteDataSource.getOnboardingSubcategories() } returns
+            listOf(onboardingSubcategoryDto("android-compose", color = categoryColor))
+
+        val result = createRepository().fetchOnboardingSubcategories()
+
+        result.getOrThrow().single().color shouldBe categoryColor
+    }
+
+    @Test
+    fun `fetchOnboardingSubcategories maps a missing dto color to null`() = runTest {
+        coEvery { remoteDataSource.getOnboardingSubcategories() } returns
+            listOf(onboardingSubcategoryDto("android-compose", color = null))
+
+        val result = createRepository().fetchOnboardingSubcategories()
+
+        result.getOrThrow().single().color shouldBe null
     }
 
     @Test
