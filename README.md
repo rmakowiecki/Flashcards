@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/readme/banner.webp" alt="Flashcards: developer flashcards for Android" width="720">
+  <img src="docs/readme/banner.webp" alt="Flashcards: developer flashcards for Android" width="100%">
 </p>
 
 <h1 align="center">Flashcards</h1>
 
 <p align="center">
-  <b>Study developer flashcards by tapping, listening, or answering out loud.</b>
+  <b>Android flashcards for developers, with read-aloud sessions and spoken answers graded by an LLM.</b>
 </p>
 
 <p align="center">
@@ -19,9 +19,10 @@
   <img src="https://img.shields.io/badge/Firebase-Auth%20%C2%B7%20Firestore%20%C2%B7%20Cloud%20Functions%20%C2%B7%20App%20Check%20%C2%B7%20Crashlytics%20%C2%B7%20Hosting-FFCA28?logo=firebase&logoColor=black" alt="Firebase: Auth, Firestore, Cloud Functions, App Check, Crashlytics, Hosting">
 </p>
 
-An Android app with curated flashcards for developers: Kotlin, Android, Swift, Python, Machine Learning and more.
-Pick topics, preview the session, then study it your way: tap through the cards, let them play aloud hands-free, or
-answer out loud and have the answer graded for you. Progress, XP, Levels and Streaks keep you coming back.
+An Android app with curated flashcards for developers (Kotlin, Android, Swift, Python, Machine Learning and more),
+built as a multi-module Kotlin and Jetpack Compose client on a Firebase backend. It has three ways to study:
+tap-through, hands-free read-aloud, and Voice Answering, where a spoken answer is transcribed and graded by an LLM.
+XP, Levels and Streaks score each session, gamifying the experience to increase retention.
 
 In closed testing on Google Play. Website and privacy policy:
 [flashcards-8ad6d.web.app](https://flashcards-8ad6d.web.app).
@@ -30,7 +31,7 @@ In closed testing on Google Play. Website and privacy policy:
 
 <p align="center">
   <a href="https://claude.ai/artifact/EJtwc7qDnTDipnJSSeKYW8">
-    <img src="docs/readme/design-system.webp" alt="Flashcards design system: brand colors, typography and components" width="720">
+    <img src="docs/readme/design-system.webp" alt="Flashcards design system: brand colors, typography and components" width="100%">
   </a>
 </p>
 
@@ -138,17 +139,18 @@ sequenceDiagram
   it leaves the phone, so the upload is far less useful for casual re-identification or voice cloning. It is not
   strong anonymization.
   [Voice obfuscation](docs/design/voice-obfuscation.md)
-- **Streamed transcribe-then-grade.** One streaming callable transcribes the answer with ElevenLabs Scribe, has
-  Gemini clean the transcript and streams it back, then has Gemini grade it, so you read your answer while the
-  grade is on its way.
+- **Streamed transcribe-then-grade.** One streaming callable transcribes the answer with ElevenLabs Scribe, has an
+  LLM clean the transcript and streams it back, then has the LLM grade it, so the transcript is on screen while
+  grading is still running.
   [ADR-0028](docs/adr/0028-voice-answering-not-background-only-streamed-transcript-then-grade.md) ·
   [Voice Answering backend](docs/design/voice-answering.md#backend)
 - **Enforced architecture.** Multi-module Clean Architecture (`feature:*` over `core:*`), with layer and naming
   rules checked by Konsist and a static-analysis gate (Spotless, detekt, Android Lint) on every pull request.
   [ADR-0011](docs/adr/0011-multi-module-architecture.md) · [CI/CD](docs/ci-cd.md)
-- **Spoken sessions that survive real life.** Playback runs in the background and with the screen off through a
+- **Spoken sessions in the background.** Playback runs in the background and with the screen off through a
   MediaSession, the microphone routes to Bluetooth earphones, and custom handling of audio interruptions tells a
-  notification from a call: short sounds are ignored, an alarm pauses and resumes, a call pauses until you play again.
+  notification from a call: short sounds are ignored, an alarm pauses and resumes, a call pauses playback until it is
+  resumed.
   [Spoken sessions](docs/design/study-session.md#spoken-sessions) ·
   [ADR-0027](docs/adr/0027-bluetooth-mic-capture-le-audio-first-sco-fallback-bt-strict-screen-off.md)
 
@@ -170,9 +172,9 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/01-home.webp" alt="Home: Level card, Streak and Daily Goal, Favorites and recent sessions" width="270"></td>
     <td>
       <h3>Home and progress</h3>
-      <p>Home opens on your Level and XP, your Streak and today's minutes against your Daily Goal. Below them, a
-      carousel of your favorite Categories and Topics starts a session in one tap, and the Recently studied list
-      replays any past session.</p>
+      <p>Home shows the Level and XP, the Streak, and today's minutes against the Daily Goal. Below them, a carousel
+      of favorite Categories and Topics starts a session in one tap, and the Recently studied list replays any past
+      session.</p>
       <p><a href="docs/design/home.md">How it works →</a></p>
     </td>
   </tr>
@@ -180,8 +182,8 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/02-category-search.webp" alt="Search across Categories and Topics" width="270"></td>
     <td>
       <h3>Search</h3>
-      <p>Search finds Topics and Categories as you type. A matching Topic also brings up its Category, and a
-      Topic result can start a session right away.</p>
+      <p>Search finds Topics and Categories as the query is typed. A matching Topic also brings up its Category, and
+      a Topic result can start a session right away.</p>
       <p><a href="docs/design/category-search.md">How it works →</a></p>
     </td>
   </tr>
@@ -189,8 +191,8 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/03-category-selection-mode.webp" alt="Selection Mode on Category Details" width="270"></td>
     <td>
       <h3>Selection Mode and custom sessions</h3>
-      <p>Inside a Category, start a session for one Topic, let a Quick Session pick a random mix, or long-press to
-      enter Selection Mode and combine the Topics you choose into one custom session.</p>
+      <p>Inside a Category, a session can start for one Topic, as a Quick Session with a random mix, or as a custom
+      session: a long-press enters Selection Mode and combines the chosen Topics.</p>
       <p><a href="docs/design/browse.md">How it works →</a></p>
     </td>
   </tr>
@@ -198,8 +200,8 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/04-subcategory-details.webp" alt="Topic details with tag filters and sorting" width="270"></td>
     <td>
       <h3>Topic details</h3>
-      <p>Each Topic lists its cards with their difficulty. Filter them by tags and difficulty, sort them easiest or
-      hardest first, and start a session with exactly the cards you are looking at.</p>
+      <p>Each Topic lists its cards with their difficulty. The list can be filtered by tags and difficulty and sorted
+      easiest or hardest first, and a session can start with exactly the cards shown.</p>
       <p><a href="docs/design/browse.md">How it works →</a></p>
     </td>
   </tr>
@@ -207,9 +209,9 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/05-preview-study-session.webp" alt="Preview of a study session and its settings" width="270"></td>
     <td>
       <h3>Session preview</h3>
-      <p>Every session, whichever way it starts, opens on a preview with its card count and estimated time. Choose
-      the mode and how it is delivered, the length, the difficulty range, the filters and the card order, and keep
-      any of them as your default.</p>
+      <p>Every session, whichever way it starts, opens on a preview with its card count and estimated time. The mode
+      and its delivery, the length, the difficulty range, the filters and the card order are set there, and any of
+      them can be saved as the default.</p>
       <p><a href="docs/design/preview-study-session.md">How it works →</a> · <a href="docs/design/flashcard-selection.md">Card selection →</a></p>
     </td>
   </tr>
@@ -217,10 +219,10 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/06-rated-voice-graded.webp" alt="Rated session with a spoken answer graded" width="270"></td>
     <td>
       <h3>Rated mode and Voice Answering</h3>
-      <p>Reveal the answer and rate yourself Failed, Partial or Correct, or turn on Voice Answering: the question is
-      read aloud, you answer out loud, and the transcript and grade arrive within seconds. Weaker cards come back
-      later in the session, and each card's best rating decides whether it is Mastered. Voice Answering keeps going
-      with the screen off and works with Bluetooth earphones.</p>
+      <p>The answer is revealed and self-rated Failed, Partial or Correct, or Voice Answering is switched on: the
+      question is read aloud, the answer is spoken, and the transcript and grade arrive within seconds. Weaker cards
+      come back later in the session, and each card's best rating decides whether it is Mastered. Voice Answering
+      keeps going with the screen off and works with Bluetooth earphones.</p>
       <p><a href="docs/design/rated-mode.md">How it works →</a> · <a href="docs/design/voice-answering.md">Voice Answering →</a></p>
     </td>
   </tr>
@@ -228,9 +230,9 @@ sequenceDiagram
     <td width="300"><img src="docs/readme/07-fast-read-aloud.webp" alt="Fast session reading cards aloud" width="270"></td>
     <td>
       <h3>Fast mode and read-aloud</h3>
-      <p>No grading: tap through question and answer, or turn on read-aloud and the app reads each question, pauses,
-      reads the answer and moves on. Playback continues in the background, with controls in the notification, on the
-      lock screen and on your headset.</p>
+      <p>No grading: question and answer are tapped through, or read-aloud reads each question, pauses, reads the
+      answer and moves on. Playback continues in the background, with controls in the notification, on the lock
+      screen and on a headset.</p>
       <p><a href="docs/design/fast-mode.md">How it works →</a></p>
     </td>
   </tr>
@@ -250,7 +252,7 @@ sequenceDiagram
 
 - Favorite Categories and Topics, and a Recently studied list that replays any past session
 - Streak and Daily Goal
-- Launcher shortcuts to any Category or Topic, pinned or mirroring your Favorites
+- Launcher shortcuts to any Category or Topic, pinned or mirroring the Favorites
 - Onboarding with an on-device voice test
 - Sign-in with Google or GitHub
 - Report a problem on a card, or send a Bug Report from the app
