@@ -14,6 +14,11 @@ local.properties
 *.ap_
 *.aab
 
+# Signing keystores — never committed, except the shared debug keystore
+*.keystore
+*.jks
+!app/debug.keystore
+
 # Firebase config — not committed for public repos. Each dev/CI provides their own.
 app/google-services.json
 
