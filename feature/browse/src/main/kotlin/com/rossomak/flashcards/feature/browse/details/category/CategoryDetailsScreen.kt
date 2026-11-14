@@ -70,6 +70,7 @@ import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTonalIconBu
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenListContentPadding
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsSelectableListRow
@@ -484,9 +485,10 @@ private fun SubcategoryList(
             state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
+                .padding(horizontal = MaterialTheme.spacing.normal)
                 .flashcardsListGroupContainer(listState)
-                .flashcardsListScrollFade(listState)
+                .flashcardsListScrollFade(listState),
+            contentPadding = flashcardsScreenListContentPadding(),
         ) {
             flashcardsListGroupItems(
                 items = subcategories,
