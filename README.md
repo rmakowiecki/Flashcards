@@ -26,6 +26,18 @@ answer out loud and have the answer graded for you. Progress, XP, Levels and Str
 In closed testing on Google Play. Website and privacy policy:
 [flashcards-8ad6d.web.app](https://flashcards-8ad6d.web.app).
 
+## Design system
+
+<p align="center">
+  <a href="https://claude.ai/artifact/EJtwc7qDnTDipnJSSeKYW8">
+    <img src="docs/readme/design-system.webp" alt="Flashcards design system: brand colors, typography and components" width="720">
+  </a>
+</p>
+
+The app's [design system](https://claude.ai/artifact/EJtwc7qDnTDipnJSSeKYW8) is public, made with Claude Design: brand
+colors and typography, spacing and shape tokens, reusable components, and mockups of the app's screens. It is the source
+of truth and the reference for the whole app UI.
+
 ## How it's built
 
 **System overview** (C4 container level):
