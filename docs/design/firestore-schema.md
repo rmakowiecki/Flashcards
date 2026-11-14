@@ -33,13 +33,13 @@ subcategories/{categoryId-subSlug}/shards/{n}   → { flashcards: { "<cardId>": 
 ```
 onboarding/subcategories                        → { subcategories: { "<subcategoryId>": {
                                                       order, categoryId, categoryName,
-                                                      subcategoryId, subcategoryName, iconSvg
+                                                      subcategoryId, subcategoryName, iconSvg, color
                                                     }, ... } }
 ```
 
-- **One document holding an admin-picked subset of Subcategories**, so onboarding's Favorites step costs exactly one read. Each entry is trimmed to what onboarding shows, and carries its parent Category's `iconSvg`, so onboarding never reads `categories`.
+- **One document holding an admin-picked subset of Subcategories**, so onboarding's Favorites step costs exactly one read. Each entry is trimmed to what onboarding shows, and carries its parent Category's `iconSvg` and `color` (both optional, copied as the Category holds them), so onboarding never reads `categories`.
 - **Readable by anyone, signed in or not**, because onboarding runs before Login ([onboarding-flow.md](onboarding-flow.md)). It is a separate document rather than a looser rule on `subcategories`, so the real taxonomy stays readable only by signed-in users.
-- Written only by the seed pipeline, which replaces it whole on every run. It takes no part in the cache freshness signal below: it is small, changes rarely, and the signal itself needs a signed-in reader.
+- Written only by the seed pipeline, which replaces it whole on every run. Each entry's `color` is read from its Category document after that run's Category writes, so it matches `categories`. It takes no part in the cache freshness signal below: it is small, changes rarely, and the signal itself needs a signed-in reader.
 
 ## Cache freshness signal
 

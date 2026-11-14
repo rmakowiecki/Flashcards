@@ -9,7 +9,7 @@ Schema written (see ADR-0007, ADR-0037):
   subcategories/{categoryId-subSlug}                    → { name, nameLower, categoryId, categoryName, order, cardCount }
   subcategories/{categoryId-subSlug}/shards/{n}         → { flashcards: { "<cardId>": { id, question, answer, tags[], createdAt, ... }, ... } }
   onboarding/subcategories                              → { subcategories: { "{categoryId-subSlug}": { order, categoryId, categoryName,
-                                                            subcategoryId, subcategoryName, iconSvg }, ... } } — one singleton document,
+                                                            subcategoryId, subcategoryName, iconSvg, color }, ... } } — one singleton document,
                                                             fully overwritten every run (see write_onboarding_subcategories)
 
 The `subcategoryId` field carried in the fixture is used to route each shard into the correct
@@ -311,17 +311,37 @@ def refresh_card_counts(db, subcategories: list[dict], *, dry_run: bool) -> int:
     return written
 
 
+def live_category_colors(db, category_ids: set[str]) -> dict[str, str]:
+    """Each Category's current non-empty `color` in Firestore; a Category without one is left out."""
+    colors: dict[str, str] = {}
+    for category_id in sorted(category_ids):
+        color = (db.collection("categories").document(category_id).get().to_dict() or {}).get("color")
+        if isinstance(color, str) and color.strip():
+            colors[category_id] = color
+    return colors
+
+
 def write_onboarding_subcategories(db, doc: dict, *, dry_run: bool) -> int:
     """Overwrites the singleton `onboarding/subcategories` document in full every run — same
     get-then-set write shape as `bump_cache_seed`'s `meta/seed` doc (same accepted non-atomic risk:
-    a solo, manually-run pipeline). Unlike `categories.iconSvg`/`color`, nothing in this doc is
-    ever hand-curated directly in Firestore, so there is no sticky-field check to make: the fixture
-    is the single source of truth and a reseed always fully replaces it. Returns the number of
-    curated entries written (or, under `--dry-run`, the number that would have been written).
+    a solo, manually-run pipeline). Nothing in this doc is hand-curated directly in Firestore, so a
+    reseed always fully replaces it, with one exception: each entry's `color` is a copy of its
+    Category's, so it is taken from the live `categories` doc (call this after `upsert_categories`,
+    which applies the sticky-field rule) and falls back to the fixture's only when the Category holds
+    none yet, such as under `--dry-run`. Returns the number of curated entries written (or, under
+    `--dry-run`, the number that would have been written).
     """
+    entries = doc.get("subcategories", {})
+    live_colors = live_category_colors(db, {entry["categoryId"] for entry in entries.values()})
+    resolved_doc = {
+        "subcategories": {
+            subcategory_id: {**entry, "color": live_colors.get(entry["categoryId"], entry.get("color"))}
+            for subcategory_id, entry in entries.items()
+        }
+    }
     if not dry_run:
-        db.collection("onboarding").document("subcategories").set(doc)
-    return len(doc.get("subcategories", {}))
+        db.collection("onboarding").document("subcategories").set(resolved_doc)
+    return len(entries)
 
 
 def bump_cache_seed(db, *, dry_run: bool) -> int:

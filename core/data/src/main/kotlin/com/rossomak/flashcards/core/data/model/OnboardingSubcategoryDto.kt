@@ -13,6 +13,7 @@ data class OnboardingSubcategoryDto(
     val subcategoryId: String? = null,
     val subcategoryName: String? = null,
     val iconSvg: String? = null,
+    val color: String? = null,
 )
 
 /**

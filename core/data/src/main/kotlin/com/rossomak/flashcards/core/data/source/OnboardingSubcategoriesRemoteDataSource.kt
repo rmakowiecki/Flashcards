@@ -10,7 +10,7 @@ import kotlinx.coroutines.tasks.await
  * Reads the single, publicly-readable `onboarding/subcategories` document — a small, admin-picked
  * subset of `subcategories` (`scripts/seed/curated_onboarding_topics.py` is the allowlist source
  * of truth), readable before any auth exists (`firestore.rules`: `allow read: if true`). Every
- * curated entry is denormalized (its parent Category's `iconSvg` joined in) and trimmed down to
+ * curated entry is denormalized (its parent Category's `iconSvg` and `color` joined in) and trimmed down to
  * exactly what onboarding needs, and packed into one document's `subcategories` map so the whole
  * curated list costs a single Firestore read.
  */

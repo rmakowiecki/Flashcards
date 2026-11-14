@@ -8,7 +8,7 @@ import androidx.compose.runtime.Immutable
  *
  * [id] is a real Subcategory id, sourced from the curated `onboarding/subcategories` document
  * (`GetOnboardingSubcategoriesUseCase`) and written back via `SetFavoriteSubcategoriesUseCase` on
- * commit. [iconSvg] is denormalized from the subcategory's parent Category on that same document.
+ * commit. [iconSvg] and [color] are denormalized from the subcategory's parent Category on that same document.
  */
 @Immutable
 data class FavoriteSubcategoryOption(
@@ -16,4 +16,5 @@ data class FavoriteSubcategoryOption(
     val name: String,
     val categoryName: String,
     val iconSvg: String?,
+    val color: String?,
 )

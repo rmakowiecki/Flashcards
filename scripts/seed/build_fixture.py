@@ -17,7 +17,7 @@ Schema (see ADR-0007, ADR-0037):
                                                      answer, tags[], createdAt, ... }, ... } }
   onboarding/subcategories                       → { subcategories: { "{categoryId-subSlug}": {
                                                      order, categoryId, categoryName, subcategoryId,
-                                                     subcategoryName, iconSvg }, ... } } — one
+                                                     subcategoryName, iconSvg, color }, ... } } — one
                                                      document, denormalized+trimmed for the
                                                      admin-curated id allowlist in
                                                      curated_onboarding_topics.py (publicly readable,
@@ -315,11 +315,11 @@ def build(
     # onboarding/subcategories: a small, admin-curated subset of `subcategories`
     # (curated_onboarding_topics.py, docs/design/firestore-schema.md), denormalized and trimmed
     # down to exactly what onboarding needs, packed into ONE document's `subcategories` map so the
-    # whole curated list costs a single Firestore read. `iconSvg` is joined in from each entry's
-    # parent category — onboarding never reads `categories` itself. `order` is this curated list's
-    # own fresh sequential order, not each subcategory's order within its real parent category. A
-    # curated id that no longer exists in the built taxonomy fails the run loudly rather than
-    # silently seeding a shorter list than intended.
+    # whole curated list costs a single Firestore read. `iconSvg` and `color` are joined in from each
+    # entry's parent category — onboarding never reads `categories` itself. `order` is this curated
+    # list's own fresh sequential order, not each subcategory's order within its real parent
+    # category. A curated id that no longer exists in the built taxonomy fails the run loudly rather
+    # than silently seeding a shorter list than intended.
     subcategories_by_id = {sub["id"]: sub for sub in subcategories}
     categories_by_id = {category["id"]: category for category in categories}
     missing_curated_ids = [
@@ -330,16 +330,23 @@ def build(
             "curated_onboarding_topics.py lists subcategory ids that no longer exist in the "
             f"built taxonomy: {missing_curated_ids} — update the allowlist"
         )
+
+    def onboarding_entry(order: int, sid: str) -> dict:
+        subcategory = subcategories_by_id[sid]
+        parent_category = categories_by_id[subcategory["categoryId"]]
+        return {
+            "order": order,
+            "categoryId": subcategory["categoryId"],
+            "categoryName": subcategory["categoryName"],
+            "subcategoryId": sid,
+            "subcategoryName": subcategory["name"],
+            "iconSvg": parent_category.get("iconSvg"),
+            "color": parent_category.get("color"),
+        }
+
     onboarding_subcategories_doc = {
         "subcategories": {
-            sid: {
-                "order": order,
-                "categoryId": subcategories_by_id[sid]["categoryId"],
-                "categoryName": subcategories_by_id[sid]["categoryName"],
-                "subcategoryId": sid,
-                "subcategoryName": subcategories_by_id[sid]["name"],
-                "iconSvg": categories_by_id[subcategories_by_id[sid]["categoryId"]].get("iconSvg"),
-            }
+            sid: onboarding_entry(order, sid)
             for order, sid in enumerate(CURATED_ONBOARDING_SUBCATEGORY_IDS)
         }
     }
