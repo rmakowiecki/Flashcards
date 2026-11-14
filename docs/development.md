@@ -7,7 +7,7 @@ so a fresh clone does not build until the private configuration below is in plac
 
 - Android Studio (its bundled JDK is enough; the build needs JDK 17 or newer)
 - Node 22, for Cloud Functions and the Firestore rules tests
-- The Firebase CLI (`firebase-tools`), for deploys and the emulators
+- The Firebase CLI (`firebase-tools`), for deploys and the emulators. The emulators behind those tests need Java 21 or newer on `PATH`, even though the build itself runs on JDK 17.
 
 ## Checkout
 
@@ -23,7 +23,7 @@ git submodule update --init
 These files are gitignored and never committed:
 
 - `app/google-services.json`: the Firebase config, with entries for the release and debug application ids.
-- `local.properties`: `GOOGLE_WEB_CLIENT_ID`, used for Google sign-in.
+- `local.properties`: `GOOGLE_WEB_CLIENT_ID`, used for Google sign-in, and the four debug signing properties `DEBUG_STORE_FILE`, `DEBUG_STORE_PASSWORD`, `DEBUG_KEY_ALIAS` and `DEBUG_KEY_PASSWORD`, needed to sign a debug build.
 - The release keystore and its passwords, needed only to sign a release build ([ci-cd.md](ci-cd.md)).
 
 ## App
@@ -33,6 +33,8 @@ Open the project in Android Studio and run the `app` configuration, or from the 
 ```shell
 ./gradlew :app:installDebug
 ```
+
+A fresh debug install must have its App Check debug token registered, or the Cloud Functions reject its callable requests, so session submission and voice grading fail. The steps are under "Registering a debug token" in [functions/README.md](../functions/README.md).
 
 ## Website
 

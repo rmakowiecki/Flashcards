@@ -123,7 +123,8 @@ sequenceDiagram
   connection returns. It counts toward progress, XP and Streak at once, scored on the device with the server's rules.
   [ADR-0055](docs/adr/0055-pending-sessions-and-local-progress-projection.md)
 - **On-device voice obfuscation.** Every spoken answer has its pitch and formants shifted by a random amount before
-  it leaves the phone, so the upload no longer carries the speaker's voiceprint.
+  it leaves the phone, so the upload is far less useful for casual re-identification or voice cloning. It is not
+  strong anonymization.
   [Voice obfuscation](docs/design/voice-obfuscation.md)
 - **Streamed transcribe-then-grade.** One streaming callable transcribes the answer with ElevenLabs Scribe, has
   Gemini clean the transcript and streams it back, then has Gemini grade it, so you read your answer while the
