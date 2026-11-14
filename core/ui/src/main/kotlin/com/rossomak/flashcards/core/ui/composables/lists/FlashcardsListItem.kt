@@ -92,13 +92,9 @@ fun Modifier.flashcardsListGroupContainer(): Modifier = this
     .background(MaterialTheme.colorScheme.secondaryContainer)
 
 /**
- * [flashcardsListGroupContainer] variant for a scrollable `LazyColumn` that holds one group and
- * nothing else: draws the group background from the first item's top to the last item's bottom,
- * so its rounded ends scroll with the rows and an end out of view is cut straight. See ADR-0078.
- *
- * Note: the boundary row itself keeps its static [FlashcardsListItemPosition.Top] shape however
- * far it has scrolled, so under a pinned header its own big rounded corner can briefly show
- * mid-row as it leaves the top edge, a known, accepted cosmetic gap.
+ * [flashcardsListGroupContainer] for a `LazyColumn` holding one group: rounded ends scroll with
+ * the rows, an end out of view is cut straight. Under a pinned header the top row's own corner
+ * can briefly show as it leaves; accepted.
  */
 @Composable
 fun Modifier.flashcardsListGroupContainer(listState: LazyListState): Modifier {
