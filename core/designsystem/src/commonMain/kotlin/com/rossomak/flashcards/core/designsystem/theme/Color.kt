@@ -65,29 +65,73 @@ internal val errorDark = Color(0xFFFFB3B5)
 internal val onErrorDark = Color(0xFF680018)
 internal val errorContainerDark = Color(0xFFB50031)
 internal val onErrorContainerDark = Color(0xFFFFC1C3)
-internal val backgroundDark = Color(0xFF131319)
 internal val onBackgroundDark = Color(0xFFE4E1EA)
-internal val surfaceDark = Color(0xFF131319)
 internal val onSurfaceDark = Color(0xFFE4E1EA)
-internal val surfaceVariantDark = Color(0xFF464652)
 internal val onSurfaceVariantDark = Color(0xFFC7C5D4)
 internal val outlineDark = Color(0xFF908F9D)
-internal val outlineVariantDark = Color(0xFF464652)
 internal val scrimDark = Color(0xFF000000)
 internal val inverseSurfaceDark = Color(0xFFE4E1EA)
 internal val inverseOnSurfaceDark = Color(0xFF303036)
 internal val inversePrimaryDark = Color(0xFF4F54B4)
-internal val surfaceDimDark = Color(0xFF131319)
-internal val surfaceBrightDark = Color(0xFF39383F)
-internal val surfaceContainerLowestDark = Color(0xFF0E0E14)
-internal val surfaceContainerLowDark = Color(0xFF1B1B21)
-internal val surfaceContainerDark = Color(0xFF1F1F25)
-internal val surfaceContainerHighDark = Color(0xFF2A2930)
-internal val surfaceContainerHighestDark = Color(0xFF34343B)
+
+// The dark surfaces: HCT tones of one neutral palette, hue 290 and chroma 10, so only the tone moves
+// and the steps look evenly spaced. Unlike stock Material dark, the card (the surfaceContainerLowest
+// slot, the app's card color in both themes) sits above the background, so cards lift off the screen
+// as white cards do in light. The containers above the card keep Material's dark spacing from it:
+// Low +1, Container +2, High +7, Highest +12 and Bright +14 tones. The debug dark theme tuner derives
+// the same colors from the same tones, and a test keeps the two equal.
+
+/** The screen: background, surface and surfaceDim. Tone 6. */
+internal val backgroundDark = Color(0xFF13121C)
+
+/** Cards and list rows: the surfaceContainerLowest slot. Tone 10. */
+internal val surfaceContainerLowestDark = Color(0xFF1B1A25)
+
+/** Tone 11. */
+internal val surfaceContainerLowDark = Color(0xFF1E1C27)
+
+/** Tone 12. */
+internal val surfaceContainerDark = Color(0xFF201E29)
+
+/** Tone 17. */
+internal val surfaceContainerHighDark = Color(0xFF2A2933)
+
+/** Tone 22. */
+internal val surfaceContainerHighestDark = Color(0xFF35333F)
+
+/** Tone 24. */
+internal val surfaceBrightDark = Color(0xFF393843)
+
+/** surfaceVariant and outlineVariant: the option card ring and dividers. Tone 30. */
+internal val outlineVariantDark = Color(0xFF474551)
+
+/** A bottom sheet's fill. Tone 12. */
+internal val sheetContainerDark = Color(0xFF201E29)
+
+/** A dialog's fill. Tone 14, above the sheet so a dialog stands off the dimmed screen behind it. */
+internal val dialogContainerDark = Color(0xFF24222D)
+
+/** A tonal button's fill. Tone 22, above the dialog so a tonal Cancel still reads as a button. */
+internal val tonalButtonContainerDark = Color(0xFF35333F)
+
+/** The opaque ink pill of a filled button on a gradient. Tone 17. */
+internal val onGradientFilledContainerDark = Color(0xFF2A2933)
+
+/** The on-gradient glass and its progress track: tone 12 at 30%, the one translucent dark surface. */
+internal val onGradientContainerDark = Color(0x4D201E29)
+
+/** The glass's faint white edge: white at 12%. */
+internal val onGradientBorderDark = Color(0x1FFFFFFF)
+
+/**
+ * Behind a grouped list's rows: secondaryDark at 5% over the card, as the light group container is a
+ * faint lavender off white rows.
+ */
+internal val listGroupContainerDark = Color(0xFF252230)
 
 // Valence palette backing [SemanticColors] — see that file for why these are hand-authored
 // container/content pairs rather than one accent tinted at an alpha. The light values are the
-// study screen's shipped rating-button palette, promoted to tokens; the dark values are new.
+// study screen's shipped rating-button palette, promoted to tokens.
 //
 // onXContainerLight are darkened from the original rating-button palette (3E9556/C98F2B/C94F4F):
 // those only hit 2.3:1-3.4:1 against their containers, well under the 4.5:1 WCAG AA text minimum
@@ -99,9 +143,17 @@ internal val onNeutralContainerLight = Color(0xFF845E1C)
 internal val negativeContainerLight = Color(0xFFF6D9DA)
 internal val onNegativeContainerLight = Color(0xFFAB3434)
 
-internal val positiveContainerDark = Color(0xFF1E3524)
+// The dark status containers mix each content hue at 14% over the card tone (surfaceContainerLowestDark)
+// into one opaque color, so a banner reads the same on a card, a sheet or a dialog.
+
+/** onPositiveContainerDark at 14% over the card. */
+internal val positiveContainerDark = Color(0xFF293533)
 internal val onPositiveContainerDark = Color(0xFF7BD98A)
-internal val neutralContainerDark = Color(0xFF3A2F16)
+
+/** onNeutralContainerDark at 14% over the card. */
+internal val neutralContainerDark = Color(0xFF38302A)
 internal val onNeutralContainerDark = Color(0xFFE8B84B)
-internal val negativeContainerDark = Color(0xFF3A1F20)
+
+/** onNegativeContainerDark at 14% over the card. */
+internal val negativeContainerDark = Color(0xFF382A34)
 internal val onNegativeContainerDark = Color(0xFFE88C8C)

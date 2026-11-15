@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.PROGRESS_TRACK_ALPHA
 import com.rossomak.flashcards.core.designsystem.theme.semanticColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
@@ -58,7 +59,6 @@ private val DAILY_GOAL_RING_STROKE = 4.dp
 
 private const val DAILY_GOAL_RING_FULL_CIRCLE_DEGREES = 360f
 private const val DAILY_GOAL_RING_START_DEGREES = -90f
-private const val DAILY_GOAL_RING_TRACK_ALPHA = 0.16f
 private const val DAILY_GOAL_CHECK_SCALE = 1.5f
 private const val PERCENT = 100
 
@@ -165,7 +165,7 @@ private fun DailyGoalRingLabel(percent: Int, checkAlpha: () -> Float, checkColor
 /** A round ring that grows to hold [content], never capped, so large text stays inside it; [sweep] is read only while drawing, so it never recomposes. */
 @Composable
 private fun DailyGoalRing(sweep: () -> Float, arcColor: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val trackColor = arcColor.copy(alpha = DAILY_GOAL_RING_TRACK_ALPHA)
+    val trackColor = arcColor.copy(alpha = PROGRESS_TRACK_ALPHA)
 
     Layout(
         content = content,

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -22,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -61,7 +63,8 @@ fun FlashcardsOptionCard(
         targetValue = if (selected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = SELECTED_TINT_ALPHA)
         } else {
-            MaterialTheme.colorScheme.surfaceContainerLowest
+            // Unselected, the card takes its host's color: the dialog, or the panel it sits on.
+            Color.Transparent
         },
         animationSpec = tween(FlashcardsMotion.DURATION_SHORT_MS, easing = FlashcardsMotion.StandardEasing),
     )
@@ -83,6 +86,9 @@ fun FlashcardsOptionCard(
             .selectable(selected = selected, enabled = enabled, onClick = onSelect, role = Role.RadioButton),
         shape = shape,
         color = containerColor,
+        // A transparent fill resolves no content color, so unselected pins onSurface; selected keeps
+        // the surrounding content color.
+        contentColor = if (selected) LocalContentColor.current else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(
             width = if (selected) MaterialTheme.sizes.tagChipBorder else MaterialTheme.sizes.hairline,
             color = borderColor,

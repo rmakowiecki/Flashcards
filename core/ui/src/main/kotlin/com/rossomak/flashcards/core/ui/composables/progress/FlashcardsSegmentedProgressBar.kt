@@ -11,17 +11,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -48,6 +57,7 @@ fun FlashcardsSegmentedProgressBar(
     modifier: Modifier = Modifier,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+    blursBackdrop: Boolean = style == FlashcardsComponentStyle.OnGradient,
 ) {
     val safeSegmentCount = clampSegmentCount(segmentCount)
     val clampedFilledCount = clampFilledSegmentCount(filledSegmentCount, safeSegmentCount)
@@ -55,11 +65,13 @@ fun FlashcardsSegmentedProgressBar(
     val fillColor = progressBarFillColorFor(style)
     val trackColor = progressBarTrackColorFor(style)
     val gap = metrics.segmentGap
+    val segmentsShape = remember(safeSegmentCount, gap) { SegmentsShape(safeSegmentCount, gap) }
 
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(metrics.segmentHeight)
+            .blurBackdrop(shape = segmentsShape, enabled = blursBackdrop)
             .semantics {
                 // steps = safeSegmentCount - 1: this is discrete step progress, not a continuous
                 // range, so TalkBack announces segment granularity instead of treating it as smooth.
@@ -86,6 +98,21 @@ fun FlashcardsSegmentedProgressBar(
                 cornerRadius = corner,
             )
         }
+    }
+}
+
+/** The bar's segments as one outline, so the backdrop blurs behind each pill and not in the gaps. */
+private class SegmentsShape(private val segmentCount: Int, private val gap: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val gapPx = with(density) { gap.toPx() }
+        val segmentWidthPx = (size.width - gapPx * (segmentCount - 1)) / segmentCount
+        val corner = CornerRadius(size.height / 2f)
+        val path = Path()
+        repeat(segmentCount) { index ->
+            val left = index * (segmentWidthPx + gapPx)
+            path.addRoundRect(RoundRect(left, 0f, left + segmentWidthPx, size.height, corner))
+        }
+        return Outline.Generic(path)
     }
 }
 

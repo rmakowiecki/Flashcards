@@ -50,7 +50,7 @@ internal fun SessionModesStep(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(MaterialTheme.cornerRadius.card),
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
         ) {
             FlashcardsSingleSelectGroup(
                 modifier = Modifier.padding(MaterialTheme.spacing.small),

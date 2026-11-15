@@ -36,6 +36,7 @@ androidxMedia = "1.8.0"
 media3 = "1.11.1"
 ksp = "2.3.12"
 datastorePreferences = "1.2.1"
+materialColorUtilities = "5.0.1"
 showkase = "1.0.5"
 composeShimmer = "1.5.0"
 # Compose Multiplatform (JetBrains) for :core:designsystem and :web. On Android its artifacts resolve
@@ -130,6 +131,7 @@ spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "spotless-plug
 detekt-gradlePlugin = { group = "io.gitlab.arturbosch.detekt", name = "detekt-gradle-plugin", version.ref = "detekt" }
 konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+materialkolor-color-utilities = { group = "com.materialkolor", name = "material-color-utilities", version.ref = "materialColorUtilities" }
 showkase = { group = "com.airbnb.android", name = "showkase", version.ref = "showkase" }
 showkase-annotation = { group = "com.airbnb.android", name = "showkase-annotation", version.ref = "showkase" }
 showkase-processor = { group = "com.airbnb.android", name = "showkase-processor", version.ref = "showkase" }

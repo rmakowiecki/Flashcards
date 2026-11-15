@@ -23,14 +23,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
 import com.rossomak.flashcards.core.ui.composables.common.disabledAlpha
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-
-/** Opacity of [MaterialTheme.colorScheme.secondaryContainer] used as a selection tint. */
-private const val SELECTED_TINT_ALPHA = 0.12f
 
 /**
  * A multi-select list row: an optional [leading] slot, a title with optional [subtitle], a
@@ -58,7 +56,7 @@ fun FlashcardsSelectableListRow(
     // Read only in the draw phase below, so animation frames redraw the tint without recomposing the row.
     val backgroundColor = animateColorAsState(
         targetValue = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = SELECTED_TINT_ALPHA)
+            MaterialTheme.brandColors.listGroupContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainerLowest
         },

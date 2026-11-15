@@ -90,6 +90,10 @@ theme-fixed member alongside one theme-flipping member:
 Both `OnGradient` members are theme-fixed like every other on-gradient color in `BrandColors` —
 the gradients they sit on never flip either.
 
+**Amended:** dark differs. On a surface the bar fills with `primaryDark` over a track of the same
+color at 16%, matching the progress rings, and on a gradient the track is the dark glass. See
+[ADR-0078](0078-dark-theme-is-frozen-tokens-from-one-neutral-palette.md).
+
 **Animation.** `FlashcardsLinearProgressBar`/`FlashcardsCircularProgressRing` animate `progress`
 via `animateFloatAsState`, using a shared `flashcardsProgressBarDefaultAnimationSpec`
 (`FlashcardsMotion.DURATION_MEDIUM_MS` + standard easing). `FlashcardsSegmentedProgressBar` has no

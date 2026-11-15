@@ -12,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.navigation
 import com.rossomak.flashcards.BuildConfig
 import com.rossomak.flashcards.debugtools.DebugBackdropBlurRoot
+import com.rossomak.flashcards.debugtools.DebugDarkThemeTunerRoot
 import com.rossomak.flashcards.debugtools.DebugGraph
 import com.rossomak.flashcards.debugtools.DebugMorpheusGraphRoot
 import com.rossomak.flashcards.debugtools.DebugRoot
@@ -20,6 +21,7 @@ import com.rossomak.flashcards.debugtools.DebugVoiceIndicatorRoot
 import com.rossomak.flashcards.debugtools.DebugVoiceRoot
 import com.rossomak.flashcards.debugtools.R as DebugR
 import com.rossomak.flashcards.debugtools.backdropblur.BackdropBlurDebugScreen
+import com.rossomak.flashcards.debugtools.darktheme.DarkThemeTunerScreen
 import com.rossomak.flashcards.debugtools.morpheus.MorpheusGraphPrototypeScreen
 import com.rossomak.flashcards.debugtools.voice.VoiceDebugScreen
 import com.rossomak.flashcards.debugtools.voiceindicator.VoiceIndicatorDebugScreen
@@ -64,6 +66,7 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
                 onNavigateToVoiceIndicatorDebug = { navigator.navigate(DebugVoiceIndicatorRoot) },
                 onNavigateToMorpheusGraphPrototype = { onNavigateToDebugTool(DebugMorpheusGraphRoot) },
                 onNavigateToBackdropBlurDebug = { navigator.navigate(DebugBackdropBlurRoot) },
+                onNavigateToDarkThemeTuner = { navigator.navigate(DebugDarkThemeTunerRoot) },
                 onNavigateToCardAnimationsDebug = {
                     context.startActivity(Intent(context, CardAnimationsDebugActivity::class.java))
                 },
@@ -72,6 +75,9 @@ internal fun NavGraphBuilder.debugNavGraphEntries(
         }
         guardedNavComposable<DebugVoiceRoot>(navController) { navigator ->
             VoiceDebugScreen(onNavigateBack = { navigator.popBackStack() })
+        }
+        guardedNavComposable<DebugDarkThemeTunerRoot>(navController) { navigator ->
+            DarkThemeTunerScreen(onNavigateBack = { navigator.popBackStack() })
         }
         guardedNavComposable<DebugBackdropBlurRoot>(navController) { navigator ->
             BackdropBlurDebugScreen(onNavigateBack = { navigator.popBackStack() })

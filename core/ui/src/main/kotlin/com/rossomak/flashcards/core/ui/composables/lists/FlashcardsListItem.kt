@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
@@ -87,7 +88,7 @@ fun Modifier.flashcardsListItemShape(
 @Composable
 fun Modifier.flashcardsListGroupContainer(): Modifier = this
     .clip(RoundedCornerShape(MaterialTheme.cornerRadius.medium)) // needs to be 2dp higher than the items background corner to maintain border width
-    .background(MaterialTheme.colorScheme.secondaryContainer)
+    .background(MaterialTheme.brandColors.listGroupContainer)
 
 /**
  * [flashcardsListGroupContainer] variant for a scrollable `LazyColumn`: rounds only the edges
@@ -114,5 +115,5 @@ fun Modifier.flashcardsListGroupContainer(listState: LazyListState): Modifier {
     )
     return this
         .clip(shape)
-        .background(MaterialTheme.colorScheme.secondaryContainer)
+        .background(MaterialTheme.brandColors.listGroupContainer)
 }

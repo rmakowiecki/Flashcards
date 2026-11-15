@@ -15,7 +15,7 @@ class CardAnimationsDebugActivity : ComponentActivity() {
         lockPortraitOnPhones()
         enableEdgeToEdge()
         setContent {
-            FlashcardsTheme(dynamicColor = false) {
+            FlashcardsTheme {
                 CardAnimationsDebugScreen(onNavigateBack = ::finish)
             }
         }

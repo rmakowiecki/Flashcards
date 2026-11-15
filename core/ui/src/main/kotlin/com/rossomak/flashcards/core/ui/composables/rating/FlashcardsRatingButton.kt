@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.core.ui.composables.rating
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,12 +27,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.RatingColorSet
+import com.rossomak.flashcards.core.designsystem.theme.RatingColors
+import com.rossomak.flashcards.core.designsystem.theme.ratingColors
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.FlashcardAttemptRating
 import com.rossomak.flashcards.core.ui.R
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-import com.rossomak.flashcards.core.ui.theme.ratingColors
 
 /**
  * A single [FlashcardAttemptRating] as a circular icon button with an optional caption.
@@ -49,9 +52,12 @@ fun FlashcardsRatingButton(
     onClick: (() -> Unit)? = null,
 ) {
     val label = stringResource(rating.labelRes)
-    val containerColor = MaterialTheme.ratingColors.containerColorFor(rating)
-    val contentColor = MaterialTheme.ratingColors.contentColorFor(rating)
-    val buttonSize = Modifier.size(MaterialTheme.sizes.ratingButton)
+    val colors = MaterialTheme.ratingColors.colorsFor(rating)
+    val containerColor = colors.container
+    val contentColor = colors.content
+    val buttonSize = Modifier
+        .size(MaterialTheme.sizes.ratingButton)
+        .then(colors.border?.let { Modifier.border(width = MaterialTheme.sizes.ratingBorder, color = it, shape = CircleShape) } ?: Modifier)
 
     Column(
         modifier = modifier,
@@ -117,6 +123,12 @@ fun FlashcardsRatingButtonRow(
             )
         }
     }
+}
+
+private fun RatingColors.colorsFor(rating: FlashcardAttemptRating): RatingColorSet = when (rating) {
+    FlashcardAttemptRating.Failed -> failed
+    FlashcardAttemptRating.PartiallyCorrect -> partial
+    FlashcardAttemptRating.Correct -> correct
 }
 
 private val FlashcardAttemptRating.icon: ImageVector
