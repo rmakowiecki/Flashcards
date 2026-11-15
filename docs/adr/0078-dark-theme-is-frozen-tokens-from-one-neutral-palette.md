@@ -51,10 +51,10 @@ palette with its own hex containers and, in dark only, a ring in the content col
 the status containers equal the rating containers, in dark they deliberately differ.
 
 **The tuner is a debug-only, in-memory override inside the theme.** In the debug build,
-`DebugThemeOverrides` sits inside `FlashcardsTheme` in `MainActivity` and the screen showcase; while
-the system is dark it re-provides the theme from the tuner's knobs (`FlashcardsTheme(colors = …)`),
-built from `darkFlashcardsColors` with the tuned slots replaced. The release variant does nothing.
-The knobs live in memory only. Their defaults reproduce `darkFlashcardsColors` exactly, which a JVM
+`DebugThemeOverrides` sits inside `FlashcardsTheme` in `MainActivity`, the screen showcase and the
+card animation harness; while the system is dark it re-provides the theme from the tuner's knobs
+(`FlashcardsTheme(colors = …)`), built from `darkFlashcardsColors` with the tuned slots replaced.
+The release variant does nothing. The knobs live in memory only. Their defaults reproduce `darkFlashcardsColors` exactly, which a JVM
 test in `:debug-tools` checks, and "Copy values" prints `Color.kt` constants ready to paste.
 materialkolor, for the HCT math, is a `:debug-tools` dependency only.
 
