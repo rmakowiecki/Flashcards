@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
@@ -43,6 +42,7 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenScroll
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -142,11 +142,8 @@ private fun DebugContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(
-                    horizontal = MaterialTheme.spacing.normal,
-                    vertical = MaterialTheme.spacing.small,
-                ),
+                .flashcardsScreenScroll(rememberScrollState(), padsTop = true)
+                .padding(horizontal = MaterialTheme.spacing.normal),
         ) {
             FlashcardsListGroup(
                 items = buildList {

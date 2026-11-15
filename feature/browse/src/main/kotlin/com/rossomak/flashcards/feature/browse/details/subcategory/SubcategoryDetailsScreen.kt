@@ -64,6 +64,7 @@ import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSiz
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnGradient
 import com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardFilters
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenListContentPadding
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsExpandableListRow
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupContainer
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupItems
@@ -462,9 +463,10 @@ private fun FlashcardList(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = MaterialTheme.spacing.normal, end = MaterialTheme.spacing.normal, bottom = MaterialTheme.spacing.normal)
+            .padding(horizontal = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState),
+        contentPadding = flashcardsScreenListContentPadding(),
     ) {
         flashcardsListGroupItems(
             items = flashcards,

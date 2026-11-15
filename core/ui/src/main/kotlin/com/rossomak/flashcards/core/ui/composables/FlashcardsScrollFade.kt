@@ -112,10 +112,9 @@ private fun Modifier.edgeScrollFade(
 
 /**
  * Fades this list's top and bottom edges once [listState] has scrolled past its first or last
- * item, signalling there's more content above/below — the same top/bottom-of-viewport cue
- * `flashcardsListGroupContainer` already gives by squaring off that corner. The bottom edge is
- * what keeps a cut-off, white list item from butting straight up against the bottom toolbar with
- * no visual separation.
+ * item, signalling there's more content above/below. The bottom edge is what keeps a cut-off,
+ * white list item from butting straight up against the bottom toolbar with no visual separation.
+ * A screen's list pairs it with [flashcardsScreenListContentPadding].
  *
  * Paints [backgroundColor] itself as the fade (see [FlashcardsFadeReveal.Solid]) rather than
  * punching a hole in the list's own alpha: that only reads as "fading into the screen" when
@@ -146,7 +145,8 @@ fun Modifier.flashcardsListScrollFade(
             val layoutInfo = listState.layoutInfo
             val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()
             if (lastVisible != null && lastVisible.index == layoutInfo.totalItemsCount - 1) {
-                (lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset).toFloat()
+                // viewportEndOffset includes the bottom content padding, which is still left to scroll.
+                (lastVisible.offset + lastVisible.size + layoutInfo.afterContentPadding - layoutInfo.viewportEndOffset).toFloat()
             } else {
                 fadeHeightPx
             }

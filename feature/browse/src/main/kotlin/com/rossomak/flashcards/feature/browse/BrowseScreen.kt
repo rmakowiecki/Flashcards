@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -64,7 +63,7 @@ import com.rossomak.flashcards.core.ui.composables.FlashcardsLoadStateContent
 import com.rossomak.flashcards.core.ui.composables.FlashcardsOverlineLabel
 import com.rossomak.flashcards.core.ui.composables.FlashcardsVectorIconTile
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
-import com.rossomak.flashcards.core.ui.composables.flashcardsScrollFade
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenScroll
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsDetailedListRow
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
@@ -447,7 +446,7 @@ internal fun CategoryList(
     favorites: UserFavorites,
     onCategoryClick: (String, String) -> Unit,
 ) {
-    ScrollableSectionColumn(fadesEdges = true) {
+    ScrollableSectionColumn {
         FlashcardsOverlineLabel(text = stringResource(R.string.browse_categories_label))
         FlashcardsListGroup(
             modifier = Modifier.padding(horizontal = MaterialTheme.spacing.normal),
@@ -484,7 +483,7 @@ internal fun SearchResults(
     onSubcategoryClick: (Subcategory) -> Unit,
     onSubcategorySessionStart: (Subcategory) -> Unit,
 ) {
-    ScrollableSectionColumn {
+    ScrollableSectionColumn(backgroundColor = MaterialTheme.colorScheme.surface) {
         if (results.subcategories.isNotEmpty()) {
             FlashcardsOverlineLabel(text = stringResource(R.string.browse_topics_label))
             SubcategoryListGroup(
@@ -540,19 +539,14 @@ private fun SubcategoryListGroup(
 }
 
 /**
- * @param fadesEdges fades the top and bottom edges while there is more to scroll, so the category
- * list's last cut-off row never butts straight up against the bottom navigation bar. Off for the
- * expanded search results, which take over the whole window and so never meet that bar.
+ * @param backgroundColor what the column sits on, painted as its edge fades.
  */
 @Composable
-private fun ScrollableSectionColumn(fadesEdges: Boolean = false, content: @Composable () -> Unit) {
-    val scrollState = rememberScrollState()
+private fun ScrollableSectionColumn(backgroundColor: Color = MaterialTheme.colorScheme.background, content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (fadesEdges) Modifier.flashcardsScrollFade(scrollState) else Modifier)
-            .verticalScroll(scrollState)
-            .padding(bottom = MaterialTheme.spacing.xsmall),
+            .flashcardsScreenScroll(rememberScrollState(), backgroundColor = backgroundColor),
     ) {
         content()
     }
