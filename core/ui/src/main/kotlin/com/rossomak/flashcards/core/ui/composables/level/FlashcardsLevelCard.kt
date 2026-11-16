@@ -225,7 +225,8 @@ private fun LevelCardFigures(content: Content, style: FlashcardsComponentStyle, 
                 )
             }
         }
-        FlashcardsLinearProgressBar(progress = { pour.fraction.value }, style = OnGradient)
+        // The card's own glass already blurs behind the bar.
+        FlashcardsLinearProgressBar(progress = { pour.fraction.value }, style = OnGradient, blursBackdrop = false)
         LevelCardXpCount(pour = pour, mutedContentColor = mutedContentColor)
     }
 }

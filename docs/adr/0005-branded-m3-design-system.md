@@ -30,3 +30,7 @@ Per-category tint (`Category.color`, a Firestore-authored hex string) is explici
 ## Amendment: the compiler enforces the rule
 
 The palette in `:core:designsystem`'s `Color.kt` is `internal`, so only the module's own `ColorScheme`, `BrandColors` and `SemanticColors` definitions can read it, and a composable in any other module cannot import a raw token at all. A theme-independent color is still a `BrandColors` slot with the same value in both themes, as the code block's `codeBlockBackground` and `onCodeBlock` are.
+
+## Amendment: BrandColors holds gradients and on-gradient colors, not neutral surfaces
+
+A themed neutral surface (a bottom sheet, a dialog, a list group, a tonal button, a progress track) is a Material `ColorScheme` slot with one role in both themes, and the light theme defines the same value where it should stay flat. `BrandColors` holds the brand gradients and the colors that exist only because a gradient is behind them, plus the fixed code block palette and the streak flame. The dark theme tokens are in [ADR-0078](0078-dark-theme-is-frozen-tokens-from-one-neutral-palette.md).

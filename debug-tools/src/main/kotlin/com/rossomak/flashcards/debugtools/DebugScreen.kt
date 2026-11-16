@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
@@ -69,6 +70,7 @@ fun DebugScreen(
     onNavigateToVoiceIndicatorDebug: () -> Unit,
     onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
+    onNavigateToDarkThemeTuner: () -> Unit,
     onNavigateToCardAnimationsDebug: () -> Unit,
     onNavigateToScreenShowcase: () -> Unit,
 ) {
@@ -91,6 +93,7 @@ fun DebugScreen(
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
+        onDarkThemeTunerClick = onNavigateToDarkThemeTuner,
         onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
         onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
@@ -113,6 +116,7 @@ private fun DebugContent(
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
+    onDarkThemeTunerClick: () -> Unit,
     onCardAnimationsDebugClick: () -> Unit,
     onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
@@ -165,6 +169,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_backdrop_blur_message,
                             icon = Icons.Default.BlurOn,
                             onClick = onBackdropBlurDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_dark_theme_tuner_label,
+                            messageRes = R.string.debug_dark_theme_tuner_message,
+                            icon = Icons.Default.DarkMode,
+                            onClick = onDarkThemeTunerClick,
                         ),
                     )
                     add(
@@ -281,6 +293,7 @@ private fun DebugContentPreview() {
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
+            onDarkThemeTunerClick = {},
             onCardAnimationsDebugClick = {},
             onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},

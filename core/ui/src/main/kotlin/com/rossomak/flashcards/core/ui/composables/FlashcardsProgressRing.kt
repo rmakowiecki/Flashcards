@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.PROGRESS_TRACK_ALPHA
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.ui.format.AppLocale
 import com.rossomak.flashcards.core.ui.format.formatPercent
@@ -31,7 +32,6 @@ private val RING_SIZE = 40.dp
 private const val FULL_CIRCLE_DEGREES = 360f
 private const val ARC_START_DEGREES = -90f
 private const val PERCENT_SCALE = 100
-private const val TRACK_ALPHA = 0.16f
 
 /**
  * Circular mastery indicator: a muted full-circle track with the filled portion drawn clockwise
@@ -52,7 +52,7 @@ fun FlashcardsProgressRing(
     modifier: Modifier = Modifier,
 ) {
     val fraction = progress?.coerceIn(0f, 1f)
-    val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = TRACK_ALPHA)
+    val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = PROGRESS_TRACK_ALPHA)
     val arcColor = MaterialTheme.colorScheme.primary
 
     Box(

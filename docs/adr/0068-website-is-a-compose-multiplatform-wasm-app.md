@@ -26,7 +26,9 @@ and is supported less well by Compose.
 colors, spacing, sizes, corner radii, motion and the Roboto type scale, in the package
 `com.rossomak.flashcards.core.designsystem.theme`. `:core:ui` re-exports it through `api`, so feature
 modules keep depending on `:core:ui` alone. What needs Android or the domain stays in `:core:ui`:
-`FlashcardsTheme` (dynamic color) and the Category, Difficulty and Rating colors. Components stay in
+`FlashcardsTheme` and the Category and Difficulty colors. The Rating colors moved into
+`:core:designsystem` later, with the light and dark color pairs of
+[ADR-0078](0078-dark-theme-is-frozen-tokens-from-one-neutral-palette.md). Components stay in
 `:core:ui` too; only tokens are shared for now.
 
 **Roboto is a Compose resource** in `:core:designsystem`, so both platforms load the same file. See

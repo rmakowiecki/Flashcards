@@ -65,11 +65,12 @@ private const val DISABLED_CONTAINER_ALPHA = 0.12f
 private const val DISABLED_CONTENT_ALPHA = 0.38f
 
 /**
- * Container fill alpha for the disabled state on [FlashcardsComponentStyle.OnGradient]. Same
- * intent as [DISABLED_CONTAINER_ALPHA], based on white instead of `onSurface` since that style
- * sits on the theme-fixed [com.rossomak.flashcards.core.designsystem.theme.BrandColors.topBarGradient].
+ * How much of the enabled on-gradient glass's opacity a disabled [FlashcardsComponentStyle.OnGradient]
+ * button keeps. Same intent as [DISABLED_CONTAINER_ALPHA], applied to the theme's
+ * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.onGradientContainer] so a disabled
+ * button stays the same glass, only fainter: white at 0.20 in light, dark glass in dark.
  */
-private const val ON_GRADIENT_DISABLED_CONTAINER_ALPHA = 0.20f
+private const val ON_GRADIENT_DISABLED_CONTAINER_OPACITY_RATIO = 0.20f / 0.24f
 
 /** Content alpha for the disabled state on [FlashcardsComponentStyle.OnGradient]. */
 private const val ON_GRADIENT_DISABLED_CONTENT_ALPHA = 0.50f
@@ -79,7 +80,9 @@ private const val ON_GRADIENT_DISABLED_CONTENT_ALPHA = 0.50f
 @ReadOnlyComposable
 internal fun disabledButtonContainerColorFor(style: FlashcardsComponentStyle): Color = when (style) {
     OnSurface -> MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_CONTAINER_ALPHA)
-    OnGradient -> Color.White.copy(alpha = ON_GRADIENT_DISABLED_CONTAINER_ALPHA)
+    OnGradient -> MaterialTheme.brandColors.onGradientContainer.let { glass ->
+        glass.copy(alpha = glass.alpha * ON_GRADIENT_DISABLED_CONTAINER_OPACITY_RATIO)
+    }
 }
 
 /** Disabled content color for the given [style], shared by every `Flashcards*Button`. */
@@ -119,7 +122,7 @@ internal data class FilledButtonColors(
 internal fun filledButtonColorsFor(style: FlashcardsComponentStyle): FilledButtonColors {
     val onGradient = style == OnGradient
     return FilledButtonColors(
-        containerColor = if (onGradient) Color.White else Color.Transparent,
+        containerColor = if (onGradient) MaterialTheme.brandColors.onGradientFilledContainer else Color.Transparent,
         contentColor = if (onGradient) MaterialTheme.brandColors.onGradientFilled else Color.White,
         disabledContainerColor = if (onGradient) disabledButtonContainerColorFor(style) else Color.Transparent,
         disabledContentColor = disabledButtonContentColorFor(style),

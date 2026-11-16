@@ -86,11 +86,11 @@ fun FlashcardsAvatar(
 ) {
     val brandColors = MaterialTheme.brandColors
     val containerColor = when (style) {
-        OnSurface -> brandColors.tonalButtonContainer
+        OnSurface -> MaterialTheme.colorScheme.surfaceContainerHighest
         OnGradient -> brandColors.onGradientContainer
     }
     val contentColor = when (style) {
-        OnSurface -> brandColors.onTonalButtonContainer
+        OnSurface -> MaterialTheme.colorScheme.primary
         OnGradient -> brandColors.onGradientContent
     }
     val border = when (style) {

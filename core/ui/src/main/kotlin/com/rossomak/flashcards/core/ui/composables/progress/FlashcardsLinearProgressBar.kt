@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -23,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
+import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize
 import com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
@@ -46,6 +48,7 @@ fun FlashcardsLinearProgressBar(
     modifier: Modifier = Modifier,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+    blursBackdrop: Boolean = style == FlashcardsComponentStyle.OnGradient,
     animate: Boolean = true,
 ) {
     val clampedProgress = clampProgressBarProgress(progress)
@@ -61,6 +64,7 @@ fun FlashcardsLinearProgressBar(
         modifier = modifier.semantics { progressBarRangeInfo = ProgressBarRangeInfo(clampedProgress, 0f..1f) },
         size = size,
         style = style,
+        blursBackdrop = blursBackdrop,
     )
 }
 
@@ -79,12 +83,14 @@ internal fun FlashcardsLinearProgressBar(
     modifier: Modifier = Modifier,
     size: FlashcardsComponentSize = FlashcardsComponentSize.Normal,
     style: FlashcardsComponentStyle = FlashcardsComponentStyle.OnSurface,
+    blursBackdrop: Boolean = style == FlashcardsComponentStyle.OnGradient,
 ) {
     LinearProgressBarCanvas(
         progress = { clampProgressBarProgress(progress()) },
         modifier = modifier,
         size = size,
         style = style,
+        blursBackdrop = blursBackdrop,
     )
 }
 
@@ -94,6 +100,7 @@ private fun LinearProgressBarCanvas(
     modifier: Modifier,
     size: FlashcardsComponentSize,
     style: FlashcardsComponentStyle,
+    blursBackdrop: Boolean,
 ) {
     val trackHeight = size.linearProgressBarMetrics().trackHeight
     val fillColor = progressBarFillColorFor(style)
@@ -102,7 +109,8 @@ private fun LinearProgressBarCanvas(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(trackHeight),
+            .height(trackHeight)
+            .blurBackdrop(shape = CircleShape, enabled = blursBackdrop),
     ) {
         // `this.size` (DrawScope's own size, the resolved canvas bounds) — bare `size` inside
         // this lambda resolves to the outer FlashcardsComponentSize param instead, since a
