@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
-import com.rossomak.flashcards.core.designsystem.theme.semanticColors
+import com.rossomak.flashcards.core.designsystem.theme.ratingColors
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
@@ -54,8 +54,8 @@ private const val ATTEMPT_SLOT_PULSE_SCALE = 1.25f
 
 /**
  * Read-only history of a card's attempts within a session: one small square per attempt, filled
- * with the same red/amber/green a [FlashcardsAttemptSlotState.Failed]/[Partial]/[Correct] rating
- * uses, an unfilled square with a heavier primary-colored border for the [FlashcardsAttemptSlotState.Current]
+ * with the same rating colors a [FlashcardsAttemptSlotState.Failed]/[Partial]/[Correct] rating button
+ * uses, ring included, an unfilled square with a heavier primary-colored border for the [FlashcardsAttemptSlotState.Current]
  * attempt, and an unfilled square with a hairline border for each [FlashcardsAttemptSlotState.Future]
  * one. Purely presentational — [slots] is fully caller-driven; this does not know a card's max
  * attempt count or track state itself.
@@ -85,20 +85,20 @@ fun FlashcardsAttemptIndicator(
 @Composable
 private fun AttemptSlot(state: FlashcardsAttemptSlotState) {
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.xsmall)
-    val semanticColors = MaterialTheme.semanticColors
-
-    val (containerColor, contentColor) = when (state) {
-        Failed -> semanticColors.negativeContainer to semanticColors.onNegativeContainer
-        Partial -> semanticColors.neutralContainer to semanticColors.onNeutralContainer
-        Correct -> semanticColors.positiveContainer to semanticColors.onPositiveContainer
-        Current, Future -> Color.Transparent to Color.Transparent
+    val ratingColors = MaterialTheme.ratingColors
+    val ratingColorSet = when (state) {
+        Failed -> ratingColors.failed
+        Partial -> ratingColors.partial
+        Correct -> ratingColors.correct
+        Current, Future -> null
     }
-    val borderColor = when (state) {
-        Current -> MaterialTheme.colorScheme.primary
-        Future -> MaterialTheme.colorScheme.outlineVariant
-        else -> null
+    val containerColor = ratingColorSet?.container ?: Color.Transparent
+    val contentColor = ratingColorSet?.content ?: Color.Transparent
+    val border = when (state) {
+        Current -> BorderStroke(width = MaterialTheme.sizes.tagChipBorder, color = MaterialTheme.colorScheme.primary)
+        Future -> BorderStroke(width = MaterialTheme.sizes.hairline, color = MaterialTheme.colorScheme.outlineVariant)
+        Failed, Partial, Correct -> ratingColorSet?.border?.let { BorderStroke(width = MaterialTheme.sizes.ratingBorder, color = it) }
     }
-    val borderWidth = if (state == Current) MaterialTheme.sizes.tagChipBorder else MaterialTheme.sizes.hairline
     val pulseScale = remember { Animatable(1f) }
     var previousState by remember { mutableStateOf(state) }
     LaunchedEffect(state) {
@@ -120,7 +120,7 @@ private fun AttemptSlot(state: FlashcardsAttemptSlotState) {
             .size(ATTEMPT_SLOT_SIZE),
         shape = shape,
         color = containerColor,
-        border = borderColor?.let { BorderStroke(width = borderWidth, color = it) },
+        border = border,
     ) {
         val icon = state.icon()
         if (icon != null) {

@@ -19,6 +19,8 @@ dependencies {
     // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts).
     implementation("com.rossomak:morpheus-tuner")
     implementation(libs.kotlinx.serialization.json)
+    // HCT tones for the dark theme tuner only; the shipped theme keeps plain color constants.
+    implementation(libs.materialkolor.color.utilities)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)

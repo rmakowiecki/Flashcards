@@ -62,3 +62,10 @@ enum class FlashcardsComponentSize { Normal, Small }
   ADR-0033's button table) rather than deriving them from a smaller, more systematic token set.
   Reducing that per-component color-locking is flagged as a future palette pass, out of scope for
   this consolidation.
+- **Amended:** the dark theme's surfaces, glass, sheet, dialog and button fills are now tones of one
+  neutral palette, frozen to hex
+  ([ADR-0078](0078-dark-theme-is-frozen-tokens-from-one-neutral-palette.md)). The light palette's
+  per-component values are unchanged.
+- **Amended:** a component's style follows its immediate backdrop, not the screen's: `OnGradient`
+  where it sits directly on a brand gradient, `OnSurface` where it sits on a card, sheet or dialog,
+  even when that host is itself on a gradient.

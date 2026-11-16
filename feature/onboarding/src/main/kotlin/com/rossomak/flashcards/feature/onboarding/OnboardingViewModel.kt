@@ -225,6 +225,7 @@ class OnboardingViewModel @Inject constructor(
                             name = subcategory.name,
                             categoryName = subcategory.categoryName,
                             iconSvg = subcategory.iconSvg,
+                            color = subcategory.color,
                         )
                     }.toPersistentList()
                     val loadedState = if (options.isEmpty()) Failed else Content(options)

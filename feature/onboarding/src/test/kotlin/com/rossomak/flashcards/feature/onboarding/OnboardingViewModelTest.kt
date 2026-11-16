@@ -94,13 +94,14 @@ class OnboardingViewModelTest {
         photoUrl = null,
     )
 
-    private fun subcategory(id: String) = OnboardingSubcategory(
+    private fun subcategory(id: String, color: String? = null) = OnboardingSubcategory(
         id = id,
         name = "Compose",
         categoryId = "android",
         categoryName = "Android",
         order = 0,
         iconSvg = "<svg/>",
+        color = color,
     )
 
     @Test
@@ -158,6 +159,31 @@ class OnboardingViewModelTest {
 
         viewModel.onFavoriteSubcategoryToggle(subcategoryId)
         viewModel.state.value.selectedFavoriteSubcategoriesIds shouldBe emptySet()
+    }
+
+    @Test
+    fun `favorite option carries the category color from the curated subcategory`() = runTest(mainDispatcherRule.testDispatcher) {
+        val categoryColor = "#3DDC84"
+        onboardingSubcategoriesRepository.resultToReturn =
+            Result.success(listOf(subcategory("android-compose", color = categoryColor)))
+        val viewModel = createViewModel()
+
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+
+        viewModel.loadedFavoriteOptions().single().color shouldBe categoryColor
+    }
+
+    @Test
+    fun `favorite option color is null when the curated subcategory has none`() = runTest(mainDispatcherRule.testDispatcher) {
+        onboardingSubcategoriesRepository.resultToReturn =
+            Result.success(listOf(subcategory("android-compose", color = null)))
+        val viewModel = createViewModel()
+
+        viewModel.onFavoritesStepEntered()
+        advanceUntilIdle()
+
+        viewModel.loadedFavoriteOptions().single().color shouldBe null
     }
 
     @Test

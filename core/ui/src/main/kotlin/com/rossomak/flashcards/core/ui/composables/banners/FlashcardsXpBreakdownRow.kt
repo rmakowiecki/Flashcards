@@ -27,7 +27,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
-import com.rossomak.flashcards.core.designsystem.theme.semanticColors
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.backdrop.blurBackdrop
@@ -61,10 +60,9 @@ fun FlashcardsXpBreakdownRow(
     blursBackdrop: Boolean = true,
 ) {
     val brandColors = MaterialTheme.brandColors
-    val semanticColors = MaterialTheme.semanticColors
     val containerColor = when (tone) {
         Gain -> brandColors.onGradientContainer
-        Loss -> semanticColors.onGradientLossContainer
+        Loss -> brandColors.onGradientLossContainer
     }
     val contentColor = when (tone) {
         Gain -> brandColors.onGradientContent
@@ -72,7 +70,7 @@ fun FlashcardsXpBreakdownRow(
     }
     val borderColor = when (tone) {
         Gain -> brandColors.onGradientBorder
-        Loss -> semanticColors.onGradientLossBorder
+        Loss -> brandColors.onGradientLossBorder
     }
 
     val shape = RoundedCornerShape(MaterialTheme.cornerRadius.medium)

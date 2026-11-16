@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
@@ -42,6 +42,7 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBar
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarOnSurfaceGraph
 import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenScroll
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroup
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListGroupItem
@@ -69,6 +70,7 @@ fun DebugScreen(
     onNavigateToVoiceIndicatorDebug: () -> Unit,
     onNavigateToMorpheusGraphPrototype: () -> Unit,
     onNavigateToBackdropBlurDebug: () -> Unit,
+    onNavigateToDarkThemeTuner: () -> Unit,
     onNavigateToCardAnimationsDebug: () -> Unit,
     onNavigateToScreenShowcase: () -> Unit,
 ) {
@@ -91,6 +93,7 @@ fun DebugScreen(
         onVoiceDebugClick = onNavigateToVoiceDebug,
         onVoiceIndicatorDebugClick = onNavigateToVoiceIndicatorDebug,
         onBackdropBlurDebugClick = onNavigateToBackdropBlurDebug,
+        onDarkThemeTunerClick = onNavigateToDarkThemeTuner,
         onCardAnimationsDebugClick = onNavigateToCardAnimationsDebug,
         onScreenShowcaseClick = onNavigateToScreenShowcase,
         onReplayOnboardingClick = viewModel::onReplayOnboardingClick,
@@ -113,6 +116,7 @@ private fun DebugContent(
     onVoiceDebugClick: () -> Unit,
     onVoiceIndicatorDebugClick: () -> Unit,
     onBackdropBlurDebugClick: () -> Unit,
+    onDarkThemeTunerClick: () -> Unit,
     onCardAnimationsDebugClick: () -> Unit,
     onScreenShowcaseClick: () -> Unit,
     onReplayOnboardingClick: () -> Unit,
@@ -138,11 +142,8 @@ private fun DebugContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(
-                    horizontal = MaterialTheme.spacing.normal,
-                    vertical = MaterialTheme.spacing.small,
-                ),
+                .flashcardsScreenScroll(rememberScrollState(), padsTop = true)
+                .padding(horizontal = MaterialTheme.spacing.normal),
         ) {
             FlashcardsListGroup(
                 items = buildList {
@@ -168,6 +169,14 @@ private fun DebugContent(
                             messageRes = R.string.debug_backdrop_blur_message,
                             icon = Icons.Default.BlurOn,
                             onClick = onBackdropBlurDebugClick,
+                        ),
+                    )
+                    add(
+                        debugToolRow(
+                            titleRes = R.string.debug_dark_theme_tuner_label,
+                            messageRes = R.string.debug_dark_theme_tuner_message,
+                            icon = Icons.Default.DarkMode,
+                            onClick = onDarkThemeTunerClick,
                         ),
                     )
                     add(
@@ -284,6 +293,7 @@ private fun DebugContentPreview() {
             onVoiceDebugClick = {},
             onVoiceIndicatorDebugClick = {},
             onBackdropBlurDebugClick = {},
+            onDarkThemeTunerClick = {},
             onCardAnimationsDebugClick = {},
             onScreenShowcaseClick = {},
             onReplayOnboardingClick = {},

@@ -77,7 +77,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  *
  * Everything else this component adds on top of a bare `BottomSheet` call is the app's own design
  * tokens — top-rounded [MaterialTheme.cornerRadius.large] shape,
- * `MaterialTheme.colorScheme.surfaceContainerLowest` container, [MaterialTheme.spacing.normal]
+ * `MaterialTheme.colorScheme.surfaceContainerLow` container, [MaterialTheme.spacing.normal]
  * padding around [content] (`BottomSheet` applies none itself beyond the bottom system-bar inset —
  * content butts against the sheet's edges otherwise) — the shape/color pairing
  * [FlashcardsDialog][com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsDialog] also
@@ -139,7 +139,7 @@ fun FlashcardsBottomSheet(
                 topStart = MaterialTheme.cornerRadius.large,
                 topEnd = MaterialTheme.cornerRadius.large,
             ),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             content = {
                 Column(
                     modifier = Modifier

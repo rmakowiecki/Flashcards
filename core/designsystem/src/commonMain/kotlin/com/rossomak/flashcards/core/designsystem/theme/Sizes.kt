@@ -25,6 +25,9 @@ object AppSizes {
     /** Outline width of an unselected tag chip — deliberately heavier than [hairline]. */
     val tagChipBorder: Dp = 1.5.dp
 
+    /** Ring around a rating: the rating buttons and the attempt indicator's rated slots, where the theme draws one. */
+    val ratingBorder: Dp = 1.5.dp
+
     /** Leading icon inside a metadata badge. */
     val metadataBadgeIcon: Dp = 16.dp
 

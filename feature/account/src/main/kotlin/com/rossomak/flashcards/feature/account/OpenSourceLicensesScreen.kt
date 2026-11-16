@@ -52,6 +52,7 @@ import com.rossomak.flashcards.core.ui.composables.bars.FlashcardsTopAppBarSize
 import com.rossomak.flashcards.core.ui.composables.bars.rememberFlashcardsTopAppBarScrollBehavior
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsTextButton
 import com.rossomak.flashcards.core.ui.composables.flashcardsListScrollFade
+import com.rossomak.flashcards.core.ui.composables.flashcardsScreenListContentPadding
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsChevron
 import com.rossomak.flashcards.core.ui.composables.lists.FlashcardsListRow
 import com.rossomak.flashcards.core.ui.composables.lists.flashcardsListGroupContainer
@@ -209,9 +210,10 @@ private fun LibraryList(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(all = MaterialTheme.spacing.normal)
+            .padding(horizontal = MaterialTheme.spacing.normal)
             .flashcardsListGroupContainer(listState)
             .flashcardsListScrollFade(listState),
+        contentPadding = flashcardsScreenListContentPadding(padsTop = true),
     ) {
         flashcardsListGroupItems(
             items = libraries,

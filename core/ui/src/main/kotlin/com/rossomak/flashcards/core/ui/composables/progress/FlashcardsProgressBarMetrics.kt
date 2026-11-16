@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.Dp
 import com.rossomak.flashcards.core.designsystem.theme.AppSizes
 import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.PROGRESS_TRACK_ALPHA
 import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
@@ -61,7 +62,7 @@ internal fun FlashcardsComponentSize.segmentedProgressBarMetrics(
 @Composable
 @ReadOnlyComposable
 internal fun progressBarFillColorFor(style: FlashcardsComponentStyle): Color = when (style) {
-    FlashcardsComponentStyle.OnSurface -> MaterialTheme.brandColors.progressBarFillOnSurface
+    FlashcardsComponentStyle.OnSurface -> MaterialTheme.colorScheme.primary
     FlashcardsComponentStyle.OnGradient -> MaterialTheme.brandColors.progressBarFillOnGradient
 }
 
@@ -69,7 +70,7 @@ internal fun progressBarFillColorFor(style: FlashcardsComponentStyle): Color = w
 @Composable
 @ReadOnlyComposable
 internal fun progressBarTrackColorFor(style: FlashcardsComponentStyle): Color = when (style) {
-    FlashcardsComponentStyle.OnSurface -> MaterialTheme.brandColors.progressBarTrackOnSurface
+    FlashcardsComponentStyle.OnSurface -> MaterialTheme.colorScheme.primary.copy(alpha = PROGRESS_TRACK_ALPHA)
     FlashcardsComponentStyle.OnGradient -> MaterialTheme.brandColors.progressBarTrackOnGradient
 }
 

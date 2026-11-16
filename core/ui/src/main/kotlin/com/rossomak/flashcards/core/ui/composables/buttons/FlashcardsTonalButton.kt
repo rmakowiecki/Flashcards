@@ -60,8 +60,8 @@ fun FlashcardsTonalButton(
         enabled = enabled,
         shape = shape,
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = enabledButtonContainerColorFor(style, MaterialTheme.brandColors.tonalButtonContainer),
-            contentColor = enabledButtonContentColorFor(style, MaterialTheme.brandColors.onTonalButtonContainer),
+            containerColor = enabledButtonContainerColorFor(style, MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentColor = enabledButtonContentColorFor(style, MaterialTheme.colorScheme.primary),
             disabledContainerColor = disabledButtonContainerColorFor(style),
             disabledContentColor = disabledButtonContentColorFor(style),
         ),

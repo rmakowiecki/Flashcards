@@ -84,11 +84,15 @@ theme-fixed member alongside one theme-flipping member:
 
 | Style | Fill | Track |
 |---|---|---|
-| `OnSurface` | `progressBarFillOnSurface` — **fixed** across themes, reuses the existing `ctaButtonGradient` purple stop (`#7C3FC4`) rather than `colorScheme.primary`, so the Surface and Gradient treatments stay the same brand purple in dark mode instead of drifting apart | `progressBarTrackOnSurface` — **theme-flipping**: `surfaceContainerHighLight` in light, `surfaceContainerHighDark` in dark (same dark token `tonalButtonContainer` uses, for the same hue-consistency reason) |
+| `OnSurface` | `colorScheme.primary` | `colorScheme.primary` at `PROGRESS_TRACK_ALPHA` (0.16), the same track the progress rings draw |
 | `OnGradient` | `progressBarFillOnGradient` — fixed white | `progressBarTrackOnGradient` — fixed white @ 20% alpha |
 
 Both `OnGradient` members are theme-fixed like every other on-gradient color in `BrandColors` —
 the gradients they sit on never flip either.
+
+**Amended:** dark differs. On a surface the bar fills with `primaryDark` over a track of the same
+color at 16%, matching the progress rings, and on a gradient the track is the dark glass. See
+[ADR-0078](0078-dark-theme-is-frozen-tokens-from-one-neutral-palette.md).
 
 **Animation.** `FlashcardsLinearProgressBar`/`FlashcardsCircularProgressRing` animate `progress`
 via `animateFloatAsState`, using a shared `flashcardsProgressBarDefaultAnimationSpec`
@@ -114,14 +118,14 @@ this codebase's flat, role-based taxonomy).
 
 ## Consequences
 
-- `BrandColors` gains four new fields (`progressBarFillOnSurface`, `progressBarTrackOnSurface`,
-  `progressBarFillOnGradient`, `progressBarTrackOnGradient`); `AppSizes` gains four
+- `BrandColors` gains two new fields (`progressBarFillOnGradient`, `progressBarTrackOnGradient`);
+  `AppSizes` gains four
   (`progressBarThicknessNormal/Small`, `progressRingDiameterNormal/Small`). **Superseded:** the
   `progressRingDiameter*` tokens were removed, see the final Amendment.
 - Any composite component that embeds one of these bars (Level/XP card, "Continue learning" card,
   list-row rings, the 88dp daily-goal ring) is future work, built against real domain data once
   those screens are reached — not designed speculatively here.
-- Exact `progressBarTrackOnSurface`/`OnGradient` alpha values may be revisited once a concrete
+- Exact `progressBarTrackOnGradient` alpha value may be revisited once a concrete
   screen renders these on a real background (mirrors the same caveat in ADR-0033).
 
 ## Amendment: one ring, the list-row ring

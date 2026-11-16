@@ -52,7 +52,16 @@ private val noMessages: SharedFlow<OnboardingMessage> = MutableSharedFlow()
 /** Microphone granted, so the voice test shows its normal card, and two Topics picked. */
 private fun ShowcaseFixtures.onboardingState(): OnboardingScreenState {
     val options = listOf(coroutines, functions, compose, navigation, typingAndInterfaces, coreTypes, swiftConcurrency, memoryManagement, connectivity, testing)
-        .map { FavoriteSubcategoryOption(id = it.id, name = it.name, categoryName = it.categoryName, iconSvg = category(it.categoryId).iconSvg) }
+        .map { subcategory ->
+            val parentCategory = category(subcategory.categoryId)
+            FavoriteSubcategoryOption(
+                id = subcategory.id,
+                name = subcategory.name,
+                categoryName = subcategory.categoryName,
+                iconSvg = parentCategory.iconSvg,
+                color = parentCategory.color,
+            )
+        }
     return OnboardingScreenState(
         userName = ShowcaseUser.DISPLAY_NAME,
         favoriteSubcategories = FavoriteSubcategoriesState.Content(options.toImmutableList()),

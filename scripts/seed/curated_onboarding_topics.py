@@ -4,7 +4,7 @@ Single source of truth for the single `onboarding/subcategories` Firestore docum
 docs/design/firestore-schema.md) — a small, publicly-readable, denormalized subset of the real
 `subcategories` collection. `build_fixture.py` cross-references this list against the
 subcategories it builds, trims each to onboarding's fields, and joins in its parent category's
-`iconSvg`; it fails loudly if an id here no longer exists in the real taxonomy, rather than
+`iconSvg` and `color`; it fails loudly if an id here no longer exists in the real taxonomy, rather than
 silently seeding a shorter list than intended.
 
 Admin can extend/edit this list directly — plain data, ids only, no other file needs to change.

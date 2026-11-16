@@ -80,9 +80,15 @@ onboarding `FavoriteSubcategoryCard`.
 **Opt-in for future variants.** A component that does not sit directly on a gradient today
 (`FlashcardsAttemptIndicator`, `FlashcardsDifficultyBadge`, `FlashcardsIndicatorBadge`,
 `FlashcardsRatingButtonRow`, `FlashcardsStepper`, `FlashcardsIconTile`,
-`FlashcardsVoiceCaptureIndicator`, the progress-bar tracks and `FlashcardsOptionCard`) gets no blur.
+`FlashcardsVoiceCaptureIndicator` and `FlashcardsOptionCard`) gets no blur.
 A later on-gradient variant of one adopts it with a `blursBackdrop` parameter and one `blurBackdrop`
 call.
+
+**Progress-bar tracks blur too.** The on-gradient linear and segmented bars sit straight on the
+gradient (the session header, onboarding), so their tracks are glass like any other on-gradient
+fill: each blurs behind its own pill, and the segmented bar behind each segment, never in the gaps.
+A bar inside a component that already blurs, such as the Level card's, passes
+`blursBackdrop = false`.
 
 ## Consequences
 

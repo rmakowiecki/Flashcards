@@ -9,11 +9,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipRect
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
@@ -79,10 +81,8 @@ fun Modifier.flashcardsListItemShape(
 /**
  * The group background a screen wraps around its grouped `LazyColumn` section, so individually
  * shaped [flashcardsListItemShape] rows appear inside one rounded card and the 1dp gaps between
- * unchecked rows show this color rather than a drawn divider line. Deliberately a warm
- * `secondaryContainer` tone rather than [androidx.compose.material3.ColorScheme.background] —
- * it also shows through a selected row's translucent tint (see [FlashcardsSelectableListRow]), so
- * it must read as different from the screen behind it, not blend into it.
+ * unchecked rows show this color rather than a drawn divider line. It is `secondaryContainer`,
+ * which a selected row also fills with (see [FlashcardsSelectableListRow]).
  */
 @Composable
 fun Modifier.flashcardsListGroupContainer(): Modifier = this
@@ -90,29 +90,36 @@ fun Modifier.flashcardsListGroupContainer(): Modifier = this
     .background(MaterialTheme.colorScheme.secondaryContainer)
 
 /**
- * [flashcardsListGroupContainer] variant for a scrollable `LazyColumn`: rounds only the edges
- * whose real corner is actually at rest in the viewport. A corner clipped to the container's full
- * radius while [listState] has scrolled past it reads as a floating rounded card with no top or
- * bottom — wrong, since that edge is really a straight cut mid-list, not the group's start or end.
- *
- * Note: the boundary row itself still renders its static [FlashcardsListItemPosition.Top]/
- * [FlashcardsListItemPosition.Bottom] shape regardless of scroll offset, so its own big rounded
- * corner can briefly show mid-row once this container squares off that edge — a known, accepted
- * cosmetic gap rather than something this modifier tries to hide.
+ * [flashcardsListGroupContainer] for a `LazyColumn` holding one group: rounded ends scroll with
+ * the rows, an end out of view is cut straight. Under a pinned header the top row's own corner
+ * can briefly show as it leaves; accepted.
  */
 @Composable
 fun Modifier.flashcardsListGroupContainer(listState: LazyListState): Modifier {
-    val corner = MaterialTheme.cornerRadius.medium
-    val topRounded by remember(listState) { derivedStateOf { !listState.canScrollBackward } }
-    val bottomRounded by remember(listState) { derivedStateOf { !listState.canScrollForward } }
-    val square = MaterialTheme.cornerRadius.none
-    val shape = RoundedCornerShape(
-        topStart = if (topRounded) corner else square,
-        topEnd = if (topRounded) corner else square,
-        bottomStart = if (bottomRounded) corner else square,
-        bottomEnd = if (bottomRounded) corner else square,
-    )
-    return this
-        .clip(shape)
-        .background(MaterialTheme.colorScheme.secondaryContainer)
+    val cornerRadius = MaterialTheme.cornerRadius.medium
+    val backgroundColor = MaterialTheme.colorScheme.secondaryContainer
+    return drawBehind {
+        val layoutInfo = listState.layoutInfo
+        val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull() ?: return@drawBehind
+        val lastVisible = layoutInfo.visibleItemsInfo.last()
+        val startsInView = firstVisible.index == 0
+        val endsInView = lastVisible.index == layoutInfo.totalItemsCount - 1
+        // Item offsets count from the end of the top content padding; viewportStartOffset is minus that padding.
+        val top = if (startsInView) (firstVisible.offset - layoutInfo.viewportStartOffset).toFloat() else 0f
+        val bottom = if (endsInView) (lastVisible.offset + lastVisible.size - layoutInfo.viewportStartOffset).toFloat() else size.height
+        val radiusPx = cornerRadius.toPx()
+        val topCorner = if (startsInView) CornerRadius(radiusPx) else CornerRadius.Zero
+        val bottomCorner = if (endsInView) CornerRadius(radiusPx) else CornerRadius.Zero
+        val groupOutline = RoundRect(
+            left = 0f,
+            top = top,
+            right = size.width,
+            bottom = bottom,
+            topLeftCornerRadius = topCorner,
+            topRightCornerRadius = topCorner,
+            bottomRightCornerRadius = bottomCorner,
+            bottomLeftCornerRadius = bottomCorner,
+        )
+        clipRect { drawPath(path = Path().apply { addRoundRect(groupOutline) }, color = backgroundColor) }
+    }
 }

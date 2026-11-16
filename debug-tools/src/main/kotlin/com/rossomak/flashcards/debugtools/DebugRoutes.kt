@@ -18,3 +18,6 @@ import kotlinx.serialization.Serializable
 
 /** Backdrop blur harness with a live radius slider. */
 @Serializable object DebugBackdropBlurRoot
+
+/** Live dark theme tuner — see [com.rossomak.flashcards.debugtools.darktheme.DarkThemeTunerScreen]. */
+@Serializable object DebugDarkThemeTunerRoot

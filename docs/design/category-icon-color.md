@@ -24,10 +24,11 @@ Subcategories have no icon or color of their own. A surface that shows a Subcate
 **Tinting.** The glyph is drawn through the same tint mechanism the app's built-in icons use, so every tinted icon in the app recolors the same way. Each surface picks the tint. Most use the Category's color:
 
 - The icon tile on Category rows in Browse and on Favorite Subcategory cards on Home: the glyph in the Category color on a faint container of the same color.
+- The icon tile on a picked Favorite pick card in onboarding: the same treatment, with the color read from the curated onboarding document, which copies it from the parent Category.
 - The small inline glyph that leads the Category line of a Recent on Home and of a Topic search result.
 - The large faded watermark on a Favorite Category card on Home, whose title also takes the Category color.
 
-Other surfaces show only the glyph and ignore the Category color, drawing it in their own tint instead. For example, the onboarding Favorite pick card tints the glyph with its own selected or unselected treatment, and the Preview hero draws it in white on its circle.
+Other surfaces show only the glyph and ignore the Category color, drawing it in their own tint instead. For example, an unpicked onboarding Favorite pick card tints the glyph with its own on-gradient treatment, and the Preview hero draws it in white on its circle.
 
 **Caching.** An SVG is parsed and rasterized once per size into an untinted mask, off the main thread. The mask is held in a cache shared across the whole process, and the tint is applied when the mask is drawn. One mask therefore serves every tint, so a selection change or a light/dark switch never re-renders it. Returning to Home or Browse draws every glyph already seen in the first frame. While a glyph that is not yet cached loads, a tile shows only its tinted container and an inline glyph keeps its space empty, so the fallback glyph never flashes in its place.
 
@@ -40,6 +41,8 @@ Icon and color cannot be derived from a Category's folder name, so they are vers
 When the fixture is built, each Category takes whichever of its two files exist. A missing or empty file leaves that field out entirely and prints a warning, but never fails the build.
 
 When the fixture is seeded, Firestore wins once it holds a value. An icon or color that is already present on the Category document, whether seeded earlier or edited by hand in the console, is never overwritten by the checked-in file. Every other Category field is rewritten on each run, and a field left out of the write is never touched. A forced overwrite run replaces whichever of the two the checked-in files supply, and still leaves a field with no file alone. Adding missing art to a live Category is therefore just a matter of adding its files and running the seed pipeline. Replacing art the Category already holds needs the forced overwrite run (`--overwrite`).
+
+Onboarding's curated Topic document copies each Category's color alongside its icon. The copy takes the color the Category document holds once the run's own Category writes are done, so a console-edited color is carried over, not the checked-in file's.
 
 There is no in-app way to edit a Category's icon or color.
 

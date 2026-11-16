@@ -75,6 +75,7 @@ internal fun FlashcardsDialog(
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     val supportingTextAlign = if (icon == null) TextAlign.Start else TextAlign.Center
+    val shape = RoundedCornerShape(MaterialTheme.cornerRadius.large)
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -103,8 +104,8 @@ internal fun FlashcardsDialog(
                 content()
             }
         },
-        shape = RoundedCornerShape(MaterialTheme.cornerRadius.large),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shape = shape,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         iconContentColor = MaterialTheme.colorScheme.primary,
         // M3 defaults the text slot to onSurfaceVariant, which is right for supporting prose but
         // washes out the selectable rows that make up most dialog content. Those rows opt into

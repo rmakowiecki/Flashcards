@@ -14,6 +14,7 @@ import com.rossomak.flashcards.core.domain.repository.AppShortcutsRepository
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import com.rossomak.flashcards.core.ui.window.lockPortraitOnPhones
+import com.rossomak.flashcards.presentation.main.DebugThemeOverrides
 import com.rossomak.flashcards.presentation.startup.AppStartViewModel
 import com.rossomak.flashcards.presentation.startup.AppStartupState
 import com.rossomak.flashcards.ui.navigation.FlashcardsNavGraph
@@ -45,16 +46,18 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            FlashcardsTheme(dynamicColor = false) {
-                val navController = rememberNavController()
-                FlashcardsNavGraph(
-                    navController = navController,
-                    permissionGateway = permissionGateway,
-                    modifier = Modifier.fillMaxSize(),
-                    launchRoute = launchRoute,
-                    shortcutEvents = appStartViewModel.shortcutEvents,
-                    onNavigationStateChange = appStartViewModel::onNavigationStateChange,
-                )
+            FlashcardsTheme {
+                DebugThemeOverrides {
+                    val navController = rememberNavController()
+                    FlashcardsNavGraph(
+                        navController = navController,
+                        permissionGateway = permissionGateway,
+                        modifier = Modifier.fillMaxSize(),
+                        launchRoute = launchRoute,
+                        shortcutEvents = appStartViewModel.shortcutEvents,
+                        onNavigationStateChange = appStartViewModel::onNavigationStateChange,
+                    )
+                }
             }
         }
     }

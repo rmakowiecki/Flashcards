@@ -21,6 +21,7 @@ import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntry
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseEntryContent
 import com.rossomak.flashcards.debugtools.showcase.ScreenShowcaseListScreen
 import com.rossomak.flashcards.debugtools.showcase.fixtures.ShowcaseFixtures
+import com.rossomak.flashcards.presentation.main.DebugThemeOverrides
 import com.rossomak.flashcards.ui.navigation.guardedNavComposable
 import kotlinx.serialization.Serializable
 
@@ -41,8 +42,10 @@ class ScreenShowcaseActivity : ComponentActivity() {
         enableEdgeToEdge()
         val fixtures = ShowcaseFixtures.load(resources)
         setContent {
-            FlashcardsTheme(dynamicColor = false) {
-                ScreenShowcaseNavHost(fixtures = fixtures, onExit = ::finish)
+            FlashcardsTheme {
+                DebugThemeOverrides {
+                    ScreenShowcaseNavHost(fixtures = fixtures, onExit = ::finish)
+                }
             }
         }
     }
