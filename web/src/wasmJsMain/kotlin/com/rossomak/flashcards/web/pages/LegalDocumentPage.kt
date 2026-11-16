@@ -3,21 +3,16 @@ package com.rossomak.flashcards.web.pages
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.web.components.HtmlText
-import com.rossomak.flashcards.web.components.PageLink
 import com.rossomak.flashcards.web.components.WebPage
 import com.rossomak.flashcards.web.content.LegalBlock
 import com.rossomak.flashcards.web.content.LegalBlock.BulletList
@@ -26,15 +21,11 @@ import com.rossomak.flashcards.web.content.LegalBlock.Paragraph
 import com.rossomak.flashcards.web.content.LegalDocument
 import com.rossomak.flashcards.web.content.LegalSection
 import com.rossomak.flashcards.web.navigation.OnNavigate
-import com.rossomak.flashcards.web.navigation.WebRoute
-import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 
-/** A legal page (privacy policy, account deletion): a link home, the title, then its sections. */
+/** A legal page (privacy policy, account deletion): the title, then its sections, on the site's reading card. */
 @Composable
 fun LegalDocumentPage(modifier: Modifier = Modifier, document: LegalDocument, onNavigate: OnNavigate) {
-    WebPage(modifier = modifier) {
-        PageLink(label = "Flashcards", route = WebRoute.Home, style = MaterialTheme.typography.titleMediumEmphasized, onNavigate = onNavigate)
-        Spacer(Modifier.height(MaterialTheme.spacing.large))
+    WebPage(modifier = modifier, onNavigate = onNavigate) {
         Text(
             text = document.title,
             style = MaterialTheme.typography.headlineMedium,
@@ -43,7 +34,7 @@ fun LegalDocumentPage(modifier: Modifier = Modifier, document: LegalDocument, on
         Text(
             text = document.subtitle,
             style = MaterialTheme.typography.bodyLarge,
-            color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = MaterialTheme.spacing.xxsmall),
         )
         Column(
@@ -60,7 +51,7 @@ fun LegalDocumentPage(modifier: Modifier = Modifier, document: LegalDocument, on
 private fun LegalSectionContent(section: LegalSection, onNavigate: OnNavigate) {
     HorizontalDivider(
         modifier = Modifier.padding(top = MaterialTheme.spacing.large, bottom = MaterialTheme.spacing.normal),
-        color = MaterialTheme.brandColors.onGradientBorder,
+        color = MaterialTheme.colorScheme.outlineVariant,
     )
     Text(
         text = section.title,
@@ -96,7 +87,7 @@ private fun ListItem(marker: String, html: String, onNavigate: OnNavigate) {
 
 @Composable
 private fun BodyText(html: String, onNavigate: OnNavigate) {
-    HtmlText(html = html, style = MaterialTheme.typography.bodyLarge, onNavigate = onNavigate)
+    HtmlText(html = html, style = MaterialTheme.typography.bodyLarge, onNavigate = onNavigate, linkColor = MaterialTheme.colorScheme.primary)
 }
 
 private const val BULLET = "•"

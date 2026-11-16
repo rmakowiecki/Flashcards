@@ -4,7 +4,7 @@ plugins {
     id("kmp-web-app")
 }
 
-// The hosted website (Firebase Hosting): home, privacy policy and account deletion pages, drawn
+// The hosted website (Firebase Hosting): the landing page, privacy policy and account deletion pages, drawn
 // with Compose Multiplatform over the shared :core:designsystem tokens. Build the deployable site
 // with `./gradlew :web:wasmJsBrowserDistribution`; preview it with `wasmJsBrowserDevelopmentRun`.
 kotlin {
@@ -17,6 +17,9 @@ kotlin {
     sourceSets {
         wasmJsMain.dependencies {
             implementation(project(":core:designsystem"))
+            // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts):
+            // the landing page's animated graph.
+            implementation("com.rossomak:morpheus")
             implementation(libs.jetbrains.compose.foundation)
             implementation(libs.jetbrains.compose.material3)
             implementation(libs.jetbrains.compose.components.resources)
