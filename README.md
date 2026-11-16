@@ -169,8 +169,15 @@ sequenceDiagram
 
 <table>
   <tr>
-    <td width="300"><img src="docs/readme/01-home.webp" alt="Home: Level card, Streak and Daily Goal, Favorites and recent sessions" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/01-home.webp" alt="Home: Level card, Streak and Daily Goal, Favorites and recent sessions (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/01-home.webp" alt="Home: Level card, Streak and Daily Goal, Favorites and recent sessions (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Home and progress</h3>
       <p>Home shows the Level and XP, the Streak, and today's minutes against the Daily Goal. Below them, a carousel
       of favorite Categories and Topics starts a session in one tap, and the Recently studied list replays any past
@@ -179,8 +186,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/02-category-search.webp" alt="Search across Categories and Topics" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/02-category-search.webp" alt="Search across Categories and Topics (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/02-category-search.webp" alt="Search across Categories and Topics (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Search</h3>
       <p>Search finds Topics and Categories as the query is typed. A matching Topic also brings up its Category, and
       a Topic result can start a session right away.</p>
@@ -188,8 +202,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/03-category-selection-mode.webp" alt="Selection Mode on Category Details" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/03-category-selection-mode.webp" alt="Selection Mode on Category Details (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/03-category-selection-mode.webp" alt="Selection Mode on Category Details (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Selection Mode and custom sessions</h3>
       <p>Inside a Category, a session can start for one Topic, as a Quick Session with a random mix, or as a custom
       session: a long-press enters Selection Mode and combines the chosen Topics.</p>
@@ -197,8 +218,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/04-subcategory-details.webp" alt="Topic details with tag filters and sorting" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/04-subcategory-details.webp" alt="Topic details with tag filters and sorting (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/04-subcategory-details.webp" alt="Topic details with tag filters and sorting (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Topic details</h3>
       <p>Each Topic lists its cards with their difficulty. The list can be filtered by tags and difficulty and sorted
       easiest or hardest first, and a session can start with exactly the cards shown.</p>
@@ -206,8 +234,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/05-preview-study-session.webp" alt="Preview of a study session and its settings" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/05-preview-study-session.webp" alt="Preview of a study session and its settings (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/05-preview-study-session.webp" alt="Preview of a study session and its settings (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Session preview</h3>
       <p>Every session, whichever way it starts, opens on a preview with its card count and estimated time. The mode
       and its delivery, the length, the difficulty range, the filters and the card order are set there, and any of
@@ -216,8 +251,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/06-rated-voice-graded.webp" alt="Rated session with a spoken answer graded" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/06-rated-voice-graded.webp" alt="Rated session with a spoken answer graded (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/06-rated-voice-graded.webp" alt="Rated session with a spoken answer graded (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Rated mode and Voice Answering</h3>
       <p>The answer is revealed and self-rated Failed, Partial or Correct, or Voice Answering is switched on: the
       question is read aloud, the answer is spoken, and the transcript and grade arrive within seconds. Weaker cards
@@ -227,8 +269,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/07-fast-read-aloud.webp" alt="Fast session reading cards aloud" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/07-fast-read-aloud.webp" alt="Fast session reading cards aloud (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/07-fast-read-aloud.webp" alt="Fast session reading cards aloud (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>Fast mode and read-aloud</h3>
       <p>No grading: question and answer are tapped through, or read-aloud reads each question, pauses, reads the
       answer and moves on. Playback continues in the background, with controls in the notification, on the lock
@@ -237,8 +286,15 @@ sequenceDiagram
     </td>
   </tr>
   <tr>
-    <td width="300"><img src="docs/readme/08-session-complete.webp" alt="Session Summary with XP breakdown and Level" width="270"></td>
     <td>
+      <table>
+        <tr>
+          <td><img src="docs/readme/screenshots/light/08-session-complete.webp" alt="Session Summary with XP breakdown and Level (light theme)" width="190"></td>
+          <td><img src="docs/readme/screenshots/dark/08-session-complete.webp" alt="Session Summary with XP breakdown and Level (dark theme)" width="190"></td>
+        </tr>
+      </table>
+    </td>
+    <td valign="middle">
       <h3>XP and Levels</h3>
       <p>The Session Summary breaks down the XP the session earned: new cards, mastered cards, defended mastery,
       finishing the session, the Daily Goal and the Streak. The Level card fills and pulses for every Level crossed.
