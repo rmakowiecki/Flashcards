@@ -16,7 +16,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipRect
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
@@ -82,14 +81,13 @@ fun Modifier.flashcardsListItemShape(
 /**
  * The group background a screen wraps around its grouped `LazyColumn` section, so individually
  * shaped [flashcardsListItemShape] rows appear inside one rounded card and the 1dp gaps between
- * unchecked rows show this color rather than a drawn divider line. It is
- * [com.rossomak.flashcards.core.designsystem.theme.BrandColors.listGroupContainer], which a selected
- * row also fills with (see [FlashcardsSelectableListRow]).
+ * unchecked rows show this color rather than a drawn divider line. It is `secondaryContainer`,
+ * which a selected row also fills with (see [FlashcardsSelectableListRow]).
  */
 @Composable
 fun Modifier.flashcardsListGroupContainer(): Modifier = this
     .clip(RoundedCornerShape(MaterialTheme.cornerRadius.medium)) // needs to be 2dp higher than the items background corner to maintain border width
-    .background(MaterialTheme.brandColors.listGroupContainer)
+    .background(MaterialTheme.colorScheme.secondaryContainer)
 
 /**
  * [flashcardsListGroupContainer] for a `LazyColumn` holding one group: rounded ends scroll with
@@ -99,7 +97,7 @@ fun Modifier.flashcardsListGroupContainer(): Modifier = this
 @Composable
 fun Modifier.flashcardsListGroupContainer(listState: LazyListState): Modifier {
     val cornerRadius = MaterialTheme.cornerRadius.medium
-    val backgroundColor = MaterialTheme.brandColors.listGroupContainer
+    val backgroundColor = MaterialTheme.colorScheme.secondaryContainer
     return drawBehind {
         val layoutInfo = listState.layoutInfo
         val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull() ?: return@drawBehind

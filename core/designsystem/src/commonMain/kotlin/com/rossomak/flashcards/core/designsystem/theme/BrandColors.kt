@@ -8,43 +8,30 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
+/**
+ * The brand gradients and the colors that exist only because a gradient is behind them. A themed
+ * neutral surface belongs in the Material `ColorScheme`, not here.
+ */
 data class BrandColors(
     val screenGradient: Brush,
     val screenGradientBase: Color,
     val topBarGradient: Brush,
     val onTopBarGradient: Color,
     val ctaButtonGradient: Brush,
-    /**
-     * The opaque pill of a filled button on a gradient: white in light; in dark an ink pill a few tones
-     * above the cards, so it stays the strongest action without glaring white among the dark glass.
-     */
+    /** The opaque pill of a filled button on a gradient: white in light, an ink pill in dark. */
     val onGradientFilledContainer: Color,
     val onGradientFilled: Color,
-    val tonalButtonContainer: Color,
-    val onTonalButtonContainer: Color,
-    val progressBarFillOnSurface: Color,
-    val progressBarTrackOnSurface: Color,
     val progressBarFillOnGradient: Color,
     val progressBarTrackOnGradient: Color,
     val onGradientContainer: Color,
     val onGradientBorder: Color,
     val onGradientContent: Color,
     val onGradientLoss: Color,
+    val onGradientLossContainer: Color,
+    val onGradientLossBorder: Color,
     val codeBlockBackground: Color,
     val onCodeBlock: Color,
     val streakFlame: Color,
-    /**
-     * Behind a grouped list's rows, showing as the hairline between them, and the fill of a selected
-     * multi-select row. Only subtly off the row color, so a selection reads as a tint, not a block.
-     */
-    val listGroupContainer: Color,
-    /**
-     * A dialog's fill. White in light, the brightest surface on screen. In dark, a raised tone above
-     * the cards and the sheet, so it stands off the dimmed, blurred screen behind it.
-     */
-    val dialogContainer: Color,
-    /** A bottom sheet's fill. White in light; in dark a tone above the cards. */
-    val sheetContainer: Color,
 )
 
 /**
@@ -115,24 +102,8 @@ private val brandScreenGradientBase = screenGradientBlue
 private val onGradientFilledContainerLight = Color.White
 private val onGradientFilledLight = primaryLight
 
-/**
- * Light fill colour for every `Flashcards*Progress*` composable's
- * [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentStyle.OnSurface] style.
- * Reuses [ctaGradientPurple], the brand accent. Dark uses [primaryDark] instead, the light accent
- * the progress rings and selected options use there, so a bar and a ring read as one indicator.
- */
-private val progressBarFillOnSurfaceLight = ctaGradientPurple
-private val progressBarFillOnSurfaceDark = primaryDark
-
-/** Opacity of a progress track: its fill color, faint. The rings, the Daily Goal arc and the dark bar use it. */
+/** Opacity of a progress track: its fill color, faint. The rings, the Daily Goal arc and the bars use it. */
 const val PROGRESS_TRACK_ALPHA = 0.16f
-
-/**
- * Track colour for the `OnSurface` style. Light is a recessed neutral surface; dark is the dark fill
- * at [PROGRESS_TRACK_ALPHA], matching the progress rings' track.
- */
-private val progressBarTrackOnSurfaceLight = surfaceContainerHighLight
-private val progressBarTrackOnSurfaceDark = progressBarFillOnSurfaceDark.copy(alpha = PROGRESS_TRACK_ALPHA)
 
 /**
  * Fill/track colours for the
@@ -177,6 +148,17 @@ private val onGradientBorderLight = Color.White.copy(alpha = ON_GRADIENT_BORDER_
 private val onGradientLossColor = errorDark
 
 /**
+ * The fill and border of a `Loss` surface on the brand gradient, [errorContainerDark] at an alpha and
+ * pinned in both themes like [onGradientLossColor]. Deliberately not `SemanticColors.negativeContainer`:
+ * that pair is tuned for a themed surface and reads too washed-out on the gradient.
+ */
+private const val ON_GRADIENT_LOSS_CONTAINER_ALPHA = 0.33f
+private const val ON_GRADIENT_LOSS_BORDER_ALPHA = 0.5f
+
+private val onGradientLossContainerColor = errorContainerDark.copy(alpha = ON_GRADIENT_LOSS_CONTAINER_ALPHA)
+private val onGradientLossBorderColor = errorContainerDark.copy(alpha = ON_GRADIENT_LOSS_BORDER_ALPHA)
+
+/**
  * Fixed palette for [com.rossomak.flashcards.core.ui.composables.SyntaxCodeBlock]. The code
  * block always renders `SyntaxTheme.DefaultDark` regardless of the app's light/dark theme,
  * so both themes pin the same theme-independent values.
@@ -196,26 +178,19 @@ val lightBrandColors = BrandColors(
     ctaButtonGradient = brandCtaButtonGradient,
     onGradientFilledContainer = onGradientFilledContainerLight,
     onGradientFilled = onGradientFilledLight,
-    tonalButtonContainer = secondaryContainerLight,
-    onTonalButtonContainer = onSecondaryContainerLight,
-    progressBarFillOnSurface = progressBarFillOnSurfaceLight,
-    progressBarTrackOnSurface = progressBarTrackOnSurfaceLight,
     progressBarFillOnGradient = progressBarFillOnGradientColor,
     progressBarTrackOnGradient = progressBarTrackOnGradientLight,
     onGradientContainer = onGradientContainerLight,
     onGradientBorder = onGradientBorderLight,
     onGradientContent = onBrandTopBarGradient,
     onGradientLoss = onGradientLossColor,
+    onGradientLossContainer = onGradientLossContainerColor,
+    onGradientLossBorder = onGradientLossBorderColor,
     codeBlockBackground = codeBlockBackgroundColor,
     onCodeBlock = onCodeBlockColor,
     streakFlame = streakFlameLight,
-    listGroupContainer = secondaryContainerLight,
-    dialogContainer = surfaceContainerLowestLight,
-    sheetContainer = surfaceContainerLowestLight,
 )
 
-// The dark Tonal button is a neutral container with primaryDark content, the same content color
-// FlashcardsOutlinedButton and FlashcardsTextButton use in dark, so the three read as one family.
 val darkBrandColors = BrandColors(
     screenGradient = brandScreenGradient,
     screenGradientBase = brandScreenGradientBase,
@@ -224,22 +199,17 @@ val darkBrandColors = BrandColors(
     ctaButtonGradient = brandCtaButtonGradient,
     onGradientFilledContainer = onGradientFilledContainerDark,
     onGradientFilled = onSurfaceDark,
-    tonalButtonContainer = tonalButtonContainerDark,
-    onTonalButtonContainer = primaryDark,
-    progressBarFillOnSurface = progressBarFillOnSurfaceDark,
-    progressBarTrackOnSurface = progressBarTrackOnSurfaceDark,
     progressBarFillOnGradient = progressBarFillOnGradientColor,
     progressBarTrackOnGradient = onGradientContainerDark,
     onGradientContainer = onGradientContainerDark,
     onGradientBorder = onGradientBorderDark,
     onGradientContent = onBrandTopBarGradient,
     onGradientLoss = onGradientLossColor,
+    onGradientLossContainer = onGradientLossContainerColor,
+    onGradientLossBorder = onGradientLossBorderColor,
     codeBlockBackground = codeBlockBackgroundColor,
     onCodeBlock = onCodeBlockColor,
     streakFlame = streakFlameDark,
-    listGroupContainer = listGroupContainerDark,
-    dialogContainer = dialogContainerDark,
-    sheetContainer = sheetContainerDark,
 )
 
 val LocalBrandColors = staticCompositionLocalOf { lightBrandColors }

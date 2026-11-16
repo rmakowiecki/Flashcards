@@ -29,7 +29,7 @@
 | Type | Container | Content |
 |---|---|---|
 | Filled (Surface style) | Transparent `Button` + `brandColors.ctaButtonGradient` painted as a background brush behind it (M3's `ButtonColors` can't take a `Brush`) | Fixed white — not `onPrimary`, since the gradient container is itself theme-fixed |
-| Tonal | `brandColors.tonalButtonContainer` — **theme-flipping**: `secondaryContainer` in light, `surfaceContainerHighDark` in dark | `brandColors.onTonalButtonContainer` — `onSecondaryContainer` in light, `primaryDark` in dark |
+| Tonal | `colorScheme.surfaceContainerHighest` — lilac in light, neutral tone 22 in dark ([ADR-0078](0078-dark-theme-is-frozen-tokens-from-one-neutral-palette.md)) | `colorScheme.primary` |
 | Outlined | transparent, `primary` border | `primary` |
 | Text | transparent | `primary` |
 | Disabled (all types/styles, except Filled-Surface below) | `onSurface` @ 12% alpha | `onSurface` @ 38% alpha |
@@ -47,7 +47,7 @@ Disabled uses the standard M3 low-alpha convention (`onSurface` at reduced alpha
 
 ## Consequences
 
-- `BrandColors` gains `onGradientFilled` (fixed, non-theme-flipping, like `onTopBarGradient`) plus `tonalButtonContainer`/`onTonalButtonContainer` (theme-flipping, unlike the fixed gradient-related members).
+- `BrandColors` gains `onGradientFilled` (fixed, non-theme-flipping, like `onTopBarGradient`) (fixed, non-theme-flipping, like `onTopBarGradient`). The tonal button's colors are Material scheme slots, not `BrandColors` members.
 - No `AppSizes` icon-size fields exist — icon size comes from `ButtonDefaults.IconSize` directly, so there's nothing to keep in sync if that M3 default ever changes.
 - Exact on-gradient color/alpha values beyond what's specified here may be revisited once a concrete screen actually consumes the on-gradient style (none exist yet).
 - `FlashcardsButtonSize` and `FlashcardsButtonStyle` are later generalized into shared `FlashcardsComponentSize`/`FlashcardsComponentStyle` types in `composables/common/`, reused by buttons, the metadata badge, and the progress bar family — see [ADR-0034](0034-consolidated-component-style-and-size-tokens.md) for the current type names and the rationale for sharing them across components; `Style.Surface` is named `.OnSurface` there.

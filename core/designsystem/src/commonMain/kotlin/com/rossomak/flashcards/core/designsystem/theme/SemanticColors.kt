@@ -28,25 +28,7 @@ data class SemanticColors(
     val onNeutralContainer: Color,
     val negativeContainer: Color,
     val onNegativeContainer: Color,
-    val onGradientLossContainer: Color,
-    val onGradientLossBorder: Color,
 )
-
-/**
- * The container fill and border for a `Loss` surface on the brand gradient —
- * [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]'s `Loss` tone and
- * [com.rossomak.flashcards.core.ui.composables.FlashcardsEmptyState]'s error tone. Both are
- * [errorContainerDark] at an alpha and, unlike every other pair in this file, do **not** flip
- * light/dark, because the gradient they sit on doesn't either.
- *
- * Deliberately not [negativeContainer]: that pair is tuned for a themed surface and reads too
- * washed-out once tinted onto the gradient at a usable alpha.
- */
-private const val ON_GRADIENT_LOSS_CONTAINER_ALPHA = 0.33f
-private const val ON_GRADIENT_LOSS_BORDER_ALPHA = 0.5f
-
-private val onGradientLossContainerColor = errorContainerDark.copy(alpha = ON_GRADIENT_LOSS_CONTAINER_ALPHA)
-private val onGradientLossBorderColor = errorContainerDark.copy(alpha = ON_GRADIENT_LOSS_BORDER_ALPHA)
 
 val lightSemanticColors = SemanticColors(
     positiveContainer = positiveContainerLight,
@@ -55,8 +37,6 @@ val lightSemanticColors = SemanticColors(
     onNeutralContainer = onNeutralContainerLight,
     negativeContainer = negativeContainerLight,
     onNegativeContainer = onNegativeContainerLight,
-    onGradientLossContainer = onGradientLossContainerColor,
-    onGradientLossBorder = onGradientLossBorderColor,
 )
 
 val darkSemanticColors = SemanticColors(
@@ -66,8 +46,6 @@ val darkSemanticColors = SemanticColors(
     onNeutralContainer = onNeutralContainerDark,
     negativeContainer = negativeContainerDark,
     onNegativeContainer = onNegativeContainerDark,
-    onGradientLossContainer = onGradientLossContainerColor,
-    onGradientLossBorder = onGradientLossBorderColor,
 )
 
 val LocalSemanticColors = staticCompositionLocalOf { lightSemanticColors }

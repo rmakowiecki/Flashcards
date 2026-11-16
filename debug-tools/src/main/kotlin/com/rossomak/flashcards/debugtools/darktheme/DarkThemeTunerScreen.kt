@@ -232,7 +232,7 @@ private fun TunerGradientPreview() {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(MaterialTheme.cornerRadius.card),
-                color = brandColors.sheetContainer,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 FlashcardsRatingButtonRow(
                     modifier = Modifier.padding(vertical = MaterialTheme.spacing.xsmall),
@@ -273,7 +273,7 @@ private fun TunerSurfaceBannersPreview() {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(MaterialTheme.cornerRadius.large),
-            color = MaterialTheme.brandColors.dialogContainer,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             FlashcardsInfoBanner(
                 text = stringResource(R.string.dark_theme_tuner_banner_dialog_message),
@@ -376,13 +376,10 @@ private fun DarkThemeTunerKnobs.readout(): String {
             "surfaceContainerHighestDark" to colorScheme.surfaceContainerHighest,
             "surfaceBrightDark" to colorScheme.surfaceBright,
             "outlineVariantDark" to colorScheme.outlineVariant,
-            "sheetContainerDark" to brand.sheetContainer,
-            "dialogContainerDark" to brand.dialogContainer,
-            "tonalButtonContainerDark" to brand.tonalButtonContainer,
+            "secondaryContainerDark" to colorScheme.secondaryContainer,
             "onGradientFilledContainerDark" to brand.onGradientFilledContainer,
             "onGradientContainerDark" to brand.onGradientContainer,
             "onGradientBorderDark" to brand.onGradientBorder,
-            "listGroupContainerDark" to brand.listGroupContainer,
             "positiveContainerDark" to semantic.positiveContainer,
             "neutralContainerDark" to semantic.neutralContainer,
             "negativeContainerDark" to semantic.negativeContainer,

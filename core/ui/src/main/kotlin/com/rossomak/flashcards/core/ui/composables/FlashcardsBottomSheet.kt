@@ -28,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.buttons.FlashcardsFilledButton
@@ -78,7 +77,7 @@ import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
  *
  * Everything else this component adds on top of a bare `BottomSheet` call is the app's own design
  * tokens — top-rounded [MaterialTheme.cornerRadius.large] shape,
- * `MaterialTheme.brandColors.sheetContainer` container, [MaterialTheme.spacing.normal]
+ * `MaterialTheme.colorScheme.surfaceContainerLow` container, [MaterialTheme.spacing.normal]
  * padding around [content] (`BottomSheet` applies none itself beyond the bottom system-bar inset —
  * content butts against the sheet's edges otherwise) — the shape/color pairing
  * [FlashcardsDialog][com.rossomak.flashcards.core.ui.composables.dialogs.FlashcardsDialog] also
@@ -140,7 +139,7 @@ fun FlashcardsBottomSheet(
                 topStart = MaterialTheme.cornerRadius.large,
                 topEnd = MaterialTheme.cornerRadius.large,
             ),
-            containerColor = MaterialTheme.brandColors.sheetContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             content = {
                 Column(
                     modifier = Modifier

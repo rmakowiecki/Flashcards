@@ -23,7 +23,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.composables.FlashcardsIconTile
@@ -56,7 +55,7 @@ fun FlashcardsSelectableListRow(
     // Read only in the draw phase below, so animation frames redraw the tint without recomposing the row.
     val backgroundColor = animateColorAsState(
         targetValue = if (selected) {
-            MaterialTheme.brandColors.listGroupContainer
+            MaterialTheme.colorScheme.secondaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainerLowest
         },

@@ -20,19 +20,21 @@ setting. There is no dynamic color.
 **Every dark surface is an HCT tone of one neutral palette** (hue 290, chroma 10), frozen to hex in
 `Color.kt`, each constant naming its tone:
 
-| Slot | Tone |
+| Slot (role) | Tone |
 |---|---|
 | background, surface, surfaceDim | 6 |
 | card (`surfaceContainerLowest`) | 10 |
-| `surfaceContainerLow` / `surfaceContainer` / `High` / `Highest` / `surfaceBright` | 11 / 12 / 17 / 22 / 24 |
+| `surfaceContainerLow` (bottom sheet) | 11 |
+| `surfaceContainer` | 12 |
+| `surfaceContainerHigh` (dialog) | 13 |
+| `surfaceContainerHighest` (tonal button) | 22 |
+| `surfaceBright` | 24 |
 | `surfaceVariant`, `outlineVariant` | 30 |
-| bottom sheet | 12 |
-| dialog | 14 |
-| tonal button | 22 |
+| `secondaryContainer` (list group backdrop, selected row) | secondaryDark at 10% over the card |
 | filled button on a gradient (with on-surface text) | 17 |
 | on-gradient glass and its progress track | 12 at 30% |
 
-The card sits above the background, so cards lift off the screen.
+The card sits above the background, so cards lift off the screen. A role uses the same slot in both themes, and light defines the same value where it should stay flat (white sheet and dialog). `BrandColors` keeps only the gradients and what exists on them.
 
 **Glass only on the gradient.** There, dark components use the tone-12 glass with a 12% white edge.
 Sheets, dialogs, cards and filled buttons are opaque.

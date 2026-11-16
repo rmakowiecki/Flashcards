@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.offset
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import com.rossomak.flashcards.core.designsystem.theme.AppSpacing
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import java.util.function.Consumer
@@ -106,7 +105,7 @@ internal fun FlashcardsDialog(
             }
         },
         shape = shape,
-        containerColor = MaterialTheme.brandColors.dialogContainer,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         iconContentColor = MaterialTheme.colorScheme.primary,
         // M3 defaults the text slot to onSurfaceVariant, which is right for supporting prose but
         // washes out the selectable rows that make up most dialog content. Those rows opt into

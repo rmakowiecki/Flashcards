@@ -18,8 +18,8 @@ data class DarkThemeTunerKnobs(
     val chroma: Float = 10f,
     val backgroundTone: Float = 6f,
     val cardTone: Float = 10f,
-    val sheetTone: Float = 12f,
-    val dialogTone: Float = 14f,
+    val sheetTone: Float = 11f,
+    val dialogTone: Float = 13f,
     val tonalButtonTone: Float = 22f,
     val filledButtonTone: Float = 17f,
     val glassTone: Float = 12f,
@@ -27,7 +27,7 @@ data class DarkThemeTunerKnobs(
     val glassAlpha: Float = 0.3f,
     val glassEdgeAlpha: Float = 0.12f,
     val semanticTintAlpha: Float = 0.14f,
-    val listTintAlpha: Float = 0.05f,
+    val listTintAlpha: Float = 0.1f,
 ) {
     /** The neutral palette's color at [tone]. */
     fun tone(tone: Float): Color = Color(Hct.from(hue.toDouble(), chroma.toDouble(), tone.toDouble()).toInt())
@@ -40,8 +40,7 @@ data class DarkThemeTunerKnobs(
 
     /**
      * [darkFlashcardsColors] with every tuned slot taken from these knobs. The container slots without
-     * their own knob keep Material's dark spacing above the card: Low +1, Container +2, High +7,
-     * Highest +12, Bright +14 tones.
+     * their own knob keep Material's dark spacing above the card: Container +2, Bright +14 tones.
      */
     fun toColors(): FlashcardsColors = with(darkFlashcardsColors) {
         val background = tone(backgroundTone)
@@ -52,23 +51,20 @@ data class DarkThemeTunerKnobs(
                 surface = background,
                 surfaceDim = background,
                 surfaceContainerLowest = card,
-                surfaceContainerLow = tone(cardTone + LOW_OFFSET),
+                surfaceContainerLow = tone(sheetTone),
                 surfaceContainer = tone(cardTone + CONTAINER_OFFSET),
-                surfaceContainerHigh = tone(cardTone + HIGH_OFFSET),
-                surfaceContainerHighest = tone(cardTone + HIGHEST_OFFSET),
+                surfaceContainerHigh = tone(dialogTone),
+                surfaceContainerHighest = tone(tonalButtonTone),
                 surfaceBright = tone(cardTone + BRIGHT_OFFSET),
+                secondaryContainer = colorScheme.secondary.copy(alpha = listTintAlpha).compositeOver(card),
                 surfaceVariant = outlineVariant,
                 outlineVariant = outlineVariant,
             ),
             brand = brand.copy(
-                tonalButtonContainer = tone(tonalButtonTone),
                 onGradientFilledContainer = tone(filledButtonTone),
                 progressBarTrackOnGradient = glass,
                 onGradientContainer = glass,
                 onGradientBorder = Color.White.copy(alpha = glassEdgeAlpha),
-                listGroupContainer = colorScheme.secondary.copy(alpha = listTintAlpha).compositeOver(card),
-                dialogContainer = tone(dialogTone),
-                sheetContainer = tone(sheetTone),
             ),
             semantic = with(semantic) {
                 copy(
@@ -81,10 +77,7 @@ data class DarkThemeTunerKnobs(
     }
 
     companion object {
-        const val LOW_OFFSET = 1f
         const val CONTAINER_OFFSET = 2f
-        const val HIGH_OFFSET = 7f
-        const val HIGHEST_OFFSET = 12f
         const val BRIGHT_OFFSET = 14f
     }
 }

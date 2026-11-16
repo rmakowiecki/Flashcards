@@ -64,7 +64,7 @@ private val EMPTY_STATE_ICON_SIZE = 40.dp
  * [style] follows the shared on-surface/on-gradient axis every `Flashcards*` component family uses
  * (ADR-0034). [OnGradient]'s [FlashcardsEmptyStateTone.Error] circle mirrors
  * [FlashcardsXpBreakdownRow][com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]'s
- * own `Loss` tone: `semanticColors.onGradientLossContainer` for the fill and `onGradientLossBorder`
+ * own `Loss` tone: `brandColors.onGradientLossContainer` for the fill and `onGradientLossBorder`
  * for the border.
  * The icon and title use `brandColors.onGradientLoss` rather than [OnSurface]'s own
  * `onNegativeContainer` red: that token is tuned for a themed surface and falls short of the
@@ -125,13 +125,13 @@ private fun emptyStateColors(
                 border = BorderStroke(width = MaterialTheme.sizes.hairline, color = brandColors.onGradientBorder),
             )
             Error -> EmptyStateColors(
-                container = semanticColors.onGradientLossContainer,
+                container = brandColors.onGradientLossContainer,
                 icon = brandColors.onGradientLoss,
                 title = brandColors.onGradientLoss,
                 supportingText = brandColors.onGradientContent,
                 border = BorderStroke(
                     width = MaterialTheme.sizes.hairline,
-                    color = semanticColors.onGradientLossBorder,
+                    color = brandColors.onGradientLossBorder,
                 ),
             )
         }

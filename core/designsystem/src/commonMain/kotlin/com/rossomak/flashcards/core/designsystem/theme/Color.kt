@@ -33,10 +33,16 @@ internal val inversePrimaryLight = Color(0xFFBFC1FF)
 internal val surfaceDimLight = Color(0xFFDBD9E1)
 internal val surfaceBrightLight = Color(0xFFFBF8FF)
 internal val surfaceContainerLowestLight = Color(0xFFFFFFFF)
-internal val surfaceContainerLowLight = Color(0xFFF5F2FB)
+
+/** The bottom sheet's fill, flat white. */
+internal val surfaceContainerLowLight = Color(0xFFFFFFFF)
 internal val surfaceContainerLight = Color(0xFFF0ECF5)
-internal val surfaceContainerHighLight = Color(0xFFEAE7F0)
-internal val surfaceContainerHighestLight = Color(0xFFE4E1EA)
+
+/** The dialog's fill, flat white. */
+internal val surfaceContainerHighLight = Color(0xFFFFFFFF)
+
+/** The tonal button's fill, the faint lavender of secondaryContainerLight. */
+internal val surfaceContainerHighestLight = Color(0xFFF0E8FA)
 
 // Hue-corrected: the previous values (0xFFBFC1FF / 0xFF1D2184) sat at ~238° hue — matching
 // primaryContainerDark's indigo, not primaryLight's ~268° violet — so colorScheme.primary read
@@ -49,13 +55,12 @@ internal val onPrimaryContainerDark = Color(0xFF989DFF)
 internal val secondaryDark = Color(0xFFDEB7FF)
 internal val onSecondaryDark = Color(0xFF4A007F)
 
-// Dark-tuned like SemanticColors' dark pairs (see that section below): a muted, near-surface
-// purple rather than a punchy mid-tone accent, so full-opacity consumers (FlashcardsTagChip's
-// selected fill, FlashcardsIconTile, FlashcardsEmptyState's Info tone, …) read as a subtle tint
-// on dark surfaces the same way secondaryContainerLight reads as a subtle tint on light ones,
-// instead of a solid saturated color-block. onSecondaryContainerDark is unchanged — already
-// bright/contrasty enough against this darker container.
-internal val secondaryContainerDark = Color(0xFF33204A)
+/**
+ * A faint lavender tint off the card, as secondaryContainerLight is off white: secondaryDark at 10%
+ * over the card. A grouped list's backdrop and a selected row fill with it, and so does every other
+ * secondaryContainer consumer.
+ */
+internal val secondaryContainerDark = Color(0xFF2F2A3B)
 internal val onSecondaryContainerDark = Color(0xFFDAAFFF)
 internal val tertiaryDark = Color(0xFFFFE0F0)
 internal val onTertiaryDark = Color(0xFF501D42)
@@ -78,7 +83,7 @@ internal val inversePrimaryDark = Color(0xFF4F54B4)
 // and the steps look evenly spaced. Unlike stock Material dark, the card (the surfaceContainerLowest
 // slot, the app's card color in both themes) sits above the background, so cards lift off the screen
 // as white cards do in light. The containers above the card keep Material's dark spacing from it:
-// Low +1, Container +2, High +7, Highest +12 and Bright +14 tones. The debug dark theme tuner derives
+// Low +1, Container +2, High +3, Highest +12 and Bright +14 tones. The debug dark theme tuner derives
 // the same colors from the same tones, and a test keeps the two equal.
 
 /** The screen: background, surface and surfaceDim. Tone 6. */
@@ -87,16 +92,16 @@ internal val backgroundDark = Color(0xFF13121C)
 /** Cards and list rows: the surfaceContainerLowest slot. Tone 10. */
 internal val surfaceContainerLowestDark = Color(0xFF1B1A25)
 
-/** Tone 11. */
+/** A bottom sheet's fill. Tone 11. */
 internal val surfaceContainerLowDark = Color(0xFF1E1C27)
 
 /** Tone 12. */
 internal val surfaceContainerDark = Color(0xFF201E29)
 
-/** Tone 17. */
-internal val surfaceContainerHighDark = Color(0xFF2A2933)
+/** A dialog's fill. Tone 13, above the sheet so a dialog stands off the dimmed screen behind it. */
+internal val surfaceContainerHighDark = Color(0xFF22202B)
 
-/** Tone 22. */
+/** A tonal button's fill. Tone 22, above the dialog so a tonal Cancel still reads as a button. */
 internal val surfaceContainerHighestDark = Color(0xFF35333F)
 
 /** Tone 24. */
@@ -104,15 +109,6 @@ internal val surfaceBrightDark = Color(0xFF393843)
 
 /** surfaceVariant and outlineVariant: the option card ring and dividers. Tone 30. */
 internal val outlineVariantDark = Color(0xFF474551)
-
-/** A bottom sheet's fill. Tone 12. */
-internal val sheetContainerDark = Color(0xFF201E29)
-
-/** A dialog's fill. Tone 14, above the sheet so a dialog stands off the dimmed screen behind it. */
-internal val dialogContainerDark = Color(0xFF24222D)
-
-/** A tonal button's fill. Tone 22, above the dialog so a tonal Cancel still reads as a button. */
-internal val tonalButtonContainerDark = Color(0xFF35333F)
 
 /** The opaque ink pill of a filled button on a gradient. Tone 17. */
 internal val onGradientFilledContainerDark = Color(0xFF2A2933)
@@ -122,12 +118,6 @@ internal val onGradientContainerDark = Color(0x4D201E29)
 
 /** The glass's faint white edge: white at 12%. */
 internal val onGradientBorderDark = Color(0x1FFFFFFF)
-
-/**
- * Behind a grouped list's rows: secondaryDark at 5% over the card, as the light group container is a
- * faint lavender off white rows.
- */
-internal val listGroupContainerDark = Color(0xFF252230)
 
 // Valence palette backing [SemanticColors] — see that file for why these are hand-authored
 // container/content pairs rather than one accent tinted at an alpha. The light values are the
