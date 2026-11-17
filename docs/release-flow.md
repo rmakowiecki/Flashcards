@@ -12,6 +12,8 @@ How code moves from a feature branch to users, which branch holds what, and how 
 | `release/x.y` | One release being stabilized: cut from `develop`, then only fixes. | From the cut until the release ships |
 | `release/x.y.z` | One hotfix: cut from the tag of the release it fixes. | Until the hotfix ships |
 
+`develop` is the repository's default branch on GitHub, so the repository page, clones and new pull requests start from the current state of the work. `main` is the last release shipped, not the starting point. A `Fixes #N` keyword closes its issue when the pull request merges into `develop`; a release pull request into `main` closes none.
+
 Every change reaches `develop`, `main` and `release/*` through a pull request that passes the `pr-check` workflow, up to date with its base. Nothing is pushed to them directly; the one push is creating a release branch. Release tags (`v*`) cannot be deleted or moved once pushed. Every pull request merges with a merge commit, never squash or rebase: the commit count is the `versionCode` (see [Versions](#versions)), and rewriting history would change it.
 
 `main` and `develop` never merge into each other directly. Changes reach `main` only from a release branch, and reach `develop` back from a release branch.

@@ -120,6 +120,7 @@ review, no static analysis; just "does it compile, ship it."
 ## GitHub integration
 
 - Bitrise GitHub App installed on `rmakowiecki/Flashcards`.
-- Branch protection on `develop`, `main` and `release/*`: pull requests only, `pr-check` status check required before merge, up to date with base, no admin bypass. `release/*` branches may be created and deleted.
+- `develop` is the GitHub default branch, and the Bitrise app's default branch (Project settings → Repository) is `develop` too. Triggers in `bitrise.yml` name their branches and do not depend on it.
+- Branch protection on `develop`, `main` and `release/*`: pull requests only, `pr-check` status check required before merge, up to date with base, no admin bypass. `release/*` branches may be created and deleted. The required check is the Bitrise status `ci/bitrise/<app-id>/pr`, the same on every branch. If Bitrise is down, merges stay blocked until it recovers; do not remove the requirement to get around an outage.
 - Merge commits only: squash and rebase merges are disabled for the repository, since the commit count is the `versionCode`.
 - `v*` tags cannot be deleted or moved.
