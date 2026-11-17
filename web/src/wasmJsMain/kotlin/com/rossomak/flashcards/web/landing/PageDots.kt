@@ -34,11 +34,7 @@ import com.rossomak.flashcards.web.theme.WebColors
 import com.rossomak.flashcards.web.theme.WebDimensions
 import kotlin.math.abs
 
-/**
- * A column of one dot per page on the window's end edge, on a frosted pill that blurs [backdrop]. The
- * dots follow the scroll: a dot grows larger and brighter as the pages near its page, so the highlight
- * slides from dot to dot. A hovered dot grows a little, and a dot opens its page.
- */
+/** One dot per page on a frosted pill. A dot grows and brightens as the pages near it, and opens its page. */
 @Composable
 fun PageDots(modifier: Modifier = Modifier, pagerState: PagerState, backdrop: BlurBackdrop, onPageClick: (Int) -> Unit) {
     val currentPage = pagerState.currentPage
@@ -85,14 +81,12 @@ fun PageDots(modifier: Modifier = Modifier, pagerState: PagerState, backdrop: Bl
     }
 }
 
-/** How the page dots' highlight follows the scroll. */
 object PageDotHighlight {
-    /** How near pager [position] is to [page]: 1 on it, falling to 0 one page away and beyond. */
+    /** 1 on [page], falling to 0 one page away. */
     fun nearness(position: Float, page: Int): Float = (1f - abs(position - page)).coerceIn(0f, 1f)
 }
 
 private const val IDLE_DOT_ALPHA = 0.4f
 private const val PILL_CORNER_PERCENT = 50
 
-/** How much larger a hovered dot grows. */
 private const val HOVER_GROWTH = 0.3f

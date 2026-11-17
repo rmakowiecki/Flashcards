@@ -1,10 +1,10 @@
 # Website
 
-The public website served by Firebase Hosting: the app's landing page, the Privacy Policy and the
-steps for Account Deletion without the app. The Play Console listing and the app's Account screen
-link to the legal pages, so their addresses are part of the app's contract. The site is drawn with
-the same design tokens as the app ([ADR-0068](../adr/0068-website-is-a-compose-multiplatform-wasm-app.md)),
-and its landing page is a snapping pager over one animated graph
+The public website on Firebase Hosting has three parts: the app's landing page, the Privacy Policy,
+and the steps for Account Deletion without the app. The Play Console listing and the app's Account
+screen link to the legal pages, so their addresses are part of the app's contract. The site uses the
+app's design tokens ([ADR-0068](../adr/0068-website-is-a-compose-multiplatform-wasm-app.md)). Its
+landing page is a snapping pager over one animated graph
 ([ADR-0079](../adr/0079-website-landing-page-is-a-snapping-pager-over-one-morpheus-graph.md)).
 
 ## Pages and addresses
@@ -13,130 +13,128 @@ and its landing page is a snapping pager over one animated graph
 |---|---|
 | `/` | The landing page: a hero, one page per feature, and a closing page |
 | `/privacy` | The Privacy Policy |
-| `/delete-account` | How to delete the account in the app or request Account Deletion by email, what is deleted and what is kept |
+| `/delete-account` | How to delete the account in the app or by email, and what is deleted or kept |
 
-- Every address is served the same page; the site reads the path and shows the matching page.
-- A trailing slash and the `.html` ending of the original static pages are accepted.
-- Any other address shows the landing page.
-- When the address is not a page's own (a trailing slash, an `.html` ending, an unknown path), it is
-  replaced in place with the page's own address, without a new history entry.
-- The landing page's pages have no addresses of their own; a reload returns to the hero.
+- Every address serves the same page, which reads the path. Any other address shows the landing page.
+- A trailing slash or an `.html` ending is accepted. It is then replaced in place by the page's own
+  address, with no new history entry.
+- The landing page's pages have no addresses of their own. A reload returns to the hero.
 
 ## Navigation
 
-- A link to another page of the site switches the page without reloading and adds a browser history
-  entry, so Back and Forward move between pages.
-- Email links open the visitor's mail app, with the subject prefilled on the deletion page.
-- The browser tab title names the page shown.
+- A link to another page switches without reloading and adds a history entry.
+- The pages crossfade over about 300ms over one shared backdrop. The graph morphs to the new page's
+  shape: the hero's on the landing page, the closing page's on the legal pages.
+- Email links open the mail app. The deletion page prefills the subject.
+- The tab title names the page shown.
 
 ## Landing page
 
-Ten full-window pages, one at a time, that snap into place: the hero, eight feature pages and the
-closing page.
+Ten full-window pages that snap: the hero, eight feature pages and the closing page.
 
 ### Moving between pages
 
-- The page scrolls like any page: a trackpad moves it by exactly its own movement, momentum included,
-  a mouse-wheel notch eases it by the notch's distance, and a touch fling travels as far as its speed
-  carries it. The page can stop anywhere between two pages while the input continues.
-- Snapping only assists. Once scrolling has come to rest, the page settles on the nearest page, leaning
-  toward the one it was heading for, so a deliberate scroll lands on the next page and a small nudge
-  settles back. The settle is short and decisive, without a bounce, and any new input takes over from
-  where the page is.
-- The pages respond in the same frame as the input, with nothing smoothed or queued.
-- Arrow up and down and Page Up and Down move one page; Home goes to the hero and End to the closing
-  page. Keys with Ctrl, Alt or Meta held stay with the browser.
-- A column of dots on the window's right edge shows the current page; a dot opens its page.
-- The hero's scroll hint opens the first feature.
+- The browser scrolls and snaps the pages with its own feel for trackpad, wheel, touch and momentum.
+- Once the input ends, the pages snap to the nearest page. A snap never starts under resting fingers.
+- One swipe stops at the next page (`scroll-snap-stop: always`). Late trackpad momentum may carry one
+  page further.
+- There is no visible scrollbar and no bounce at either end.
+- Arrow up and down and Page Up and Down move one page smoothly. Pressed again mid-scroll, they go on
+  from the target page. Home and End go to the first and last page. Keys with Ctrl, Alt or Meta stay
+  with the browser.
+- Page dots on the right edge sit on a frosted pill. A dot grows and brightens as the pages near its
+  page, and a click scrolls there. The hero's scroll hint opens the first feature.
 
 ### Backdrop
 
-- The brand screen gradient fills the window, with one animated graph fixed in front of it, behind all
-  pages; the graph does not scroll with them.
-- Each page has its own graph shape: wide ribbons sweeping across the whole window at a new angle,
-  height and curve, and blooms anchored in its corners. The hero's is brighter, a cover; the closing
-  page's is calm. Glowing nodes are an accent, and every graph drifts, waves and pulses gently.
-- As the pages scroll, the graph morphs from one page's shape to the next, nodes staying in place,
-  with comets carrying the light from the old shape to the new one. The next shape starts to grow from
-  the first pixels of a scroll. A slow scroll is followed exactly; a fast scroll or a snap morphs at
-  most at a fixed pace, so the graph catches up shortly after the page lands.
-- The site's graph family is its own, not the app's.
+- The brand gradient fills the window, with one fixed graph in front of it.
+- Each page has its own shape of ribbons and corner blooms. The hero's is brightest. The closing
+  page's is a calm band with no bloom.
+- While scrolling, the graph morphs between page shapes with nodes in place. It follows a slow scroll
+  exactly. A fast scroll morphs at most one shape per second, so the graph catches up after the page
+  lands.
+
+### Local tuner
+
+- On `localhost` or `127.0.0.1` only, T toggles Morpheus's tuning sheet for the page on screen. The
+  wheel over it scrolls the sheet.
+- Layer edits apply to every page's graph. Shape edits apply to the page on screen.
+- Extra controls set the minimum morph time, one page per swipe, the side-by-side aspect ratio, and
+  the reveal time, rise and stagger. A button copies the values as Kotlin.
+- Edits live in memory until reload.
 
 ### Logo
 
-- One logo for the whole landing page. On the hero and the closing page it is large, about half the
-  window's width, above the tagline. On every feature page it is small, pinned at the window's top
-  start corner.
-- Between the hero and the first feature, and between the last feature and the closing page, it moves
-  and shrinks continuously with the scroll, so it never leaves the window. A click opens the hero.
+- The hero and the closing page show a large logo, about half the window's width, at the top of the
+  text block. It moves and fades with the text.
+- Feature pages pin a small logo at the top start corner. It slides in from the start edge with the
+  scroll. Neither logo is a link.
 
 ### Hero
 
-- The tagline and a one-line description of the app under the large logo, a hint to scroll, and quiet
-  links to the two legal pages at the bottom.
-- On first load only, the graph fades in, then the logo and text fade up, in about half a second.
-  Coming back to the landing page from a legal page does not replay it.
+- The tagline and a one-line description under the logo, a scroll hint, and quiet legal links at the
+  bottom. Soft dark halos keep the text legible over the graph.
+- On first load the graph fades in, then the logo, the text, the hint and the links reveal in turn.
+  Returning from a legal page replays only the logo, hint and links.
 
 ### Feature pages
 
-- Each shows a headline, a subline, and a longer detail paragraph in smaller, quieter type for
-  visitors who stop to read, next to a framed screenshot of the app. The page dots show where the
-  visitor is; the pages carry no counter of their own.
-- In a wide window, text and phone sit side by side, the phone alternating sides from one feature to
-  the next. In a narrow window (under the Material expanded width), the text sits on top and the phone
-  below; there is still one page per feature.
-- Content stays clear of the pinned logo.
-- The phone moves with its page. The text moves slightly slower than its page and fades in as its page
-  arrives.
-- A soft dark halo behind each block of text keeps it legible over the graph; it looks the same at
-  every scroll position.
-- Phone and text sit together as one group centered in the window, the text in a narrow column.
-- Each feature has a light and a dark screenshot. The one shown follows the browser's color scheme and
-  switches live when it changes. Besides the legal pages' card, nothing else on the site follows the
-  system theme.
-- A screenshot is loaded and decoded only when its page is on screen or next to it.
+- A headline, a subline, a quieter detail paragraph, and a framed screenshot of the app.
+- A window at least 0.9 times as wide as tall shows text and phone side by side. The phone alternates
+  sides and takes at most 45% of the row. A narrower window stacks the text above the phone.
+- The phone casts a soft shadow and moves with its page. The text lags slightly and fades in.
+- A soft dark halo with no visible edge sits behind the text.
+- The screenshot follows `prefers-color-scheme` live. It loads only when its page is on or next to the
+  screen.
 
 ### Closing page
 
-- The tagline again under the large logo, with links to the two legal pages and the contact address.
+- The large logo, the tagline, the legal links and the contact address, under one halo.
+
+### Components appearing
+
+- A component fades in while rising about 16dp, over about 450ms. Components on a page start about
+  80ms apart. The large logo also grows slightly.
+- The hero's and closing page's logo and links reveal as the pages head for their page. They replay
+  after the page has fully left the window.
+- Text, phones and the pinned logo do not reveal, because they move with the scroll.
 
 ### Reduced motion
 
-Under the browser's reduced-motion preference, the text moves with its page and does not fade, the
-scroll hint stays still, and the first-load entrance does not play.
+Under `prefers-reduced-motion`, text moves with its page, nothing fades or reveals, the first-load
+entrance does not play, hover changes at once, and pages switch without a crossfade.
 
 ## Legal pages
 
-- The Flashcards logo, large and centered at the top, scrolling away with the page; it opens the
-  landing page.
-- The page's text in one readable column with a maximum width, on an opaque card in the app's own
-  card colors: light with dark text when the browser asks for a light color scheme, dark grey with
-  light text when it asks for dark, switching live. Links take the app's primary color. The page
-  scrolls when it is taller than the window.
-- The closing page's calm graph sits fixed behind, over the brand gradient.
-- Sections are separated by a hairline divider and a section heading.
-- The same links as the closing page follow the text.
+- A large centered logo at the top scrolls with the page and opens the landing page. It brightens on
+  hover.
+- The logo, card and links reveal in turn as the page opens. Each section's divider and heading
+  reveals the first time it scrolls into view. Body text never moves.
+- The text sits in one readable column on an opaque card in the app's card colors. The card is light
+  or dark by `prefers-color-scheme`, switching live. Links use the app's primary color.
+- The closing page's calm graph sits behind the card.
+- The closing page's links follow the text.
 
 ## Look
 
-- Every page sits on the brand screen gradient, the one behind splash, login and onboarding, in both
-  light and dark mode, because the gradient never flips.
-- Text is the on-gradient white, with secondary lines (the feature sublines and detail paragraphs, the
-  policy date, the deletion page's subtitle, the quiet links) at reduced opacity, in the app's Roboto
-  type scale.
-- On the landing page the type scale grows with the window beyond a reference width, up to a cap, so
-  text fills a large desktop window; narrow windows use smaller slots of the same scale.
-- The legal pages' text can be selected and copied. The landing page's cannot, and it shows no
-  context menu; its clickable logo, scroll hint and dots show a pointer but no hover highlight.
+- Every page sits on the brand screen gradient, which never flips between light and dark mode.
+- Text is the on-gradient white. Secondary lines use reduced opacity. Type follows the app's Roboto
+  scale.
+- On the landing page, the type grows past a 1280dp reference, up to a cap. It grows by the smaller
+  of the window's width and its height at 16:9.
+- Landing paragraphs wrap into lines of equal width, like CSS `text-wrap: balance`. The legal pages
+  wrap as usual.
+- Legal text is selectable. Landing text is not, and the landing page shows no context menu.
+- Quiet links, the scroll hint and the legal logo show a pointer and brighten over about 150ms on
+  hover. Page dots grow on hover.
 
 ## Loading and limits
 
-- Until the site has loaded, the window already shows the brand gradient, so there is no white flash.
-- With JavaScript off, a short fallback names the contact address for privacy and deletion requests.
-- The pages are drawn on a canvas, so search engines and screen readers read little of them beyond
-  the page title and description.
-- The local preview serves every path the same page, as Hosting does, on a port of its own, since the
-  default one belongs to the Firestore emulator.
+- The brand gradient shows before the site loads, so there is no white flash.
+- With JavaScript off, a fallback names the contact address.
+- Search engines and screen readers read little beyond the title and description.
+- The local preview serves every path the same page, on its own port. The default port belongs to the
+  Firestore emulator.
 
 ## Related
 

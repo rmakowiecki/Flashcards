@@ -30,10 +30,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * How the site's components appear: each fades in while it rises [rise] into place over [duration],
- * and in a sequence each next one starts [stagger] after the one before.
- */
+/** A component fades in while rising [rise] over [duration]. In a sequence, each starts [stagger] after the last. */
 @Immutable
 data class RevealMotion(val duration: Duration, val rise: Dp, val stagger: Duration) {
     internal fun tween() = tween<Float>(durationMillis = duration.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.EmphasizedDecelerateEasing)
@@ -43,16 +40,12 @@ data class RevealMotion(val duration: Duration, val rise: Dp, val stagger: Durat
     }
 }
 
-/** The reveal motion of the site, which the landing page's local tuner changes live. */
 val LocalRevealMotion = staticCompositionLocalOf { RevealMotion.Default }
 
-/** The large logos start this much smaller as they reveal, and grow into place. */
+/** The large logos grow from this scale as they reveal. */
 const val LOGO_REVEAL_START_SCALE = 0.96f
 
-/**
- * Components that reveal one after another, by slot: slot n starts n staggers after slot 0. A slot's
- * progress runs from 0 (hidden) to 1 (in place).
- */
+/** Reveal slots: slot n starts n staggers after slot 0, its progress from 0 (hidden) to 1. */
 @Stable
 class RevealSequence internal constructor(slotCount: Int, initial: Float) {
     private val slots: List<Animatable<Float, AnimationVector1D>> = List(slotCount) { Animatable(initial) }
@@ -71,10 +64,7 @@ class RevealSequence internal constructor(slotCount: Int, initial: Float) {
     internal suspend fun snapTo(value: Float) = slots.forEach { progress -> progress.snapTo(value) }
 }
 
-/**
- * A [RevealSequence] of [slotCount] slots that plays each time [shown] turns true and hides at once when
- * it turns false. Under the browser's reduced-motion preference every slot stays in place.
- */
+/** Plays when [shown] turns true and hides at once when false. Under reduced motion, every slot stays shown. */
 @Composable
 fun rememberRevealSequence(slotCount: Int, shown: Boolean): RevealSequence {
     val reducedMotion by rememberPrefersReducedMotion()
@@ -90,7 +80,7 @@ fun rememberRevealSequence(slotCount: Int, shown: Boolean): RevealSequence {
     return sequence
 }
 
-/** Fades this in and lifts it [rise] into place as [progress] goes from 0 to 1, growing from [startScale]. */
+/** Fades in and rises [rise] as [progress] goes from 0 to 1, growing from [startScale]. */
 fun Modifier.reveal(progress: () -> Float, rise: Dp, startScale: Float = 1f): Modifier = graphicsLayer {
     val fraction = progress()
     alpha = fraction
@@ -101,18 +91,15 @@ fun Modifier.reveal(progress: () -> Float, rise: Dp, startScale: Float = 1f): Mo
     }
 }
 
-/** Share of the window's height the top of a [RevealWhenScrolledIn] block must scroll above before it reveals. */
+/** A block reveals once its top rises above this share of the window's height. */
 private const val SCROLL_IN_WINDOW_SHARE = 0.92f
 
-/**
- * [content] that reveals once, the first time it scrolls into the window. Content already in the window
- * when it first lays out shows at once, as part of whatever reveals around it.
- */
+/** Reveals [content] the first time it scrolls into view. Content in view at first layout shows at once. */
 @Composable
 fun RevealWhenScrolledIn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val reducedMotion by rememberPrefersReducedMotion()
     val motion = LocalRevealMotion.current
-    // Null until first laid out, then whether it was in view then; true once it has scrolled in.
+    // Null until first laid out.
     var inViewOnFirstLayout by remember { mutableStateOf<Boolean?>(null) }
     var scrolledIn by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }

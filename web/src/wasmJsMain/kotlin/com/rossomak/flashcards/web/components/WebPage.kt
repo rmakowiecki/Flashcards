@@ -45,7 +45,7 @@ import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
 import org.jetbrains.compose.resources.vectorResource
 
-/** A legal page's components, by the slot in which they reveal as it opens ([RevealSequence]). */
+/** A legal page's reveal slots. */
 private object LegalSlots {
     const val LOGO = 0
     const val CARD = 1
@@ -54,11 +54,8 @@ private object LegalSlots {
 }
 
 /**
- * The frame of every page below the landing page, over the site's shared backdrop: a scrolling column
- * of the large Flashcards logo (linking home), the [content] on an opaque card and the site's links,
- * which reveal one after another as the page opens. The card is the app's own card in the app's light
- * or dark colors, following the browser's color scheme live. Its text is selectable, since the page is
- * drawn on a canvas the browser can't select from. The logo is muted until hovered.
+ * A legal page's scrolling column: the home logo, [content] on a selectable card in the app's light or
+ * dark card colors, and the site's links, revealed in turn.
  */
 @Composable
 fun WebPage(modifier: Modifier = Modifier, onNavigate: OnNavigate, content: @Composable ColumnScope.() -> Unit) {

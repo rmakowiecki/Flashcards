@@ -45,12 +45,7 @@ import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
 
-/**
- * The first page: the large logo ([HeroLogo]) over the tagline and a one-line description, one block
- * under one scrim that moves together, a hint to scroll, and the legal links at the bottom. The logo,
- * the hint and the links reveal by [reveal]'s slots ([HeroSlots]); the text reveals by [textEntrance],
- * on first load only.
- */
+/** The first page: logo, tagline and description, a scroll hint, and legal links. [textEntrance] reveals the text on first load. */
 @Composable
 fun HeroPage(
     modifier: Modifier = Modifier,
@@ -89,7 +84,7 @@ fun HeroPage(
             }
         }
         Column(
-            // One glow behind the scroll hint and the links together, so they stay legible over the graph; it comes with the hint.
+            // One glow behind the hint and links, arriving with the hint.
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) })

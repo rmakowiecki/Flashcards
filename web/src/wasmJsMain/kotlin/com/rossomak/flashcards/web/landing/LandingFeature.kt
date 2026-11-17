@@ -21,22 +21,18 @@ import com.rossomak.flashcards.web.resources.screenshot_08_session_complete_dark
 import com.rossomak.flashcards.web.resources.screenshot_08_session_complete_light
 import org.jetbrains.compose.resources.DrawableResource
 
-/** Which of a feature's two screenshots to show: the app in light or in dark mode. */
+/** A feature's light or dark screenshot. */
 enum class ScreenshotVariant {
     Light,
     Dark,
     ;
 
     companion object {
-        /** Follows the browser's `prefers-color-scheme`; nothing else on the site does. */
         fun forColorScheme(prefersDark: Boolean): ScreenshotVariant = if (prefersDark) Dark else Light
     }
 }
 
-/**
- * One feature page of the landing pager, in page order: its headline, its subline, a longer detail
- * paragraph for those who stop to read, and the app screenshot that shows it.
- */
+/** One feature page, in page order. */
 enum class LandingFeature(
     val headline: String,
     val subline: String,
@@ -110,7 +106,7 @@ enum class LandingFeature(
     ),
     ;
 
-    /** Features alternate sides: the first shows its phone on the end side, the next on the start side, and so on. */
+    /** The phone alternates sides, starting on the end side. */
     val phoneOnEnd: Boolean get() = ordinal % 2 == 0
 
     fun screenshot(variant: ScreenshotVariant): DrawableResource = when (variant) {

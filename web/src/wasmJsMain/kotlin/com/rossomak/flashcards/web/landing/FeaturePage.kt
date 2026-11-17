@@ -34,36 +34,26 @@ import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
 import org.jetbrains.compose.resources.painterResource
 
-/** Width over height of the framed screenshots. */
 private const val SCREENSHOT_ASPECT_RATIO = 578f / 1238f
 
-/** The phone frame's outline in the screenshots: its corners round off over 11% of its width. */
+/** The phone frame's outline in the screenshots. */
 private val phoneFrameShape = RoundedCornerShape(percent = 11)
 
-/** Share of the space under the header the phone takes next to the text. */
 private const val PHONE_HEIGHT_SHARE = 0.94f
 
-/** At most this share of a side-by-side row's width goes to the phone, so the text column beside it always has room. */
+/** The phone's maximum share of a side-by-side row, leaving the text room. */
 private const val PHONE_MAX_ROW_WIDTH_SHARE = 0.45f
 
-/**
- * The phone's height next to the text: a share of the window's height left after [verticalPadding], no
- * taller than its cap, and no wider than its share of the row.
- */
+/** The side-by-side phone's height: a share of the height left after [verticalPadding], capped by height and row width. */
 private fun sideBySidePhoneHeight(frame: LandingFrame, verticalPadding: Dp): Dp {
     val rowWidth = minOf(frame.width, WebDimensions.featureRowMaxWidth) - WebDimensions.featureSidePadding * 2
     val byWidth = rowWidth * PHONE_MAX_ROW_WIDTH_SHARE / SCREENSHOT_ASPECT_RATIO
     return minOf((frame.height - verticalPadding) * PHONE_HEIGHT_SHARE, WebDimensions.phoneMaxHeight, byWidth).coerceAtLeast(0.dp)
 }
 
-/** The type of a feature's three blocks of text. */
 private class FeatureTextStyles(val headline: TextStyle, val subline: TextStyle, val detail: TextStyle)
 
-/**
- * One feature: its headline, subline and detail paragraph next to the app screenshot, on the side
- * [LandingFeature.phoneOnEnd] picks, or stacked above it in a narrow window. Content stays clear of
- * the header logo. [textModifier] carries the text's scroll motion and scrim; the phone moves with the page.
- */
+/** One feature's text and screenshot, side by side or stacked by [LandingFrame.layout]. [textModifier] moves only the text. */
 @Composable
 fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: LandingFeature, screenshotVariant: ScreenshotVariant, textModifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -173,10 +163,7 @@ private fun FeatureText(feature: LandingFeature, styles: FeatureTextStyles, text
     }
 }
 
-/**
- * The framed app screenshot, casting a soft shadow in the frame's rounded shape. The pager composes only
- * the pages on and next to the screen, so it decodes only near its page.
- */
+/** The framed screenshot with a shadow in the frame's shape. */
 @Composable
 private fun Screenshot(feature: LandingFeature, variant: ScreenshotVariant, modifier: Modifier = Modifier) {
     Image(

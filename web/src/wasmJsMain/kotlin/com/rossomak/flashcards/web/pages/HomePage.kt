@@ -9,10 +9,7 @@ import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.morpheus.ExperimentalMorpheusGraphApi
 import com.rossomak.morpheus.MorpheusGraphMorphState
 
-/**
- * `/`: the landing page, over the site's shared [backdrop] whose graph [graphState] it drives. [playEntrance]
- * is true only the first time it shows after the site loads.
- */
+/** `/`: the landing page. [playEntrance] is true only on its first show. */
 @OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
 fun HomePage(

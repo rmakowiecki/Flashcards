@@ -35,15 +35,9 @@ import com.rossomak.morpheus.MorpheusGraphSpec
 import com.rossomak.morpheus.rememberMorpheusGraphMorphState
 import kotlinx.browser.document
 
-/** How long the old page takes to fade out as the new one fades in. */
 private const val ROUTE_CROSSFADE_MILLIS = 300
 
-/**
- * The whole site: one page at a time, chosen by the browser's URL path, crossfading from one to the
- * next over one shared backdrop. The graph morphs to each page's shape, the landing page's hero or the
- * legal pages' calm one, and fades in on first load when the site opens on the landing page. The
- * landing page's entrance plays once, on first load.
- */
+/** The site: the page for the URL path, crossfading over one shared backdrop whose graph morphs to each page. */
 @OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
 fun WebApp() {
@@ -61,7 +55,7 @@ fun WebApp() {
     LaunchedEffect(Unit) {
         graphAlpha.animateTo(1f, tween(LandingTimings.entranceGraphFade.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.StandardEasing))
     }
-    // A page change morphs the graph from wherever it is; the landing page then follows its scroll from the hero.
+    // A page change morphs the graph from wherever it is.
     LaunchedEffect(route) {
         graphState.animateTo(route.graphSpec(tuning), tween(tuning.minMorphDuration.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.StandardEasing))
     }
@@ -89,5 +83,5 @@ fun WebApp() {
     }
 }
 
-/** The graph a page opens on: the hero's on the landing page, which always opens on the hero, and the closing page's calm one on the legal pages. */
+/** The hero's graph on the landing page, the closing page's on the legal pages. */
 private fun WebRoute.graphSpec(tuning: LandingTuning): MorpheusGraphSpec = if (this == Home) tuning.pages.first() else tuning.pages.last()

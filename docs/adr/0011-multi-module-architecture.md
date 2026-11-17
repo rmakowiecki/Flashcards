@@ -23,7 +23,7 @@ Portfolio project designed to demonstrate enterprise-grade Android development. 
 | `:core:data` | repository impls, DTOs, mappers, Firestore sources, Hilt bindings | `:core:domain` |
 | `:core:ui` | `FlashcardsTheme`, shared composables (buttons, cards, chips, etc.); re-exports `:core:designsystem` | `:core:domain`, `:core:designsystem` |
 | `:core:designsystem` | design tokens (colors, color schemes, brand gradients, typography, spacing, sizes, motion) as a Kotlin Multiplatform library for Android and wasmJs ([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md)) | nothing |
-| `:web` | the hosted website, a Compose Multiplatform wasmJs app ([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md), [ADR-0079](0079-website-landing-page-is-a-snapping-pager-over-one-morpheus-graph.md)) | `:core:designsystem`, `com.rossomak:morpheus` |
+| `:web` | the hosted website, a Compose Multiplatform wasmJs app ([ADR-0068](0068-website-is-a-compose-multiplatform-wasm-app.md), [ADR-0079](0079-website-landing-page-is-a-snapping-pager-over-one-morpheus-graph.md)) | `:core:designsystem`, `com.rossomak:morpheus`, `com.rossomak:morpheus-tuner` |
 
 **Strict rule:** no `:feature:*` may depend on another `:feature:*`. No `:core:*` may depend on `:app` or any `:feature:*`. Features import `:core:ui` for theme and shared composables.
 

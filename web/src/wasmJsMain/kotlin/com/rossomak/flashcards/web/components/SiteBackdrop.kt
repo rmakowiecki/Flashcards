@@ -13,11 +13,7 @@ import com.rossomak.morpheus.LocalMorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphMorphState
 import com.rossomak.morpheus.morpheusGraphBackground
 
-/**
- * The brand gradient and the one graph behind every page of the site, as one layer that frosted
- * components blur ([backdrop]). It stays put while the pages change over it; each page morphs
- * [graphState] to its own shape. [graphAlpha] fades the graph in on first load.
- */
+/** The gradient and graph behind every page, as one [backdrop] layer for frosted components. */
 @OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
 fun SiteBackdrop(modifier: Modifier = Modifier, backdrop: BlurBackdrop, graphState: MorpheusGraphMorphState, graphAlpha: () -> Float, showViolations: Boolean) {

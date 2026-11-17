@@ -12,17 +12,12 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 
-/**
- * A paragraph wrapped so its lines are about equally wide, as CSS `text-wrap: balance` does, which a
- * canvas-drawn page cannot use: it keeps the line count it has at the full width it is given, but lays
- * out at the narrowest width that still fits that many lines ([balancedLineWidth]). It is never wider
- * than the width it is given, and sits inside it by its parent's alignment.
- */
+/** Text wrapped like CSS `text-wrap: balance`: laid out at [balancedLineWidth] of the width given. */
 @Composable
 fun BalancedText(text: String, style: TextStyle, textAlign: TextAlign, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     val measurer = rememberTextMeasurer()
     val mergedStyle = LocalTextStyle.current.merge(style)
-    // The balanced width for the last width given, so a relayout at the same width measures nothing.
+    // Caches the last given and balanced widths.
     val lastBalance = remember(text, mergedStyle) { IntArray(2) { NOT_MEASURED } }
     Text(
         text = text,
@@ -48,11 +43,7 @@ fun BalancedText(text: String, style: TextStyle, textAlign: TextAlign, modifier:
     )
 }
 
-/**
- * The narrowest width, in pixels up to [maxWidth], at which a paragraph breaks into no more lines than at
- * [maxWidth], found by halving the range; [lineCountAt] gives the paragraph's line count at a width. A
- * paragraph on one line keeps [maxWidth], since it has nothing to balance.
- */
+/** The narrowest width that keeps the line count at [maxWidth], by bisection. One line keeps [maxWidth]. */
 fun balancedLineWidth(maxWidth: Int, lineCountAt: (width: Int) -> Int): Int {
     val lineCount = lineCountAt(maxWidth)
     if (lineCount <= 1) return maxWidth
@@ -65,7 +56,6 @@ fun balancedLineWidth(maxWidth: Int, lineCountAt: (width: Int) -> Int): Int {
     return wideEnough
 }
 
-/** The balanced width is found to within this many pixels. */
 private const val PRECISION_PX = 1
 private const val NOT_MEASURED = -1
 private const val GIVEN = 0

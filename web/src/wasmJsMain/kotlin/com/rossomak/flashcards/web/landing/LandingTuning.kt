@@ -8,39 +8,26 @@ import com.rossomak.morpheus.MorpheusGraphLayerSpec
 import com.rossomak.morpheus.MorpheusGraphSpec
 import kotlin.time.Duration
 
-/**
- * Everything that the landing page's local tuner changes live: every page's graph spec, the graph's
- * minimum morph time, whether a swipe stops at every page, the window shape at which feature pages go
- * side by side, and how components reveal. A visitor's page never changes them; they start at what
- * the site ships with. The site keeps one for as long as it is open, so edits survive a visit to a
- * legal page.
- */
+/** The values the local tuner edits live. They start at the shipped values and last until reload. */
 class LandingTuning {
     var pages: List<MorpheusGraphSpec> by mutableStateOf(LandingGraphs.pages)
         private set
     var minMorphDuration: Duration by mutableStateOf(LandingTimings.minMorphDuration)
     var showViolations: Boolean by mutableStateOf(false)
 
-    /** Whether one swipe or fling moves at most one page; see [BrowserSnap]. */
     var stopAtEveryPage: Boolean by mutableStateOf(LandingTimings.STOP_AT_EVERY_PAGE)
-
-    /** See [FeatureLayout.SIDE_BY_SIDE_MIN_ASPECT_RATIO]. */
     var sideBySideMinAspectRatio: Float by mutableStateOf(FeatureLayout.SIDE_BY_SIDE_MIN_ASPECT_RATIO)
-
-    /** How every page's components fade and rise in, on the landing page and the legal pages alike. */
     var reveal: RevealMotion by mutableStateOf(RevealMotion.Default)
 
-    /** Applies an edit of page [pageIndex]'s spec; see [withPageEdit]. */
+    /** See [withPageEdit]. */
     fun editPage(pageIndex: Int, edited: MorpheusGraphSpec) {
         pages = pages.withPageEdit(pageIndex, edited)
     }
 }
 
 /**
- * These specs after [edited] replaced the one at [pageIndex]: every other page's layers take over
- * whatever the edit changed in that page's layers, except their shapes, so the pages stay in one
- * morph family and keep their own shapes and every difference the edit did not touch. A layer added
- * or removed by the edit is added or removed on every page, the new layer with the edited page's shapes.
+ * Replaces page [pageIndex] with [edited]. Other pages take every changed layer field except shapes, so
+ * all stay in one morph family. An added or removed layer applies to every page.
  */
 fun List<MorpheusGraphSpec>.withPageEdit(pageIndex: Int, edited: MorpheusGraphSpec): List<MorpheusGraphSpec> {
     val before = this[pageIndex]
@@ -56,7 +43,7 @@ private fun List<MorpheusGraphLayerSpec>.followingEdit(before: List<MorpheusGrap
         edited.mapIndexed { index, layer -> layer.copy(shapes = getOrNull(index)?.shapes ?: layer.shapes) }
     }
 
-/** This layer with every field but the shapes that differs between [before] and [edited] set to the edited value. */
+/** This layer with every non-shape field changed from [before] to [edited] taken over. */
 private fun MorpheusGraphLayerSpec.withChangesBetween(before: MorpheusGraphLayerSpec, edited: MorpheusGraphLayerSpec): MorpheusGraphLayerSpec = this
     .takingChange(before.edgeRule, edited.edgeRule) { copy(edgeRule = it) }
     .takingChange(before.density, edited.density) { copy(density = it) }

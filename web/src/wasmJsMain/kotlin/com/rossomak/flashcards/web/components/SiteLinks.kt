@@ -11,14 +11,9 @@ import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.navigation.WebRoute
 import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 
-/** The contact address on the closing page and the legal pages' footer. */
 private const val CONTACT_LINK = """<a href="mailto:flashcardsdev@gmail.com">Contact</a>"""
 
-/**
- * The site's quiet links: the Privacy Policy and the account deletion page, and with [showContact]
- * the contact address. Small, muted and centered, wrapping onto a second line when narrow; a link
- * brightens to the full color while hovered.
- */
+/** The quiet legal links, plus the contact address with [showContact]. */
 @Composable
 fun SiteLinks(modifier: Modifier = Modifier, showContact: Boolean, onNavigate: OnNavigate) {
     val style = MaterialTheme.typography.bodyLarge

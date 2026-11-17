@@ -18,10 +18,7 @@ import com.rossomak.flashcards.web.components.reveal
 import com.rossomak.flashcards.web.landing.FeatureLayout.SideBySide
 import com.rossomak.flashcards.web.navigation.OnNavigate
 
-/**
- * The last page: the large logo ([HeroLogo]) over the tagline again, the legal links and the contact
- * address, as one block. The logo and the links reveal by [reveal]'s slots ([ClosingSlots]).
- */
+/** The last page: logo, tagline, legal links and contact address, revealed by [ClosingSlots]. */
 @Composable
 fun ClosingPage(modifier: Modifier = Modifier, frame: LandingFrame, textModifier: Modifier = Modifier, reveal: RevealSequence, onNavigate: OnNavigate) {
     val rise = LocalRevealMotion.current.rise

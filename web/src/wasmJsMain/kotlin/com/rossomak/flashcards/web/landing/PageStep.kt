@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.web.landing
 
-/** A move between the landing pages that a key asks for. */
+/** A keyboard move between landing pages. */
 enum class PageStep {
     Previous,
     Next,
@@ -8,7 +8,7 @@ enum class PageStep {
     Last,
     ;
 
-    /** The page this step lands on from [page], kept within the [pageCount] pages. */
+    /** The target page from [page], clamped. */
     fun from(page: Int, pageCount: Int): Int {
         val lastPage = pageCount - 1
         return when (this) {
@@ -20,11 +20,7 @@ enum class PageStep {
     }
 
     companion object {
-        /**
-         * The step for a keyboard [key] (a DOM `KeyboardEvent.key`): the arrows and Page Up or Down
-         * move one page, Home and End go to the hero and the closing page. Any other key is null, so
-         * the browser keeps it.
-         */
+        /** The step for a DOM `KeyboardEvent.key`, or null to leave it to the browser. */
         fun forKey(key: String): PageStep? = when (key) {
             "ArrowUp", "PageUp" -> Previous
             "ArrowDown", "PageDown" -> Next

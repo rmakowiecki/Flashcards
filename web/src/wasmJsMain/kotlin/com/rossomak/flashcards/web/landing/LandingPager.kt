@@ -44,12 +44,8 @@ import kotlinx.coroutines.flow.filterNotNull
 val LANDING_PAGE_COUNT: Int = LandingFeature.entries.size + 2
 
 /**
- * The landing page: full-window pages that snap, over the site's shared [backdrop], whose graph
- * ([graphState]) morphs from page to page as they scroll. The browser scrolls and snaps the pages for
- * the wheel, the trackpad and touch ([BrowserSnap]); keys and the page dots scroll it page by page. The
- * hero's and the closing page's components reveal each time their page arrives ([PageReveal]). With
- * [playEntrance], the hero's components reveal once the graph has faded in. On a local preview, T opens
- * the tuner ([LandingTunerPane]), which edits [tuning].
+ * The landing page: snapping full-window pages, scrolled by the browser ([BrowserSnap]), driving
+ * [graphState]'s morph. With [playEntrance], the hero reveals after the graph fades in.
  */
 @OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
@@ -146,10 +142,7 @@ fun LandingPager(
     }
 }
 
-/**
- * A reveal of [page]'s components that plays as the pages head for it and hides once it has left the
- * window ([PageReveal]), held back until [gate] opens.
- */
+/** [page]'s reveal by [PageReveal], held back until [gate] opens. */
 @Composable
 private fun rememberPageReveal(pagerState: PagerState, page: Int, slotCount: Int, gate: Boolean): RevealSequence {
     var arrived by remember { mutableStateOf(false) }
@@ -164,34 +157,27 @@ private fun rememberPageReveal(pagerState: PagerState, page: Int, slotCount: Int
 /** How far [page] is from the position on screen, in pages: positive once scrolled past. */
 fun PagerState.offsetOf(page: Int): Float = (currentPage - page) + currentPageOffsetFraction
 
-/**
- * A page's text lags slightly behind its page and fades as it leaves; without [enabled] (reduced
- * motion) it moves with its page and never fades. [scrimEntrance] fades the text's scrim alone in.
- */
+/** A page's text lag and fade ([TextParallax]), off without [enabled]. [scrimEntrance] fades only the scrim. */
 class TextMotion(private val pagerState: PagerState, private val page: Int, private val enabled: Boolean, private val scrimEntrance: () -> Float = { 1f }) {
     fun alpha(): Float = if (enabled) TextParallax.alpha(pagerState.offsetOf(page)) else 1f
 
-    /** The scrim's alpha: the text's, held back further while [scrimEntrance] runs on first load. */
     fun scrimAlpha(): Float = alpha() * scrimEntrance()
 
     fun translationYPx(): Float = if (enabled) TextParallax.translationFraction(pagerState.offsetOf(page)) * pagerState.layoutInfo.pageSize else 0f
 }
 
-/** Applies [motion] to the text. The text's scrim sits outside this layer ([textScrim]), so the layer never clips it. */
+/** Applies [motion] to the text. The scrim stays outside this layer so it is not clipped. */
 private fun Modifier.textMotion(motion: TextMotion): Modifier = graphicsLayer {
     translationY = motion.translationYPx()
     alpha = motion.alpha()
 }
 
-/** The first load's entrance: [started] once the graph has faded in, then [content] (the hero's text, the header logo and the page dots) reveals. */
+/** First load: [started] after the graph fades in, then [content] reveals. */
 private class Entrance(val content: Animatable<Float, *>, started: Boolean) {
     var started: Boolean by mutableStateOf(started)
 }
 
-/**
- * First load only: the hero waits for the graph to fade in, then its components reveal, the text in
- * its own slot. Without [playEntrance] everything starts shown.
- */
+/** The first load's [Entrance]. Without [playEntrance] everything starts shown. */
 @Composable
 private fun rememberEntrance(playEntrance: Boolean, onEntrancePlayed: () -> Unit): Entrance {
     val motion by rememberUpdatedState(LocalRevealMotion.current)
@@ -207,11 +193,7 @@ private fun rememberEntrance(playEntrance: Boolean, onEntrancePlayed: () -> Unit
     return entrance
 }
 
-/**
- * Keys, read from the window while the landing page shows, and the wheel, left to the browser to scroll
- * the pages. On a local preview, T toggles [tunerOpen], and the wheel over the open tuner scrolls it
- * instead.
- */
+/** Window keys, and the wheel left to the browser except over the open tuner. T toggles [tunerOpen] locally. */
 @Composable
 private fun rememberPagerInput(pagerState: PagerState, tunerOpen: MutableState<Boolean>): LandingPagerInput {
     val isLocalPreview = remember { isLocalPreview() }

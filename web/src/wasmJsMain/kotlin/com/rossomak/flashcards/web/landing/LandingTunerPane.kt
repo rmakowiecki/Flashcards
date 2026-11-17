@@ -32,15 +32,10 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.launch
 
-/** The tuner's width, in dp: also the part of the window's end edge where the wheel scrolls the pane, not the pages. */
+/** Also the end-edge strip where the wheel scrolls the pane. */
 val LANDING_TUNER_PANE_WIDTH: Dp = 380.dp
 
-/**
- * The local tuner, a pane over the window's end edge: Morpheus's own tuning sheet for the page on
- * screen, whose edits of anything but shapes reach every page ([LandingTuning.editPage]), under a header
- * with the graph's morph time, whether a swipe stops at every page, the window shape at which feature
- * pages go side by side, and how components reveal. Shown only on a local preview.
- */
+/** The local-only tuner: Morpheus's tuning sheet for the page on screen under the [LandingTuning] controls. */
 @Composable
 fun LandingTunerPane(modifier: Modifier = Modifier, tuning: LandingTuning, pageIndex: Int) {
     val clipboard = LocalClipboard.current

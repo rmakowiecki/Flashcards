@@ -9,18 +9,14 @@ import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.WheelEvent
 
-/**
- * Hands every vertical `wheel` event on the window to [target], with the pointer's distance from the
- * window's start edge in CSS pixels, before Compose sees it, while in composition, and sends the event
- * where [target] says. Pinch zoom (a wheel event with Ctrl held) is left to the browser.
- */
+/** Routes each vertical window `wheel` event where [target] says, by pointer x, before Compose sees it. Pinch zoom stays with the browser. */
 @Composable
 fun WindowWheelHandler(target: (clientX: Double) -> WheelTarget) {
     val currentTarget by rememberUpdatedState(target)
     DisposableEffect(Unit) {
         val listener: (Event) -> Unit = { event ->
             val wheel = event as WheelEvent
-            // Captured on the window, so Compose's own wheel listener, which prevents the default, never runs.
+            // Stops Compose's listener, which would prevent the default.
             if (!wheel.ctrlKey && wheel.deltaY != 0.0 && currentTarget(wheel.clientX.toDouble()) == WheelTarget.Browser) {
                 wheel.stopImmediatePropagation()
             }
@@ -30,10 +26,7 @@ fun WindowWheelHandler(target: (clientX: Double) -> WheelTarget) {
     }
 }
 
-/**
- * Hands every `keydown` without a modifier (Ctrl, Alt, Meta) to [onKey] as its `KeyboardEvent.key`
- * while in composition; a key [onKey] returns true for is kept from the browser.
- */
+/** Passes each unmodified `keydown` to [onKey]. A key it returns true for is kept from the browser. */
 @Composable
 fun WindowKeyHandler(onKey: (String) -> Boolean) {
     val currentOnKey by rememberUpdatedState(onKey)

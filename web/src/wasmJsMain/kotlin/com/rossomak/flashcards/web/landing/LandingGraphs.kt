@@ -13,15 +13,8 @@ import com.rossomak.morpheus.ShapePrimitive.Ribbon
 import com.rossomak.morpheus.ShapePrimitive.Uniform
 
 /**
- * The website's own graph family, one spec per landing page, behind every page. Each spec has the
- * same two layers, a fine, faint back mesh and a dense, bright front one, and every layer is a copy
- * of [back] or [front], so any two specs morph within the same meshes and the nodes stay put. Every
- * page composes the front from wide ribbons sweeping across the whole window and blooms anchored in
- * its corners; the text keeps legible through its own soft scrim ([textScrim]) rather than through a
- * thinner graph.
- *
- * Not the app's `BrandMorpheusGraphSpecs`, which lives in the Android-only `:core:ui`; the site
- * shares no graph with the app.
+ * The site's own graph family, one spec per landing page. Every layer copies [back] or [front], so all
+ * specs share one morph family and nodes stay put. Separate from the app's `BrandMorpheusGraphSpecs`.
  */
 object LandingGraphs {
 
@@ -29,10 +22,7 @@ object LandingGraphs {
 
     private val fill: MorpheusGraphFill = MorpheusGraphFill.Solid(Color.White)
 
-    /**
-     * The fine mesh behind: small, dim nodes with no glow, the same shape on every page, so a page turn
-     * reshapes only the front mesh. It waves and pulses gently for life.
-     */
+    /** The faint back mesh, the same shape on every page. */
     private val back: MorpheusGraphLayerSpec = MorpheusGraphLayerSpec(
         density = 46f,
         jitter = 0.45f,
@@ -56,10 +46,7 @@ object LandingGraphs {
         alpha = 0.32f,
     )
 
-    /**
-     * The mesh in front: one continuous mesh per shape, bright edges that pulse, a few hot nodes as an
-     * accent, and a steady wave and drift. Morphs carry no comets.
-     */
+    /** The bright front mesh, whose shapes change per page. */
     private val front: MorpheusGraphLayerSpec = MorpheusGraphLayerSpec(
         density = 40f,
         jitter = 0.42f,
@@ -80,13 +67,12 @@ object LandingGraphs {
         glowStrength = 0.4f,
         depthDimming = 0.25f,
         comets = MorpheusGraphComets(strength = 0f),
-        // The leaving and the arriving shape sweep the whole morph together, so the first pixels of a slow
-        // scroll already grow the next page's shape instead of only fading this one.
+        // Both shapes sweep the whole morph, so a slow scroll grows the next shape from its first pixels.
         morphGap = -1f,
         alpha = 0.61f,
     )
 
-    /** The hero's cover: a wide band sweeping low under the tagline, a bloom in the top-end corner and a smaller one opposite. */
+    /** The hero's brighter cover. */
     val hero: MorpheusGraphSpec = spec(
         back = back.copy(alpha = 0.38f),
         front = front.copy(
@@ -101,11 +87,7 @@ object LandingGraphs {
         ),
     )
 
-    /**
-     * One spec per feature page, in [LandingFeature] order: each a wide ribbon or two across the whole
-     * window and a bloom in a corner, at a new angle, height, curve and corner from the page before, so
-     * part of every shape leaves and part arrives.
-     */
+    /** One spec per feature, in [LandingFeature] order, each differing from the one before. */
     private val features: List<MorpheusGraphSpec> = listOf(
         // Home: a band climbing from the lower start to the upper end, a bloom in the bottom-end corner.
         spec(
@@ -186,7 +168,7 @@ object LandingGraphs {
         ),
     )
 
-    /** The closing page, and the backdrop of the legal pages: only one calm band along the bottom. */
+    /** The closing page's and legal pages' calm band. */
     val closing: MorpheusGraphSpec = spec(
         back = back.copy(driftSpeed = 0.7f),
         front = front.copy(
@@ -197,7 +179,7 @@ object LandingGraphs {
         ),
     )
 
-    /** One spec per landing page, in page order: the hero, each feature, the closing page. */
+    /** One spec per landing page, in page order. */
     val pages: List<MorpheusGraphSpec> = listOf(hero) + features + closing
 
     private fun spec(back: MorpheusGraphLayerSpec, front: MorpheusGraphLayerSpec): MorpheusGraphSpec {

@@ -14,10 +14,9 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
-// The website's only file allowed to import `dev.chrisbanes.haze` (Konsist enforces it), the
-// counterpart of `:core:ui`'s BlurBackdrop.kt, which the Android-only module keeps from the site.
+// The website's only Haze import (Konsist enforces it).
 
-/** A background that [blurBackdrop] components blur; mark it with [blurBackdropSource]. */
+/** A background that [blurBackdrop] components blur. */
 @Stable
 class BlurBackdrop internal constructor(internal val hazeState: HazeState)
 
@@ -27,13 +26,10 @@ fun rememberBlurBackdrop(): BlurBackdrop {
     return remember(hazeState) { BlurBackdrop(hazeState) }
 }
 
-/**
- * Marks a background that [blurBackdrop] components blur. It records its children too and a
- * component cannot blur itself, so it must be a sibling layer behind the content.
- */
+/** Marks the blurred background. It must be a sibling layer behind the content. */
 fun Modifier.blurBackdropSource(backdrop: BlurBackdrop): Modifier = hazeSource(backdrop.hazeState)
 
-/** Blurs [backdrop] behind this node by [radius], clipped to [shape]; the component's own container is drawn over it. */
+/** Blurs [backdrop] behind this node by [radius], clipped to [shape]. */
 fun Modifier.blurBackdrop(backdrop: BlurBackdrop, shape: Shape, radius: Dp): Modifier = clip(shape).hazeBlur(
     input = HazeInput.Sources(backdrop.hazeState),
     style = HazeBlurStyle {

@@ -33,38 +33,23 @@ fun WebTheme(content: @Composable () -> Unit) {
 
 /** Layout values that exist only on the website. */
 object WebDimensions {
-    /** Widest a page's text column grows, so lines stay readable on a desktop screen. */
     val contentMaxWidth: Dp = 720.dp
-
-    /** Widest the hero's one-line description runs before it wraps. */
     val heroDescriptionMaxWidth: Dp = 760.dp
-
     val scrollHintChevronSize: Dp = 20.dp
-
-    /** How far the scroll hint's chevron bobs. */
     val scrollHintBob: Dp = 4.dp
-
-    /** Widest a side-by-side feature page's text and phone row grows on a wide window. */
     val featureRowMaxWidth: Dp = 1680.dp
 
     /** Keeps a side-by-side feature page clear of the window edges and the page dots. */
     val featureSidePadding: Dp = 112.dp
-
-    /** Between the text and the phone on a side-by-side feature page. */
     val featureGap: Dp = 96.dp
-
     val featureTextMaxWidth: Dp = 600.dp
-
-    /** Tallest a screenshot is drawn, on a large desktop window. */
     val phoneMaxHeight: Dp = 860.dp
-
-    /** How high the phone floats over the graph: the reach of its soft shadow. */
     val phoneShadowElevation: Dp = 24.dp
 
     /** Keeps a stacked feature page clear of the page dots. */
     val stackedEndPadding: Dp = 40.dp
 
-    /** The legal pages' logo, at the top of their scrolling column: a share of the window's width, within bounds. */
+    /** The legal pages' logo: a share of the window's width, within bounds. */
     const val SUBPAGE_LOGO_WIDTH_SHARE = 0.28f
     val subpageLogoMinWidth: Dp = 240.dp
     val subpageLogoMaxWidth: Dp = 560.dp
@@ -73,8 +58,6 @@ object WebDimensions {
     val pageDotCurrentSize: Dp = 10.dp
     val pageDotTouchTarget: Dp = 24.dp
     val pageDotsEndPadding: Dp = 8.dp
-
-    /** The frosted pill behind the page dots: how far it reaches past the dots' column, and its blur. */
     val pageDotsPillPadding: Dp = 4.dp
     val pageDotsBlurRadius: Dp = 12.dp
 
@@ -84,16 +67,16 @@ object WebDimensions {
 
 /** Colors that exist only on the website. */
 object WebColors {
-    /** The frosted pill behind the page dots: a faint white tint and hairline over the blurred graph. */
+    /** The page dots' frosted pill. */
     val frostedFill: Color = Color.White.copy(alpha = 0.1f)
     val frostedBorder: Color = Color.White.copy(alpha = 0.18f)
 
-    /** The soft glow behind landing text, which keeps it legible over the dense graph. */
+    /** The glow behind landing text. */
     val textScrim: Color = Color(0xFF1A1C5C).copy(alpha = 0.62f)
 }
 
-/** Alpha of secondary text (subtitles, dates) against the on-gradient white. */
+/** Alpha of secondary text. */
 const val WEB_MUTED_CONTENT_ALPHA = 0.8f
 
-/** Alpha of tertiary text (the landing page's detail paragraphs), quieter than [WEB_MUTED_CONTENT_ALPHA]. */
+/** Alpha of tertiary text, such as the feature detail paragraphs. */
 const val WEB_FAINT_CONTENT_ALPHA = 0.66f

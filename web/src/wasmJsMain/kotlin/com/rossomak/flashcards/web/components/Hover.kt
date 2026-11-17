@@ -20,10 +20,7 @@ import com.rossomak.flashcards.web.browser.rememberPrefersReducedMotion
 
 private const val HOVER_MILLIS = 150
 
-/**
- * How far the pointer's hover over a component whose `Modifier.hoverable` takes this source has eased
- * in: 0 at rest, 1 while hovered. Under the browser's reduced-motion preference it changes at once.
- */
+/** Hover eased from 0 to 1, instant under reduced motion. */
 @Composable
 fun MutableInteractionSource.hoverProgress(): State<Float> {
     val hovered by collectIsHoveredAsState()
@@ -35,7 +32,7 @@ fun MutableInteractionSource.hoverProgress(): State<Float> {
     )
 }
 
-/** [content] in the surrounding content color at [restAlpha] of its alpha, rising to the full color while hovered. */
+/** [content] at [restAlpha], brightening to full while hovered. */
 @Composable
 fun HoverBrightens(modifier: Modifier = Modifier, restAlpha: Float, content: @Composable () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
