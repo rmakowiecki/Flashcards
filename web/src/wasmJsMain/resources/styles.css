@@ -11,6 +11,35 @@ html, body {
   font: 16px/1.6 Roboto, system-ui, sans-serif;
 }
 
+/* Browser snap (BrowserSnapScroller): the body scrolls and snaps the landing page's pages itself,
+   with no visible scrollbar and no bounce at either end. The Compose viewport, the body's first child,
+   stays pinned at the top; one empty stop per page gives the body its scroll height and snap points. */
+body.browser-snap {
+  position: relative;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+
+body.browser-snap::-webkit-scrollbar {
+  display: none;
+}
+
+body.browser-snap > div:first-child {
+  position: sticky !important;
+  top: 0;
+}
+
+.browser-snap-stop {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  scroll-snap-align: start;
+  pointer-events: none;
+}
+
 noscript main {
   display: block;
   max-width: 720px;

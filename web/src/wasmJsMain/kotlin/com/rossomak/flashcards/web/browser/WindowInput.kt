@@ -1,6 +1,3 @@
-// Reading the legacy `wheelDeltaY` field, which the DOM bindings leave out, is Wasm–JS interop.
-@file:OptIn(ExperimentalWasmJsInterop::class)
-
 package com.rossomak.flashcards.web.browser
 
 import androidx.compose.runtime.Composable
@@ -13,20 +10,19 @@ import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.WheelEvent
 
 /**
- * Takes every vertical `wheel` event on the window before Compose sees it, while in composition, and
- * hands it to [onWheel]. Pinch zoom (a wheel event with Ctrl held) is left to the browser.
+ * Hands every vertical `wheel` event on the window to [target], with the pointer's distance from the
+ * window's start edge in CSS pixels, before Compose sees it, while in composition, and sends the event
+ * where [target] says. Pinch zoom (a wheel event with Ctrl held) is left to the browser.
  */
 @Composable
-fun WindowWheelHandler(onWheel: (WheelReading) -> Unit) {
-    val currentOnWheel by rememberUpdatedState(onWheel)
+fun WindowWheelHandler(target: (clientX: Double) -> WheelTarget) {
+    val currentTarget by rememberUpdatedState(target)
     DisposableEffect(Unit) {
         val listener: (Event) -> Unit = { event ->
             val wheel = event as WheelEvent
-            if (!wheel.ctrlKey && wheel.deltaY != 0.0) {
-                // Captured on the window, so Compose's own wheel scrolling never runs. The window's wheel
-                // listeners are passive, so there is no default to prevent; the page never scrolls natively.
+            // Captured on the window, so Compose's own wheel listener, which prevents the default, never runs.
+            if (!wheel.ctrlKey && wheel.deltaY != 0.0 && currentTarget(wheel.clientX.toDouble()) == WheelTarget.Browser) {
                 wheel.stopImmediatePropagation()
-                currentOnWheel(WheelReading(deltaY = wheel.deltaY, deltaMode = wheel.deltaMode, wheelDeltaY = readWheelDeltaY(wheel)))
             }
         }
         window.addEventListener(WHEEL_EVENT, listener, true)
@@ -53,10 +49,6 @@ fun WindowKeyHandler(onKey: (String) -> Boolean) {
         onDispose { window.removeEventListener(KEY_DOWN_EVENT, listener, true) }
     }
 }
-
-// The parameter is read by name inside the JavaScript body, which detekt cannot see.
-@Suppress("UnusedParameter")
-private fun readWheelDeltaY(event: WheelEvent): Double = js("event.wheelDeltaY || 0")
 
 private const val WHEEL_EVENT = "wheel"
 private const val KEY_DOWN_EVENT = "keydown"
