@@ -39,9 +39,6 @@ object WebDimensions {
     /** Widest the hero's one-line description runs before it wraps. */
     val heroDescriptionMaxWidth: Dp = 760.dp
 
-    /** How far the hero rises as it fades up on first load. */
-    val entranceRise: Dp = 24.dp
-
     val scrollHintChevronSize: Dp = 20.dp
 
     /** How far the scroll hint's chevron bobs. */
@@ -61,6 +58,9 @@ object WebDimensions {
     /** Tallest a screenshot is drawn, on a large desktop window. */
     val phoneMaxHeight: Dp = 860.dp
 
+    /** How high the phone floats over the graph: the reach of its soft shadow. */
+    val phoneShadowElevation: Dp = 24.dp
+
     /** Keeps a stacked feature page clear of the page dots. */
     val stackedEndPadding: Dp = 40.dp
 
@@ -73,10 +73,21 @@ object WebDimensions {
     val pageDotCurrentSize: Dp = 10.dp
     val pageDotTouchTarget: Dp = 24.dp
     val pageDotsEndPadding: Dp = 8.dp
+
+    /** The frosted pill behind the page dots: how far it reaches past the dots' column, and its blur. */
+    val pageDotsPillPadding: Dp = 4.dp
+    val pageDotsBlurRadius: Dp = 12.dp
+
+    /** How far the glow behind the hero's scroll hint and links reaches past them. */
+    val bottomLinksScrimReach: Dp = 160.dp
 }
 
 /** Colors that exist only on the website. */
 object WebColors {
+    /** The frosted pill behind the page dots: a faint white tint and hairline over the blurred graph. */
+    val frostedFill: Color = Color.White.copy(alpha = 0.1f)
+    val frostedBorder: Color = Color.White.copy(alpha = 0.18f)
+
     /** The soft glow behind landing text, which keeps it legible over the dense graph. */
     val textScrim: Color = Color(0xFF1A1C5C).copy(alpha = 0.62f)
 }

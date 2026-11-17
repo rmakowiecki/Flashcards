@@ -13,6 +13,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.web.components.HtmlText
+import com.rossomak.flashcards.web.components.RevealWhenScrolledIn
 import com.rossomak.flashcards.web.components.WebPage
 import com.rossomak.flashcards.web.content.LegalBlock
 import com.rossomak.flashcards.web.content.LegalBlock.BulletList
@@ -47,17 +48,20 @@ fun LegalDocumentPage(modifier: Modifier = Modifier, document: LegalDocument, on
     }
 }
 
+/** A section: its divider and heading reveal once, as they first scroll into the window; its text never moves. */
 @Composable
 private fun LegalSectionContent(section: LegalSection, onNavigate: OnNavigate) {
-    HorizontalDivider(
-        modifier = Modifier.padding(top = MaterialTheme.spacing.large, bottom = MaterialTheme.spacing.normal),
-        color = MaterialTheme.colorScheme.outlineVariant,
-    )
-    Text(
-        text = section.title,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.semantics { heading() },
-    )
+    RevealWhenScrolledIn {
+        HorizontalDivider(
+            modifier = Modifier.padding(top = MaterialTheme.spacing.large, bottom = MaterialTheme.spacing.normal),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text = section.title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.semantics { heading() },
+        )
+    }
     Column(
         modifier = Modifier.padding(top = MaterialTheme.spacing.small),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),

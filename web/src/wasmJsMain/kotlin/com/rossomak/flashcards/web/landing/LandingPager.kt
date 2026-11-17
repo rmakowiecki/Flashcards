@@ -1,75 +1,87 @@
 package com.rossomak.flashcards.web.landing
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import com.rossomak.flashcards.web.browser.WheelTarget
 import com.rossomak.flashcards.web.browser.WindowKeyHandler
 import com.rossomak.flashcards.web.browser.WindowWheelHandler
+import com.rossomak.flashcards.web.browser.isLocalPreview
 import com.rossomak.flashcards.web.browser.rememberPrefersDarkColorScheme
 import com.rossomak.flashcards.web.browser.rememberPrefersReducedMotion
+import com.rossomak.flashcards.web.components.BlurBackdrop
+import com.rossomak.flashcards.web.components.LocalRevealMotion
+import com.rossomak.flashcards.web.components.RevealSequence
+import com.rossomak.flashcards.web.components.rememberRevealSequence
 import com.rossomak.flashcards.web.navigation.OnNavigate
+import com.rossomak.morpheus.ExperimentalMorpheusGraphApi
 import com.rossomak.morpheus.Follow
-import com.rossomak.morpheus.morpheusGraphBackground
-import com.rossomak.morpheus.rememberMorpheusGraphMorphState
+import com.rossomak.morpheus.MorpheusGraphMorphState
+import kotlin.math.abs
+import kotlinx.browser.window
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 
 /** The hero, one page per [LandingFeature], and the closing page. */
 val LANDING_PAGE_COUNT: Int = LandingFeature.entries.size + 2
 
 /**
- * The landing page: full-window pages that snap, over the brand gradient and one fixed graph that
- * morphs from page to page as they scroll. The wheel and touch scroll the pages freely and a snap
- * assist settles them on a page once they rest; keys and the page dots step page by page. With
- * [playEntrance], the graph fades in and then the hero fades up.
+ * The landing page: full-window pages that snap, over the site's shared [backdrop], whose graph
+ * ([graphState]) morphs from page to page as they scroll. The browser scrolls and snaps the pages for
+ * the wheel, the trackpad and touch ([BrowserSnap]); keys and the page dots scroll it page by page. The
+ * hero's and the closing page's components reveal each time their page arrives ([PageReveal]). With
+ * [playEntrance], the hero's components reveal once the graph has faded in. On a local preview, T opens
+ * the tuner ([LandingTunerPane]), which edits [tuning].
  */
+@OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
-fun LandingPager(modifier: Modifier = Modifier, playEntrance: Boolean, onEntrancePlayed: () -> Unit, onNavigate: OnNavigate) {
+fun LandingPager(
+    modifier: Modifier = Modifier,
+    graphState: MorpheusGraphMorphState,
+    tuning: LandingTuning,
+    backdrop: BlurBackdrop,
+    playEntrance: Boolean,
+    onEntrancePlayed: () -> Unit,
+    onNavigate: OnNavigate,
+) {
     val pagerState = rememberPagerState { LANDING_PAGE_COUNT }
     val reducedMotion by rememberPrefersReducedMotion()
     val prefersDark by rememberPrefersDarkColorScheme()
     val screenshotVariant = ScreenshotVariant.forColorScheme(prefersDark)
     val entrance = rememberEntrance(playEntrance = playEntrance && !reducedMotion, onEntrancePlayed = onEntrancePlayed)
 
-    val graphState = rememberMorpheusGraphMorphState(LandingGraphs.pages.first())
+    val tunerOpen = remember { mutableStateOf(false) }
     graphState.Follow(
-        LandingGraphs.pages,
-        minMorphDuration = LandingTimings.minMorphDuration,
+        tuning.pages,
+        minMorphDuration = tuning.minMorphDuration,
         target = { pagerState.targetPage },
     ) {
         pagerState.currentPage + pagerState.currentPageOffsetFraction
     }
 
-    val input = rememberPagerInput(pagerState)
+    val input = rememberPagerInput(pagerState, tunerOpen)
+    BrowserSnap(pagerState = pagerState, input = input, stopAtEveryPage = tuning.stopAtEveryPage)
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(MaterialTheme.brandColors.screenGradient)) {
-        val frame = LandingFrame(width = maxWidth, height = maxHeight)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = entrance.graph.value }
-                .morpheusGraphBackground(graphState),
-        )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val frame = LandingFrame(width = maxWidth, height = maxHeight, sideBySideMinAspectRatio = tuning.sideBySideMinAspectRatio)
         // The landing page's text grows with the window, over the shared type scale.
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * frame.fontScale)) {
@@ -77,45 +89,76 @@ fun LandingPager(modifier: Modifier = Modifier, playEntrance: Boolean, onEntranc
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 beyondViewportPageCount = 1,
-                // A fling travels as far as its speed carries it, as on any page, then settles on a page.
-                flingBehavior = PagerDefaults.flingBehavior(
-                    state = pagerState,
-                    pagerSnapDistance = PagerSnapDistance.atMost(LANDING_PAGE_COUNT),
-                    snapAnimationSpec = LandingTimings.snapAnimationSpec(),
-                ),
+                // The browser scrolls the pages (BrowserSnap); the pager only follows it.
+                userScrollEnabled = false,
             ) { page ->
-                val textMotion = TextMotion(pagerState = pagerState, page = page, enabled = !reducedMotion).let { motion -> Modifier.textScrim(motion).textMotion(motion) }
                 when (page) {
-                    0 -> HeroPage(
-                        frame = frame,
-                        textModifier = textMotion,
-                        entranceProgress = { entrance.content.value },
-                        animateHint = !reducedMotion,
-                        onScrollHintClick = { input.step(PageStep.Next) },
-                        onNavigate = onNavigate,
-                    )
-                    LANDING_PAGE_COUNT - 1 -> ClosingPage(frame = frame, textModifier = textMotion, onNavigate = onNavigate)
-                    else -> FeaturePage(
-                        frame = frame,
-                        feature = LandingFeature.entries[page - 1],
-                        screenshotVariant = screenshotVariant,
-                        textModifier = textMotion,
-                    )
+                    0 -> {
+                        val reveal = rememberPageReveal(pagerState = pagerState, page = page, slotCount = HeroSlots.COUNT, gate = entrance.started)
+                        // The scrim comes with the logo on first load, and stays while the logo replays on later arrivals.
+                        val motion = TextMotion(
+                            pagerState = pagerState,
+                            page = page,
+                            enabled = !reducedMotion,
+                            scrimEntrance = { maxOf(reveal.progress(HeroSlots.LOGO), entrance.content.value) },
+                        )
+                        HeroPage(
+                            frame = frame,
+                            textModifier = Modifier.textScrim(motion).textMotion(motion),
+                            reveal = reveal,
+                            textEntrance = { entrance.content.value },
+                            animateHint = !reducedMotion,
+                            onScrollHintClick = { input.step(PageStep.Next) },
+                            onNavigate = onNavigate,
+                        )
+                    }
+                    LANDING_PAGE_COUNT - 1 -> {
+                        val reveal = rememberPageReveal(pagerState = pagerState, page = page, slotCount = ClosingSlots.COUNT, gate = true)
+                        val motion = TextMotion(pagerState = pagerState, page = page, enabled = !reducedMotion)
+                        ClosingPage(frame = frame, textModifier = Modifier.textScrim(motion).textMotion(motion), reveal = reveal, onNavigate = onNavigate)
+                    }
+                    else -> {
+                        val motion = TextMotion(pagerState = pagerState, page = page, enabled = !reducedMotion)
+                        FeaturePage(
+                            frame = frame,
+                            feature = LandingFeature.entries[page - 1],
+                            screenshotVariant = screenshotVariant,
+                            textModifier = Modifier.textScrim(motion).textMotion(motion),
+                        )
+                    }
                 }
             }
         }
-        LandingLogo(
+        HeaderLogo(
             frame = frame,
             headerProgress = { LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT) },
             alpha = { entrance.content.value },
-            onClick = { input.goTo(0) },
         )
         PageDots(
             pagerState = pagerState,
+            backdrop = backdrop,
             onPageClick = input::goTo,
             modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer { alpha = entrance.content.value },
         )
+        if (tunerOpen.value) {
+            LandingTunerPane(modifier = Modifier.align(Alignment.CenterEnd), tuning = tuning, pageIndex = pagerState.currentPage)
+        }
     }
+}
+
+/**
+ * A reveal of [page]'s components that plays as the pages head for it and hides once it has left the
+ * window ([PageReveal]), held back until [gate] opens.
+ */
+@Composable
+private fun rememberPageReveal(pagerState: PagerState, page: Int, slotCount: Int, gate: Boolean): RevealSequence {
+    var arrived by remember { mutableStateOf(false) }
+    LaunchedEffect(pagerState, page) {
+        snapshotFlow { PageReveal.shown(isTarget = pagerState.targetPage == page, distancePages = abs(pagerState.offsetOf(page))) }
+            .filterNotNull()
+            .collect { shown -> arrived = shown }
+    }
+    return rememberRevealSequence(slotCount = slotCount, shown = arrived && gate)
 }
 
 /** How far [page] is from the position on screen, in pages: positive once scrolled past. */
@@ -123,10 +166,13 @@ fun PagerState.offsetOf(page: Int): Float = (currentPage - page) + currentPageOf
 
 /**
  * A page's text lags slightly behind its page and fades as it leaves; without [enabled] (reduced
- * motion) it moves with its page and never fades.
+ * motion) it moves with its page and never fades. [scrimEntrance] fades the text's scrim alone in.
  */
-class TextMotion(private val pagerState: PagerState, private val page: Int, private val enabled: Boolean) {
+class TextMotion(private val pagerState: PagerState, private val page: Int, private val enabled: Boolean, private val scrimEntrance: () -> Float = { 1f }) {
     fun alpha(): Float = if (enabled) TextParallax.alpha(pagerState.offsetOf(page)) else 1f
+
+    /** The scrim's alpha: the text's, held back further while [scrimEntrance] runs on first load. */
+    fun scrimAlpha(): Float = alpha() * scrimEntrance()
 
     fun translationYPx(): Float = if (enabled) TextParallax.translationFraction(pagerState.offsetOf(page)) * pagerState.layoutInfo.pageSize else 0f
 }
@@ -137,30 +183,55 @@ private fun Modifier.textMotion(motion: TextMotion): Modifier = graphicsLayer {
     alpha = motion.alpha()
 }
 
-private class Entrance(val graph: Animatable<Float, *>, val content: Animatable<Float, *>)
+/** The first load's entrance: [started] once the graph has faded in, then [content] (the hero's text, the header logo and the page dots) reveals. */
+private class Entrance(val content: Animatable<Float, *>, started: Boolean) {
+    var started: Boolean by mutableStateOf(started)
+}
 
-/** First load only: the graph fades in, then the hero fades up. Without [playEntrance] both start shown. */
+/**
+ * First load only: the hero waits for the graph to fade in, then its components reveal, the text in
+ * its own slot. Without [playEntrance] everything starts shown.
+ */
 @Composable
 private fun rememberEntrance(playEntrance: Boolean, onEntrancePlayed: () -> Unit): Entrance {
-    val entrance = remember {
-        val start = if (playEntrance) 0f else 1f
-        Entrance(graph = Animatable(start), content = Animatable(start))
-    }
+    val motion by rememberUpdatedState(LocalRevealMotion.current)
+    val entrance = remember { Entrance(content = Animatable(if (playEntrance) 0f else 1f), started = !playEntrance) }
     LaunchedEffect(Unit) {
         if (!playEntrance) return@LaunchedEffect
         onEntrancePlayed()
-        entrance.graph.animateTo(1f, tween(LandingTimings.entranceGraphFade.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.StandardEasing))
-        entrance.content.animateTo(1f, tween(LandingTimings.entranceContentFade.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.EmphasizedDecelerateEasing))
+        delay(LandingTimings.entranceGraphFade)
+        entrance.started = true
+        delay(motion.stagger * HeroSlots.TEXT)
+        entrance.content.animateTo(1f, motion.tween())
     }
     return entrance
 }
 
-/** Mouse-wheel notches, trackpad glides and keys, read from the window while the landing page shows. */
+/**
+ * Keys, read from the window while the landing page shows, and the wheel, left to the browser to scroll
+ * the pages. On a local preview, T toggles [tunerOpen], and the wheel over the open tuner scrolls it
+ * instead.
+ */
 @Composable
-private fun rememberPagerInput(pagerState: PagerState): LandingPagerInput {
-    val scope = rememberCoroutineScope()
-    val input = remember(pagerState, scope) { LandingPagerInput(pagerState, scope) }
-    WindowWheelHandler(onWheel = input::onWheel)
-    WindowKeyHandler(onKey = input::onKey)
+private fun rememberPagerInput(pagerState: PagerState, tunerOpen: MutableState<Boolean>): LandingPagerInput {
+    val isLocalPreview = remember { isLocalPreview() }
+    val input = remember(pagerState) { LandingPagerInput(pageCount = pagerState.pageCount) }
+    WindowWheelHandler(
+        target = { clientX ->
+            if (tunerOpen.value && clientX >= window.innerWidth - LANDING_TUNER_PANE_WIDTH.value) WheelTarget.Compose else WheelTarget.Browser
+        },
+    )
+    WindowKeyHandler(
+        onKey = { key ->
+            if (isLocalPreview && key.equals(TUNER_KEY, ignoreCase = true)) {
+                tunerOpen.value = !tunerOpen.value
+                true
+            } else {
+                input.onKey(key)
+            }
+        },
+    )
     return input
 }
+
+private const val TUNER_KEY = "t"

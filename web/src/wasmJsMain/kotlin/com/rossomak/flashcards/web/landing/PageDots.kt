@@ -1,52 +1,98 @@
 package com.rossomak.flashcards.web.landing
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.util.lerp
+import com.rossomak.flashcards.web.components.BlurBackdrop
+import com.rossomak.flashcards.web.components.blurBackdrop
+import com.rossomak.flashcards.web.components.hoverProgress
+import com.rossomak.flashcards.web.theme.WebColors
 import com.rossomak.flashcards.web.theme.WebDimensions
+import kotlin.math.abs
 
-/** A column of one dot per page on the window's end edge: the current page's dot is larger and brighter, and a dot opens its page. */
+/**
+ * A column of one dot per page on the window's end edge, on a frosted pill that blurs [backdrop]. The
+ * dots follow the scroll: a dot grows larger and brighter as the pages near its page, so the highlight
+ * slides from dot to dot. A hovered dot grows a little, and a dot opens its page.
+ */
 @Composable
-fun PageDots(modifier: Modifier = Modifier, pagerState: PagerState, onPageClick: (Int) -> Unit) {
+fun PageDots(modifier: Modifier = Modifier, pagerState: PagerState, backdrop: BlurBackdrop, onPageClick: (Int) -> Unit) {
     val currentPage = pagerState.currentPage
-    Column(modifier = modifier.padding(end = WebDimensions.pageDotsEndPadding)) {
+    val pillShape = RoundedCornerShape(percent = PILL_CORNER_PERCENT)
+    val dotColor = LocalContentColor.current
+    Column(
+        modifier = modifier
+            .padding(end = WebDimensions.pageDotsEndPadding)
+            .blurBackdrop(backdrop = backdrop, shape = pillShape, radius = WebDimensions.pageDotsBlurRadius)
+            .background(WebColors.frostedFill, pillShape)
+            .border(width = Dp.Hairline, color = WebColors.frostedBorder, shape = pillShape)
+            .padding(WebDimensions.pageDotsPillPadding),
+    ) {
         repeat(pagerState.pageCount) { page ->
-            val isCurrent = page == currentPage
+            val interactionSource = remember { MutableInteractionSource() }
+            val hover by interactionSource.hoverProgress()
             Box(
                 modifier = Modifier
                     .size(WebDimensions.pageDotTouchTarget)
                     .clip(CircleShape)
+                    .hoverable(interactionSource)
                     .clickable(interactionSource = null, indication = null) { onPageClick(page) }
                     .pointerHoverIcon(PointerIcon.Hand)
                     .semantics {
                         contentDescription = "Page ${page + 1} of ${pagerState.pageCount}"
-                        selected = isCurrent
+                        selected = page == currentPage
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(if (isCurrent) WebDimensions.pageDotCurrentSize else WebDimensions.pageDotSize)
-                        .background(LocalContentColor.current.copy(alpha = if (isCurrent) 1f else IDLE_DOT_ALPHA), CircleShape),
+                        .size(WebDimensions.pageDotCurrentSize)
+                        .graphicsLayer {
+                            val nearness = PageDotHighlight.nearness(pagerState.currentPage + pagerState.currentPageOffsetFraction, page)
+                            val idleScale = WebDimensions.pageDotSize / WebDimensions.pageDotCurrentSize
+                            scaleX = lerp(idleScale, 1f, nearness) * (1f + HOVER_GROWTH * hover)
+                            scaleY = scaleX
+                            alpha = lerp(IDLE_DOT_ALPHA, 1f, nearness)
+                        }
+                        .background(dotColor, CircleShape),
                 )
             }
         }
     }
 }
 
+/** How the page dots' highlight follows the scroll. */
+object PageDotHighlight {
+    /** How near pager [position] is to [page]: 1 on it, falling to 0 one page away and beyond. */
+    fun nearness(position: Float, page: Int): Float = (1f - abs(position - page)).coerceIn(0f, 1f)
+}
+
 private const val IDLE_DOT_ALPHA = 0.4f
+private const val PILL_CORNER_PERCENT = 50
+
+/** How much larger a hovered dot grows. */
+private const val HOVER_GROWTH = 0.3f

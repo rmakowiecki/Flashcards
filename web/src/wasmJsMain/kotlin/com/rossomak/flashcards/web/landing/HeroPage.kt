@@ -34,92 +34,108 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.designsystem.theme.spacing
+import com.rossomak.flashcards.web.components.HoverBrightens
+import com.rossomak.flashcards.web.components.LOGO_REVEAL_START_SCALE
+import com.rossomak.flashcards.web.components.LocalRevealMotion
+import com.rossomak.flashcards.web.components.RevealSequence
 import com.rossomak.flashcards.web.components.SiteLinks
+import com.rossomak.flashcards.web.components.reveal
 import com.rossomak.flashcards.web.landing.FeatureLayout.SideBySide
 import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
 
 /**
- * The first page: the tagline and a one-line description under the large logo (drawn by
- * [LandingLogo], which stays on screen as the page scrolls), a hint to scroll, and the legal links
- * at the bottom. [entranceProgress] runs from 0 to 1 as the hero fades up on first load.
+ * The first page: the large logo ([HeroLogo]) over the tagline and a one-line description, one block
+ * under one scrim that moves together, a hint to scroll, and the legal links at the bottom. The logo,
+ * the hint and the links reveal by [reveal]'s slots ([HeroSlots]); the text reveals by [textEntrance],
+ * on first load only.
  */
 @Composable
 fun HeroPage(
     modifier: Modifier = Modifier,
     frame: LandingFrame,
     textModifier: Modifier = Modifier,
-    entranceProgress: () -> Float,
+    reveal: RevealSequence,
+    textEntrance: () -> Float,
     animateHint: Boolean,
     onScrollHintClick: () -> Unit,
     onNavigate: OnNavigate,
 ) {
     val isWide = frame.layout == SideBySide
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                val progress = entranceProgress()
-                alpha = progress
-                translationY = (1f - progress) * WebDimensions.entranceRise.toPx()
-            }
-            .padding(horizontal = MaterialTheme.spacing.medium),
-    ) {
-        Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = frame.heroTextTop).then(textModifier)) {
+    val rise = LocalRevealMotion.current.rise
+    Box(modifier = modifier.fillMaxSize().padding(horizontal = MaterialTheme.spacing.medium)) {
+        Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = frame.heroLogoTop).then(textModifier)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Stay sharp, study smart",
-                    style = if (isWide) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { heading() },
+                HeroLogo(
+                    frame = frame,
+                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LOGO) }, rise = rise, startScale = LOGO_REVEAL_START_SCALE),
                 )
-                Text(
-                    text = "Sharpen your dev skills: curated flashcards for Kotlin, Android, Python and more",
-                    style = if (isWide) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                    color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-                    modifier = Modifier.padding(top = MaterialTheme.spacing.small).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.reveal(progress = textEntrance, rise = rise)) {
+                    BalancedText(
+                        text = "Stay sharp, study smart",
+                        style = if (isWide) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    BalancedText(
+                        text = "Sharpen your dev skills: curated flashcards for Kotlin, Android, Python and more",
+                        style = if (isWide) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
+                        modifier = Modifier.padding(top = MaterialTheme.spacing.small).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
+                    )
+                }
             }
         }
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = MaterialTheme.spacing.medium),
+            // One glow behind the scroll hint and the links together, so they stay legible over the graph; it comes with the hint.
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) })
+                .padding(bottom = MaterialTheme.spacing.medium),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
         ) {
-            ScrollHint(animate = animateHint, onClick = onScrollHintClick)
-            SiteLinks(showContact = false, onNavigate = onNavigate)
+            ScrollHint(
+                modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
+                animate = animateHint,
+                onClick = onScrollHintClick,
+            )
+            SiteLinks(
+                modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
+                showContact = false,
+                onNavigate = onNavigate,
+            )
         }
     }
 }
 
+/** "Scroll to explore" over a bobbing chevron, muted until hovered. */
 @Composable
-private fun ScrollHint(animate: Boolean, onClick: () -> Unit) {
+private fun ScrollHint(modifier: Modifier = Modifier, animate: Boolean, onClick: () -> Unit) {
     val bob = if (animate) rememberHintBob() else remember { mutableFloatStateOf(0f) }
-    Column(
-        modifier = Modifier
-            .clickable(interactionSource = null, indication = null, onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(MaterialTheme.spacing.xsmall),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "Scroll to explore",
-            style = MaterialTheme.typography.titleMedium,
-            color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-        )
-        val chevronColor = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA)
-        Canvas(
+    HoverBrightens(modifier = modifier, restAlpha = WEB_MUTED_CONTENT_ALPHA) {
+        Column(
             modifier = Modifier
-                .padding(top = MaterialTheme.spacing.xxsmall)
-                .size(WebDimensions.scrollHintChevronSize)
-                .graphicsLayer { translationY = bob.value * WebDimensions.scrollHintBob.toPx() },
+                .clickable(interactionSource = null, indication = null, onClick = onClick)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(MaterialTheme.spacing.xsmall),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val strokeWidth = 2.dp.toPx()
-            val middle = Offset(size.width / 2, size.height * CHEVRON_TIP)
-            drawLine(chevronColor, Offset(0f + strokeWidth, size.height * CHEVRON_ARMS), middle, strokeWidth, StrokeCap.Round)
-            drawLine(chevronColor, Offset(size.width - strokeWidth, size.height * CHEVRON_ARMS), middle, strokeWidth, StrokeCap.Round)
+            Text(text = "Scroll to explore", style = MaterialTheme.typography.titleMedium)
+            val chevronColor = LocalContentColor.current
+            Canvas(
+                modifier = Modifier
+                    .padding(top = MaterialTheme.spacing.xxsmall)
+                    .size(WebDimensions.scrollHintChevronSize)
+                    .graphicsLayer { translationY = bob.value * WebDimensions.scrollHintBob.toPx() },
+            ) {
+                val strokeWidth = 2.dp.toPx()
+                val middle = Offset(size.width / 2, size.height * CHEVRON_TIP)
+                drawLine(chevronColor, Offset(0f + strokeWidth, size.height * CHEVRON_ARMS), middle, strokeWidth, StrokeCap.Round)
+                drawLine(chevronColor, Offset(size.width - strokeWidth, size.height * CHEVRON_ARMS), middle, strokeWidth, StrokeCap.Round)
+            }
         }
     }
 }

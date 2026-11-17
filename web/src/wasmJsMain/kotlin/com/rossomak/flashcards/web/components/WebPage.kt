@@ -3,7 +3,8 @@ package com.rossomak.flashcards.web.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -21,42 +22,54 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
-import com.rossomak.flashcards.core.designsystem.theme.brandColors
+import androidx.compose.ui.util.lerp
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.darkFlashcardsColors
 import com.rossomak.flashcards.core.designsystem.theme.lightFlashcardsColors
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.web.browser.rememberPrefersDarkColorScheme
-import com.rossomak.flashcards.web.landing.LandingGraphs
 import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.navigation.WebRoute
 import com.rossomak.flashcards.web.resources.Res
 import com.rossomak.flashcards.web.resources.flashcards_logo
+import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
-import com.rossomak.morpheus.morpheusGraphBackground
 import org.jetbrains.compose.resources.vectorResource
 
+/** A legal page's components, by the slot in which they reveal as it opens ([RevealSequence]). */
+private object LegalSlots {
+    const val LOGO = 0
+    const val CARD = 1
+    const val LINKS = 2
+    const val COUNT = 3
+}
+
 /**
- * The frame of every page below the landing page: the brand gradient with the closing page's calm
- * graph fixed behind, and a scrolling column of the large Flashcards logo (linking home), the
- * [content] on an opaque card and the site's links. The card is the app's own card in the app's
- * light or dark colors, following the browser's color scheme live. Its text is selectable, since the
- * page is drawn on a canvas the browser can't select from.
+ * The frame of every page below the landing page, over the site's shared backdrop: a scrolling column
+ * of the large Flashcards logo (linking home), the [content] on an opaque card and the site's links,
+ * which reveal one after another as the page opens. The card is the app's own card in the app's light
+ * or dark colors, following the browser's color scheme live. Its text is selectable, since the page is
+ * drawn on a canvas the browser can't select from. The logo is muted until hovered.
  */
 @Composable
 fun WebPage(modifier: Modifier = Modifier, onNavigate: OnNavigate, content: @Composable ColumnScope.() -> Unit) {
     val prefersDark by rememberPrefersDarkColorScheme()
     val cardColors = if (prefersDark) darkFlashcardsColors.colorScheme else lightFlashcardsColors.colorScheme
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(MaterialTheme.brandColors.screenGradient)) {
+    val reveal = rememberRevealSequence(slotCount = LegalSlots.COUNT, shown = true)
+    val rise = LocalRevealMotion.current.rise
+    val logoInteractionSource = remember { MutableInteractionSource() }
+    val logoHover by logoInteractionSource.hoverProgress()
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val logoWidth = subpageLogoWidth(maxWidth)
-        Box(modifier = Modifier.fillMaxSize().morpheusGraphBackground(LandingGraphs.closing))
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -69,6 +82,9 @@ fun WebPage(modifier: Modifier = Modifier, onNavigate: OnNavigate, content: @Com
                 contentDescription = "Flashcards home",
                 modifier = Modifier
                     .width(logoWidth)
+                    .reveal(progress = { reveal.progress(LegalSlots.LOGO) }, rise = rise, startScale = LOGO_REVEAL_START_SCALE)
+                    .graphicsLayer { alpha = lerp(WEB_MUTED_CONTENT_ALPHA, 1f, logoHover) }
+                    .hoverable(logoInteractionSource)
                     .clickable(interactionSource = null, indication = null, role = Role.Button) { onNavigate(WebRoute.Home) }
                     .pointerHoverIcon(PointerIcon.Hand),
             )
@@ -78,6 +94,7 @@ fun WebPage(modifier: Modifier = Modifier, onNavigate: OnNavigate, content: @Com
                         Column(
                             modifier = Modifier
                                 .padding(top = MaterialTheme.spacing.medium)
+                                .reveal(progress = { reveal.progress(LegalSlots.CARD) }, rise = rise)
                                 .widthIn(max = WebDimensions.contentMaxWidth)
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(MaterialTheme.cornerRadius.large))
@@ -89,9 +106,11 @@ fun WebPage(modifier: Modifier = Modifier, onNavigate: OnNavigate, content: @Com
                 }
             }
             SiteLinks(
+                modifier = Modifier
+                    .padding(top = MaterialTheme.spacing.large)
+                    .reveal(progress = { reveal.progress(LegalSlots.LINKS) }, rise = rise),
                 showContact = true,
                 onNavigate = onNavigate,
-                modifier = Modifier.padding(top = MaterialTheme.spacing.large),
             )
         }
     }

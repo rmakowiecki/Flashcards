@@ -1,9 +1,5 @@
 package com.rossomak.flashcards.web.landing
 
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
@@ -11,31 +7,44 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** How a feature page lays out its text and phone, by window width. */
+/** How a feature page lays out its text and phone, by the window's shape. */
 enum class FeatureLayout {
     /** Text and phone next to each other, on alternating sides. */
     SideBySide,
 
-    /** Text on top, phone below: narrow windows and phones. */
+    /** Text on top, phone below: portrait windows clearly narrower than square, and phones. */
     Stacked,
     ;
 
     companion object {
-        /** Narrower than this, a feature page stacks; the Material expanded width class starts here. */
-        val sideBySideMinWidth: Dp = 840.dp
+        /**
+         * A window at least this much wider than tall lays a feature page out side by side; a narrower one
+         * stacks. The phone is sized by the window's height, so only the shape, never the size alone, tells
+         * whether a text column still fits beside it: a half-width desktop window or a portrait monitor stacks.
+         */
+        const val SIDE_BY_SIDE_MIN_ASPECT_RATIO = 0.9f
 
-        fun forWindowWidth(width: Dp): FeatureLayout = if (width >= sideBySideMinWidth) SideBySide else Stacked
+        fun forWindow(width: Dp, height: Dp, sideBySideMinAspectRatio: Float = SIDE_BY_SIDE_MIN_ASPECT_RATIO): FeatureLayout =
+            if (height > 0.dp && width / height >= sideBySideMinAspectRatio) SideBySide else Stacked
     }
 }
 
 /** Sizes on the landing page that follow the window. */
 object LandingScale {
-    /** At this window width and below the type scale is used as is; it grows on wider windows. */
+    /** At this window size and below the type scale is used as is; it grows on larger windows. */
     private val referenceWidth: Dp = 1280.dp
     private const val MAX_FONT_SCALE = 1.45f
 
-    /** How much the landing page's text grows over the type scale: 1 up to [referenceWidth], larger on wider windows, capped. */
-    fun fontScale(windowWidth: Dp): Float = (windowWidth / referenceWidth).coerceIn(1f, MAX_FONT_SCALE)
+    /** The widest shape whose width counts in full for the type scale; a taller window counts its height instead. */
+    private const val REFERENCE_ASPECT_RATIO = 16f / 9f
+
+    /**
+     * How much the landing page's text grows over the type scale: 1 up to [referenceWidth], larger on larger
+     * windows, capped. A window narrower than 16:9 counts its height as if it were 16:9 wide, the smaller of
+     * the two, so a tall window's text never outgrows its width.
+     */
+    fun fontScale(windowWidth: Dp, windowHeight: Dp): Float =
+        (minOf(windowWidth, windowHeight * REFERENCE_ASPECT_RATIO) / referenceWidth).coerceIn(1f, MAX_FONT_SCALE)
 
     private const val HERO_LOGO_WIDTH_SHARE = 0.46f
     private const val HERO_LOGO_HEIGHT_SHARE = 0.8f
@@ -57,9 +66,9 @@ object LandingScale {
     private val headerLogoMaxWidth: Dp = 300.dp
 
     /**
-     * How far the logo has moved from its large place to the header, from 0 to 1, at pager
-     * [position]: 0 on the hero and on the closing page, 1 on every feature page, and in between while
-     * the pages scroll, so it follows the scroll exactly.
+     * How far the header logo has slid in, from 0 to 1, at pager [position]: 0 (off screen) on the hero
+     * and on the closing page, 1 on every feature page, and in between while the pages scroll, so it
+     * follows the scroll exactly.
      */
     fun headerProgress(position: Float, pageCount: Int): Float = minOf(position, (pageCount - 1) - position).coerceIn(0f, 1f)
 }
@@ -86,22 +95,51 @@ object LandingTimings {
     /** The graph never crosses from one page's shape to the next faster than this. */
     val minMorphDuration: Duration = 1.seconds
 
-    /** Scrolling counts as at rest, momentum included, after this long without a wheel event; then the snap assist settles. */
-    val scrollRestDelay: Duration = 180.milliseconds
+    /** Whether a swipe's snap stops at the next page (`scroll-snap-stop: always`); on, so a fling cannot skip pages. */
+    const val STOP_AT_EVERY_PAGE = true
 
-    /** How long one mouse-wheel notch eases its scroll over, as a browser's smooth scrolling does. */
-    val notchScrollDuration: Duration = 140.milliseconds
-
-    /** Every settle or step to a page: short and decisive, so the pages never lag behind the input. */
-    val snapDuration: Duration = 300.milliseconds
-
-    /** A strong ease-out (easeOutQuint): the page starts fast and settles without a bounce. */
-    val snapEasing: Easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
-
-    /** The animation of every settle and step: the snap assist, keys, dots and touch flings alike. */
-    fun <T> snapAnimationSpec(): AnimationSpec<T> = tween(snapDuration.inWholeMilliseconds.toInt(), easing = snapEasing)
-
-    /** First load: the graph fades in, then the hero fades up; about 600ms together. */
+    /** First load: the graph fades in over this, then the hero's components reveal one after another. */
     val entranceGraphFade: Duration = 300.milliseconds
-    val entranceContentFade: Duration = 300.milliseconds
+}
+
+/**
+ * When a landing page's components reveal ([com.rossomak.flashcards.web.components.RevealSequence]):
+ * as soon as the pages head for it, and again on every later arrival, once it has left the window
+ * entirely in between.
+ */
+object PageReveal {
+    /** A page at least this many pages from the position on screen is out of the window. */
+    private const val OUT_OF_WINDOW_DISTANCE = 0.999f
+
+    /**
+     * Whether a page's components should now be shown (true) or hidden for their next reveal (false),
+     * or null to keep them as they are: [isTarget] when the pages head for it, [distancePages] its
+     * distance from the position on screen.
+     */
+    fun shown(isTarget: Boolean, distancePages: Float): Boolean? = when {
+        isTarget -> true
+        distancePages >= OUT_OF_WINDOW_DISTANCE -> false
+        else -> null
+    }
+}
+
+/** The hero's components, by the slot in which they reveal ([com.rossomak.flashcards.web.components.RevealSequence]). */
+object HeroSlots {
+    const val LOGO = 0
+
+    /**
+     * The tagline and the description. They reveal in this slot on first load only ([HeroPage]'s
+     * `textEntrance`), since their page's scroll motion already moves them on every later arrival.
+     */
+    const val TEXT = 1
+    const val HINT = 2
+    const val LINKS = 3
+    const val COUNT = 4
+}
+
+/** The closing page's components, by the slot in which they reveal. */
+object ClosingSlots {
+    const val LOGO = 0
+    const val LINKS = 1
+    const val COUNT = 2
 }
