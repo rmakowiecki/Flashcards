@@ -107,10 +107,11 @@ class ArchitectureKonsistTest {
 
     @Test
     fun `only the backdrop blur wrapper imports Haze`() {
-        // ADR-0062: Haze stays an implementation detail of the blurBackdrop* modifiers.
+        // ADR-0062: Haze stays an implementation detail of the blurBackdrop* modifiers, the app's and the website's.
+        val wrappers = listOf("/core/ui/backdrop/BlurBackdrop.kt", "/web/components/BlurBackdrop.kt")
         projectScope
             .files
-            .filter { !it.path.endsWith("/core/ui/backdrop/BlurBackdrop.kt") }
+            .filter { file -> wrappers.none { wrapper -> file.path.endsWith(wrapper) } }
             .assertTrue { file ->
                 file.imports.none { import -> import.name.startsWith("dev.chrisbanes.haze") }
             }

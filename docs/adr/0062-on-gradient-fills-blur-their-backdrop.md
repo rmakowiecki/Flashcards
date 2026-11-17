@@ -24,6 +24,8 @@ animated can opt out and pay nothing.
 
 **A thin wrapper seam.** Exactly one file, `core/ui/.../backdrop/BlurBackdrop.kt`, imports Haze
 (`dev.chrisbanes.haze`, the `haze` and `haze-blur` modules); Konsist fails any other file that does.
+The website, which cannot use the Android-only `:core:ui`, has the one other wrapper,
+`web/.../components/BlurBackdrop.kt`, with the same role for its frosted page dots.
 It exposes three modifiers, so the implementation can be swapped without touching a component or a
 screen:
 

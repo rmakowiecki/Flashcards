@@ -1,16 +1,11 @@
 package com.rossomak.flashcards.web.landing
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -26,18 +21,16 @@ private const val LOGO_ASPECT_RATIO = 1.8f
 /** Share of the window's height at which the large logo's center sits on the hero and the closing page. */
 private const val HERO_LOGO_CENTER_SHARE = 0.32f
 
-/** Where things sit on a landing window of [width] by [height]. */
-class LandingFrame(val width: Dp, val height: Dp) {
-    val layout: FeatureLayout = FeatureLayout.forWindowWidth(width)
-    val fontScale: Float = LandingScale.fontScale(width)
+/** Where things sit on a landing window of [width] by [height]; see [FeatureLayout.forWindow] for [sideBySideMinAspectRatio]. */
+class LandingFrame(val width: Dp, val height: Dp, sideBySideMinAspectRatio: Float = FeatureLayout.SIDE_BY_SIDE_MIN_ASPECT_RATIO) {
+    val layout: FeatureLayout = FeatureLayout.forWindow(width, height, sideBySideMinAspectRatio)
+    val fontScale: Float = LandingScale.fontScale(width, height)
 
     val heroLogoWidth: Dp = LandingScale.heroLogoWidth(width, height)
-    private val heroLogoHeight: Dp = heroLogoWidth / LOGO_ASPECT_RATIO
-    val heroLogoLeft: Dp = (width - heroLogoWidth) / 2
-    val heroLogoTop: Dp = height * HERO_LOGO_CENTER_SHARE - heroLogoHeight / 2
+    val heroLogoHeight: Dp = heroLogoWidth / LOGO_ASPECT_RATIO
 
-    /** Where the hero's and the closing page's text starts, just under the large logo. */
-    val heroTextTop: Dp = heroLogoTop + heroLogoHeight
+    /** Where the large logo, and the text under it, start on the hero and the closing page. */
+    val heroLogoTop: Dp = height * HERO_LOGO_CENTER_SHARE - heroLogoHeight / 2
 
     val headerLogoWidth: Dp = LandingScale.headerLogoWidth(width)
     val headerMargin: Dp = if (layout == FeatureLayout.SideBySide) 28.dp else 12.dp
@@ -46,35 +39,34 @@ class LandingFrame(val width: Dp, val height: Dp) {
     val headerClearance: Dp = headerMargin * 2 + headerLogoWidth / LOGO_ASPECT_RATIO
 }
 
+/** The large logo at the top of the hero's and the closing page's text, moving and fading with it. */
+@Composable
+fun HeroLogo(modifier: Modifier = Modifier, frame: LandingFrame) {
+    Image(
+        imageVector = vectorResource(Res.drawable.flashcards_logo),
+        contentDescription = "Flashcards",
+        modifier = modifier.size(frame.heroLogoWidth, frame.heroLogoHeight),
+    )
+}
+
 /**
- * The one Flashcards logo of the landing page, outside the pager: large above the hero's text and
- * the closing page's, small at the top of the window on every feature page. It moves and scales
- * between the two continuously as [headerProgress] goes from 0 to 1, following the scroll. A click
- * opens the hero.
+ * The small logo pinned at the top start corner of every feature page, outside the pager. It slides in
+ * from the window's start edge as [headerProgress] goes from 0 (the hero and the closing page, where it
+ * is off screen) to 1, following the scroll.
  */
 @Composable
-fun LandingLogo(modifier: Modifier = Modifier, frame: LandingFrame, headerProgress: () -> Float, alpha: () -> Float, onClick: () -> Unit) {
+fun HeaderLogo(modifier: Modifier = Modifier, frame: LandingFrame, headerProgress: () -> Float, alpha: () -> Float) {
     Image(
         imageVector = vectorResource(Res.drawable.flashcards_logo),
         contentDescription = "Flashcards",
         modifier = modifier
-            .size(frame.heroLogoWidth, frame.heroLogoWidth / LOGO_ASPECT_RATIO)
+            .size(frame.headerLogoWidth, frame.headerLogoWidth / LOGO_ASPECT_RATIO)
             .offset {
-                val progress = headerProgress()
                 IntOffset(
-                    x = lerp(frame.heroLogoLeft.toPx(), frame.headerMargin.toPx(), progress).roundToInt(),
-                    y = lerp(frame.heroLogoTop.toPx(), frame.headerMargin.toPx(), progress).roundToInt(),
+                    x = lerp(-frame.headerLogoWidth.toPx(), frame.headerMargin.toPx(), headerProgress()).roundToInt(),
+                    y = frame.headerMargin.roundToPx(),
                 )
             }
-            .graphicsLayer {
-                // Drawn at the large size and only ever scaled down, so the vector stays sharp.
-                val scale = lerp(1f, frame.headerLogoWidth / frame.heroLogoWidth, headerProgress())
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(0f, 0f)
-                this.alpha = alpha()
-            }
-            .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand),
+            .graphicsLayer { this.alpha = alpha() },
     )
 }

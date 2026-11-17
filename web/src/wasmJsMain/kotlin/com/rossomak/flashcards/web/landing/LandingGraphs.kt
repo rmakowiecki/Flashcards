@@ -50,14 +50,15 @@ object LandingGraphs {
         nodeSizeVariance = 0.35f,
         glowStrength = 0.15f,
         depthDimming = 0.5f,
-        comets = MorpheusGraphComets(spark = 0.3f),
+        // No comets: a morph only fades one shape out and the next one in.
+        comets = MorpheusGraphComets(strength = 0f),
         shapes = listOf(Uniform(weight = 0.55f), Ribbon(center = 0.5f, width = 0.8f, curve = 0.08f)),
         alpha = 0.32f,
     )
 
     /**
      * The mesh in front: one continuous mesh per shape, bright edges that pulse, a few hot nodes as an
-     * accent, a steady wave and drift, and comets that carry the light across every morph.
+     * accent, and a steady wave and drift. Morphs carry no comets.
      */
     private val front: MorpheusGraphLayerSpec = MorpheusGraphLayerSpec(
         density = 40f,
@@ -78,11 +79,11 @@ object LandingGraphs {
         glowRadiusDp = 16f,
         glowStrength = 0.4f,
         depthDimming = 0.25f,
-        comets = MorpheusGraphComets(strength = 1.5f, size = 1.3f, spark = 1f, sizeDeviation = 0.4f, stagger = 0.3f),
+        comets = MorpheusGraphComets(strength = 0f),
         // The leaving and the arriving shape sweep the whole morph together, so the first pixels of a slow
         // scroll already grow the next page's shape instead of only fading this one.
         morphGap = -1f,
-        alpha = 0.88f,
+        alpha = 0.61f,
     )
 
     /** The hero's cover: a wide band sweeping low under the tagline, a bloom in the top-end corner and a smaller one opposite. */
@@ -96,14 +97,14 @@ object LandingGraphs {
             ),
             hotNodeShare = 0.1f,
             glowStrength = 0.5f,
-            alpha = 0.95f,
+            alpha = 0.67f,
         ),
     )
 
     /**
      * One spec per feature page, in [LandingFeature] order: each a wide ribbon or two across the whole
      * window and a bloom in a corner, at a new angle, height, curve and corner from the page before, so
-     * part of every shape leaves and part arrives and the comets carry the light between them.
+     * part of every shape leaves and part arrives.
      */
     private val features: List<MorpheusGraphSpec> = listOf(
         // Home: a band climbing from the lower start to the upper end, a bloom in the bottom-end corner.
@@ -185,14 +186,14 @@ object LandingGraphs {
         ),
     )
 
-    /** The closing page, and the backdrop of the legal pages: one calm band along the bottom and a small bloom in the top-start corner. */
+    /** The closing page, and the backdrop of the legal pages: only one calm band along the bottom. */
     val closing: MorpheusGraphSpec = spec(
         back = back.copy(driftSpeed = 0.7f),
         front = front.copy(
-            shapes = listOf(Ribbon(center = 0.88f, width = 0.3f, curve = 0.06f, tilt = -3f), Bloom(x = 0f, y = 0f, reach = 0.32f)),
+            shapes = listOf(Ribbon(center = 0.88f, width = 0.3f, curve = 0.06f, tilt = -3f)),
             driftSpeed = 1f,
             waveAmplitude = 0.025f,
-            alpha = 0.75f,
+            alpha = 0.53f,
         ),
     )
 
