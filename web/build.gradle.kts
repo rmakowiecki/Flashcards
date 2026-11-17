@@ -20,6 +20,11 @@ kotlin {
             // Morpheus, included from the `morpheus` submodule as a composite build (see settings.gradle.kts):
             // the landing page's animated graph.
             implementation("com.rossomak:morpheus")
+            // Morpheus's tuning sheet, the landing page's local tuner (press T on a local preview).
+            implementation("com.rossomak:morpheus-tuner")
+            // Backdrop blur for the page dots' frosted pill, behind the site's own BlurBackdrop.kt.
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
             implementation(libs.jetbrains.compose.foundation)
             implementation(libs.jetbrains.compose.material3)
             implementation(libs.jetbrains.compose.components.resources)
