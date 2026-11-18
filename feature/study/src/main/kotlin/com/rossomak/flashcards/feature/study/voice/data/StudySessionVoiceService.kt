@@ -76,7 +76,7 @@ class StudySessionVoiceService : MediaSessionService() {
     @Inject
     lateinit var audioEnvironmentMonitor: AudioEnvironmentMonitor
 
-    private val binder = LocalBinder()
+    private val binderHandle = BinderHandle(LocalBinder())
 
     // Single collector (the gateway); unlimited so nothing reported before it subscribes is lost.
     private val playbackEvents = Channel<PlaybackEvent>(Channel.UNLIMITED)
@@ -98,6 +98,13 @@ class StudySessionVoiceService : MediaSessionService() {
     // From the load of a session until stopPlayback: the service owns the foreground and the notification.
     private var isSessionForegroundHeld = false
     private var isStartedAsForeground = false
+
+    /**
+     * What [onBind] publishes. The system keeps its reference to a published binder for a while after
+     * [onDestroy], and that reference pins everything the binder reaches. The handle reaches the
+     * [LocalBinder], and so the service, only until [onDestroy] clears it.
+     */
+    class BinderHandle(@Volatile var localBinder: LocalBinder?) : Binder()
 
     @Suppress("TooManyFunctions") // one method per voice-stack command the gateway forwards.
     inner class LocalBinder : Binder() {
@@ -261,7 +268,7 @@ class StudySessionVoiceService : MediaSessionService() {
     }
 
     override fun onBind(intent: Intent?): IBinder? =
-        if (intent?.action == ACTION_BIND_LOCAL) binder else super.onBind(intent)
+        if (intent?.action == ACTION_BIND_LOCAL) binderHandle else super.onBind(intent)
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Voice is tied to the study screen; swiping the app away ends playback.
@@ -283,6 +290,7 @@ class StudySessionVoiceService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        binderHandle.localBinder = null
         voiceCaptureSession.release()
         noticeSpeaker.release()
         audioEnvironmentMonitor.release()

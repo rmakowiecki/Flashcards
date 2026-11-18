@@ -98,10 +98,10 @@ class DefaultStudySessionVoiceGateway @Inject constructor(
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             if (!isBound) {
                 // Rapid toggle: stop() fired before connection landed — kill the orphaned service.
-                (service as? StudySessionVoiceService.LocalBinder)?.stopPlayback()
+                (service as? StudySessionVoiceService.BinderHandle)?.localBinder?.stopPlayback()
                 return
             }
-            val binder = service as? StudySessionVoiceService.LocalBinder ?: return
+            val binder = (service as? StudySessionVoiceService.BinderHandle)?.localBinder ?: return
             voiceBinder.value = binder
             // Subscribed before the replay below, so an event a replayed command causes (such as a
             // refused microphone type on startVoiceAnswering) is never lost.
