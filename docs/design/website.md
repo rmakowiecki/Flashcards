@@ -25,8 +25,8 @@ landing page is a snapping pager over one animated graph
 - A link to another page switches without reloading and adds a history entry.
 - The pages crossfade briefly over one shared backdrop. The graph morphs to the new page's
   shape: the hero's on the landing page, the closing page's on the legal pages.
-- While the landing page fades out, it takes no keys or wheel and no longer moves the graph: the page
-  coming in owns them.
+- While the landing page fades out, it takes no keys or wheel, no longer moves the graph and gives up
+  the browser's page snapping: the page coming in owns them.
 - Email links open the mail app. The deletion page prefills the subject.
 - The tab title names the page shown.
 

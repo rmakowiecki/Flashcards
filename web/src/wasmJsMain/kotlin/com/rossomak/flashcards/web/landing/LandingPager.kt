@@ -75,7 +75,7 @@ fun LandingPager(
 
     val input = rememberPagerInput(pagerState, tunerOpen, active)
     input.reducedMotion = reducedMotion
-    BrowserSnap(pagerState = pagerState, input = input, stopAtEveryPage = tuning.stopAtEveryPage)
+    BrowserSnap(pagerState = pagerState, input = input, stopAtEveryPage = tuning.stopAtEveryPage, active = active)
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val frame = LandingFrame(width = maxWidth, height = maxHeight, sideBySideMinAspectRatio = tuning.sideBySideMinAspectRatio)

@@ -10,11 +10,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.rossomak.flashcards.web.browser.BrowserSnapScroller
 
-/** Installs a [BrowserSnapScroller] while in composition. The pager follows its scroll exactly. */
+/** Installs a [BrowserSnapScroller] while in composition and [active]. The pager follows its scroll exactly. */
 @Composable
-fun BrowserSnap(pagerState: PagerState, input: LandingPagerInput, stopAtEveryPage: Boolean) {
+fun BrowserSnap(pagerState: PagerState, input: LandingPagerInput, stopAtEveryPage: Boolean, active: Boolean) {
     var installed by remember { mutableStateOf<BrowserSnapScroller?>(null) }
-    DisposableEffect(pagerState, input) {
+    DisposableEffect(pagerState, input, active) {
+        if (!active) return@DisposableEffect onDispose {}
         val scroller = BrowserSnapScroller(
             pageCount = pagerState.pageCount,
             onScroll = { positionPages ->
