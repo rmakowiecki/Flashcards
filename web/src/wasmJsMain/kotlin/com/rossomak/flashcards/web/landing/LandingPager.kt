@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.web.landing
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.zIndex
 import com.rossomak.flashcards.web.browser.WheelTarget
 import com.rossomak.flashcards.web.browser.WindowKeyHandler
 import com.rossomak.flashcards.web.browser.WindowWheelHandler
@@ -127,14 +129,17 @@ fun LandingPager(
                 }
             }
         }
-        val headerProgress = { LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT) }
-        HeaderChrome(frame = frame, headerProgress = headerProgress, alpha = { entrance.content.value }, onNavigate = onNavigate)
         PageDots(
             pagerState = pagerState,
             metrics = frame.dots,
             backdrop = backdrop,
             modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer { alpha = entrance.content.value },
         )
+        // The logo and the links come last, and with the highest z, so nothing ever covers them.
+        val headerProgress = { LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT) }
+        Box(modifier = Modifier.fillMaxSize().zIndex(HEADER_Z_INDEX)) {
+            HeaderChrome(frame = frame, headerProgress = headerProgress, alpha = { entrance.content.value }, onNavigate = onNavigate)
+        }
         if (tunerOpen.value) {
             LandingTunerPane(modifier = Modifier.align(Alignment.CenterEnd), tuning = tuning, pageIndex = pagerState.currentPage)
         }
@@ -223,3 +228,6 @@ private fun rememberPagerInput(pagerState: PagerState, tunerOpen: MutableState<B
 }
 
 private const val TUNER_KEY = "t"
+
+/** Above every page and phone. */
+private const val HEADER_Z_INDEX = 10f

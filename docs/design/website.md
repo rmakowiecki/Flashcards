@@ -91,7 +91,8 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 - A window at least 0.9 times as wide as tall shows text and phone side by side. The phone alternates
   sides and takes at most 45% of the row. A narrower window stacks the text above the phone.
 - The phone casts a soft shadow and moves with its page. The text lags slightly and fades in.
-- A soft dark halo with no visible edge sits behind the text.
+- A soft dark halo with no visible edge sits behind the text. The phone always sits above the halo and
+  the graph, so the halo never dims it, and the pinned logo and link sit above everything.
 - The screenshot follows `prefers-color-scheme` live. It loads only when its page is on or next to the
   screen.
 
@@ -107,8 +108,12 @@ A window narrower than 600dp (a phone in portrait) or shorter than 480dp (a phon
 compact. Larger windows are unchanged apart from the dots not being clickable.
 
 - The page dots are smaller, and every page keeps its content clear of them.
-- Feature text uses smaller type and tighter gaps, so the screenshot gets the room. Side by side, the
-  text sits close to the phone.
+- Feature text uses smaller type, so the screenshot gets the room, but it keeps clear gaps between the
+  headline, the paragraph and the phone. Side by side, the text is narrow (about 380dp) and sits close
+  to the phone, and the two are centred as one group.
+- The page follows the browser's visible height. When a mobile browser hides or shows its address bar,
+  the page grows or shrinks with it and settles on the nearest page once the scrolling stops and no
+  finger is down. No empty bar is left at the bottom, and no part of the previous page shows.
 - In landscape the pinned logo is small, with a small margin, so the phone gets the height. The hero
   and the closing page show a smaller logo near the top and smaller text. The hero has no scroll
   hint, and the links stay in one row.

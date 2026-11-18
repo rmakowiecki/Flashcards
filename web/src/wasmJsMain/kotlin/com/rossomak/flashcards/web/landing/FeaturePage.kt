@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.web.landing.FeatureLayout.SideBySide
 import com.rossomak.flashcards.web.landing.FeatureLayout.Stacked
@@ -80,7 +81,7 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
                 FeatureText(
                     feature = feature,
                     styles = featureTextStyles(frame),
-                    bodyGap = if (frame.isCompact) MaterialTheme.spacing.small else MaterialTheme.spacing.normal,
+                    bodyGap = MaterialTheme.spacing.normal,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.widthIn(max = WebDimensions.featureTextMaxWidth).fillMaxWidth().then(textModifier),
                 )
@@ -88,7 +89,7 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(top = if (frame.isCompact) MaterialTheme.spacing.xsmall else MaterialTheme.spacing.medium),
+                        .padding(top = if (frame.isCompact) MaterialTheme.spacing.large else MaterialTheme.spacing.medium),
                     contentAlignment = Alignment.Center,
                 ) {
                     Screenshot(
@@ -104,9 +105,10 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
 
 @Composable
 private fun SideBySidePage(frame: LandingFrame, feature: LandingFeature, screenshotVariant: ScreenshotVariant, textModifier: Modifier) {
-    // A compact window clears the page dots on both sides and packs the text close to the phone.
+    // A compact window clears the page dots on both sides and packs a narrow text close to the phone, centred as one group.
     val sidePadding = if (frame.isCompact) frame.dots.contentClearance else WebDimensions.featureSidePadding
-    val gap = if (frame.isCompact) MaterialTheme.spacing.xlarge else WebDimensions.featureGap
+    val gap = if (frame.isCompact) MaterialTheme.spacing.large else WebDimensions.featureGap
+    val textMaxWidth = if (frame.isCompact) WebDimensions.compactFeatureTextMaxWidth else WebDimensions.featureTextMaxWidth
     Row(
         modifier = Modifier
             .widthIn(max = WebDimensions.featureRowMaxWidth)
@@ -127,7 +129,7 @@ private fun SideBySidePage(frame: LandingFrame, feature: LandingFeature, screens
                 styles = styles,
                 bodyGap = MaterialTheme.spacing.normal,
                 textAlign = TextAlign.Start,
-                modifier = Modifier.weight(1f, fill = false).widthIn(max = WebDimensions.featureTextMaxWidth).then(textModifier),
+                modifier = Modifier.weight(1f, fill = false).widthIn(max = textMaxWidth).then(textModifier),
             )
         }
         val phoneHeight = sideBySidePhoneHeight(
@@ -136,7 +138,12 @@ private fun SideBySidePage(frame: LandingFrame, feature: LandingFeature, screens
             sidePadding = sidePadding,
         )
         val phone: @Composable () -> Unit = {
-            Screenshot(feature = feature, variant = screenshotVariant, modifier = Modifier.height(phoneHeight).aspectRatio(SCREENSHOT_ASPECT_RATIO))
+            // Above the text, whose halo reaches past it and would dim a phone drawn before it.
+            Screenshot(
+                feature = feature,
+                variant = screenshotVariant,
+                modifier = Modifier.zIndex(1f).height(phoneHeight).aspectRatio(SCREENSHOT_ASPECT_RATIO),
+            )
         }
         if (feature.phoneOnEnd) {
             text()

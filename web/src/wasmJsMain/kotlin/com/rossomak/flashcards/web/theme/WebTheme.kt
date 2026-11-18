@@ -43,6 +43,9 @@ object WebDimensions {
     val featureSidePadding: Dp = 112.dp
     val featureGap: Dp = 96.dp
     val featureTextMaxWidth: Dp = 600.dp
+
+    /** A compact side-by-side feature page packs its text next to the phone. */
+    val compactFeatureTextMaxWidth: Dp = 380.dp
     val phoneMaxHeight: Dp = 860.dp
     val phoneShadowElevation: Dp = 24.dp
 
