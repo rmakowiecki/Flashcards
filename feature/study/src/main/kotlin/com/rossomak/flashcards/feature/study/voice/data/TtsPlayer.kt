@@ -64,6 +64,10 @@ class TtsPlayer(
 
     private var ttsReady = false
 
+    // Set first thing in releaseEngine. The engine can still report ready after shutdown() once its
+    // connection is established, and registering the listener then would put the leak back.
+    private var isReleased = false
+
     // Reading was asked for before the engine was ready; it starts on the presented part once it is.
     private var startWhenReady = false
 
@@ -93,6 +97,7 @@ class TtsPlayer(
     private var generation = 0
 
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
+        if (isReleased) return@TextToSpeech
         if (status == TextToSpeech.SUCCESS) {
             ttsReady = true
             runCatching {
@@ -394,6 +399,7 @@ class TtsPlayer(
     }
 
     private fun releaseEngine() {
+        isReleased = true
         generation++
         handler.removeCallbacksAndMessages(null)
         audioEnvironment.abandonFocus()
