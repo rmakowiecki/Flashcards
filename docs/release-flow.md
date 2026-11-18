@@ -49,7 +49,7 @@ When `develop` holds what the next release should contain, create `release/x.y` 
 
 ### 3. Stabilize
 
-- Every merge into `release/x.y` produces a **candidate**: a signed release AAB built from the branch head and uploaded to the Play internal track. A candidate that looks good is promoted to the closed track for testers.
+- Every merge into `release/x.y` produces a **candidate**: a signed release AAB built from the branch head and uploaded to the Play internal track. A candidate that looks good is promoted to the closed track for testers, and the [release test checklist](release-test-checklist.md) is run on it.
 - A bug found in testing is fixed on a branch off `release/x.y`, with a pull request into `release/x.y`. Fixup commits stay on the fix branch while its pull request is in review, so only reviewed, accepted changes ever produce a candidate. The merge produces the next candidate.
 - After each fix, `release/x.y` is merged into `develop` by pull request, so the fix is never lost from the next release.
 
