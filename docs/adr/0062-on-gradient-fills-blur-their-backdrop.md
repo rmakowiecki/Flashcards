@@ -22,10 +22,12 @@ driven by `style`. The default is `style == OnGradient`, so a call site changes 
 `OnSurface` variant can opt in, and an `OnGradient` instance that will never sit over anything
 animated can opt out and pay nothing.
 
-**A thin wrapper seam.** Exactly one file, `core/ui/.../backdrop/BlurBackdrop.kt`, imports Haze
-(`dev.chrisbanes.haze`, the `haze` and `haze-blur` modules); Konsist fails any other file that does.
-It exposes three modifiers, so the implementation can be swapped without touching a component or a
-screen:
+**A thin wrapper seam.** Exactly two files import Haze (`dev.chrisbanes.haze`, the `haze` and
+`haze-blur` modules), and Konsist fails any other file that does: the app's wrapper,
+`core/ui/.../backdrop/BlurBackdrop.kt`, and the website's, `web/.../components/BlurBackdrop.kt`.
+The website cannot use the Android-only `:core:ui` and its Android modifier API, so its wrapper has the
+same role for its frosted page dots. The app's wrapper exposes three modifiers, so the implementation
+can be swapped without touching a component or a screen:
 
 - `blurBackdropScope()` on a common ancestor of a background and the components on it. It owns the
   backdrop state and exposes it to descendants through a `ModifierLocal`.

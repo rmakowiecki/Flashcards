@@ -4,6 +4,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.LocalBrandColors
@@ -32,12 +33,51 @@ fun WebTheme(content: @Composable () -> Unit) {
 
 /** Layout values that exist only on the website. */
 object WebDimensions {
-    /** Widest a page's text column grows, so lines stay readable on a desktop screen. */
     val contentMaxWidth: Dp = 720.dp
+    val heroDescriptionMaxWidth: Dp = 760.dp
+    val scrollHintChevronSize: Dp = 20.dp
+    val scrollHintBob: Dp = 4.dp
+    val featureRowMaxWidth: Dp = 1680.dp
 
-    /** Width of the logo on the home page. */
-    val homeLogoWidth: Dp = 280.dp
+    /** Keeps a side-by-side feature page clear of the window edges and the page dots. */
+    val featureSidePadding: Dp = 112.dp
+    val featureGap: Dp = 96.dp
+    val featureTextMaxWidth: Dp = 600.dp
+
+    /** A compact side-by-side feature page packs its text next to the phone. */
+    val compactFeatureTextMaxWidth: Dp = 380.dp
+    val phoneMaxHeight: Dp = 860.dp
+    val phoneShadowElevation: Dp = 24.dp
+
+    /** The legal pages' logo: a share of the window's width, within bounds. */
+    const val SUBPAGE_LOGO_WIDTH_SHARE = 0.28f
+    val subpageLogoMinWidth: Dp = 240.dp
+    val subpageLogoMaxWidth: Dp = 560.dp
+
+    val pageDotsBlurRadius: Dp = 12.dp
+
+    val focusRingWidth: Dp = 2.dp
+    val focusRingCornerRadius: Dp = 8.dp
+
+    /** How far the glow behind the hero's scroll hint and links reaches past them. */
+    val bottomLinksScrimReach: Dp = 160.dp
 }
 
-/** Alpha of secondary text (subtitles, dates) against the on-gradient white. */
-const val WEB_MUTED_CONTENT_ALPHA = 0.72f
+/** Colors that exist only on the website. */
+object WebColors {
+    /** The page dots' frosted pill. */
+    val frostedFill: Color = Color.White.copy(alpha = 0.1f)
+    val frostedBorder: Color = Color.White.copy(alpha = 0.18f)
+
+    /** The ring around a focused button-like element, on the gradient. */
+    val focusRing: Color = Color.White
+
+    /** The highlight behind a focused text link, visible on the gradient and on the legal cards alike. */
+    val focusedLinkBackground: Color = Color.Gray.copy(alpha = 0.45f)
+
+    /** The glow behind landing text. */
+    val textScrim: Color = Color(0xFF1A1C5C).copy(alpha = 0.62f)
+}
+
+/** Alpha of secondary text. */
+const val WEB_MUTED_CONTENT_ALPHA = 0.8f

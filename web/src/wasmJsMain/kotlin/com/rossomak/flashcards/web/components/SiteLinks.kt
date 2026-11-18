@@ -1,0 +1,39 @@
+package com.rossomak.flashcards.web.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.rossomak.flashcards.core.designsystem.theme.spacing
+import com.rossomak.flashcards.web.navigation.OnNavigate
+import com.rossomak.flashcards.web.navigation.WebRoute
+import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
+
+private const val CONTACT_LINK = """<a href="mailto:flashcardsdev@gmail.com">Contact</a>"""
+
+/** The quiet links in the order policy, contact, deletion: the contact address with [showContact], the deletion page with [showDeleteAccount]. */
+@Composable
+fun SiteLinks(modifier: Modifier = Modifier, showContact: Boolean, showDeleteAccount: Boolean = true, onNavigate: OnNavigate) {
+    val style = MaterialTheme.typography.bodyLarge
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xsmall),
+    ) {
+        HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
+            PageLink(label = "Privacy Policy", route = WebRoute.PrivacyPolicy, style = style, onNavigate = onNavigate)
+        }
+        if (showContact) {
+            HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
+                HtmlText(html = CONTACT_LINK, style = style, onNavigate = onNavigate)
+            }
+        }
+        if (showDeleteAccount) {
+            HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
+                PageLink(label = "Delete your account", route = WebRoute.DeleteAccount, style = style, onNavigate = onNavigate)
+            }
+        }
+    }
+}

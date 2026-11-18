@@ -30,6 +30,8 @@ style:
     maxLineLength: 180
     excludeCommentStatements: true # comments are never wrapped/broken to fit a length limit
   MagicNumber:
+    # detekt's default test exclusions, plus the website's wasmJs tests, which the defaults miss.
+    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**', '**/wasmJsTest/**']
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
     ignoreNamedArgument: true
