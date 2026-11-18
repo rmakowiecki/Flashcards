@@ -108,7 +108,11 @@ class ArchitectureKonsistTest {
     @Test
     fun `only the backdrop blur wrapper imports Haze`() {
         // ADR-0062: Haze stays an implementation detail of the blurBackdrop* modifiers, the app's and the website's.
-        val wrappers = listOf("/core/ui/backdrop/BlurBackdrop.kt", "/web/components/BlurBackdrop.kt")
+        // Exact module-relative paths, so a same-named file in another source set does not count.
+        val wrappers = listOf(
+            "/core/ui/src/main/kotlin/com/rossomak/flashcards/core/ui/backdrop/BlurBackdrop.kt",
+            "/web/src/wasmJsMain/kotlin/com/rossomak/flashcards/web/components/BlurBackdrop.kt",
+        )
         projectScope
             .files
             .filter { file -> wrappers.none { wrapper -> file.path.endsWith(wrapper) } }

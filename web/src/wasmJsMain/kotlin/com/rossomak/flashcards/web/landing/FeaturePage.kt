@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -95,7 +94,8 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
                     Screenshot(
                         feature = feature,
                         variant = screenshotVariant,
-                        modifier = Modifier.fillMaxHeight().aspectRatio(SCREENSHOT_ASPECT_RATIO, matchHeightConstraintsFirst = true),
+                        // Fits the column's width first, then its height, so the phone never outgrows the column.
+                        modifier = Modifier.aspectRatio(SCREENSHOT_ASPECT_RATIO),
                     )
                 }
             }

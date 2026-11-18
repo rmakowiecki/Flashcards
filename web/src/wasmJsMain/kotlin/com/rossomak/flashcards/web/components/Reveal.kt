@@ -102,11 +102,13 @@ fun RevealWhenScrolledIn(modifier: Modifier = Modifier, content: @Composable () 
     // Null until first laid out.
     var inViewOnFirstLayout by remember { mutableStateOf<Boolean?>(null) }
     var scrolledIn by remember { mutableStateOf(false) }
-    val progress = remember { Animatable(0f) }
-    LaunchedEffect(scrolledIn) {
+    val progress = remember { Animatable(if (reducedMotion) 1f else 0f) }
+    // Reduced motion shows the section at once, scrolled in or not, and ends a reveal under way.
+    LaunchedEffect(scrolledIn, reducedMotion) {
         when {
+            reducedMotion -> progress.snapTo(1f)
             !scrolledIn -> Unit
-            reducedMotion || inViewOnFirstLayout == true -> progress.snapTo(1f)
+            inViewOnFirstLayout == true -> progress.snapTo(1f)
             else -> progress.animateTo(1f, motion.tween())
         }
     }

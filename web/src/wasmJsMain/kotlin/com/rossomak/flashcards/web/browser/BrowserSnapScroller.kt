@@ -14,8 +14,9 @@ import org.w3c.dom.events.Event
 /**
  * Makes the body a CSS scroll-snap container with [pageCount] window-tall stops, so the browser snaps
  * and waits for lifted fingers. The canvas stays pinned (`styles.css`). [onScroll] gets the position in pages.
+ * [onUserScroll] hears a finger taking over from a scroll this started.
  */
-class BrowserSnapScroller(pageCount: Int, private val onScroll: (positionPages: Float) -> Unit) {
+class BrowserSnapScroller(pageCount: Int, private val onScroll: (positionPages: Float) -> Unit, private val onUserScroll: () -> Unit = {}) {
     private val body: HTMLElement = requireNotNull(document.body) { "index.html has no body to scroll" }
     private val stops: List<HTMLDivElement> = List(pageCount) { index ->
         (document.createElement("div") as HTMLDivElement).apply {
@@ -29,7 +30,10 @@ class BrowserSnapScroller(pageCount: Int, private val onScroll: (positionPages: 
         if (realignTimer != null) scheduleRealign()
     }
     private val resizeListener: (Event) -> Unit = { scheduleRealign() }
-    private val touchStartListener: (Event) -> Unit = { fingerDown = true }
+    private val touchStartListener: (Event) -> Unit = {
+        fingerDown = true
+        onUserScroll()
+    }
     private val touchEndListener: (Event) -> Unit = { fingerDown = false }
     private var fingerDown = false
     private var realignTimer: Int? = null
@@ -59,8 +63,9 @@ class BrowserSnapScroller(pageCount: Int, private val onScroll: (positionPages: 
 
     fun position(): Float = if (body.clientHeight > 0) (body.scrollTop / body.clientHeight).toFloat() else 0f
 
-    fun scrollToPage(page: Int) {
-        smoothScrollTo(body, page * body.clientHeight.toDouble())
+    /** Scrolls to [page], or with [smooth] false jumps there, so no page in between is animated through. */
+    fun scrollToPage(page: Int, smooth: Boolean) {
+        scrollTo(body, page * body.clientHeight.toDouble(), if (smooth) SMOOTH_BEHAVIOR else INSTANT_BEHAVIOR)
     }
 
     /** Sets `scroll-snap-stop`: with [always], one fling stops at the next page. */
@@ -107,9 +112,11 @@ class BrowserSnapScroller(pageCount: Int, private val onScroll: (positionPages: 
         const val SNAP_STOP_ALWAYS = "always"
         const val SNAP_STOP_NORMAL = "normal"
         const val PERCENT = 100
+        const val SMOOTH_BEHAVIOR = "smooth"
+        const val INSTANT_BEHAVIOR = "instant"
     }
 }
 
 // The parameters are read by name inside the JavaScript body, which detekt cannot see.
 @Suppress("UnusedParameter")
-private fun smoothScrollTo(element: HTMLElement, top: Double): Unit = js("element.scrollTo({ top: top, behavior: 'smooth' })")
+private fun scrollTo(element: HTMLElement, top: Double, behavior: String): Unit = js("element.scrollTo({ top: top, behavior: behavior })")

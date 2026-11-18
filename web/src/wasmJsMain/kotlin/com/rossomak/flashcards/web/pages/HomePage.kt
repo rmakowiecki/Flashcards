@@ -9,7 +9,7 @@ import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.morpheus.ExperimentalMorpheusGraphApi
 import com.rossomak.morpheus.MorpheusGraphMorphState
 
-/** `/`: the landing page. [playEntrance] is true only on its first show. */
+/** `/`: the landing page, [active] while it is the current route. [playEntrance] is true only on its first show. */
 @OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
 fun HomePage(
@@ -17,6 +17,7 @@ fun HomePage(
     graphState: MorpheusGraphMorphState,
     tuning: LandingTuning,
     backdrop: BlurBackdrop,
+    active: Boolean,
     playEntrance: Boolean,
     onEntrancePlayed: () -> Unit,
     onNavigate: OnNavigate,
@@ -26,6 +27,7 @@ fun HomePage(
         graphState = graphState,
         tuning = tuning,
         backdrop = backdrop,
+        active = active,
         playEntrance = playEntrance,
         onEntrancePlayed = onEntrancePlayed,
         onNavigate = onNavigate,

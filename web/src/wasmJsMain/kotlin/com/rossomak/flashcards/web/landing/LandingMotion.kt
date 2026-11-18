@@ -12,7 +12,7 @@ enum class FeatureLayout {
     /** Text and phone next to each other, on alternating sides. */
     SideBySide,
 
-    /** Text on top, phone below: portrait windows clearly narrower than square, and phones. */
+    /** Text on top, phone below: portrait windows clearly narrower than square, windows too narrow for a readable text column, and phones. */
     Stacked,
     ;
 
@@ -20,8 +20,11 @@ enum class FeatureLayout {
         /** Width over height from which a feature page goes side by side. The phone is sized by height, so shape decides, not width. */
         const val SIDE_BY_SIDE_MIN_ASPECT_RATIO = 0.9f
 
+        /** Below this width the phone and the gap leave the text too little room, whatever the shape. */
+        val SIDE_BY_SIDE_MIN_WIDTH: Dp = 480.dp
+
         fun forWindow(width: Dp, height: Dp, sideBySideMinAspectRatio: Float = SIDE_BY_SIDE_MIN_ASPECT_RATIO): FeatureLayout =
-            if (height > 0.dp && width / height >= sideBySideMinAspectRatio) SideBySide else Stacked
+            if (height > 0.dp && width >= SIDE_BY_SIDE_MIN_WIDTH && width / height >= sideBySideMinAspectRatio) SideBySide else Stacked
     }
 }
 

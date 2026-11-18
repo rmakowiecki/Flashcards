@@ -39,6 +39,7 @@ import com.rossomak.morpheus.ExperimentalMorpheusGraphApi
 import com.rossomak.morpheus.Follow
 import com.rossomak.morpheus.MorpheusGraphMorphState
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.browser.window
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
@@ -48,7 +49,8 @@ val LANDING_PAGE_COUNT: Int = LandingFeature.entries.size + 2
 
 /**
  * The landing page: snapping full-window pages, scrolled by the browser ([BrowserSnap]), driving
- * [graphState]'s morph. With [playEntrance], the hero reveals after the graph fades in.
+ * [graphState]'s morph. With [playEntrance], the hero reveals after the graph fades in. While not [active],
+ * the page fades out under another route: it no longer takes keys or wheel, or moves the graph.
  */
 @OptIn(ExperimentalMorpheusGraphApi::class)
 @Composable
@@ -57,6 +59,7 @@ fun LandingPager(
     graphState: MorpheusGraphMorphState,
     tuning: LandingTuning,
     backdrop: BlurBackdrop,
+    active: Boolean,
     playEntrance: Boolean,
     onEntrancePlayed: () -> Unit,
     onNavigate: OnNavigate,
@@ -65,18 +68,13 @@ fun LandingPager(
     val reducedMotion by rememberPrefersReducedMotion()
     val prefersDark by rememberPrefersDarkColorScheme()
     val screenshotVariant = ScreenshotVariant.forColorScheme(prefersDark)
-    val entrance = rememberEntrance(playEntrance = playEntrance && !reducedMotion, onEntrancePlayed = onEntrancePlayed)
+    val entrance = rememberEntrance(playEntrance = playEntrance, animate = !reducedMotion, onEntrancePlayed = onEntrancePlayed)
 
     val tunerOpen = remember { mutableStateOf(false) }
-    graphState.Follow(
-        tuning.pages,
-        minMorphDuration = tuning.minMorphDuration,
-        target = { pagerState.targetPage },
-    ) {
-        pagerState.currentPage + pagerState.currentPageOffsetFraction
-    }
+    FollowPagerWhileActive(graphState = graphState, tuning = tuning, pagerState = pagerState, active = active)
 
-    val input = rememberPagerInput(pagerState, tunerOpen)
+    val input = rememberPagerInput(pagerState, tunerOpen, active)
+    input.reducedMotion = reducedMotion
     BrowserSnap(pagerState = pagerState, input = input, stopAtEveryPage = tuning.stopAtEveryPage)
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -136,14 +134,38 @@ fun LandingPager(
             modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer { alpha = entrance.content.value },
         )
         // The logo and the links come last, and with the highest z, so nothing ever covers them.
-        val headerProgress = { LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT) }
         Box(modifier = Modifier.fillMaxSize().zIndex(HEADER_Z_INDEX)) {
-            HeaderChrome(frame = frame, headerProgress = headerProgress, alpha = { entrance.content.value }, onNavigate = onNavigate)
+            HeaderChrome(
+                frame = frame,
+                headerProgress = { headerProgressAt(pagerState, reducedMotion) },
+                alpha = { entrance.content.value },
+                onNavigate = onNavigate,
+            )
         }
         if (tunerOpen.value) {
             LandingTunerPane(modifier = Modifier.align(Alignment.CenterEnd), tuning = tuning, pageIndex = pagerState.currentPage)
         }
     }
+}
+
+/** Morphs [graphState] with the pager. Under another route the legal page owns the graph, so a fading landing page leaves it alone. */
+@OptIn(ExperimentalMorpheusGraphApi::class)
+@Composable
+private fun FollowPagerWhileActive(graphState: MorpheusGraphMorphState, tuning: LandingTuning, pagerState: PagerState, active: Boolean) {
+    if (!active) return
+    graphState.Follow(
+        tuning.pages,
+        minMorphDuration = tuning.minMorphDuration,
+        target = { pagerState.targetPage },
+    ) {
+        pagerState.currentPage + pagerState.currentPageOffsetFraction
+    }
+}
+
+/** How far the header has slid in at the pager's position. Under reduced motion it is in or out, with no slide or fade. */
+private fun headerProgressAt(pagerState: PagerState, reducedMotion: Boolean): Float {
+    val progress = LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT)
+    return if (reducedMotion) progress.roundToInt().toFloat() else progress
 }
 
 /** The small logo at the top start and the legal links at the top end, sliding in together as [headerProgress] goes 0 to 1. */
@@ -188,14 +210,18 @@ private class Entrance(val content: Animatable<Float, *>, started: Boolean) {
     var started: Boolean by mutableStateOf(started)
 }
 
-/** The first load's [Entrance]. Without [playEntrance] everything starts shown. */
+/**
+ * The first load's [Entrance]. Without [playEntrance], or without [animate], everything starts shown. The first
+ * load counts as played even when not animated, so a later return to the page does not play it.
+ */
 @Composable
-private fun rememberEntrance(playEntrance: Boolean, onEntrancePlayed: () -> Unit): Entrance {
+private fun rememberEntrance(playEntrance: Boolean, animate: Boolean, onEntrancePlayed: () -> Unit): Entrance {
     val motion by rememberUpdatedState(LocalRevealMotion.current)
-    val entrance = remember { Entrance(content = Animatable(if (playEntrance) 0f else 1f), started = !playEntrance) }
+    val entrance = remember { Entrance(content = Animatable(if (playEntrance && animate) 0f else 1f), started = !(playEntrance && animate)) }
     LaunchedEffect(Unit) {
         if (!playEntrance) return@LaunchedEffect
         onEntrancePlayed()
+        if (!animate) return@LaunchedEffect
         delay(LandingTimings.entranceGraphFade)
         entrance.started = true
         delay(motion.stagger * HeroSlots.TEXT)
@@ -204,23 +230,29 @@ private fun rememberEntrance(playEntrance: Boolean, onEntrancePlayed: () -> Unit
     return entrance
 }
 
-/** Window keys, and the wheel left to the browser except over the open tuner. T toggles [tunerOpen] locally. */
+/**
+ * Window keys, and the wheel left to the browser except over the open tuner. T toggles [tunerOpen] locally.
+ * Nothing is taken while not [active]: the keys and the wheel belong to the page now shown.
+ */
 @Composable
-private fun rememberPagerInput(pagerState: PagerState, tunerOpen: MutableState<Boolean>): LandingPagerInput {
+private fun rememberPagerInput(pagerState: PagerState, tunerOpen: MutableState<Boolean>, active: Boolean): LandingPagerInput {
     val isLocalPreview = remember { isLocalPreview() }
     val input = remember(pagerState) { LandingPagerInput(pageCount = pagerState.pageCount) }
     WindowWheelHandler(
+        onBrowserWheel = input::onUserScroll,
         target = { clientX ->
-            if (tunerOpen.value && clientX >= window.innerWidth - LANDING_TUNER_PANE_WIDTH.value) WheelTarget.Compose else WheelTarget.Browser
+            if (!active || (tunerOpen.value && clientX >= window.innerWidth - LANDING_TUNER_PANE_WIDTH.value)) WheelTarget.Compose else WheelTarget.Browser
         },
     )
     WindowKeyHandler(
         onKey = { key ->
-            if (isLocalPreview && key.equals(TUNER_KEY, ignoreCase = true)) {
-                tunerOpen.value = !tunerOpen.value
-                true
-            } else {
-                input.onKey(key)
+            when {
+                !active -> false
+                isLocalPreview && key.equals(TUNER_KEY, ignoreCase = true) -> {
+                    tunerOpen.value = !tunerOpen.value
+                    true
+                }
+                else -> input.onKey(key)
             }
         },
     )

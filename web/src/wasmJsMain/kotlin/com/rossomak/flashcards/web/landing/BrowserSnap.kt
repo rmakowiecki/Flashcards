@@ -15,7 +15,14 @@ import com.rossomak.flashcards.web.browser.BrowserSnapScroller
 fun BrowserSnap(pagerState: PagerState, input: LandingPagerInput, stopAtEveryPage: Boolean) {
     var installed by remember { mutableStateOf<BrowserSnapScroller?>(null) }
     DisposableEffect(pagerState, input) {
-        val scroller = BrowserSnapScroller(pageCount = pagerState.pageCount, onScroll = { positionPages -> pagerState.followTo(positionPages) })
+        val scroller = BrowserSnapScroller(
+            pageCount = pagerState.pageCount,
+            onScroll = { positionPages ->
+                input.onPosition(positionPages)
+                pagerState.followTo(positionPages)
+            },
+            onUserScroll = input::onUserScroll,
+        )
         scroller.install(startPage = pagerState.currentPage)
         input.scroller = scroller
         installed = scroller

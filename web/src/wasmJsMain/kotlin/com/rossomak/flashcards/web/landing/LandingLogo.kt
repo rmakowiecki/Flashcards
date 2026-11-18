@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -104,6 +107,9 @@ fun HeaderLogo(modifier: Modifier = Modifier, frame: LandingFrame, headerProgres
 /** The privacy policy link pinned at the top end, outside the pager, sliding in and fading in from the end edge as [headerProgress] goes 0 to 1, level with [HeaderLogo]. */
 @Composable
 fun HeaderLinks(modifier: Modifier = Modifier, frame: LandingFrame, headerProgress: () -> Float, alpha: () -> Float, onNavigate: OnNavigate) {
+    // Out of sight the link is left out, so a keyboard cannot reach it.
+    val shown by remember { derivedStateOf { alpha() * headerProgress() > 0f } }
+    if (!shown) return
     val logoHeight = frame.headerLogoWidth / LOGO_ASPECT_RATIO
     val marginPx = with(LocalDensity.current) { frame.headerMargin.toPx() }
     Box(

@@ -2,6 +2,7 @@ package com.rossomak.flashcards.web
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -57,7 +58,8 @@ fun WebApp() {
     }
     // A page change morphs the graph from wherever it is.
     LaunchedEffect(route) {
-        graphState.animateTo(route.graphSpec(tuning), tween(tuning.minMorphDuration.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.StandardEasing))
+        val morph: AnimationSpec<Float> = if (reducedMotion) snap() else tween(tuning.minMorphDuration.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.StandardEasing)
+        graphState.animateTo(route.graphSpec(tuning), morph)
     }
 
     WebTheme {
@@ -70,6 +72,7 @@ fun WebApp() {
                             graphState = graphState,
                             tuning = tuning,
                             backdrop = backdrop,
+                            active = route == Home,
                             playEntrance = homeEntrancePending,
                             onEntrancePlayed = { homeEntrancePending = false },
                             onNavigate = navigator::navigate,

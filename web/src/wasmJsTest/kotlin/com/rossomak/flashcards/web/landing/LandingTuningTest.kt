@@ -16,10 +16,12 @@ class LandingTuningTest {
         val result = pages.withPageEdit(EDITED_PAGE, edited)
 
         result.forEachIndexed { index, spec ->
-            spec.layers.last().density shouldBe EDITED_DENSITY
-            spec.layers.last().fillChance shouldBe EDITED_FILL_CHANCE
-            spec.layers.last().hotNodeShare shouldBe pages[index].layers.last().hotNodeShare
-            spec.layers.last().alpha shouldBe pages[index].layers.last().alpha
+            with(spec.layers.last()) {
+                density shouldBe EDITED_DENSITY
+                fillChance shouldBe EDITED_FILL_CHANCE
+                hotNodeShare shouldBe pages[index].layers.last().hotNodeShare
+                alpha shouldBe pages[index].layers.last().alpha
+            }
             spec.layers.first() shouldBe pages[index].layers.first()
         }
     }
@@ -41,8 +43,10 @@ class LandingTuningTest {
         val result = pages.withPageEdit(EDITED_PAGE, edited)
 
         result.forEach { spec ->
-            spec.layers.last().density shouldBe EDITED_DENSITY
-            spec.layers.last().jitter shouldBe EDITED_JITTER
+            with(spec.layers.last()) {
+                density shouldBe EDITED_DENSITY
+                jitter shouldBe EDITED_JITTER
+            }
         }
     }
 

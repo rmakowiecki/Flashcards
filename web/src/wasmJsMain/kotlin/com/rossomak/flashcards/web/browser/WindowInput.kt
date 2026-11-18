@@ -9,15 +9,20 @@ import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.WheelEvent
 
-/** Routes each vertical window `wheel` event where [target] says, by pointer x, before Compose sees it. Pinch zoom stays with the browser. */
+/**
+ * Routes each vertical window `wheel` event where [target] says, by pointer x, before Compose sees it. Pinch zoom
+ * stays with the browser. [onBrowserWheel] hears each one left to the browser, which scrolls by itself.
+ */
 @Composable
-fun WindowWheelHandler(target: (clientX: Double) -> WheelTarget) {
+fun WindowWheelHandler(onBrowserWheel: () -> Unit = {}, target: (clientX: Double) -> WheelTarget) {
+    val currentOnBrowserWheel by rememberUpdatedState(onBrowserWheel)
     val currentTarget by rememberUpdatedState(target)
     DisposableEffect(Unit) {
         val listener: (Event) -> Unit = { event ->
             val wheel = event as WheelEvent
             // Stops Compose's listener, which would prevent the default.
             if (!wheel.ctrlKey && wheel.deltaY != 0.0 && currentTarget(wheel.clientX.toDouble()) == WheelTarget.Browser) {
+                currentOnBrowserWheel()
                 wheel.stopImmediatePropagation()
             }
         }

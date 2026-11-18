@@ -14,11 +14,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -41,6 +44,7 @@ import com.rossomak.flashcards.web.components.LOGO_REVEAL_START_SCALE
 import com.rossomak.flashcards.web.components.LocalRevealMotion
 import com.rossomak.flashcards.web.components.RevealSequence
 import com.rossomak.flashcards.web.components.SiteLinks
+import com.rossomak.flashcards.web.components.focusRing
 import com.rossomak.flashcards.web.components.reveal
 import com.rossomak.flashcards.web.landing.FeatureLayout.SideBySide
 import com.rossomak.flashcards.web.navigation.OnNavigate
@@ -86,30 +90,34 @@ fun HeroPage(
                 }
             }
         }
-        Column(
-            // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
-            // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
-                .graphicsLayer { alpha = footerAlpha() }
-                .padding(bottom = MaterialTheme.spacing.medium),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
-        ) {
-            // A short window has no room for the hint, and swiping needs none.
-            if (!frame.isCompactHeight) {
-                ScrollHint(
-                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
-                    animate = animateHint,
-                    onClick = onScrollHintClick,
+        // Once faded out the footer is left out, so its invisible hint and links take no click or focus.
+        val footerShown by remember { derivedStateOf { footerAlpha() > 0f } }
+        if (footerShown) {
+            Column(
+                // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
+                // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
+                    .graphicsLayer { alpha = footerAlpha() }
+                    .padding(bottom = MaterialTheme.spacing.medium),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+            ) {
+                // A short window has no room for the hint, and swiping needs none.
+                if (!frame.isCompactHeight) {
+                    ScrollHint(
+                        modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
+                        animate = animateHint,
+                        onClick = onScrollHintClick,
+                    )
+                }
+                SiteLinks(
+                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
+                    showContact = false,
+                    onNavigate = onNavigate,
                 )
             }
-            SiteLinks(
-                modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
-                showContact = false,
-                onNavigate = onNavigate,
-            )
         }
     }
 }
@@ -147,6 +155,7 @@ private fun ScrollHint(modifier: Modifier = Modifier, animate: Boolean, onClick:
     HoverBrightens(modifier = modifier, restAlpha = WEB_MUTED_CONTENT_ALPHA) {
         Column(
             modifier = Modifier
+                .focusRing(RoundedCornerShape(WebDimensions.focusRingCornerRadius))
                 .clickable(interactionSource = null, indication = null, onClick = onClick)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .padding(MaterialTheme.spacing.xsmall),

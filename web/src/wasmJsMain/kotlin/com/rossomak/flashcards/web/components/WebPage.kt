@@ -82,6 +82,7 @@ fun WebPage(modifier: Modifier = Modifier, onNavigate: OnNavigate, content: @Com
                     .reveal(progress = { reveal.progress(LegalSlots.LOGO) }, rise = rise, startScale = LOGO_REVEAL_START_SCALE)
                     .graphicsLayer { alpha = lerp(WEB_MUTED_CONTENT_ALPHA, 1f, logoHover) }
                     .hoverable(logoInteractionSource)
+                    .focusRing(RoundedCornerShape(WebDimensions.focusRingCornerRadius))
                     .clickable(interactionSource = null, indication = null, role = Role.Button) { onNavigate(WebRoute.Home) }
                     .pointerHoverIcon(PointerIcon.Hand),
             )

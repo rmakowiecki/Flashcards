@@ -42,6 +42,13 @@ class FeatureLayoutTest {
     }
 
     @Test
+    fun `a window too narrow for a text column stacks features however flat it is`() {
+        FeatureLayout.forWindow(width = 320.dp, height = 300.dp) shouldBe Stacked
+        FeatureLayout.forWindow(width = 479.dp, height = 300.dp) shouldBe Stacked
+        FeatureLayout.forWindow(width = 480.dp, height = 300.dp) shouldBe SideBySide
+    }
+
+    @Test
     fun `the threshold can be tuned`() {
         FeatureLayout.forWindow(width = 1000.dp, height = 1000.dp, sideBySideMinAspectRatio = 1.2f) shouldBe Stacked
     }

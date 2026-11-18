@@ -28,6 +28,13 @@ class BalancedLineWidthTest {
         balancedLineWidth(maxWidth = 1000, lineCountAt = lineCountOf(wordCount = 4)) shouldBe 1000
     }
 
+    @Test
+    fun `two explicit lines that each fit narrowly are narrowed to that width`() {
+        // Each line fits at 100px; below that, each wraps.
+        val hardBreakLineCount: (Int) -> Int = { width -> if (width >= WORD) 2 else 4 }
+        balancedLineWidth(maxWidth = 1000, lineCountAt = hardBreakLineCount) shouldBe WORD
+    }
+
     private companion object {
         const val WORD = 100
     }

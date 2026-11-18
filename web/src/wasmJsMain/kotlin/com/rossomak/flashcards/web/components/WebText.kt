@@ -17,11 +17,17 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.navigation.WebRoute
+import com.rossomak.flashcards.web.theme.WebColors
 
-private val webLinkStyles = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.Underline))
+private val focusedLinkStyle = SpanStyle(background = WebColors.focusedLinkBackground)
 
-private fun linkStyles(color: Color): TextLinkStyles =
-    if (color.isSpecified) TextLinkStyles(style = SpanStyle(color = color, textDecoration = TextDecoration.Underline)) else webLinkStyles
+private val webLinkStyles = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.Underline), focusedStyle = focusedLinkStyle)
+
+private fun linkStyles(color: Color): TextLinkStyles = if (color.isSpecified) {
+    TextLinkStyles(style = SpanStyle(color = color, textDecoration = TextDecoration.Underline), focusedStyle = focusedLinkStyle)
+} else {
+    webLinkStyles
+}
 
 /** Text from a small HTML fragment ([parseInlineMarkup]). Site-path links open in place; others go to the browser. */
 @Composable

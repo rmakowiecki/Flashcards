@@ -23,8 +23,10 @@ landing page is a snapping pager over one animated graph
 ## Navigation
 
 - A link to another page switches without reloading and adds a history entry.
-- The pages crossfade over about 300ms over one shared backdrop. The graph morphs to the new page's
+- The pages crossfade briefly over one shared backdrop. The graph morphs to the new page's
   shape: the hero's on the landing page, the closing page's on the legal pages.
+- While the landing page fades out, it takes no keys or wheel and no longer moves the graph: the page
+  coming in owns them.
 - Email links open the mail app. The deletion page prefills the subject.
 - The tab title names the page shown.
 
@@ -80,7 +82,7 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 - The tagline and a one-line description under the logo, a scroll hint, and quiet legal links at the
   bottom. Soft dark halos keep the text legible over the graph.
 - The scroll hint, the links and their halo fade with the scroll and are gone once it is halfway to
-  the next page.
+  the next page. Once gone they take no click and no focus.
 - On first load the graph fades in, then the logo, the text, the hint and the links reveal in turn.
   Returning from a legal page replays only the logo, hint and links.
 
@@ -88,8 +90,10 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 
 - A headline, one supporting paragraph of about 30 words that keeps the page's core message in a
   call-to-action voice, and a framed screenshot of the app.
-- A window at least 0.9 times as wide as tall shows text and phone side by side. The phone alternates
-  sides and takes at most 45% of the row. A narrower window stacks the text above the phone.
+- A window that is wide enough for its height, and wide enough for a readable text column beside the
+  phone, shows text and phone side by side. The local tuner sets the shape threshold. The phone
+  alternates sides and takes under half of the row. Any other window stacks the text above the phone,
+  and the phone fits the column's width and the height left.
 - The phone casts a soft shadow and moves with its page. The text lags slightly and fades in.
 - A soft dark halo with no visible edge sits behind the text. The phone always sits above the halo and
   the graph, so the halo never dims it, and the pinned logo and link sit above everything.
@@ -104,13 +108,13 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 
 ### Small windows
 
-A window narrower than 600dp (a phone in portrait) or shorter than 480dp (a phone in landscape) is
-compact. Larger windows are unchanged apart from the dots not being clickable.
+A window narrower than the phone-portrait breakpoint or shorter than the phone-landscape one is
+compact (`LandingScale`). Larger windows are unchanged apart from the dots not being clickable.
 
 - The page dots are smaller, and every page keeps its content clear of them.
 - Feature text uses smaller type, so the screenshot gets the room, but it keeps clear gaps between the
-  headline, the paragraph and the phone. Side by side, the text is narrow (about 380dp) and sits close
-  to the phone, and the two are centred as one group.
+  headline, the paragraph and the phone. Side by side, the text column is narrow and sits close to the
+  phone, and the two are centred as one group.
 - The page follows the browser's visible height. When a mobile browser hides or shows its address bar,
   the page grows or shrinks with it and settles on the nearest page once the scrolling stops and no
   finger is down. No empty bar is left at the bottom, and no part of the previous page shows.
@@ -120,8 +124,8 @@ compact. Larger windows are unchanged apart from the dots not being clickable.
 
 ### Components appearing
 
-- A component fades in while rising about 16dp, over about 450ms. Components on a page start about
-  80ms apart. The large logo also grows slightly.
+- A component fades in while rising a short distance. Components on a page start one after another. The
+  large logo also grows slightly. The tuner sets the time, rise and stagger.
 - The hero's and closing page's logo and links reveal as the pages head for their page. They replay
   after the page has fully left the window.
 - Text, phones and the pinned logo do not reveal, because they move with the scroll.
@@ -129,7 +133,15 @@ compact. Larger windows are unchanged apart from the dots not being clickable.
 ### Reduced motion
 
 Under `prefers-reduced-motion`, text moves with its page, nothing fades or reveals, the first-load
-entrance does not play, hover changes at once, and pages switch without a crossfade.
+entrance does not play, hover changes at once, and pages switch without a crossfade. Keys and the
+scroll hint jump to their page instead of scrolling through the pages between. The pinned logo and
+link are there or not, with no slide or fade, and the graph switches shape at once, also between the
+landing page and a legal page. A legal section shows at once. The preference is followed live.
+
+### Keyboard focus
+
+The links, the legal pages' logo and the hero's scroll hint show a visible focus mark. A control that
+is faded out, such as the pinned link on the hero, cannot be focused.
 
 ## Legal pages
 
@@ -147,8 +159,8 @@ entrance does not play, hover changes at once, and pages switch without a crossf
 - Every page sits on the brand screen gradient, which never flips between light and dark mode.
 - Text is the on-gradient white. Secondary lines use reduced opacity. Type follows the app's Roboto
   scale.
-- On the landing page, the type grows past a 1280dp reference, up to a cap. It grows by the smaller
-  of the window's width and its height at 16:9.
+- On the landing page, the type grows once the window passes a reference size, up to a cap. It grows
+  by the smaller of the window's width and its height at 16:9 (`LandingScale`).
 - Landing paragraphs wrap into lines of equal width, like CSS `text-wrap: balance`. The legal pages
   wrap as usual.
 - Legal text is selectable. Landing text is not, and the landing page shows no context menu.

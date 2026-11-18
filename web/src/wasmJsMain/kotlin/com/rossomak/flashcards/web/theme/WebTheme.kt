@@ -56,6 +56,9 @@ object WebDimensions {
 
     val pageDotsBlurRadius: Dp = 12.dp
 
+    val focusRingWidth: Dp = 2.dp
+    val focusRingCornerRadius: Dp = 8.dp
+
     /** How far the glow behind the hero's scroll hint and links reaches past them. */
     val bottomLinksScrimReach: Dp = 160.dp
 }
@@ -65,6 +68,12 @@ object WebColors {
     /** The page dots' frosted pill. */
     val frostedFill: Color = Color.White.copy(alpha = 0.1f)
     val frostedBorder: Color = Color.White.copy(alpha = 0.18f)
+
+    /** The ring around a focused button-like element, on the gradient. */
+    val focusRing: Color = Color.White
+
+    /** The highlight behind a focused text link, visible on the gradient and on the legal cards alike. */
+    val focusedLinkBackground: Color = Color.Gray.copy(alpha = 0.45f)
 
     /** The glow behind landing text. */
     val textScrim: Color = Color(0xFF1A1C5C).copy(alpha = 0.62f)

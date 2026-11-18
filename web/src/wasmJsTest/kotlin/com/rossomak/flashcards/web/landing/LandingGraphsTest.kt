@@ -17,10 +17,12 @@ class LandingGraphsTest {
             spec.seed shouldBe first.seed
             spec.layers.size shouldBe first.layers.size
             spec.layers.zip(first.layers).forEach { (layer, firstLayer) ->
-                layer.density shouldBe firstLayer.density
-                layer.jitter shouldBe firstLayer.jitter
-                layer.edgeRule shouldBe firstLayer.edgeRule
-                layer.strictTriangles shouldBe firstLayer.strictTriangles
+                with(layer) {
+                    density shouldBe firstLayer.density
+                    jitter shouldBe firstLayer.jitter
+                    edgeRule shouldBe firstLayer.edgeRule
+                    strictTriangles shouldBe firstLayer.strictTriangles
+                }
             }
         }
     }

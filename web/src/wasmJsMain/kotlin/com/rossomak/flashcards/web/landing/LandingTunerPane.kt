@@ -85,12 +85,15 @@ private fun TunerHeader(pageIndex: Int, tuning: LandingTuning, onCopy: () -> Uni
             Text(text = "One page per swipe (scroll-snap-stop: always)", style = MaterialTheme.typography.bodySmall)
         }
         TunerSlider("Side by side from aspect ratio", tuning.sideBySideMinAspectRatio, 0.5f..2.5f) { tuning.sideBySideMinAspectRatio = it }
-        TunerSlider("Reveal time (ms)", tuning.reveal.duration.inWholeMilliseconds.toFloat(), 100f..1500f) {
-            tuning.reveal = tuning.reveal.copy(duration = it.roundToInt().milliseconds)
-        }
-        TunerSlider("Reveal rise (dp)", tuning.reveal.rise.value, 0f..64f) { tuning.reveal = tuning.reveal.copy(rise = it.roundToInt().dp) }
-        TunerSlider("Reveal stagger (ms)", tuning.reveal.stagger.inWholeMilliseconds.toFloat(), 0f..300f) {
-            tuning.reveal = tuning.reveal.copy(stagger = it.roundToInt().milliseconds)
+        // Each edit copies the current reveal, so it never overwrites a newer value of another field.
+        with(tuning.reveal) {
+            TunerSlider("Reveal time (ms)", duration.inWholeMilliseconds.toFloat(), 100f..1500f) {
+                tuning.reveal = tuning.reveal.copy(duration = it.roundToInt().milliseconds)
+            }
+            TunerSlider("Reveal rise (dp)", rise.value, 0f..64f) { tuning.reveal = tuning.reveal.copy(rise = it.roundToInt().dp) }
+            TunerSlider("Reveal stagger (ms)", stagger.inWholeMilliseconds.toFloat(), 0f..300f) {
+                tuning.reveal = tuning.reveal.copy(stagger = it.roundToInt().milliseconds)
+            }
         }
     }
 }

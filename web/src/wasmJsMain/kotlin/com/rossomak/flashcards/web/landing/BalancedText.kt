@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -17,8 +18,9 @@ import androidx.compose.ui.unit.Constraints
 fun BalancedText(text: String, style: TextStyle, textAlign: TextAlign, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     val measurer = rememberTextMeasurer()
     val mergedStyle = LocalTextStyle.current.merge(style)
-    // Caches the last given and balanced widths.
-    val lastBalance = remember(text, mergedStyle) { IntArray(2) { NOT_MEASURED } }
+    // Caches the last given and balanced widths. Font sizes are in sp, so a new density or font scale needs a new balance.
+    val density = LocalDensity.current
+    val lastBalance = remember(text, mergedStyle, density.density, density.fontScale) { IntArray(2) { NOT_MEASURED } }
     Text(
         text = text,
         style = style,
@@ -43,11 +45,15 @@ fun BalancedText(text: String, style: TextStyle, textAlign: TextAlign, modifier:
     )
 }
 
-/** The narrowest width that keeps the line count at [maxWidth], by bisection. One line keeps [maxWidth]. */
+/**
+ * The narrowest width that keeps the line count at [maxWidth], by bisection. One line keeps [maxWidth]. Explicit
+ * line breaks can make the line count fit at far less than a line count's share of [maxWidth], so the search
+ * starts below every width.
+ */
 fun balancedLineWidth(maxWidth: Int, lineCountAt: (width: Int) -> Int): Int {
     val lineCount = lineCountAt(maxWidth)
     if (lineCount <= 1) return maxWidth
-    var tooNarrow = maxWidth / lineCount - 1
+    var tooNarrow = 0
     var wideEnough = maxWidth
     while (wideEnough - tooNarrow > PRECISION_PX) {
         val middle = (tooNarrow + wideEnough) / 2

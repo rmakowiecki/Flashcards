@@ -31,6 +31,8 @@ private const val LINKS_TOP_SHARE = 0.16f
 fun ClosingPage(modifier: Modifier = Modifier, frame: LandingFrame, textModifier: Modifier = Modifier, reveal: RevealSequence, onNavigate: OnNavigate) {
     val rise = LocalRevealMotion.current.rise
     val textStyles = heroTextStyles(frame)
+    // A short window has no room for the full gap: the links stay in view.
+    val linksMinGap = if (frame.isCompactHeight) MaterialTheme.spacing.medium else MaterialTheme.spacing.xlarge
     Box(modifier = modifier.fillMaxSize().padding(horizontal = heroSideInset(frame))) {
         Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = frame.heroLogoTop).then(textModifier)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -58,7 +60,7 @@ fun ClosingPage(modifier: Modifier = Modifier, frame: LandingFrame, textModifier
                 }
                 SiteLinks(
                     modifier = Modifier
-                        .padding(top = (frame.height * LINKS_TOP_SHARE).coerceAtLeast(MaterialTheme.spacing.xlarge))
+                        .padding(top = (frame.height * LINKS_TOP_SHARE).coerceAtLeast(linksMinGap))
                         .reveal(progress = { reveal.progress(ClosingSlots.LINKS) }, rise = rise),
                     showContact = true,
                     onNavigate = onNavigate,
