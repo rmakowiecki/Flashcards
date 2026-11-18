@@ -19,7 +19,6 @@ import com.rossomak.flashcards.web.components.LocalRevealMotion
 import com.rossomak.flashcards.web.components.RevealSequence
 import com.rossomak.flashcards.web.components.SiteLinks
 import com.rossomak.flashcards.web.components.reveal
-import com.rossomak.flashcards.web.landing.FeatureLayout.SideBySide
 import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
@@ -31,7 +30,8 @@ private const val LINKS_TOP_SHARE = 0.16f
 @Composable
 fun ClosingPage(modifier: Modifier = Modifier, frame: LandingFrame, textModifier: Modifier = Modifier, reveal: RevealSequence, onNavigate: OnNavigate) {
     val rise = LocalRevealMotion.current.rise
-    Box(modifier = modifier.fillMaxSize().padding(horizontal = MaterialTheme.spacing.medium)) {
+    val textStyles = heroTextStyles(frame)
+    Box(modifier = modifier.fillMaxSize().padding(horizontal = heroSideInset(frame))) {
         Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = frame.heroLogoTop).then(textModifier)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 HeroLogo(
@@ -44,16 +44,16 @@ fun ClosingPage(modifier: Modifier = Modifier, frame: LandingFrame, textModifier
                 ) {
                     BalancedText(
                         text = "Stay sharp, study smart",
-                        style = if (frame.layout == SideBySide) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
+                        style = textStyles.tagline,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.semantics { heading() },
                     )
                     BalancedText(
                         text = "Join Flashcards and start learning right now",
-                        style = if (frame.layout == SideBySide) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                        style = textStyles.description,
                         textAlign = TextAlign.Center,
                         color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-                        modifier = Modifier.padding(top = MaterialTheme.spacing.large * 2).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
+                        modifier = Modifier.padding(top = textStyles.gap).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
                     )
                 }
                 SiteLinks(

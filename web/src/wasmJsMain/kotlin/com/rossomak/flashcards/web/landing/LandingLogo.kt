@@ -35,19 +35,33 @@ private const val HERO_LOGO_CENTER_SHARE = 0.32f
 /** How much of the large logo's height the text below tucks into, to close the logo's own empty margin. */
 private const val HERO_LOGO_TEXT_OVERLAP_SHARE = 0.1f
 
+/** In a short window the large logo sits this share of the window's height from the top. */
+private const val COMPACT_HEIGHT_HERO_LOGO_TOP_SHARE = 0.1f
+
 /** Layout values for a landing window of [width] by [height]. */
 class LandingFrame(val width: Dp, val height: Dp, sideBySideMinAspectRatio: Float = FeatureLayout.SIDE_BY_SIDE_MIN_ASPECT_RATIO) {
     val layout: FeatureLayout = FeatureLayout.forWindow(width, height, sideBySideMinAspectRatio)
     val fontScale: Float = LandingScale.fontScale(width, height)
 
+    /** A phone in portrait. */
+    val isCompactWidth: Boolean = LandingScale.isCompactWidth(width)
+
+    /** A phone in landscape. */
+    val isCompactHeight: Boolean = LandingScale.isCompactHeight(height)
+
+    /** Small windows get smaller text, tighter gaps and a smaller page indicator. */
+    val isCompact: Boolean = isCompactWidth || isCompactHeight
+
+    val dots: PageDotMetrics = if (isCompact) PageDotMetrics.Compact else PageDotMetrics.Regular
+
     val heroLogoWidth: Dp = LandingScale.heroLogoWidth(width, height)
     val heroLogoHeight: Dp = heroLogoWidth / LOGO_ASPECT_RATIO
     val heroLogoTextOverlap: Dp = heroLogoHeight * HERO_LOGO_TEXT_OVERLAP_SHARE
 
-    val heroLogoTop: Dp = height * HERO_LOGO_CENTER_SHARE - heroLogoHeight / 2
+    val heroLogoTop: Dp = if (isCompactHeight) height * COMPACT_HEIGHT_HERO_LOGO_TOP_SHARE else height * HERO_LOGO_CENTER_SHARE - heroLogoHeight / 2
 
-    val headerLogoWidth: Dp = LandingScale.headerLogoWidth(width)
-    val headerMargin: Dp = if (layout == FeatureLayout.SideBySide) 28.dp else 12.dp
+    val headerLogoWidth: Dp = LandingScale.headerLogoWidth(width, height)
+    val headerMargin: Dp = if (layout == FeatureLayout.SideBySide && !isCompactHeight) 28.dp else 12.dp
 
     /** A feature page's top inset, clear of the header logo. */
     val headerClearance: Dp = headerMargin * 2 + headerLogoWidth / LOGO_ASPECT_RATIO

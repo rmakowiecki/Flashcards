@@ -35,24 +35,40 @@ object LandingScale {
     fun fontScale(windowWidth: Dp, windowHeight: Dp): Float =
         (minOf(windowWidth, windowHeight * REFERENCE_ASPECT_RATIO) / referenceWidth).coerceIn(1f, MAX_FONT_SCALE)
 
+    /** Windows narrower than this are phones in portrait. */
+    private val compactMaxWidth: Dp = 600.dp
+
+    /** Windows shorter than this are phones in landscape. */
+    private val compactMaxHeight: Dp = 480.dp
+
+    fun isCompactWidth(windowWidth: Dp): Boolean = windowWidth < compactMaxWidth
+
+    fun isCompactHeight(windowHeight: Dp): Boolean = windowHeight < compactMaxHeight
+
     private const val HERO_LOGO_WIDTH_SHARE = 0.46f
     private const val HERO_LOGO_HEIGHT_SHARE = 0.8f
+    private const val COMPACT_HEIGHT_HERO_LOGO_HEIGHT_SHARE = 0.5f
     private val heroLogoMinWidth: Dp = 240.dp
     private val heroLogoMaxWidth: Dp = 960.dp
     private val narrowWindowMargin: Dp = 48.dp
 
-    /** The hero's and closing page's logo: about half the window's width, within the window. */
+    /** The hero's and closing page's logo: about half the window's width, within the window, and smaller still in a short window. */
     fun heroLogoWidth(windowWidth: Dp, windowHeight: Dp): Dp {
         val byWidth = (windowWidth * HERO_LOGO_WIDTH_SHARE).coerceIn(heroLogoMinWidth, heroLogoMaxWidth)
-        return minOf(byWidth, windowHeight * HERO_LOGO_HEIGHT_SHARE, windowWidth - narrowWindowMargin)
+        val heightShare = if (isCompactHeight(windowHeight)) COMPACT_HEIGHT_HERO_LOGO_HEIGHT_SHARE else HERO_LOGO_HEIGHT_SHARE
+        return minOf(byWidth, windowHeight * heightShare, windowWidth - narrowWindowMargin)
     }
 
-    /** The feature pages' pinned logo: a seventh of the window, within bounds. */
-    fun headerLogoWidth(windowWidth: Dp): Dp = (windowWidth * HEADER_LOGO_WIDTH_SHARE).coerceIn(headerLogoMinWidth, headerLogoMaxWidth)
+    /** The feature pages' pinned logo: a seventh of the window, within bounds, and a fixed small size in a short window. */
+    fun headerLogoWidth(windowWidth: Dp, windowHeight: Dp): Dp = when {
+        isCompactHeight(windowHeight) -> compactHeightHeaderLogoWidth
+        else -> (windowWidth * HEADER_LOGO_WIDTH_SHARE).coerceIn(headerLogoMinWidth, headerLogoMaxWidth)
+    }
 
     private const val HEADER_LOGO_WIDTH_SHARE = 0.14f
     private val headerLogoMinWidth: Dp = 150.dp
     private val headerLogoMaxWidth: Dp = 300.dp
+    private val compactHeightHeaderLogoWidth: Dp = 88.dp
 
     /** How far the header logo has slid in at pager [position]: 0 on the hero and closing page, 1 on features. */
     fun headerProgress(position: Float, pageCount: Int): Float = minOf(position, (pageCount - 1) - position).coerceIn(0f, 1f)

@@ -43,7 +43,8 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
   from the target page. Home and End go to the first and last page. Keys with Ctrl, Alt or Meta stay
   with the browser.
 - Page dots on the right edge sit on a frosted pill. A dot grows and brightens as the pages near its
-  page, and a click scrolls there. The hero's scroll hint opens the first feature.
+  page. The dots only indicate: they take no click, touch or hover. The hero's scroll hint opens the
+  first feature.
 
 ### Backdrop
 
@@ -99,6 +100,18 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 - The large logo, the tagline, a call to join and start learning right now, and the links under one
   halo, in the order Privacy Policy, Contact, Delete your account. The links sit well below the text,
   a share of the window's height, not at the bottom edge.
+
+### Small windows
+
+A window narrower than 600dp (a phone in portrait) or shorter than 480dp (a phone in landscape) is
+compact. Larger windows are unchanged apart from the dots not being clickable.
+
+- The page dots are smaller, and every page keeps its content clear of them.
+- Feature text uses smaller type and tighter gaps, so the screenshot gets the room. Side by side, the
+  text sits close to the phone.
+- In landscape the pinned logo is small, with a small margin, so the phone gets the height. The hero
+  and the closing page show a smaller logo near the top and smaller text. The hero has no scroll
+  hint, and the links stay in one row.
 
 ### Components appearing
 

@@ -44,62 +44,34 @@ private const val PHONE_HEIGHT_SHARE = 0.94f
 private const val PHONE_MAX_ROW_WIDTH_SHARE = 0.45f
 
 /** The side-by-side phone's height: a share of the height left after [verticalPadding], capped by height and row width. */
-private fun sideBySidePhoneHeight(frame: LandingFrame, verticalPadding: Dp): Dp {
-    val rowWidth = minOf(frame.width, WebDimensions.featureRowMaxWidth) - WebDimensions.featureSidePadding * 2
+private fun sideBySidePhoneHeight(frame: LandingFrame, verticalPadding: Dp, sidePadding: Dp): Dp {
+    val rowWidth = minOf(frame.width, WebDimensions.featureRowMaxWidth) - sidePadding * 2
     val byWidth = rowWidth * PHONE_MAX_ROW_WIDTH_SHARE / SCREENSHOT_ASPECT_RATIO
     return minOf((frame.height - verticalPadding) * PHONE_HEIGHT_SHARE, WebDimensions.phoneMaxHeight, byWidth).coerceAtLeast(0.dp)
 }
 
 private class FeatureTextStyles(val headline: TextStyle, val body: TextStyle)
 
+/** Compact windows share smaller type: the screenshot gets the room. */
+@Composable
+private fun featureTextStyles(frame: LandingFrame): FeatureTextStyles = when {
+    frame.isCompact -> FeatureTextStyles(headline = MaterialTheme.typography.headlineSmall, body = MaterialTheme.typography.bodyMedium)
+    frame.layout == SideBySide -> FeatureTextStyles(headline = MaterialTheme.typography.displayMedium, body = MaterialTheme.typography.titleMedium)
+    else -> FeatureTextStyles(headline = MaterialTheme.typography.headlineMedium, body = MaterialTheme.typography.bodyLarge)
+}
+
 /** One feature's text and screenshot, side by side or stacked by [LandingFrame.layout]. [textModifier] moves only the text. */
 @Composable
 fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: LandingFeature, screenshotVariant: ScreenshotVariant, textModifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (frame.layout) {
-            SideBySide -> Row(
-                modifier = Modifier
-                    .widthIn(max = WebDimensions.featureRowMaxWidth)
-                    .fillMaxSize()
-                    .padding(
-                        start = WebDimensions.featureSidePadding,
-                        end = WebDimensions.featureSidePadding,
-                        top = frame.headerClearance,
-                        bottom = MaterialTheme.spacing.large,
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(WebDimensions.featureGap, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val styles = FeatureTextStyles(
-                    headline = MaterialTheme.typography.displayMedium,
-                    body = MaterialTheme.typography.titleMedium,
-                )
-                val text: @Composable () -> Unit = {
-                    FeatureText(
-                        feature = feature,
-                        styles = styles,
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier.weight(1f, fill = false).widthIn(max = WebDimensions.featureTextMaxWidth).then(textModifier),
-                    )
-                }
-                val phoneHeight = sideBySidePhoneHeight(frame = frame, verticalPadding = frame.headerClearance + MaterialTheme.spacing.large)
-                val phone: @Composable () -> Unit = {
-                    Screenshot(feature = feature, variant = screenshotVariant, modifier = Modifier.height(phoneHeight).aspectRatio(SCREENSHOT_ASPECT_RATIO))
-                }
-                if (feature.phoneOnEnd) {
-                    text()
-                    phone()
-                } else {
-                    phone()
-                    text()
-                }
-            }
+            SideBySide -> SideBySidePage(frame = frame, feature = feature, screenshotVariant = screenshotVariant, textModifier = textModifier)
             Stacked -> Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
                         start = MaterialTheme.spacing.medium,
-                        end = WebDimensions.stackedEndPadding,
+                        end = frame.dots.contentClearance,
                         top = frame.headerClearance,
                         bottom = MaterialTheme.spacing.medium,
                     ),
@@ -107,15 +79,16 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
             ) {
                 FeatureText(
                     feature = feature,
-                    styles = FeatureTextStyles(
-                        headline = MaterialTheme.typography.headlineMedium,
-                        body = MaterialTheme.typography.bodyLarge,
-                    ),
+                    styles = featureTextStyles(frame),
+                    bodyGap = if (frame.isCompact) MaterialTheme.spacing.small else MaterialTheme.spacing.normal,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.widthIn(max = WebDimensions.featureTextMaxWidth).fillMaxWidth().then(textModifier),
                 )
                 Box(
-                    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = MaterialTheme.spacing.medium),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(top = if (frame.isCompact) MaterialTheme.spacing.xsmall else MaterialTheme.spacing.medium),
                     contentAlignment = Alignment.Center,
                 ) {
                     Screenshot(
@@ -130,7 +103,53 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
 }
 
 @Composable
-private fun FeatureText(feature: LandingFeature, styles: FeatureTextStyles, textAlign: TextAlign, modifier: Modifier = Modifier) {
+private fun SideBySidePage(frame: LandingFrame, feature: LandingFeature, screenshotVariant: ScreenshotVariant, textModifier: Modifier) {
+    // A compact window clears the page dots on both sides and packs the text close to the phone.
+    val sidePadding = if (frame.isCompact) frame.dots.contentClearance else WebDimensions.featureSidePadding
+    val gap = if (frame.isCompact) MaterialTheme.spacing.xlarge else WebDimensions.featureGap
+    Row(
+        modifier = Modifier
+            .widthIn(max = WebDimensions.featureRowMaxWidth)
+            .fillMaxSize()
+            .padding(
+                start = sidePadding,
+                end = sidePadding,
+                top = frame.headerClearance,
+                bottom = MaterialTheme.spacing.large,
+            ),
+        horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val styles = featureTextStyles(frame)
+        val text: @Composable () -> Unit = {
+            FeatureText(
+                feature = feature,
+                styles = styles,
+                bodyGap = MaterialTheme.spacing.normal,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.weight(1f, fill = false).widthIn(max = WebDimensions.featureTextMaxWidth).then(textModifier),
+            )
+        }
+        val phoneHeight = sideBySidePhoneHeight(
+            frame = frame,
+            verticalPadding = frame.headerClearance + MaterialTheme.spacing.large,
+            sidePadding = sidePadding,
+        )
+        val phone: @Composable () -> Unit = {
+            Screenshot(feature = feature, variant = screenshotVariant, modifier = Modifier.height(phoneHeight).aspectRatio(SCREENSHOT_ASPECT_RATIO))
+        }
+        if (feature.phoneOnEnd) {
+            text()
+            phone()
+        } else {
+            phone()
+            text()
+        }
+    }
+}
+
+@Composable
+private fun FeatureText(feature: LandingFeature, styles: FeatureTextStyles, bodyGap: Dp, textAlign: TextAlign, modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -147,7 +166,7 @@ private fun FeatureText(feature: LandingFeature, styles: FeatureTextStyles, text
                 style = styles.body,
                 textAlign = textAlign,
                 color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-                modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
+                modifier = Modifier.padding(top = bodyGap),
             )
         }
     }

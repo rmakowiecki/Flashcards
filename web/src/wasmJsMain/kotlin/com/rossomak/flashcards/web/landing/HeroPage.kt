@@ -30,7 +30,9 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.designsystem.theme.spacing
@@ -58,9 +60,9 @@ fun HeroPage(
     onScrollHintClick: () -> Unit,
     onNavigate: OnNavigate,
 ) {
-    val isWide = frame.layout == SideBySide
     val rise = LocalRevealMotion.current.rise
-    Box(modifier = modifier.fillMaxSize().padding(horizontal = MaterialTheme.spacing.medium)) {
+    val textStyles = heroTextStyles(frame)
+    Box(modifier = modifier.fillMaxSize().padding(horizontal = heroSideInset(frame))) {
         Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = frame.heroLogoTop).then(textModifier)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 HeroLogo(
@@ -70,16 +72,16 @@ fun HeroPage(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.reveal(progress = textEntrance, rise = rise)) {
                     BalancedText(
                         text = "Stay sharp, study smart",
-                        style = if (isWide) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
+                        style = textStyles.tagline,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.semantics { heading() },
                     )
                     BalancedText(
                         text = "Sharpen your dev skills: curated flashcards for Kotlin, Android, Python and more",
-                        style = if (isWide) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                        style = textStyles.description,
                         textAlign = TextAlign.Center,
                         color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-                        modifier = Modifier.padding(top = MaterialTheme.spacing.large * 2).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
+                        modifier = Modifier.padding(top = textStyles.gap).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
                     )
                 }
             }
@@ -95,11 +97,14 @@ fun HeroPage(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
         ) {
-            ScrollHint(
-                modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
-                animate = animateHint,
-                onClick = onScrollHintClick,
-            )
+            // A short window has no room for the hint, and swiping needs none.
+            if (!frame.isCompactHeight) {
+                ScrollHint(
+                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
+                    animate = animateHint,
+                    onClick = onScrollHintClick,
+                )
+            }
             SiteLinks(
                 modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
                 showContact = false,
@@ -108,6 +113,32 @@ fun HeroPage(
         }
     }
 }
+
+/** The tagline, its description and the gap between them on the hero and the closing page. */
+class HeroTextStyles(val tagline: TextStyle, val description: TextStyle, val gap: Dp)
+
+@Composable
+fun heroTextStyles(frame: LandingFrame): HeroTextStyles = when {
+    frame.isCompactHeight -> HeroTextStyles(
+        tagline = MaterialTheme.typography.headlineSmall,
+        description = MaterialTheme.typography.titleMedium,
+        gap = MaterialTheme.spacing.medium,
+    )
+    frame.layout == SideBySide -> HeroTextStyles(
+        tagline = MaterialTheme.typography.displaySmall,
+        description = MaterialTheme.typography.headlineSmall,
+        gap = MaterialTheme.spacing.large * 2,
+    )
+    else -> HeroTextStyles(
+        tagline = MaterialTheme.typography.headlineMedium,
+        description = MaterialTheme.typography.titleMedium,
+        gap = MaterialTheme.spacing.large * 2,
+    )
+}
+
+/** The hero's and closing page's side inset: a compact window keeps the text clear of the page dots. */
+@Composable
+fun heroSideInset(frame: LandingFrame): Dp = if (frame.isCompact) frame.dots.contentClearance else MaterialTheme.spacing.medium
 
 /** "Scroll to explore" over a bobbing chevron, muted until hovered. */
 @Composable

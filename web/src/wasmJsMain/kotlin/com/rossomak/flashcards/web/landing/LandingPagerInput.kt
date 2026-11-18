@@ -4,7 +4,7 @@ import com.rossomak.flashcards.web.browser.BrowserSnapScroller
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Keys, page dots and the scroll hint, which smooth-scroll the browser's [scroller] to a page. */
+/** Keys and the scroll hint, which smooth-scroll the browser's [scroller] to a page. */
 class LandingPagerInput(private val pageCount: Int) {
     /** Null until installed; moves are dropped until then. */
     var scroller: BrowserSnapScroller? = null
@@ -26,7 +26,7 @@ class LandingPagerInput(private val pageCount: Int) {
         goTo(step.from(from, pageCount))
     }
 
-    fun goTo(page: Int) {
+    private fun goTo(page: Int) {
         val scroller = scroller ?: return
         targetPage = page
         scroller.scrollToPage(page)

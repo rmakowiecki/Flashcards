@@ -131,8 +131,8 @@ fun LandingPager(
         HeaderChrome(frame = frame, headerProgress = headerProgress, alpha = { entrance.content.value }, onNavigate = onNavigate)
         PageDots(
             pagerState = pagerState,
+            metrics = frame.dots,
             backdrop = backdrop,
-            onPageClick = input::goTo,
             modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer { alpha = entrance.content.value },
         )
         if (tunerOpen.value) {

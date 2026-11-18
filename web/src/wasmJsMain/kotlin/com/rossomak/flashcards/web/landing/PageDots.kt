@@ -2,9 +2,6 @@ package com.rossomak.flashcards.web.landing
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -14,63 +11,57 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.rossomak.flashcards.web.components.BlurBackdrop
 import com.rossomak.flashcards.web.components.blurBackdrop
-import com.rossomak.flashcards.web.components.hoverProgress
 import com.rossomak.flashcards.web.theme.WebColors
 import com.rossomak.flashcards.web.theme.WebDimensions
 import kotlin.math.abs
 
-/** One dot per page on a frosted pill. A dot grows and brightens as the pages near it, and opens its page. */
+/** The page dots' sizes. [contentClearance] is how far a page's content stays from the window's end edge so the dots never cover it. */
+class PageDotMetrics(
+    val slot: Dp,
+    val currentSize: Dp,
+    val idleSize: Dp,
+    val pillPadding: Dp,
+    val endPadding: Dp,
+    val contentClearance: Dp,
+) {
+    companion object {
+        val Regular = PageDotMetrics(slot = 24.dp, currentSize = 10.dp, idleSize = 6.dp, pillPadding = 4.dp, endPadding = 8.dp, contentClearance = 40.dp)
+        val Compact = PageDotMetrics(slot = 16.dp, currentSize = 6.dp, idleSize = 4.dp, pillPadding = 3.dp, endPadding = 4.dp, contentClearance = 32.dp)
+    }
+}
+
+/** One dot per page on a frosted pill. A dot grows and brightens as the pages near it. Only an indicator: it takes no input. */
 @Composable
-fun PageDots(modifier: Modifier = Modifier, pagerState: PagerState, backdrop: BlurBackdrop, onPageClick: (Int) -> Unit) {
-    val currentPage = pagerState.currentPage
+fun PageDots(modifier: Modifier = Modifier, pagerState: PagerState, metrics: PageDotMetrics, backdrop: BlurBackdrop) {
     val pillShape = RoundedCornerShape(percent = PILL_CORNER_PERCENT)
     val dotColor = LocalContentColor.current
     Column(
         modifier = modifier
-            .padding(end = WebDimensions.pageDotsEndPadding)
+            .padding(end = metrics.endPadding)
             .blurBackdrop(backdrop = backdrop, shape = pillShape, radius = WebDimensions.pageDotsBlurRadius)
             .background(WebColors.frostedFill, pillShape)
             .border(width = Dp.Hairline, color = WebColors.frostedBorder, shape = pillShape)
-            .padding(WebDimensions.pageDotsPillPadding),
+            .padding(metrics.pillPadding)
+            .clearAndSetSemantics { contentDescription = "Page ${pagerState.currentPage + 1} of ${pagerState.pageCount}" },
     ) {
         repeat(pagerState.pageCount) { page ->
-            val interactionSource = remember { MutableInteractionSource() }
-            val hover by interactionSource.hoverProgress()
-            Box(
-                modifier = Modifier
-                    .size(WebDimensions.pageDotTouchTarget)
-                    .clip(CircleShape)
-                    .hoverable(interactionSource)
-                    .clickable(interactionSource = null, indication = null) { onPageClick(page) }
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .semantics {
-                        contentDescription = "Page ${page + 1} of ${pagerState.pageCount}"
-                        selected = page == currentPage
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
+            Box(modifier = Modifier.size(metrics.slot), contentAlignment = Alignment.Center) {
                 Box(
                     modifier = Modifier
-                        .size(WebDimensions.pageDotCurrentSize)
+                        .size(metrics.currentSize)
                         .graphicsLayer {
                             val nearness = PageDotHighlight.nearness(pagerState.currentPage + pagerState.currentPageOffsetFraction, page)
-                            val idleScale = WebDimensions.pageDotSize / WebDimensions.pageDotCurrentSize
-                            scaleX = lerp(idleScale, 1f, nearness) * (1f + HOVER_GROWTH * hover)
+                            scaleX = lerp(metrics.idleSize / metrics.currentSize, 1f, nearness)
                             scaleY = scaleX
                             alpha = lerp(IDLE_DOT_ALPHA, 1f, nearness)
                         }
@@ -88,5 +79,3 @@ object PageDotHighlight {
 
 private const val IDLE_DOT_ALPHA = 0.4f
 private const val PILL_CORNER_PERCENT = 50
-
-private const val HOVER_GROWTH = 0.3f

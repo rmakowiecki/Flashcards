@@ -46,19 +46,11 @@ object WebDimensions {
     val phoneMaxHeight: Dp = 860.dp
     val phoneShadowElevation: Dp = 24.dp
 
-    /** Keeps a stacked feature page clear of the page dots. */
-    val stackedEndPadding: Dp = 40.dp
-
     /** The legal pages' logo: a share of the window's width, within bounds. */
     const val SUBPAGE_LOGO_WIDTH_SHARE = 0.28f
     val subpageLogoMinWidth: Dp = 240.dp
     val subpageLogoMaxWidth: Dp = 560.dp
 
-    val pageDotSize: Dp = 6.dp
-    val pageDotCurrentSize: Dp = 10.dp
-    val pageDotTouchTarget: Dp = 24.dp
-    val pageDotsEndPadding: Dp = 8.dp
-    val pageDotsPillPadding: Dp = 4.dp
     val pageDotsBlurRadius: Dp = 12.dp
 
     /** How far the glow behind the hero's scroll hint and links reaches past them. */
