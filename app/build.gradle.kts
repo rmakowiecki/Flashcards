@@ -29,8 +29,8 @@ val gitShortSha: String = providers.exec {
 
 // The version of the next release, hand-edited: develop carries it from the moment the previous
 // release branch is cut (docs/release-flow.md).
-val versionMajor = 0
-val versionMinor = 2
+val versionMajor = 1
+val versionMinor = 0
 val versionPatch = 0
 
 android {
