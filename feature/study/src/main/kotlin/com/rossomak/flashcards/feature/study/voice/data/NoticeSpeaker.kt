@@ -226,7 +226,11 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
     }
 
     override fun shutdown() {
-        runCatching { tts.shutdown() }
+        // Drop the listener so the engine's late-released callback binder cannot pin the Service through it.
+        runCatching {
+            tts.setOnUtteranceProgressListener(null)
+            tts.shutdown()
+        }
     }
 
     override fun setVoice(voiceId: String?) {

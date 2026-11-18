@@ -400,6 +400,9 @@ class TtsPlayer(
         playbackPreroll.release()
         runCatching {
             tts.stop()
+            // The engine's callback binder outlives shutdown() until the TTS process lets go of it, and it
+            // holds this listener, which holds onEvent and so the Service. Drop the listener first.
+            tts.setOnUtteranceProgressListener(null)
             tts.shutdown()
         }
     }
