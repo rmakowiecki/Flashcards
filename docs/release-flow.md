@@ -69,6 +69,8 @@ The tag, not `main`'s tip, marks the shipped commit: the merge into `main` adds 
 
 Builds that only reach the internal or closed track get no tag: their `versionCode` already identifies them.
 
+A release branch that only ever reaches the internal and closed tracks, such as `release/0.2` before the first production release, is never merged into `main` and gets no tag. Its fixes reach `develop` by the usual merge-back. The release that goes to production is cut later from `develop` as its own branch (for example `release/1.0`), and the closed-test branch is deleted once that branch has been cut.
+
 ### 5. Hotfix
 
 A bug in production that cannot wait for the next release is fixed on `release/x.y.z`, branched from the tag of the release it fixes (for example `release/1.0.1` from `v1.0.0`), with the version set to `x.y.z`. It then follows steps 3 and 4: fix pull requests into it, candidates on the tracks, promotion, the `vx.y.z` tag, the pull request into `main`, and merging it back into `develop`.
