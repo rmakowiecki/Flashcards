@@ -8,8 +8,8 @@ Which branch holds what, and how a release and a hotfix move between branches: [
 
 | Event | Workflow | What runs |
 |---|---|---|
-| PR into `develop`, `main` or `release/*` | `pr-check` | `./gradlew staticAnalysis`, `./gradlew test` and the website build. Required GitHub status check — merge is blocked on failure. Branch protection requires the PR to be up to date with base and disallows admin bypass, so this is the *only* Bitrise build per PR — no separate post-merge check. |
-| PR into `develop`, `main` or `release/*`, or push to `develop`, touching `functions/`, `firestore-tests/`, `firestore.rules`, `firebase.json` or `bitrise.yml` | `backend-check` | Cloud Functions unit tests and Firestore rules tests against the emulators. |
+| PR into `develop`, `main` or `release/*` | `pr-check` | `./gradlew staticAnalysis`, `./gradlew test` and the website build. Required GitHub status check — merge is blocked on failure. Branch protection requires the PR to be up to date with base and disallows admin bypass, so there is no separate post-merge check. |
+| PR into `develop`, `main` or `release/*`, or push to `develop`, touching `functions/`, `firestore-tests/`, `firestore.rules`, `firebase.json` or `bitrise.yml` | `backend-check` | Cloud Functions unit tests and Firestore rules tests against the emulators. Reports its own status, `ci/bitrise/<app-id>/backend-check`, so it cannot replace the required `pr-check` status. It is not a required check: a PR that touches those files can merge with it failing, so read it before merging. |
 | Push to `release/*` | *(planned)* | Will build a signed release AAB and upload it to the Play internal track (ADR-0077). Until then each candidate is built locally from the release branch head and uploaded by hand. |
 
 No instrumented (`androidTest`) tests exist yet, so no emulator step is configured. Add one to `pr-check` if/when instrumented tests land.

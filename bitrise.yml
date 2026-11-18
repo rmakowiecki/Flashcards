@@ -56,6 +56,8 @@ workflows:
 
   backend-check:
     summary: Cloud Functions unit tests + Firestore rules tests. Runs only when backend files change.
+    # Own status name: on the default one it would replace the required pr-check status.
+    status_report_name: ci/bitrise/<project_slug>/backend-check
     steps:
     - git-clone@8: {}
     - restore-cache@2:
