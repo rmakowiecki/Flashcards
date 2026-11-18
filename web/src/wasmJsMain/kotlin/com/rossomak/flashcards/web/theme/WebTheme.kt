@@ -77,6 +77,3 @@ object WebColors {
 
 /** Alpha of secondary text. */
 const val WEB_MUTED_CONTENT_ALPHA = 0.8f
-
-/** Alpha of tertiary text, such as the feature detail paragraphs. */
-const val WEB_FAINT_CONTENT_ALPHA = 0.66f

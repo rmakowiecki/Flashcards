@@ -60,6 +60,14 @@ class LandingScaleTest {
         LandingScale.headerProgress(position = LAST_PAGE - 0.75f, pageCount = PAGE_COUNT) shouldBe 0.75f
     }
 
+    @Test
+    fun `the hero footer is gone once the scroll is halfway to the next page`() {
+        LandingScale.heroFooterAlpha(position = 0f) shouldBe 1f
+        LandingScale.heroFooterAlpha(position = 0.25f) shouldBe 0.5f
+        LandingScale.heroFooterAlpha(position = 0.5f) shouldBe 0f
+        LandingScale.heroFooterAlpha(position = 1f) shouldBe 0f
+    }
+
     private companion object {
         const val PAGE_COUNT = 10
         const val LAST_PAGE = PAGE_COUNT - 1

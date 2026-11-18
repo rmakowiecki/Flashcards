@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.web.landing.FeatureLayout.SideBySide
 import com.rossomak.flashcards.web.landing.FeatureLayout.Stacked
-import com.rossomak.flashcards.web.theme.WEB_FAINT_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
 import org.jetbrains.compose.resources.painterResource
@@ -51,7 +50,7 @@ private fun sideBySidePhoneHeight(frame: LandingFrame, verticalPadding: Dp): Dp 
     return minOf((frame.height - verticalPadding) * PHONE_HEIGHT_SHARE, WebDimensions.phoneMaxHeight, byWidth).coerceAtLeast(0.dp)
 }
 
-private class FeatureTextStyles(val headline: TextStyle, val subline: TextStyle, val detail: TextStyle)
+private class FeatureTextStyles(val headline: TextStyle, val body: TextStyle)
 
 /** One feature's text and screenshot, side by side or stacked by [LandingFrame.layout]. [textModifier] moves only the text. */
 @Composable
@@ -73,8 +72,7 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
             ) {
                 val styles = FeatureTextStyles(
                     headline = MaterialTheme.typography.displayMedium,
-                    subline = MaterialTheme.typography.titleLarge,
-                    detail = MaterialTheme.typography.bodyLarge,
+                    body = MaterialTheme.typography.titleMedium,
                 )
                 val text: @Composable () -> Unit = {
                     FeatureText(
@@ -111,8 +109,7 @@ fun FeaturePage(modifier: Modifier = Modifier, frame: LandingFrame, feature: Lan
                     feature = feature,
                     styles = FeatureTextStyles(
                         headline = MaterialTheme.typography.headlineMedium,
-                        subline = MaterialTheme.typography.bodyLarge,
-                        detail = MaterialTheme.typography.bodyMedium,
+                        body = MaterialTheme.typography.bodyLarge,
                     ),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.widthIn(max = WebDimensions.featureTextMaxWidth).fillMaxWidth().then(textModifier),
@@ -146,17 +143,10 @@ private fun FeatureText(feature: LandingFeature, styles: FeatureTextStyles, text
                 modifier = Modifier.semantics { heading() },
             )
             BalancedText(
-                text = feature.subline,
-                style = styles.subline,
+                text = feature.body,
+                style = styles.body,
                 textAlign = textAlign,
                 color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-                modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
-            )
-            BalancedText(
-                text = feature.detail,
-                style = styles.detail,
-                textAlign = textAlign,
-                color = LocalContentColor.current.copy(alpha = WEB_FAINT_CONTENT_ALPHA),
                 modifier = Modifier.padding(top = MaterialTheme.spacing.normal),
             )
         }

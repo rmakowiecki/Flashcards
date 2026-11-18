@@ -56,6 +56,9 @@ object LandingScale {
 
     /** How far the header logo has slid in at pager [position]: 0 on the hero and closing page, 1 on features. */
     fun headerProgress(position: Float, pageCount: Int): Float = minOf(position, (pageCount - 1) - position).coerceIn(0f, 1f)
+
+    /** The hero's scroll hint and links: full on the hero, gone once the scroll is halfway to the next page. */
+    fun heroFooterAlpha(position: Float): Float = (1f - position * 2f).coerceIn(0f, 1f)
 }
 
 /** A page's text motion. [pageOffset] is the page's distance from the screen in pages, positive once scrolled past. */
@@ -110,6 +113,9 @@ object HeroSlots {
 /** The closing page's reveal slots. */
 object ClosingSlots {
     const val LOGO = 0
-    const val LINKS = 1
-    const val COUNT = 2
+
+    /** The tagline and the call to action. */
+    const val CALL_TO_ACTION = 1
+    const val LINKS = 2
+    const val COUNT = 3
 }

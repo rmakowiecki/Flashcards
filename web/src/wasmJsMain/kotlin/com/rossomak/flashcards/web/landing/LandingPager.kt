@@ -1,6 +1,7 @@
 package com.rossomak.flashcards.web.landing
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.PagerState
@@ -104,6 +105,7 @@ fun LandingPager(
                             reveal = reveal,
                             textEntrance = { entrance.content.value },
                             animateHint = !reducedMotion,
+                            footerAlpha = { if (reducedMotion) 1f else LandingScale.heroFooterAlpha(pagerState.offsetOf(0)) },
                             onScrollHintClick = { input.step(PageStep.Next) },
                             onNavigate = onNavigate,
                         )
@@ -125,11 +127,8 @@ fun LandingPager(
                 }
             }
         }
-        HeaderLogo(
-            frame = frame,
-            headerProgress = { LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT) },
-            alpha = { entrance.content.value },
-        )
+        val headerProgress = { LandingScale.headerProgress(pagerState.currentPage + pagerState.currentPageOffsetFraction, LANDING_PAGE_COUNT) }
+        HeaderChrome(frame = frame, headerProgress = headerProgress, alpha = { entrance.content.value }, onNavigate = onNavigate)
         PageDots(
             pagerState = pagerState,
             backdrop = backdrop,
@@ -140,6 +139,13 @@ fun LandingPager(
             LandingTunerPane(modifier = Modifier.align(Alignment.CenterEnd), tuning = tuning, pageIndex = pagerState.currentPage)
         }
     }
+}
+
+/** The small logo at the top start and the legal links at the top end, sliding in together as [headerProgress] goes 0 to 1. */
+@Composable
+private fun BoxScope.HeaderChrome(frame: LandingFrame, headerProgress: () -> Float, alpha: () -> Float, onNavigate: OnNavigate) {
+    HeaderLogo(frame = frame, headerProgress = headerProgress, alpha = alpha)
+    HeaderLinks(modifier = Modifier.align(Alignment.TopEnd), frame = frame, headerProgress = headerProgress, alpha = alpha, onNavigate = onNavigate)
 }
 
 /** [page]'s reveal by [PageReveal], held back until [gate] opens. */

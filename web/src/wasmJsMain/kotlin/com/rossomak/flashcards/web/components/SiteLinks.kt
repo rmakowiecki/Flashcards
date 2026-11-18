@@ -13,9 +13,9 @@ import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 
 private const val CONTACT_LINK = """<a href="mailto:flashcardsdev@gmail.com">Contact</a>"""
 
-/** The quiet legal links, plus the contact address with [showContact]. */
+/** The quiet links in the order policy, contact, deletion: the contact address with [showContact], the deletion page with [showDeleteAccount]. */
 @Composable
-fun SiteLinks(modifier: Modifier = Modifier, showContact: Boolean, onNavigate: OnNavigate) {
+fun SiteLinks(modifier: Modifier = Modifier, showContact: Boolean, showDeleteAccount: Boolean = true, onNavigate: OnNavigate) {
     val style = MaterialTheme.typography.bodyLarge
     FlowRow(
         modifier = modifier,
@@ -25,12 +25,14 @@ fun SiteLinks(modifier: Modifier = Modifier, showContact: Boolean, onNavigate: O
         HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
             PageLink(label = "Privacy Policy", route = WebRoute.PrivacyPolicy, style = style, onNavigate = onNavigate)
         }
-        HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
-            PageLink(label = "Delete your account", route = WebRoute.DeleteAccount, style = style, onNavigate = onNavigate)
-        }
         if (showContact) {
             HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
                 HtmlText(html = CONTACT_LINK, style = style, onNavigate = onNavigate)
+            }
+        }
+        if (showDeleteAccount) {
+            HoverBrightens(restAlpha = WEB_MUTED_CONTENT_ALPHA) {
+                PageLink(label = "Delete your account", route = WebRoute.DeleteAccount, style = style, onNavigate = onNavigate)
             }
         }
     }

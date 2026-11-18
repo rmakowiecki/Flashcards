@@ -67,19 +67,26 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 
 - The hero and the closing page show a large logo, about half the window's width, at the top of the
   text block. It moves and fades with the text.
-- Feature pages pin a small logo at the top start corner. It slides in from the start edge with the
-  scroll. Neither logo is a link.
+- Feature pages pin a small logo at the top start corner and the Privacy Policy link at the top end
+  corner. Both slide in from their edge with the scroll and fade in as they slide. The hero and the
+  closing page have no pinned links: they carry their own. Neither logo is a link. The pinned link
+  is the same size as the other links and sits as far from the end edge as from the top edge.
+- The text under a large logo sits slightly closer to it than the logo's own bounds, and the tagline
+  and its description are set well apart.
 
 ### Hero
 
 - The tagline and a one-line description under the logo, a scroll hint, and quiet legal links at the
   bottom. Soft dark halos keep the text legible over the graph.
+- The scroll hint, the links and their halo fade with the scroll and are gone once it is halfway to
+  the next page.
 - On first load the graph fades in, then the logo, the text, the hint and the links reveal in turn.
   Returning from a legal page replays only the logo, hint and links.
 
 ### Feature pages
 
-- A headline, a subline, a quieter detail paragraph, and a framed screenshot of the app.
+- A headline, one supporting paragraph of about 30 words that keeps the page's core message in a
+  call-to-action voice, and a framed screenshot of the app.
 - A window at least 0.9 times as wide as tall shows text and phone side by side. The phone alternates
   sides and takes at most 45% of the row. A narrower window stacks the text above the phone.
 - The phone casts a soft shadow and moves with its page. The text lags slightly and fades in.
@@ -89,7 +96,9 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 
 ### Closing page
 
-- The large logo, the tagline, the legal links and the contact address, under one halo.
+- The large logo, the tagline, a call to join and start learning right now, and the links under one
+  halo, in the order Privacy Policy, Contact, Delete your account. The links sit well below the text,
+  a share of the window's height, not at the bottom edge.
 
 ### Components appearing
 

@@ -54,6 +54,7 @@ fun HeroPage(
     reveal: RevealSequence,
     textEntrance: () -> Float,
     animateHint: Boolean,
+    footerAlpha: () -> Float,
     onScrollHintClick: () -> Unit,
     onNavigate: OnNavigate,
 ) {
@@ -78,16 +79,18 @@ fun HeroPage(
                         style = if (isWide) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center,
                         color = LocalContentColor.current.copy(alpha = WEB_MUTED_CONTENT_ALPHA),
-                        modifier = Modifier.padding(top = MaterialTheme.spacing.small).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
+                        modifier = Modifier.padding(top = MaterialTheme.spacing.large * 2).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
                     )
                 }
             }
         }
         Column(
-            // One glow behind the hint and links, arriving with the hint.
+            // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
+            // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) })
+                .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
+                .graphicsLayer { alpha = footerAlpha() }
                 .padding(bottom = MaterialTheme.spacing.medium),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
