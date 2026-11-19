@@ -2,7 +2,7 @@
 
 The manual pass every release candidate gets before it is promoted to production. Run it on a release-signed build installed from the Play closed track, never a debug build: R8, Play App Signing and App Check behave differently there. The flow around it: [release-flow.md](release-flow.md).
 
-A failure that crashes the app, loses data or blocks sign-in blocks the release. Anything else is filed for the next patch release.
+A failure that crashes the app, loses data or blocks sign-in blocks the release and is fixed on the release branch. For any other failure, the release owner decides whether it is fixed on the release branch now or filed for the next patch release, and writes that decision in the [record](#record).
 
 ## Before you start
 
@@ -133,14 +133,14 @@ Run each on a Rated Voice Answering session and a Fast read-aloud session.
 
 ## Release health
 
-- [ ] A forced crash from the release build shows in Crashlytics, deobfuscated.
+- [ ] The Crashlytics console has the mapping file for this `versionCode`, and every crash or non-fatal reported on this build shows deobfuscated. The release build has no crash trigger; to force one, crash a profiling build of the same commit from its Debug tab.
 - [ ] No unexpected crashes or non-fatals from the testers on this build in the last day.
 - [ ] The Play pre-launch report for this build shows no crash or install failure.
-- [ ] The backend was deployed from this branch's head (`npm run deploy` in `functions/` and the rules deploy) before the candidate was uploaded.
+- [ ] The backend runs this branch's head: in the Firebase console, every function's last deploy time is later than the head commit's time. If not, deploy it (see [release-flow.md](release-flow.md#3-stabilize)) and rerun the checklist.
 
 ## Record
 
-For each run, note the candidate, the devices, the date, and every failure with its severity. A run passes when nothing blocking is open.
+For each run, note the candidate, the devices, the date, and every failure with its severity and the release owner's decision for it: fixed on the release branch or deferred to the next patch. A run passes when nothing blocking is open and every other failure has a decision.
 
-| Candidate (`versionName` / `versionCode`) | Devices | Date | Result | Notes |
+| Candidate (`versionName` / `versionCode`) | Devices | Date | Result | Failures and decisions |
 |---|---|---|---|---|

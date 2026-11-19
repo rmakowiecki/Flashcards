@@ -49,8 +49,8 @@ When `develop` holds what the next release should contain, create `release/x.y` 
 
 ### 3. Stabilize
 
-- Every merge into `release/x.y` produces a **candidate**: a signed release AAB built from the branch head and uploaded to the Play internal track. A candidate that looks good is promoted to the closed track for testers, and the [release test checklist](release-test-checklist.md) is run on it.
-- A bug found in testing is fixed on a branch off `release/x.y`, with a pull request into `release/x.y`. Fixup commits stay on the fix branch while its pull request is in review, so only reviewed, accepted changes ever produce a candidate. The merge produces the next candidate.
+- Every merge into `release/x.y` produces a **candidate**: a signed release AAB built from the branch head and uploaded to the Play internal track. Before the upload, the backend is deployed from the same head (`npm run deploy` in `functions/`, then `firebase deploy --only firestore:rules`), so the candidate is tested against the server it ships with. A candidate that looks good is promoted to the closed track for testers, and the [release test checklist](release-test-checklist.md) is run on it.
+- A bug that blocks the release, or one the release owner chooses to fix now ([which failures block](release-test-checklist.md)), is fixed on a branch off `release/x.y`, with a pull request into `release/x.y`. Fixup commits stay on the fix branch while its pull request is in review, so only reviewed, accepted changes ever produce a candidate. The merge produces the next candidate.
 - After each fix, `release/x.y` is merged into `develop` by pull request, so the fix is never lost from the next release.
 
 Only release branches upload to Google Play. A build from `develop` on a Play track would usually carry a higher `versionCode` than the candidate, and Play gives a tester in both tracks the highest one, so the candidate would never reach them.
@@ -96,4 +96,4 @@ Once the hotfix ships, it is also merged by pull request into every release bran
 
 ## Not automated yet
 
-Candidates are built locally from the release branch head and uploaded to Play by hand. A Bitrise workflow on every push to `release/*` that builds the AAB and uploads it to the internal track is planned before the first hotfix or the release after 1.0.0 ([ADR-0077](adr/0077-release-branches-tags-and-versions.md)). Promotion and tagging stay manual.
+Candidates are built locally from the release branch head and uploaded to Play by hand, after the backend is deployed from that head by hand (step 3). A Bitrise workflow on every push to `release/*` that builds the AAB and uploads it to the internal track is planned before the first hotfix or the release after 1.0.0 ([ADR-0077](adr/0077-release-branches-tags-and-versions.md)). Promotion and tagging stay manual.
