@@ -30,13 +30,13 @@ import com.rossomak.flashcards.web.resources.flashcards_logo
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.vectorResource
 
-private const val LOGO_ASPECT_RATIO = 1.8f
+internal const val LOGO_ASPECT_RATIO = 1.8f
 
 /** The large logo's center, as a share of the window's height. */
 private const val HERO_LOGO_CENTER_SHARE = 0.32f
 
 /** How much of the large logo's height the text below tucks into, to close the logo's own empty margin. */
-private const val HERO_LOGO_TEXT_OVERLAP_SHARE = 0.1f
+internal const val HERO_LOGO_TEXT_OVERLAP_SHARE = 0.1f
 
 /** In a short window the large logo sits this share of the window's height from the top. */
 private const val COMPACT_HEIGHT_HERO_LOGO_TOP_SHARE = 0.1f
@@ -59,7 +59,6 @@ class LandingFrame(val width: Dp, val height: Dp, sideBySideMinAspectRatio: Floa
 
     val heroLogoWidth: Dp = LandingScale.heroLogoWidth(width, height)
     val heroLogoHeight: Dp = heroLogoWidth / LOGO_ASPECT_RATIO
-    val heroLogoTextOverlap: Dp = heroLogoHeight * HERO_LOGO_TEXT_OVERLAP_SHARE
 
     val heroLogoTop: Dp = if (isCompactHeight) height * COMPACT_HEIGHT_HERO_LOGO_TOP_SHARE else height * HERO_LOGO_CENTER_SHARE - heroLogoHeight / 2
 
@@ -70,19 +69,13 @@ class LandingFrame(val width: Dp, val height: Dp, sideBySideMinAspectRatio: Floa
     val headerClearance: Dp = headerMargin * 2 + headerLogoWidth / LOGO_ASPECT_RATIO
 }
 
-/** The hero's and closing page's large logo. */
+/** The hero's and closing page's large logo, at the size [HeroStack] gives it. */
 @Composable
 fun HeroLogo(modifier: Modifier = Modifier, frame: LandingFrame) {
     Image(
         imageVector = vectorResource(Res.drawable.flashcards_logo),
         contentDescription = "Flashcards",
-        modifier = modifier
-            .size(frame.heroLogoWidth, frame.heroLogoHeight)
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                val overlap = frame.heroLogoTextOverlap.roundToPx()
-                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
-            },
+        modifier = modifier.size(frame.heroLogoWidth, frame.heroLogoHeight),
     )
 }
 

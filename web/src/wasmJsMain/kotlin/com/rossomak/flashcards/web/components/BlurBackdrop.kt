@@ -3,6 +3,7 @@ package com.rossomak.flashcards.web.components
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
@@ -19,6 +20,9 @@ import dev.chrisbanes.haze.rememberHazeState
 /** A background that [blurBackdrop] components blur. */
 @Stable
 class BlurBackdrop internal constructor(internal val hazeState: HazeState)
+
+/** The site's one backdrop, for components deep in a page that blur it. */
+val LocalBlurBackdrop = staticCompositionLocalOf<BlurBackdrop> { error("No BlurBackdrop provided") }
 
 @Composable
 fun rememberBlurBackdrop(): BlurBackdrop {

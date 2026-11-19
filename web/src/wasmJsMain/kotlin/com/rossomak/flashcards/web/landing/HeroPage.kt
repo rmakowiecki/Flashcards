@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -42,6 +41,7 @@ import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.web.components.HoverBrightens
 import com.rossomak.flashcards.web.components.LOGO_REVEAL_START_SCALE
 import com.rossomak.flashcards.web.components.LocalRevealMotion
+import com.rossomak.flashcards.web.components.ProjectButtons
 import com.rossomak.flashcards.web.components.RevealSequence
 import com.rossomak.flashcards.web.components.SiteLinks
 import com.rossomak.flashcards.web.components.focusRing
@@ -51,7 +51,7 @@ import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.theme.WEB_MUTED_CONTENT_ALPHA
 import com.rossomak.flashcards.web.theme.WebDimensions
 
-/** The first page: logo, tagline and description, a scroll hint, and legal links. [textEntrance] reveals the text on first load. */
+/** The first page: logo, tagline and description, the GitHub and Google Play buttons, a scroll hint, and legal links. [textEntrance] reveals the text on first load. */
 @Composable
 fun HeroPage(
     modifier: Modifier = Modifier,
@@ -66,13 +66,20 @@ fun HeroPage(
 ) {
     val rise = LocalRevealMotion.current.rise
     val textStyles = heroTextStyles(frame)
-    Box(modifier = modifier.fillMaxSize().padding(horizontal = heroSideInset(frame))) {
-        Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = frame.heroLogoTop).then(textModifier)) {
+    // Once faded out the footer is left out, so its invisible hint and links take no click or focus.
+    val footerShown by remember { derivedStateOf { footerAlpha() > 0f } }
+    HeroStack(
+        modifier = modifier.fillMaxSize().padding(horizontal = heroSideInset(frame)),
+        frame = frame,
+        textModifier = textModifier,
+        logo = {
+            HeroLogo(
+                frame = frame,
+                modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LOGO) }, rise = rise, startScale = LOGO_REVEAL_START_SCALE),
+            )
+        },
+        body = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                HeroLogo(
-                    frame = frame,
-                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LOGO) }, rise = rise, startScale = LOGO_REVEAL_START_SCALE),
-                )
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.reveal(progress = textEntrance, rise = rise)) {
                     BalancedText(
                         text = "Stay sharp, study smart",
@@ -88,38 +95,43 @@ fun HeroPage(
                         modifier = Modifier.padding(top = textStyles.gap).widthIn(max = WebDimensions.heroDescriptionMaxWidth),
                     )
                 }
-            }
-        }
-        // Once faded out the footer is left out, so its invisible hint and links take no click or focus.
-        val footerShown by remember { derivedStateOf { footerAlpha() > 0f } }
-        if (footerShown) {
-            Column(
-                // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
-                // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
-                    .graphicsLayer { alpha = footerAlpha() }
-                    .padding(bottom = MaterialTheme.spacing.medium),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
-            ) {
-                // A short window has no room for the hint, and swiping needs none.
-                if (!frame.isCompactHeight) {
-                    ScrollHint(
-                        modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
-                        animate = animateHint,
-                        onClick = onScrollHintClick,
-                    )
-                }
-                SiteLinks(
-                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
-                    showContact = false,
-                    onNavigate = onNavigate,
+                ProjectButtons(
+                    modifier = Modifier
+                        .padding(top = projectButtonsGap(frame))
+                        .reveal(progress = { reveal.progress(HeroSlots.BUTTONS) }, rise = rise),
+                    compact = frame.isCompact,
                 )
             }
-        }
-    }
+        },
+        footer = {
+            if (footerShown) {
+                Column(
+                    // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
+                    // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
+                    modifier = Modifier
+                        .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
+                        .graphicsLayer { alpha = footerAlpha() }
+                        .padding(bottom = MaterialTheme.spacing.medium),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+                ) {
+                    // A short window has no room for the hint, and swiping needs none.
+                    if (!frame.isCompactHeight) {
+                        ScrollHint(
+                            modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
+                            animate = animateHint,
+                            onClick = onScrollHintClick,
+                        )
+                    }
+                    SiteLinks(
+                        modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
+                        showContact = false,
+                        onNavigate = onNavigate,
+                    )
+                }
+            }
+        },
+    )
 }
 
 /** The tagline, its description and the gap between them on the hero and the closing page. */
@@ -127,7 +139,8 @@ class HeroTextStyles(val tagline: TextStyle, val description: TextStyle, val gap
 
 @Composable
 fun heroTextStyles(frame: LandingFrame): HeroTextStyles = when {
-    frame.isCompactHeight -> HeroTextStyles(
+    // A short window keeps its room for the logo.
+    frame.isCompactHeight || frame.height < SHORT_HERO_MAX_HEIGHT -> HeroTextStyles(
         tagline = MaterialTheme.typography.headlineSmall,
         description = MaterialTheme.typography.titleMedium,
         gap = MaterialTheme.spacing.medium,
@@ -143,6 +156,10 @@ fun heroTextStyles(frame: LandingFrame): HeroTextStyles = when {
         gap = MaterialTheme.spacing.large * 2,
     )
 }
+
+/** The gap above the GitHub and Google Play buttons on the hero and the closing page. */
+@Composable
+fun projectButtonsGap(frame: LandingFrame): Dp = if (frame.isCompactHeight) MaterialTheme.spacing.normal else MaterialTheme.spacing.large
 
 /** The hero's and closing page's side inset: a compact window keeps the text clear of the page dots. */
 @Composable
@@ -185,6 +202,9 @@ private fun rememberHintBob(): State<Float> = rememberInfiniteTransition(label =
     animationSpec = infiniteRepeatable(tween(HINT_BOB_MS, easing = FlashcardsMotion.StandardEasing), RepeatMode.Reverse),
     label = "scroll hint bob",
 )
+
+/** Windows shorter than this set the hero's and closing page's text small, as a phone in landscape does. */
+private val SHORT_HERO_MAX_HEIGHT = 700.dp
 
 private const val CHEVRON_ARMS = 0.3f
 private const val CHEVRON_TIP = 0.7f
