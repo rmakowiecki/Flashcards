@@ -18,18 +18,23 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -66,12 +71,19 @@ fun HeroPage(
 ) {
     val rise = LocalRevealMotion.current.rise
     val textStyles = heroTextStyles(frame)
-    // Once faded out the footer is left out, so its invisible hint and links take no click or focus.
+    // Once faded out the footer is not placed, so its invisible hint and links take no click or focus, while it keeps
+    // its room so the hero never moves. Unplacing keeps focus where it is, so focus on the footer is let go.
     val footerShown by remember { derivedStateOf { footerAlpha() > 0f } }
+    var footerHasFocus by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(footerShown) {
+        if (!footerShown && footerHasFocus) focusManager.clearFocus()
+    }
     HeroStack(
         modifier = modifier.fillMaxSize().padding(horizontal = heroSideInset(frame)),
         frame = frame,
         textModifier = textModifier,
+        footerPlaced = { footerShown },
         logo = {
             HeroLogo(
                 frame = frame,
@@ -104,31 +116,31 @@ fun HeroPage(
             }
         },
         footer = {
-            if (footerShown) {
-                Column(
-                    // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
-                    // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
-                    modifier = Modifier
-                        .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
-                        .graphicsLayer { alpha = footerAlpha() }
-                        .padding(bottom = MaterialTheme.spacing.medium),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
-                ) {
-                    // A short window has no room for the hint, and swiping needs none.
-                    if (!frame.isCompactHeight) {
-                        ScrollHint(
-                            modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
-                            animate = animateHint,
-                            onClick = onScrollHintClick,
-                        )
-                    }
-                    SiteLinks(
-                        modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
-                        showContact = false,
-                        onNavigate = onNavigate,
+            Column(
+                // One glow behind the hint and links, arriving with the hint. The scroll fades the hint, links and glow together.
+                // The glow follows the scroll itself: a layer alpha around it would clip it to the block's bounds.
+                modifier = Modifier
+                    .onFocusChanged { state -> footerHasFocus = state.hasFocus }
+                    .textScrim(reach = WebDimensions.bottomLinksScrimReach, alpha = { reveal.progress(HeroSlots.HINT) * footerAlpha() })
+                    .graphicsLayer { alpha = footerAlpha() }
+                    .padding(bottom = MaterialTheme.spacing.medium),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+            ) {
+                // A short window has no room for the hint, and swiping needs none.
+                if (!frame.isCompactHeight) {
+                    ScrollHint(
+                        modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.HINT) }, rise = rise),
+                        // A hidden hint stops bobbing, so it asks for no frames.
+                        animate = animateHint && footerShown,
+                        onClick = onScrollHintClick,
                     )
                 }
+                SiteLinks(
+                    modifier = Modifier.reveal(progress = { reveal.progress(HeroSlots.LINKS) }, rise = rise),
+                    showContact = false,
+                    onNavigate = onNavigate,
+                )
             }
         },
     )

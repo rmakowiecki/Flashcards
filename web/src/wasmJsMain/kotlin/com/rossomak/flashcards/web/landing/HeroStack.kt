@@ -17,13 +17,15 @@ private val heroLogoMinHeight = 56.dp
  * The hero's and closing page's layout: the large [logo] above [body], centered, and [footer] at the bottom edge. The
  * logo sits at [LandingFrame.heroLogoTop] when everything fits. Otherwise the block moves up, and then the logo
  * shrinks, so the block never runs into the footer or past the window's bottom. [textModifier] moves and halos the
- * logo and body as one block.
+ * logo and body as one block. While [footerPlaced] is false the footer is measured but not placed: the block keeps
+ * the same room, and the footer takes no click and is skipped by keyboard focus.
  */
 @Composable
 fun HeroStack(
     modifier: Modifier = Modifier,
     frame: LandingFrame,
     textModifier: Modifier = Modifier,
+    footerPlaced: () -> Boolean = { true },
     logo: @Composable () -> Unit,
     body: @Composable () -> Unit,
     footer: @Composable () -> Unit = {},
@@ -43,7 +45,7 @@ fun HeroStack(
         layout(constraints.maxWidth, constraints.maxHeight) {
             // Above the footer, so the footer's halo never dims the hint. Placed first, so it comes first in keyboard order.
             block.place(x = (constraints.maxWidth - block.width) / 2, y = top, zIndex = 1f)
-            footerPlaceables.forEach { it.place(x = (constraints.maxWidth - it.width) / 2, y = constraints.maxHeight - it.height) }
+            if (footerPlaced()) footerPlaceables.forEach { it.place(x = (constraints.maxWidth - it.width) / 2, y = constraints.maxHeight - it.height) }
         }
     }
 }

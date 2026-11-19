@@ -59,6 +59,9 @@ object WebDimensions {
     val focusRingWidth: Dp = 2.dp
     val focusRingCornerRadius: Dp = 8.dp
 
+    /** The gap between a filled control and the focus ring drawn outside it. */
+    val focusRingGap: Dp = 2.dp
+
     val outlinedButtonBorderWidth: Dp = 1.dp
 
     /** The widest the Google Play button's closed-testing hint grows before it wraps. */

@@ -127,7 +127,8 @@ private fun SourceButton(metrics: ProjectButtonMetrics, label: String) {
     val shape = RoundedCornerShape(percent = 50)
     ButtonContent(
         modifier = Modifier
-            .focusRing(shape)
+            // Outside the white fill, which would hide a white ring drawn on it.
+            .outsetFocusRing(shape)
             .clickable(interactionSource = interactionSource, indication = null, role = Role.Button) { openInNewTab(ProjectLinks.SOURCE_URL) }
             .hoverable(interactionSource)
             .pointerHoverIcon(PointerIcon.Hand)
