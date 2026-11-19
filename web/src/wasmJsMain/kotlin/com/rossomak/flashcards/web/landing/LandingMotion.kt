@@ -124,9 +124,12 @@ object HeroSlots {
 
     /** The tagline and description, revealed on first load only. */
     const val TEXT = 1
-    const val HINT = 2
-    const val LINKS = 3
-    const val COUNT = 4
+
+    /** The GitHub and Google Play buttons. */
+    const val BUTTONS = 2
+    const val HINT = 3
+    const val LINKS = 4
+    const val COUNT = 5
 }
 
 /** The closing page's reveal slots. */
@@ -135,6 +138,8 @@ object ClosingSlots {
 
     /** The tagline and the call to action. */
     const val CALL_TO_ACTION = 1
+
+    /** The GitHub and Google Play buttons, the links and the byline. */
     const val LINKS = 2
     const val COUNT = 3
 }

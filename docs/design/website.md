@@ -28,6 +28,8 @@ landing page is a snapping pager over one animated graph
 - While the landing page fades out, it takes no keys or wheel, no longer moves the graph and gives up
   the browser's page snapping: the page coming in owns them.
 - Email links open the mail app. The deletion page prefills the subject.
+- Links that leave the site, the GitHub button and the author byline, open in a new tab, so the
+  landing page stays open behind them.
 - The tab title names the page shown.
 
 ## Landing page
@@ -77,14 +79,40 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 - The text under a large logo sits slightly closer to it than the logo's own bounds, and the tagline
   and its description are set well apart.
 
+### GitHub and Google Play buttons
+
+The landing page doubles as a portfolio link, so the hero and the closing page show two buttons side
+by side, GitHub first. Feature pages show none.
+
+- **View on GitHub**: a white pill with dark text and the GitHub mark. It opens the repository
+  (`github.com/rmakowiecki/Flashcards`) in a new tab, which shows the README of its default branch.
+  It brightens on hover.
+- **Google Play**: while the app is in closed testing, an outlined, muted pill with a play triangle.
+  It shows a not-allowed cursor, never brightens and opens nothing.
+  - Hover, a tap or keyboard focus shows a hint under the buttons, on the page dots' frosted backing,
+    saying the app is in closed testing and the public release is coming. Its space under the
+    buttons stays reserved while it is hidden, so it never moves the page or covers anything. The
+    next press anywhere hides a tapped hint.
+  - It takes keyboard focus so the hint is reachable, but Enter does nothing.
+- A compact window shows both buttons smaller, still side by side.
+- Keyboard focus draws a ring around a button. On the white GitHub pill the ring sits just outside
+  it, with a small gap, so it stays visible against the fill.
+- One availability setting lives next to the store address. Turning it on makes the Google Play
+  button an outlined link to the store listing, opened in a new tab, with no hint. What else changes
+  at public launch is in [planned/website.md](planned/website.md).
+
 ### Hero
 
-- The tagline and a one-line description under the logo, a scroll hint, and quiet legal links at the
-  bottom. Soft dark halos keep the text legible over the graph.
+- The tagline and a one-line description under the logo, the GitHub and Google Play buttons under
+  the text, a scroll hint, and quiet legal links at the bottom. The buttons move with the text. Soft
+  dark halos keep the text legible over the graph.
+- The large logo sits at its usual height when everything fits. In a shorter window the logo, text
+  and buttons move up, then the logo shrinks, so they never reach the scroll hint and links. The
+  closing page does the same with its links and byline and the window's bottom edge.
 - The scroll hint, the links and their halo fade with the scroll and are gone once it is halfway to
   the next page. Once gone they take no click and no focus.
-- On first load the graph fades in, then the logo, the text, the hint and the links reveal in turn.
-  Returning from a legal page replays only the logo, hint and links.
+- On first load the graph fades in, then the logo, the text, the buttons, the hint and the links
+  reveal in turn. Returning from a legal page replays only the logo, buttons, hint and links.
 
 ### Feature pages
 
@@ -102,9 +130,11 @@ Ten full-window pages that snap: the hero, eight feature pages and the closing p
 
 ### Closing page
 
-- The large logo, the tagline, a call to join and start learning right now, and the links under one
-  halo, in the order Privacy Policy, Contact, Delete your account. The links sit well below the text,
-  a share of the window's height, not at the bottom edge.
+- The large logo, the tagline, a line saying the app is coming to Google Play and can be followed on
+  GitHub, the GitHub and Google Play buttons, and the links under one halo, in the order Privacy
+  Policy, Contact, Delete your account. The links sit below the buttons and their hint, a small share
+  of the window's height further down, not at the bottom edge.
+- A quiet byline under the links names the author and links to their GitHub profile.
 
 ### Small windows
 
@@ -119,15 +149,17 @@ compact (`LandingScale`). Larger windows are unchanged apart from the dots not b
   the page grows or shrinks with it and settles on the nearest page once the scrolling stops and no
   finger is down. No empty bar is left at the bottom, and no part of the previous page shows.
 - In landscape the pinned logo is small, with a small margin, so the phone gets the height. The hero
-  and the closing page show a smaller logo near the top and smaller text. The hero has no scroll
+  and the closing page show a smaller logo near the top and smaller text. A window that is not compact but
+  still short, as a small laptop screen is, also uses that smaller text on the hero and the closing page, so the logo keeps its room. The hero has no scroll
   hint, and the links stay in one row.
 
 ### Components appearing
 
 - A component fades in while rising a short distance. Components on a page start one after another. The
   large logo also grows slightly. The tuner sets the time, rise and stagger.
-- The hero's and closing page's logo and links reveal as the pages head for their page. They replay
-  after the page has fully left the window.
+- The hero's and closing page's logo, buttons and links reveal as the pages head for their page. They
+  replay after the page has fully left the window. On the closing page the buttons, links and byline
+  reveal together.
 - Text, phones and the pinned logo do not reveal, because they move with the scroll.
 
 ### Reduced motion
@@ -140,7 +172,8 @@ landing page and a legal page. A legal section shows at once. The preference is 
 
 ### Keyboard focus
 
-The links, the legal pages' logo and the hero's scroll hint show a visible focus mark. A control that
+The links, the GitHub and Google Play buttons, the legal pages' logo and the hero's scroll hint show a
+visible focus mark. A control that
 is faded out, such as the pinned link on the hero, cannot be focused.
 
 ## Legal pages
@@ -164,8 +197,9 @@ is faded out, such as the pinned link on the hero, cannot be focused.
 - Landing paragraphs wrap into lines of equal width, like CSS `text-wrap: balance`. The legal pages
   wrap as usual.
 - Legal text is selectable. Landing text is not, and the landing page shows no context menu.
-- Quiet links, the scroll hint and the legal logo show a pointer and brighten over about 150ms on
-  hover. Page dots grow on hover.
+- Quiet links, the scroll hint, the GitHub button and the legal logo show a pointer and brighten over
+  about 150ms on hover. The closed-testing hint fades in over the same time, at once under reduced
+  motion. Page dots grow on hover.
 
 ## Loading and limits
 

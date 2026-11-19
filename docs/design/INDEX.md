@@ -57,7 +57,7 @@ Entry format:
   Read when: changing the microphone indicator, the input level, or where the indicator shows.
 - [voice-obfuscation.md](voice-obfuscation.md): The on-device voice transform applied to every spoken answer: the random pitch and formant shift, the time-stretch and resample math, what leaves the device, and the limits of the protection.
   Read when: changing `core:voice` obfuscation, the privacy claims about voice, or what audio is sent for grading.
-- [website.md](website.md): The public website on Firebase Hosting: its three pages and their addresses, how links and history move between them, the brand-gradient look, the loading fallback and the limits of a canvas-drawn site.
+- [website.md](website.md): The public website on Firebase Hosting: its three pages and their addresses, how links and history move between them, the GitHub and Google Play buttons, the brand-gradient look, the loading fallback and the limits of a canvas-drawn site.
   Read when: changing `:web`, the hosted pages, their addresses or Firebase Hosting.
 - [xp-leveling-system.md](xp-leveling-system.md): XP sources and their rules, the XP configuration, the Level curve, and how XP and Level are stored.
   Read when: changing XP awards, the XP configuration, the Level curve or Level-floor clamping.
@@ -76,3 +76,5 @@ Read these only when working on the feature they describe.
   Read when: starting the Progress tab, or adding the activity aggregate to session submission.
 - [planned/voice-answering.md](planned/voice-answering.md): Syncing the premium entitlement record from Play Billing purchases.
   Read when: working on Voice Answering entitlement or billing.
+- [planned/website.md](planned/website.md): The landing page at public launch: the Google Play button becoming the official badge and a store link, placed first, the closing page's call to join, and the preview-channel release.
+  Read when: preparing the website for the app's public launch on Google Play.

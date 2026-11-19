@@ -46,6 +46,13 @@ The public site (`:web`) is served by Firebase Hosting and deployed separately f
 firebase deploy --only hosting               # builds the site first (predeploy), then uploads it
 ```
 
+A site change that must go live at a set moment, such as the public launch ([planned/website.md](design/planned/website.md)), goes to a preview channel first and is promoted once it is due:
+
+```shell
+firebase hosting:channel:deploy launch                                  # uploads the site to the launch preview channel
+firebase hosting:clone flashcards-8ad6d:launch flashcards-8ad6d:live    # promotes that exact build to the live site
+```
+
 ## Cloud Functions
 
 Setup, local tests against the emulators and deploys are in [functions/README.md](../functions/README.md).

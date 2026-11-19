@@ -59,13 +59,21 @@ object WebDimensions {
     val focusRingWidth: Dp = 2.dp
     val focusRingCornerRadius: Dp = 8.dp
 
+    /** The gap between a filled control and the focus ring drawn outside it. */
+    val focusRingGap: Dp = 2.dp
+
+    val outlinedButtonBorderWidth: Dp = 1.dp
+
+    /** The widest the Google Play button's closed-testing hint grows before it wraps. */
+    val hintMaxWidth: Dp = 640.dp
+
     /** How far the glow behind the hero's scroll hint and links reaches past them. */
     val bottomLinksScrimReach: Dp = 160.dp
 }
 
 /** Colors that exist only on the website. */
 object WebColors {
-    /** The page dots' frosted pill. */
+    /** The page dots' frosted pill, also behind the closed-testing hint. */
     val frostedFill: Color = Color.White.copy(alpha = 0.1f)
     val frostedBorder: Color = Color.White.copy(alpha = 0.18f)
 
@@ -74,6 +82,10 @@ object WebColors {
 
     /** The highlight behind a focused text link, visible on the gradient and on the legal cards alike. */
     val focusedLinkBackground: Color = Color.Gray.copy(alpha = 0.45f)
+
+    /** The GitHub button: a white pill with dark text. */
+    val solidButtonFill: Color = Color.White
+    val solidButtonContent: Color = Color(0xFF1A1C5C)
 
     /** The glow behind landing text. */
     val textScrim: Color = Color(0xFF1A1C5C).copy(alpha = 0.62f)
