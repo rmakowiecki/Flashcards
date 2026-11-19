@@ -136,11 +136,11 @@ Run each on a Rated Voice Answering session and a Fast read-aloud session.
 - [ ] The Crashlytics console has the mapping file for this `versionCode`, and every crash or non-fatal reported on this build shows deobfuscated. The release build has no crash trigger; to force one, crash a profiling build of the same commit from its Debug tab.
 - [ ] No unexpected crashes or non-fatals from the testers on this build in the last day.
 - [ ] The Play pre-launch report for this build shows no crash or install failure.
-- [ ] The backend runs this branch's head: in the Firebase console, every function's last deploy time is later than the head commit's time. If not, deploy it (see [release-flow.md](release-flow.md#3-stabilize)) and rerun the checklist.
+- [ ] The backend runs this candidate's commit: the record's "Backend deployed from" entry names that commit with both the functions and the rules deploys successful, and nothing was deployed since. In the Firebase console, no function's last deploy and no Firestore rules release is later than the recorded deploy. If either check fails, redeploy (see [release-flow.md](release-flow.md#3-stabilize)), update the record and rerun the checklist.
 
 ## Record
 
 For each run, note the candidate, the devices, the date, and every failure with its severity and the release owner's decision for it: fixed on the release branch or deferred to the next patch. A run passes when nothing blocking is open and every other failure has a decision.
 
-| Candidate (`versionName` / `versionCode`) | Devices | Date | Result | Failures and decisions |
-|---|---|---|---|---|
+| Candidate (`versionName` / `versionCode`) | Backend deployed from (commit, time, functions and rules succeeded) | Devices | Date | Result | Failures and decisions |
+|---|---|---|---|---|---|
