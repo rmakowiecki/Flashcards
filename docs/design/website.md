@@ -89,21 +89,17 @@ by side, GitHub first. Feature pages show none.
   It brightens on hover.
 - **Google Play**: while the app is in closed testing, an outlined, muted pill with a play triangle.
   It shows a not-allowed cursor, never brightens and opens nothing.
-  - Hover, a tap or keyboard focus shows a hint under the buttons: "In closed testing on Google Play.
-    Public release coming soon." on the page dots' frosted backing. Its space under the buttons stays reserved while
-    it is hidden, so it never moves the page or covers anything. The next press anywhere hides a
-    tapped hint.
+  - Hover, a tap or keyboard focus shows a hint under the buttons, on the page dots' frosted backing,
+    saying the app is in closed testing and the public release is coming. Its space under the
+    buttons stays reserved while it is hidden, so it never moves the page or covers anything. The
+    next press anywhere hides a tapped hint.
   - It takes keyboard focus so the hint is reachable, but Enter does nothing.
 - A compact window shows both buttons smaller, still side by side.
-- One flag (`ProjectLinks.PLAY_STORE_AVAILABLE`) and the store address live together. Turning the
-  flag on makes the Google Play button an outlined link to the store listing, opened in a new tab,
-  with no hint.
-
-At public launch a separate change turns the flag on, restores the closing page's original call to
-action, swaps the pill for Google's official badge (which may not be altered), and puts it first.
-That build goes to a `launch` preview channel and is promoted with
-`firebase hosting:clone flashcards-8ad6d:launch flashcards-8ad6d:live` once the app is live on Google
-Play.
+- Keyboard focus draws a ring around a button. On the white GitHub pill the ring sits just outside
+  it, with a small gap, so it stays visible against the fill.
+- One availability setting lives next to the store address. Turning it on makes the Google Play
+  button an outlined link to the store listing, opened in a new tab, with no hint. What else changes
+  at public launch is in [planned/website.md](planned/website.md).
 
 ### Hero
 
@@ -134,11 +130,11 @@ Play.
 
 ### Closing page
 
-- The large logo, the tagline, the line "Coming soon to Google Play. Follow along on GitHub.", the
-  GitHub and Google Play buttons, and the links under one halo, in the order Privacy Policy, Contact,
-  Delete your account. The links sit below the buttons and their hint, a small share of the window's
-  height further down, not at the bottom edge.
-- A quiet byline under the links, "Built by rmakowiecki", links to the author's GitHub profile.
+- The large logo, the tagline, a line saying the app is coming to Google Play and can be followed on
+  GitHub, the GitHub and Google Play buttons, and the links under one halo, in the order Privacy
+  Policy, Contact, Delete your account. The links sit below the buttons and their hint, a small share
+  of the window's height further down, not at the bottom edge.
+- A quiet byline under the links names the author and links to their GitHub profile.
 
 ### Small windows
 
@@ -153,8 +149,8 @@ compact (`LandingScale`). Larger windows are unchanged apart from the dots not b
   the page grows or shrinks with it and settles on the nearest page once the scrolling stops and no
   finger is down. No empty bar is left at the bottom, and no part of the previous page shows.
 - In landscape the pinned logo is small, with a small margin, so the phone gets the height. The hero
-  and the closing page show a smaller logo near the top and smaller text. Any window under 700dp tall
-  uses that smaller text on the hero and the closing page, so the logo keeps its room. The hero has no scroll
+  and the closing page show a smaller logo near the top and smaller text. A window that is not compact but
+  still short, as a small laptop screen is, also uses that smaller text on the hero and the closing page, so the logo keeps its room. The hero has no scroll
   hint, and the links stay in one row.
 
 ### Components appearing

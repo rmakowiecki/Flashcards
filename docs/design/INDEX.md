@@ -76,3 +76,5 @@ Read these only when working on the feature they describe.
   Read when: starting the Progress tab, or adding the activity aggregate to session submission.
 - [planned/voice-answering.md](planned/voice-answering.md): Syncing the premium entitlement record from Play Billing purchases.
   Read when: working on Voice Answering entitlement or billing.
+- [planned/website.md](planned/website.md): The landing page at public launch: the Google Play button becoming the official badge and a store link, placed first, the closing page's call to join, and the preview-channel release.
+  Read when: preparing the website for the app's public launch on Google Play.
