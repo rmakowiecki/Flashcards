@@ -179,10 +179,15 @@ internal class NoticeSpeaker(
 internal class TextToSpeechNoticeEngine(context: Context, private val listener: NoticeEngineListener) : NoticeEngine {
 
     private var isReady = false
+
+    // Set first thing in shutdown. The engine can still report ready after shutdown() once its
+    // connection is established, and registering the listener then would put the leak back.
+    private var isShutdown = false
     private var voiceId: String? = null
     private var speechRate = VoiceSettings.DEFAULT_SPEECH_RATE
 
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
+        if (isShutdown) return@TextToSpeech
         isReady = status == TextToSpeech.SUCCESS
         if (isReady) {
             // Never the device's system locale (e.g. Polish), which garbles English notice text.
@@ -226,7 +231,12 @@ internal class TextToSpeechNoticeEngine(context: Context, private val listener: 
     }
 
     override fun shutdown() {
-        runCatching { tts.shutdown() }
+        isShutdown = true
+        // Drop the listener so the engine's late-released callback binder cannot pin the Service through it.
+        runCatching {
+            tts.setOnUtteranceProgressListener(null)
+            tts.shutdown()
+        }
     }
 
     override fun setVoice(voiceId: String?) {
