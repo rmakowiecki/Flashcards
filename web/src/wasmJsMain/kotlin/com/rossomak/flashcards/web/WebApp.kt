@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.web.browser.rememberPrefersReducedMotion
+import com.rossomak.flashcards.web.components.LocalBlurBackdrop
 import com.rossomak.flashcards.web.components.LocalRevealMotion
 import com.rossomak.flashcards.web.components.SiteBackdrop
 import com.rossomak.flashcards.web.components.rememberBlurBackdrop
@@ -63,7 +64,7 @@ fun WebApp() {
     }
 
     WebTheme {
-        CompositionLocalProvider(LocalRevealMotion provides tuning.reveal) {
+        CompositionLocalProvider(LocalRevealMotion provides tuning.reveal, LocalBlurBackdrop provides backdrop) {
             Box(modifier = Modifier.fillMaxSize()) {
                 SiteBackdrop(backdrop = backdrop, graphState = graphState, graphAlpha = { graphAlpha.value }, showViolations = tuning.showViolations)
                 Crossfade(targetState = route, animationSpec = if (reducedMotion) snap() else tween(ROUTE_CROSSFADE_MILLIS), label = "route") { shown ->

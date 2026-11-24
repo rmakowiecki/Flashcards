@@ -15,6 +15,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
+import com.rossomak.flashcards.web.browser.openInNewTab
 import com.rossomak.flashcards.web.navigation.OnNavigate
 import com.rossomak.flashcards.web.navigation.WebRoute
 import com.rossomak.flashcards.web.theme.WebColors
@@ -49,6 +50,20 @@ fun PageLink(label: String, route: WebRoute, style: TextStyle, onNavigate: OnNav
     val text = remember(label, route, onNavigate) {
         AnnotatedString.Builder().apply {
             withLink(LinkAnnotation.Clickable(tag = route.path, styles = webLinkStyles) { onNavigate(route) }) {
+                append(label)
+            }
+        }.toAnnotatedString()
+    }
+    Text(text = text, style = style, modifier = modifier)
+}
+
+/** [prefix] followed by a link labelled [label] that opens [url] in a new tab. */
+@Composable
+fun NewTabLink(label: String, url: String, style: TextStyle, modifier: Modifier = Modifier, prefix: String = "") {
+    val text = remember(prefix, label, url) {
+        AnnotatedString.Builder().apply {
+            append(prefix)
+            withLink(LinkAnnotation.Clickable(tag = url, styles = webLinkStyles) { openInNewTab(url) }) {
                 append(label)
             }
         }.toAnnotatedString()
