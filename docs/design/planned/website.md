@@ -19,6 +19,5 @@ app in closed testing, is in [website.md](../website.md).
 
 ## Release
 
-- The launch build is deployed to a preview channel ahead of time, and promoted to the live site
-  once the listing is public, so the site flips at the same moment as the store. The commands are in
-  [development.md](../../development.md#website).
+- The launch build is deployed to the live site by hand, with the usual site deploy in
+  [development.md](../../development.md#website), once the store listing is public.
