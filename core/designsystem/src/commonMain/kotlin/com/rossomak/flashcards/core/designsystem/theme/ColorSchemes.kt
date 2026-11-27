@@ -4,8 +4,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 
-/** The app's light Material color scheme, used whenever dynamic color is off. */
-val FlashcardsLightColorScheme: ColorScheme = lightColorScheme(
+/** The light Material color scheme. The app has no dynamic color, so this is the only light scheme. */
+internal val FlashcardsLightColorScheme: ColorScheme = lightColorScheme(
     primary = primaryLight,
     onPrimary = onPrimaryLight,
     primaryContainer = primaryContainerLight,
@@ -43,8 +43,8 @@ val FlashcardsLightColorScheme: ColorScheme = lightColorScheme(
     surfaceContainerHighest = surfaceContainerHighestLight,
 )
 
-/** The app's dark Material color scheme, used whenever dynamic color is off. */
-val FlashcardsDarkColorScheme: ColorScheme = darkColorScheme(
+/** The dark Material color scheme, frozen from one neutral palette (ADR-0078). */
+internal val FlashcardsDarkColorScheme: ColorScheme = darkColorScheme(
     primary = primaryDark,
     onPrimary = onPrimaryDark,
     primaryContainer = primaryContainerDark,

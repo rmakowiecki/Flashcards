@@ -51,3 +51,9 @@ Disabled uses the standard M3 low-alpha convention (`onSurface` at reduced alpha
 - No `AppSizes` icon-size fields exist — icon size comes from `ButtonDefaults.IconSize` directly, so there's nothing to keep in sync if that M3 default ever changes.
 - Exact on-gradient color/alpha values beyond what's specified here may be revisited once a concrete screen actually consumes the on-gradient style (none exist yet).
 - `FlashcardsButtonSize` and `FlashcardsButtonStyle` are later generalized into shared `FlashcardsComponentSize`/`FlashcardsComponentStyle` types in `composables/common/`, reused by buttons, the metadata badge, and the progress bar family — see [ADR-0034](0034-consolidated-component-style-and-size-tokens.md) for the current type names and the rationale for sharing them across components; `Style.Surface` is named `.OnSurface` there.
+
+## Amendment: `onTopBarGradient` merged into `onGradientContent`
+
+`onTopBarGradient` and `onGradientContent` were the same fixed white. The top bar, the gradient-filled
+buttons and every on-gradient component now read `brandColors.onGradientContent`, and
+`onTopBarGradient` is gone.

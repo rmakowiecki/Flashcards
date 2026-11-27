@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +41,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.PermissionStatus
@@ -56,7 +56,6 @@ import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.CaptureE
 import com.rossomak.flashcards.core.domain.model.VoiceDemoFailureReason.RouteUnavailable
 import com.rossomak.flashcards.core.domain.model.VoiceDemoState
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.backdrop.BrandMorpheusGraphSpecs
 import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropBox
 import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropStart
@@ -90,9 +89,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-
-/** Fade-and-rise of the cover's copy, once the shared logo has landed. */
-private const val COPY_REVEAL_MS = 450
 
 /** Fade-in of Skip and the CTA, the last thing to arrive. */
 private const val CHROME_REVEAL_MS = 300
@@ -217,9 +213,9 @@ fun OnboardingContent(
             return@LaunchedEffect
         }
         launch { backdrop.arriveAt(OnboardingMorpheusGraphs.specFor(entranceStep)) }
-        delay(SHARED_ELEMENT_DURATION_MS.toLong().milliseconds)
-        launch { backdrop.fadeIn(tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing)) }
-        copyReveal.animateTo(1f, tween(durationMillis = COPY_REVEAL_MS, easing = FastOutSlowInEasing))
+        delay(FlashcardsMotion.SHARED_ELEMENT_DURATION_MS.toLong().milliseconds)
+        launch { backdrop.fadeIn(tween(durationMillis = FlashcardsMotion.LAUNCH_REVEAL_DURATION_MS, easing = FlashcardsMotion.StandardEasing)) }
+        copyReveal.animateTo(1f, tween(durationMillis = FlashcardsMotion.LAUNCH_REVEAL_DURATION_MS, easing = FlashcardsMotion.StandardEasing))
         chromeReveal.animateTo(1f, tween(durationMillis = CHROME_REVEAL_MS, easing = LinearEasing))
     }
 

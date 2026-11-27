@@ -3,12 +3,12 @@
 package com.rossomak.flashcards.core.ui.backdrop
 
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.morpheus.MorpheusGraphComets
 import com.rossomak.morpheus.MorpheusGraphFill
 import com.rossomak.morpheus.MorpheusGraphLayerSpec
@@ -36,7 +36,7 @@ object BrandMorpheusGraphSpecs {
     val settleMorphDuration: Duration = 1_000.milliseconds
 
     /** The brand morph easing over [duration]. */
-    fun morphAnimationSpec(duration: Duration): AnimationSpec<Float> = tween(duration.inWholeMilliseconds.toInt(), easing = FastOutSlowInEasing)
+    fun morphAnimationSpec(duration: Duration): AnimationSpec<Float> = tween(duration.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.StandardEasing)
 
     val settleMorphAnimationSpec: AnimationSpec<Float> = morphAnimationSpec(settleMorphDuration)
 

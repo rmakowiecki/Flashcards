@@ -31,8 +31,8 @@ private val TAG_CHIP_ICON_SIZE = 18.dp
 
 /**
  * The checkable tag chip — a Material 3 [FilterChip] restyled to the design system: 40dp tall,
- * 12dp corners, a heavier-than-hairline outline when unselected, and a solid secondary-container
- * fill with a leading check when selected.
+ * 12dp corners, a hairline outline when unselected, and a solid secondary-container fill with a
+ * leading check and no outline when selected.
  *
  * This is the interactive chip used to pick study tags (filter dialogs, tag pickers). For the
  * smaller read-only stat pill see [FlashcardsMetadataBadge].

@@ -1,6 +1,6 @@
 package com.rossomak.flashcards.feature.study.summary
 
-import androidx.compose.animation.core.CubicBezierEasing
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -22,6 +22,6 @@ internal val SHEET_START: Duration = 240.milliseconds
 internal val SHEET_RISE: Duration = 640.milliseconds
 
 /** Cubic ease-out, the curve of the counting total. */
-internal val CountEasing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
+internal val CountEasing = FlashcardsMotion.FillEasing
 
 internal fun Duration.toMillisInt(): Int = inWholeMilliseconds.toInt()

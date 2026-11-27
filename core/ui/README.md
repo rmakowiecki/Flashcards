@@ -18,13 +18,13 @@ these components are held to; the checklist at the bottom is the definition of d
 ## 1. What lives here
 
 ```text
-core/ui/src/main/…/theme/        FlashcardsTheme (dynamic color) and the domain-tied Category, Difficulty and Rating colors
+core/ui/src/main/…/theme/        FlashcardsTheme (system light/dark) and the domain-tied Category and Difficulty colors
 core/ui/src/main/…/composables/  Reusable Flashcards* components (the design system)
 core/ui/src/debug/…/showcase/    Showkase root + sample data / PreviewParameterProviders
 ```
 
-The design tokens themselves (Spacing, Sizes, CornerRadius, Motion, Color, Type, BrandColors,
-SemanticColors) live in [`:core:designsystem`](../designsystem/README.md), which this module
+The design tokens themselves (Spacing, Sizes, CornerRadius, Alpha, Motion, Color, Type,
+BrandColors, SemanticColors, RatingColors) live in [`:core:designsystem`](../designsystem/README.md), which this module
 re-exports through `api`.
 
 - **`composables/` is the governed package.** The Konsist rule and `check-arg-order.py`
@@ -97,9 +97,10 @@ colors.** Always read a token:
 | Gaps & padding     | `MaterialTheme.spacing.*` (`AppSpacing`)                 |
 | Component sizes    | `AppSizes.*` when shared across components; a size only one component uses is a private `val` at the top of that component's file |
 | Corners            | `MaterialTheme.cornerRadius.*` (`AppCornerRadius`)       |
-| Colors             | `MaterialTheme.colorScheme.*` / `MaterialTheme.brandColors.*` |
+| Colors             | `MaterialTheme.colorScheme.*` for themed surfaces, `.brandColors.*` for gradients and what sits on them, `.semanticColors.*` for a status, `.ratingColors.*` for a Rating, `.difficultyColors` for a difficulty level, `rememberCategoryColor` for a Category |
+| Opacities          | `PROGRESS_TRACK_ALPHA`, `TINT_CONTAINER_ALPHA` when shared; a component's own alpha is a private `const` |
 | Typography         | `MaterialTheme.typography.*`                             |
-| Animation timing   | `FlashcardsMotion.*`                                     |
+| Animation timing   | `FlashcardsMotion.*` (durations and easings, including the shared-element flight and the launch screens' reveal) |
 
 ```kotlin
 // NO

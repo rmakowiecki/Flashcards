@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionScope.SharedContentState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,13 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import kotlinx.coroutines.flow.first
-
-/**
- * How long a shared element takes to fly from its old destination to its new one. Exposed so a
- * screen can sequence its own entrance animation behind the element that is still in flight.
- */
-const val SHARED_ELEMENT_DURATION_MS: Int = 500
 
 /** Stable identities for elements that survive a navigation change instead of being redrawn. */
 object SharedElementKey {
@@ -45,7 +39,7 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
 private val SharedElementBoundsTransform = BoundsTransform { _, _ ->
-    tween(durationMillis = SHARED_ELEMENT_DURATION_MS, easing = FastOutSlowInEasing)
+    tween(durationMillis = FlashcardsMotion.SHARED_ELEMENT_DURATION_MS, easing = FlashcardsMotion.StandardEasing)
 }
 
 /**

@@ -18,16 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
+import com.rossomak.flashcards.core.designsystem.theme.TINT_CONTAINER_ALPHA
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
-
-/**
- * Opacity of [MaterialTheme.colorScheme.secondaryContainer] used as the tile's default fill.
- * Public (not private) so [FlashcardsVectorIconTile] and feature-owned tiles can derive their
- * container tint from the same constant rather than redefining it.
- */
-const val DEFAULT_CONTAINER_ALPHA = 0.12f
 
 /**
  * Rounded, tinted square that hosts a leading icon in settings and category rows. Callers
@@ -43,7 +37,7 @@ fun FlashcardsIconTile(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
-    containerColor: Color = contentColor.copy(alpha = DEFAULT_CONTAINER_ALPHA),
+    containerColor: Color = contentColor.copy(alpha = TINT_CONTAINER_ALPHA),
 ) {
     Box(
         modifier = modifier

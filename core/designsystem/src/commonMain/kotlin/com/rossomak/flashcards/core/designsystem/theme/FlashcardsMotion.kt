@@ -22,6 +22,19 @@ object FlashcardsMotion {
     /** Loaded content fading in and sliding up into place. */
     const val REVEAL_DURATION_MS: Int = 500
 
+    /**
+     * How long a shared element takes to fly from its old destination to its new one, such as the
+     * brand mark from splash to the onboarding cover or the login screen. A screen sequences its own
+     * entrance behind the element still in flight.
+     */
+    const val SHARED_ELEMENT_DURATION_MS: Int = 500
+
+    /**
+     * A launch screen's own entrance once the shared brand mark has landed: the backdrop fading in,
+     * and the login buttons or the onboarding cover's copy arriving with it.
+     */
+    const val LAUNCH_REVEAL_DURATION_MS: Int = 450
+
     /** How long a load runs before its loading indicator appears; faster loads never show one. */
     const val LOADING_INDICATOR_DELAY_MS: Int = 250
 
@@ -36,4 +49,7 @@ object FlashcardsMotion {
 
     /** Emphasized easing for something arriving: fast at first, then a long, soft settle. */
     val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+    /** A value filling or counting up to its target: the Level card's XP pour and the Session Summary's count-up. */
+    val FillEasing: Easing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
 }

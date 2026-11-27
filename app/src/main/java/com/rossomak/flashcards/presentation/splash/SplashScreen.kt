@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.presentation.splash
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
@@ -102,7 +101,7 @@ fun SplashContent(
                 targetValue = 1f,
                 animationSpec = tween(
                     durationMillis = GRADIENT_SLIDE_MS,
-                    easing = FastOutSlowInEasing,
+                    easing = FlashcardsMotion.StandardEasing,
                     delayMillis = GRADIENT_SLIDE_START_DELAY_MS
                 )
             )
@@ -112,7 +111,7 @@ fun SplashContent(
                 targetValue = 1f,
                 animationSpec = tween(
                     durationMillis = TEXT_REVEAL_DURATION_MS,
-                    easing = FastOutSlowInEasing,
+                    easing = FlashcardsMotion.StandardEasing,
                     delayMillis = TEXT_REVEAL_DELAY_MS
                 )
             )

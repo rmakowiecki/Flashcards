@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.feature.auth
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -32,15 +31,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.domain.model.AuthProvider
 import com.rossomak.flashcards.core.domain.model.AuthProvider.GitHub
 import com.rossomak.flashcards.core.domain.model.AuthProvider.Google
 import com.rossomak.flashcards.core.ui.R as CoreUiR
-import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.rememberIsHandedOver
 import com.rossomak.flashcards.core.ui.animation.rememberSharedElementState
@@ -68,10 +67,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-private val LogoWidth = 200.dp
-
-private const val BUTTON_REVEAL_MS = 450
 
 private const val BUTTON_HIDE_MS = 200
 
@@ -161,15 +156,15 @@ private fun LoginContent(
     val backdrop = rememberLaunchBackdropState(LaunchBackdropStart(spec = LoginMorpheusGraphs.graph))
     LaunchedEffect(isSignedIn) {
         when {
-            isSignedIn -> buttonReveal.animateTo(0f, tween(durationMillis = BUTTON_HIDE_MS, easing = FastOutSlowInEasing))
+            isSignedIn -> buttonReveal.animateTo(0f, tween(durationMillis = BUTTON_HIDE_MS, easing = FlashcardsMotion.StandardEasing))
             isInspecting -> {
                 logoReveal.snapTo(1f)
                 buttonReveal.snapTo(1f)
             }
             else -> {
-                launch { logoReveal.animateTo(1f, tween(durationMillis = SHARED_ELEMENT_DURATION_MS, easing = FastOutSlowInEasing)) }
-                delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
-                buttonReveal.animateTo(1f, tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
+                launch { logoReveal.animateTo(1f, tween(durationMillis = FlashcardsMotion.SHARED_ELEMENT_DURATION_MS, easing = FlashcardsMotion.StandardEasing)) }
+                delay(FlashcardsMotion.SHARED_ELEMENT_DURATION_MS.milliseconds)
+                buttonReveal.animateTo(1f, tween(durationMillis = FlashcardsMotion.LAUNCH_REVEAL_DURATION_MS, easing = FlashcardsMotion.StandardEasing))
             }
         }
     }
@@ -177,8 +172,8 @@ private fun LoginContent(
     LaunchedEffect(backdrop) {
         if (isInspecting) return@LaunchedEffect
         launch { backdrop.arriveAt(LoginMorpheusGraphs.graph) }
-        delay(SHARED_ELEMENT_DURATION_MS.milliseconds)
-        backdrop.fadeIn(tween(durationMillis = BUTTON_REVEAL_MS, easing = FastOutSlowInEasing))
+        delay(FlashcardsMotion.SHARED_ELEMENT_DURATION_MS.milliseconds)
+        backdrop.fadeIn(tween(durationMillis = FlashcardsMotion.LAUNCH_REVEAL_DURATION_MS, easing = FlashcardsMotion.StandardEasing))
     }
 
     LaunchBackdropBox(state = backdrop, modifier = modifier) {
@@ -200,7 +195,7 @@ private fun LoginContent(
                     contentDescription = null,
                     modifier = Modifier
                         .sharedElementByState(logoState)
-                        .width(LogoWidth)
+                        .width(MaterialTheme.sizes.launchLogoWidth)
                         .graphicsLayer {
                             val reveal = if (isLogoHandedOver()) 1f else logoReveal.value
                             alpha = reveal

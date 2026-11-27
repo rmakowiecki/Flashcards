@@ -1,16 +1,12 @@
 package com.rossomak.flashcards.web.theme
 
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.rossomak.flashcards.core.designsystem.theme.LocalBrandColors
-import com.rossomak.flashcards.core.designsystem.theme.LocalRatingColors
-import com.rossomak.flashcards.core.designsystem.theme.LocalSemanticColors
-import com.rossomak.flashcards.core.designsystem.theme.appTypography
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMaterialTheme
 import com.rossomak.flashcards.core.designsystem.theme.darkFlashcardsColors
 
 /**
@@ -20,14 +16,8 @@ import com.rossomak.flashcards.core.designsystem.theme.darkFlashcardsColors
 @Composable
 fun WebTheme(content: @Composable () -> Unit) {
     val colors = darkFlashcardsColors
-    CompositionLocalProvider(
-        LocalBrandColors provides colors.brand,
-        LocalSemanticColors provides colors.semantic,
-        LocalRatingColors provides colors.rating,
-    ) {
-        MaterialTheme(colorScheme = colors.colorScheme, typography = appTypography()) {
-            CompositionLocalProvider(LocalContentColor provides colors.brand.onGradientContent, content = content)
-        }
+    FlashcardsMaterialTheme(colors = colors) {
+        CompositionLocalProvider(LocalContentColor provides colors.brand.onGradientContent, content = content)
     }
 }
 

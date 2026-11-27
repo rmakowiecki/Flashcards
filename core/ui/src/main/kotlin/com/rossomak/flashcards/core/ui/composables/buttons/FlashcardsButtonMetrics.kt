@@ -90,7 +90,7 @@ internal fun disabledButtonContainerColorFor(style: FlashcardsComponentStyle): C
 @ReadOnlyComposable
 internal fun disabledButtonContentColorFor(style: FlashcardsComponentStyle): Color = when (style) {
     OnSurface -> MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_CONTENT_ALPHA)
-    OnGradient -> Color.White.copy(alpha = ON_GRADIENT_DISABLED_CONTENT_ALPHA)
+    OnGradient -> MaterialTheme.brandColors.onGradientContent.copy(alpha = ON_GRADIENT_DISABLED_CONTENT_ALPHA)
 }
 
 /**
@@ -105,8 +105,8 @@ internal const val DISABLED_BUTTON_ALPHA = 0.38f
 
 /**
  * Resolved colors for a gradient-filled `Flashcards*Button` ([FlashcardsFilledButton],
- * [FlashcardsFilledIconButton]), shared so both stay in sync. Fixed white content on [OnSurface]
- * rather than `colorScheme.onPrimary` — that style's container is the `ctaButtonGradient` brush,
+ * [FlashcardsFilledIconButton]), shared so both stay in sync. The gradient's own content color,
+ * `brandColors.onGradientContent`, on [OnSurface] rather than `colorScheme.onPrimary` — that style's container is the `ctaButtonGradient` brush,
  * itself fixed across themes, so its content color must be fixed too.
  */
 internal data class FilledButtonColors(
@@ -123,7 +123,7 @@ internal fun filledButtonColorsFor(style: FlashcardsComponentStyle): FilledButto
     val onGradient = style == OnGradient
     return FilledButtonColors(
         containerColor = if (onGradient) MaterialTheme.brandColors.onGradientFilledContainer else Color.Transparent,
-        contentColor = if (onGradient) MaterialTheme.brandColors.onGradientFilled else Color.White,
+        contentColor = if (onGradient) MaterialTheme.brandColors.onGradientFilled else MaterialTheme.brandColors.onGradientContent,
         disabledContainerColor = if (onGradient) disabledButtonContainerColorFor(style) else Color.Transparent,
         disabledContentColor = disabledButtonContentColorFor(style),
     )

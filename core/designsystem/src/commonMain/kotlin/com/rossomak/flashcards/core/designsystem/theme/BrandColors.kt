@@ -16,7 +16,6 @@ data class BrandColors(
     val screenGradient: Brush,
     val screenGradientBase: Color,
     val topBarGradient: Brush,
-    val onTopBarGradient: Color,
     val ctaButtonGradient: Brush,
     /** The opaque pill of a filled button on a gradient: white in light, an ink pill in dark. */
     val onGradientFilledContainer: Color,
@@ -25,6 +24,7 @@ data class BrandColors(
     val progressBarTrackOnGradient: Color,
     val onGradientContainer: Color,
     val onGradientBorder: Color,
+    /** Text and icons on any brand gradient or on the glass over it, including the CTA button's. */
     val onGradientContent: Color,
     val onGradientLoss: Color,
     val onGradientLossContainer: Color,
@@ -42,8 +42,11 @@ private val brandTopBarGradient = Brush.horizontalGradient(
     colors = listOf(primaryContainerLight, secondaryLight),
 )
 
-/** Content colour for [brandTopBarGradient]; fixed, because the gradient itself never flips. */
-private val onBrandTopBarGradient = Color.White
+/**
+ * Content colour for every brand gradient (screen, top bar, CTA button) and for the glass on it;
+ * fixed, because no gradient flips with the theme.
+ */
+private val onBrandGradient = Color.White
 
 /** Indigo stop of [brandCtaButtonGradient] — the brand's CTA gradient, fixed across themes. */
 private val ctaGradientIndigo = Color(0xFF2235A8)
@@ -101,9 +104,6 @@ private val brandScreenGradientBase = screenGradientBlue
  */
 private val onGradientFilledContainerLight = Color.White
 private val onGradientFilledLight = primaryLight
-
-/** Opacity of a progress track: its fill color, faint. The rings, the Daily Goal arc and the bars use it. */
-const val PROGRESS_TRACK_ALPHA = 0.16f
 
 /**
  * Fill/track colours for the
@@ -170,11 +170,10 @@ private val onCodeBlockColor = Color(0xFFFFFFFF)
 private val streakFlameLight = Color(0xFFE8590C)
 private val streakFlameDark = Color(0xFFFF9F43)
 
-val lightBrandColors = BrandColors(
+internal val lightBrandColors = BrandColors(
     screenGradient = brandScreenGradient,
     screenGradientBase = brandScreenGradientBase,
     topBarGradient = brandTopBarGradient,
-    onTopBarGradient = onBrandTopBarGradient,
     ctaButtonGradient = brandCtaButtonGradient,
     onGradientFilledContainer = onGradientFilledContainerLight,
     onGradientFilled = onGradientFilledLight,
@@ -182,7 +181,7 @@ val lightBrandColors = BrandColors(
     progressBarTrackOnGradient = progressBarTrackOnGradientLight,
     onGradientContainer = onGradientContainerLight,
     onGradientBorder = onGradientBorderLight,
-    onGradientContent = onBrandTopBarGradient,
+    onGradientContent = onBrandGradient,
     onGradientLoss = onGradientLossColor,
     onGradientLossContainer = onGradientLossContainerColor,
     onGradientLossBorder = onGradientLossBorderColor,
@@ -191,11 +190,10 @@ val lightBrandColors = BrandColors(
     streakFlame = streakFlameLight,
 )
 
-val darkBrandColors = BrandColors(
+internal val darkBrandColors = BrandColors(
     screenGradient = brandScreenGradient,
     screenGradientBase = brandScreenGradientBase,
     topBarGradient = brandTopBarGradient,
-    onTopBarGradient = onBrandTopBarGradient,
     ctaButtonGradient = brandCtaButtonGradient,
     onGradientFilledContainer = onGradientFilledContainerDark,
     onGradientFilled = onSurfaceDark,
@@ -203,7 +201,7 @@ val darkBrandColors = BrandColors(
     progressBarTrackOnGradient = onGradientContainerDark,
     onGradientContainer = onGradientContainerDark,
     onGradientBorder = onGradientBorderDark,
-    onGradientContent = onBrandTopBarGradient,
+    onGradientContent = onBrandGradient,
     onGradientLoss = onGradientLossColor,
     onGradientLossContainer = onGradientLossContainerColor,
     onGradientLossBorder = onGradientLossBorderColor,

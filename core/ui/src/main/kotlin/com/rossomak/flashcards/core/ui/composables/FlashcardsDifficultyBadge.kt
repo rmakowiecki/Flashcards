@@ -30,8 +30,8 @@ private val DIFFICULTY_BADGE_SIZE = 24.dp
 
 /**
  * Circular badge showing a card's [level] (1 easiest – 10 hardest) filled with its
- * [DifficultyColors] ramp stop. Fixed white numeral — every ramp stop is saturated enough for
- * contrast, so this does not follow the surface/onSurface pair like [FlashcardsMetadataBadge].
+ * [DifficultyColors] ramp stop, with the fixed [DifficultyColors.onRamp] numeral rather than the
+ * surface/onSurface pair of [FlashcardsMetadataBadge]. See [DifficultyColors.onRamp] for its contrast.
  */
 @Composable
 fun FlashcardsDifficultyBadge(

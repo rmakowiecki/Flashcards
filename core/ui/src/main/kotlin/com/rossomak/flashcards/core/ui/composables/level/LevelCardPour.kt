@@ -1,7 +1,6 @@
 package com.rossomak.flashcards.core.ui.composables.level
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -9,6 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import kotlin.math.roundToLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -26,7 +26,6 @@ internal val LEVEL_PULSE: Duration = 250.milliseconds
 internal const val LEVEL_PULSE_SCALE = 1.15f
 
 /** Cubic ease-out, the curve of the bar and the XP count while they pour. */
-private val PourEasing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
 
 /** Where a User stands in a Level: the Level, the XP held in it and the XP that completes it. */
 internal data class LevelCardPosition(
@@ -175,7 +174,7 @@ internal class LevelCardPour(initial: LevelCardPosition) {
             xpIntoLevel.snapTo(segment.xpTo.toFloat())
             return
         }
-        val spec = tween<Float>(segment.duration.inWholeMilliseconds.toInt(), easing = PourEasing)
+        val spec = tween<Float>(segment.duration.inWholeMilliseconds.toInt(), easing = FlashcardsMotion.FillEasing)
         coroutineScope {
             launch { fraction.animateTo(segment.toFraction, spec) }
             launch { xpIntoLevel.animateTo(segment.xpTo.toFloat(), spec) }

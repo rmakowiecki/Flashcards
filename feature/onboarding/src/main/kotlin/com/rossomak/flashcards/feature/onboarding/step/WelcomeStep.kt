@@ -16,6 +16,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.rossomak.flashcards.core.designsystem.theme.AppSizes
+import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.animation.SharedElementKey
 import com.rossomak.flashcards.core.ui.animation.sharedElementByKey
@@ -23,8 +25,7 @@ import com.rossomak.flashcards.feature.onboarding.R
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingContentColors
 import com.rossomak.flashcards.feature.onboarding.component.OnboardingStepColumn
 
-private val LogoWidth = 200.dp
-private val LogoHeight = LogoWidth * (1000f / 1800f)
+private val LogoHeight = AppSizes.launchLogoWidth * (1000f / 1800f)
 
 /** How far below its resting place the copy starts before it slides up into view. */
 private val CopyRevealOffset = 24.dp
@@ -45,7 +46,7 @@ internal fun WelcomeStep(copyRevealProgress: Float, modifier: Modifier = Modifie
             contentDescription = null,
             modifier = Modifier
                 .sharedElementByKey(SharedElementKey.APP_LOGO)
-                .size(width = LogoWidth, height = LogoHeight),
+                .size(width = MaterialTheme.sizes.launchLogoWidth, height = LogoHeight),
         )
         Spacer(modifier = Modifier.height(MaterialTheme.spacing.xxlarge))
         Column(

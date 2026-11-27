@@ -29,7 +29,7 @@ Per-category tint (`Category.color`, a Firestore-authored hex string) is explici
 
 ## Amendment: the compiler enforces the rule
 
-The palette in `:core:designsystem`'s `Color.kt` is `internal`, so only the module's own `ColorScheme`, `BrandColors` and `SemanticColors` definitions can read it, and a composable in any other module cannot import a raw token at all. A theme-independent color is still a `BrandColors` slot with the same value in both themes, as the code block's `codeBlockBackground` and `onCodeBlock` are.
+The palette in `:core:designsystem`'s `Color.kt` is `internal`, so only the module's own `ColorScheme`, `BrandColors` and `SemanticColors` definitions can read it, and a composable in any other module cannot import a raw token at all. A theme-independent color is still a `BrandColors` slot with the same value in both themes, as the code block's `codeBlockBackground` and `onCodeBlock` are. The per-theme palettes and color schemes are `internal` too; only the `lightFlashcardsColors` and `darkFlashcardsColors` pairs are public, and `FlashcardsMaterialTheme` applies them.
 
 ## Amendment: BrandColors holds gradients and on-gradient colors, not neutral surfaces
 

@@ -150,8 +150,8 @@ private fun FlashcardsComponentStyle.topAppBarColors(): TopAppBarColors = when (
     )
     OnGradient -> TopAppBarColors(
         container = Modifier.background(MaterialTheme.brandColors.topBarGradient),
-        content = MaterialTheme.brandColors.onTopBarGradient,
-        variantContent = MaterialTheme.brandColors.onTopBarGradient,
+        content = MaterialTheme.brandColors.onGradientContent,
+        variantContent = MaterialTheme.brandColors.onGradientContent,
     )
 }
 

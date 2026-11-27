@@ -30,7 +30,7 @@ data class SemanticColors(
     val onNegativeContainer: Color,
 )
 
-val lightSemanticColors = SemanticColors(
+internal val lightSemanticColors = SemanticColors(
     positiveContainer = positiveContainerLight,
     onPositiveContainer = onPositiveContainerLight,
     neutralContainer = neutralContainerLight,
@@ -39,7 +39,7 @@ val lightSemanticColors = SemanticColors(
     onNegativeContainer = onNegativeContainerLight,
 )
 
-val darkSemanticColors = SemanticColors(
+internal val darkSemanticColors = SemanticColors(
     positiveContainer = positiveContainerDark,
     onPositiveContainer = onPositiveContainerDark,
     neutralContainer = neutralContainerDark,

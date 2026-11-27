@@ -24,6 +24,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.toRoute
 import com.rossomak.flashcards.R
+import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
 import com.rossomak.flashcards.core.domain.model.FlashcardSortOrder
 import com.rossomak.flashcards.core.domain.model.SessionSourceType
 import com.rossomak.flashcards.core.domain.model.SessionSourceType.Quick
@@ -32,7 +33,6 @@ import com.rossomak.flashcards.core.domain.model.StudyMode
 import com.rossomak.flashcards.core.domain.repository.PermissionGateway
 import com.rossomak.flashcards.core.ui.animation.LocalNavAnimatedVisibilityScope
 import com.rossomak.flashcards.core.ui.animation.LocalSharedTransitionScope
-import com.rossomak.flashcards.core.ui.animation.SHARED_ELEMENT_DURATION_MS
 import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropHost
 import com.rossomak.flashcards.core.ui.backdrop.LaunchBackdropStart
 import com.rossomak.flashcards.core.ui.navigation.observeAsEvents
@@ -259,7 +259,7 @@ private fun EntryNavigator.navigateToStudySessionSummary(route: StudySessionSumm
  */
 private val LaunchExitTransition: ExitTransition = fadeOut(
     animationSpec = keyframes {
-        durationMillis = SHARED_ELEMENT_DURATION_MS
+        durationMillis = FlashcardsMotion.SHARED_ELEMENT_DURATION_MS
         0f at LAUNCH_CONTENT_FADE_MS
     },
 )

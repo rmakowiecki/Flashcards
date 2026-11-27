@@ -22,8 +22,11 @@ object AppSizes {
     /** 1px hairline used for card borders and dividers. */
     val hairline: Dp = 1.dp
 
-    /** Outline width of an unselected tag chip — deliberately heavier than [hairline]. */
-    val tagChipBorder: Dp = 1.5.dp
+    /**
+     * The heavier outline that marks the selected or current item on a themed surface: a selected
+     * option card and the attempt indicator's current slot. Deliberately heavier than [hairline].
+     */
+    val selectedBorder: Dp = 1.5.dp
 
     /** Ring around a rating: the rating buttons and the attempt indicator's rated slots, where the theme draws one. */
     val ratingBorder: Dp = 1.5.dp
@@ -52,17 +55,19 @@ object AppSizes {
     // constant, so there's nothing tier-specific to define here.
 
     /**
-     * Track height (linear/segmented) and stroke width (circular) at
-     * [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Normal] — one
-     * shared thickness token for every `Flashcards*Progress*` composable, since the design uses
-     * the same value for both.
+     * Track height of the linear and segmented progress bars at
+     * [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Normal]. The circular
+     * indicators (the progress ring, the Daily Goal arc, the voice disc) set their own thinner stroke.
      */
     val progressBarThicknessNormal: Dp = 5.dp
 
     /** Progress-bar thickness at [com.rossomak.flashcards.core.ui.composables.common.FlashcardsComponentSize.Small]. */
     val progressBarThicknessSmall: Dp = 4.dp
 
-    /** Border of every `Flashcards*Button`, `FlashcardsOptionCard` and `FavoriteSubcategoryCard`; other on-gradient borders are a [hairline]. */
+    /**
+     * Border of the outlined and tonal `Flashcards*Button`s and of an onboarding Favorite pick card;
+     * other on-gradient borders are a [hairline].
+     */
     val onGradientButtonBorder: Dp = 1.5.dp
 
     /** Blur radius behind every translucent on-gradient fill; `LocalBackdropBlurRadius` defaults to it. */
@@ -70,6 +75,9 @@ object AppSizes {
 
     /** Leading icon inside a [com.rossomak.flashcards.core.ui.composables.banners.FlashcardsXpBreakdownRow]. */
     val xpBreakdownRowIcon: Dp = 20.dp
+
+    /** Width of the brand mark on the login screen and the onboarding cover, where it lands after flying in from splash. */
+    val launchLogoWidth: Dp = 200.dp
 }
 
 val MaterialTheme.sizes: AppSizes

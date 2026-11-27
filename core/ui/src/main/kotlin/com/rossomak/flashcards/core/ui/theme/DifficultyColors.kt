@@ -25,7 +25,10 @@ object DifficultyColors {
         Color(0xFFD92A1B),
     )
 
-    /** Foreground color on every ramp stop — all ten are saturated enough for white contrast. */
+    /**
+     * Foreground color on every ramp stop. White reaches 4.5:1 only on level 10 and 3:1 on levels 1,
+     * 8 and 9; on the yellow middle of the ramp (levels 3 to 5) it measures under 2:1.
+     */
     val onRamp: Color = Color.White
 
     /** Ramp color for a 1-[LEVELS] difficulty [level]. */

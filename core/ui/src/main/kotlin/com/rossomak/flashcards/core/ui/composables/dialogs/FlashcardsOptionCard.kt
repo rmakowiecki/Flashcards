@@ -90,7 +90,7 @@ fun FlashcardsOptionCard(
         // the surrounding content color.
         contentColor = if (selected) LocalContentColor.current else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(
-            width = if (selected) MaterialTheme.sizes.tagChipBorder else MaterialTheme.sizes.hairline,
+            width = if (selected) MaterialTheme.sizes.selectedBorder else MaterialTheme.sizes.hairline,
             color = borderColor,
         ),
     ) {

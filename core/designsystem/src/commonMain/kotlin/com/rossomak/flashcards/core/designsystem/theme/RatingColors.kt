@@ -44,7 +44,7 @@ private val partialContentDark = Color(0xFFE8B84B)
 private val correctContainerDark = Color(0xFF1E3524)
 private val correctContentDark = Color(0xFF7BD98A)
 
-val lightRatingColors = RatingColors(
+internal val lightRatingColors = RatingColors(
     failed = RatingColorSet(container = failedContainerLight, content = failedContentLight, border = null),
     partial = RatingColorSet(container = partialContainerLight, content = partialContentLight, border = null),
     correct = RatingColorSet(container = correctContainerLight, content = correctContentLight, border = null),
@@ -56,7 +56,7 @@ private fun darkRatingColorSet(container: Color, content: Color) = RatingColorSe
     border = content.copy(alpha = DARK_RATING_BORDER_ALPHA),
 )
 
-val darkRatingColors = RatingColors(
+internal val darkRatingColors = RatingColors(
     failed = darkRatingColorSet(container = failedContainerDark, content = failedContentDark),
     partial = darkRatingColorSet(container = partialContainerDark, content = partialContentDark),
     correct = darkRatingColorSet(container = correctContainerDark, content = correctContentDark),

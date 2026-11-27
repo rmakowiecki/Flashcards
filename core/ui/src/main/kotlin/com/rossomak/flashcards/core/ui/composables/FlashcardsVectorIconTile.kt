@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.AppSizes
+import com.rossomak.flashcards.core.designsystem.theme.TINT_CONTAINER_ALPHA
 import com.rossomak.flashcards.core.designsystem.theme.cornerRadius
 import com.rossomak.flashcards.core.designsystem.theme.sizes
 import com.rossomak.flashcards.core.ui.glyph.CachedGlyph.Ready
@@ -64,7 +65,7 @@ fun FlashcardsVectorIconTile(
     modifier: Modifier = Modifier,
 ) {
     val tintColor = rememberCategoryColor(hex = color, fallback = MaterialTheme.colorScheme.onSecondaryContainer)
-    val containerColor = tintColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
+    val containerColor = tintColor.copy(alpha = TINT_CONTAINER_ALPHA)
     val glyphCache = rememberCategoryGlyph(iconSvg = iconSvg, size = ICON_CONTENT_SIZE)
 
     Box(

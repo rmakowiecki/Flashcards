@@ -120,10 +120,10 @@ internal val onGradientContainerDark = Color(0x4D201E29)
 internal val onGradientBorderDark = Color(0x1FFFFFFF)
 
 // Valence palette backing [SemanticColors] — see that file for why these are hand-authored
-// container/content pairs rather than one accent tinted at an alpha. The light values are the
-// study screen's shipped rating-button palette, promoted to tokens.
+// container/content pairs rather than one accent tinted at an alpha. The light containers started as
+// the rating buttons' palette and still equal RatingColors' light containers; the two may drift apart.
 //
-// onXContainerLight are darkened from the original rating-button palette (3E9556/C98F2B/C94F4F):
+// onXContainerLight are darkened from the rating buttons' content colors:
 // those only hit 2.3:1-3.4:1 against their containers, well under the 4.5:1 WCAG AA text minimum
 // FlashcardsInfoBanner's body text needs. Same hue/saturation, lower lightness — now 4.8:1+.
 internal val positiveContainerLight = Color(0xFFD3EBD6)

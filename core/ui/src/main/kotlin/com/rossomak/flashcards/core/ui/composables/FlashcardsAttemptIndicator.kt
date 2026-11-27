@@ -95,7 +95,7 @@ private fun AttemptSlot(state: FlashcardsAttemptSlotState) {
     val containerColor = ratingColorSet?.container ?: Color.Transparent
     val contentColor = ratingColorSet?.content ?: Color.Transparent
     val border = when (state) {
-        Current -> BorderStroke(width = MaterialTheme.sizes.tagChipBorder, color = MaterialTheme.colorScheme.primary)
+        Current -> BorderStroke(width = MaterialTheme.sizes.selectedBorder, color = MaterialTheme.colorScheme.primary)
         Future -> BorderStroke(width = MaterialTheme.sizes.hairline, color = MaterialTheme.colorScheme.outlineVariant)
         Failed, Partial, Correct -> ratingColorSet?.border?.let { BorderStroke(width = MaterialTheme.sizes.ratingBorder, color = it) }
     }

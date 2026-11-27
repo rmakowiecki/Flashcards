@@ -47,9 +47,9 @@ import androidx.compose.ui.util.lerp
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.rossomak.flashcards.core.designsystem.theme.AppSizes
 import com.rossomak.flashcards.core.designsystem.theme.FlashcardsMotion
+import com.rossomak.flashcards.core.designsystem.theme.TINT_CONTAINER_ALPHA
 import com.rossomak.flashcards.core.designsystem.theme.spacing
 import com.rossomak.flashcards.core.ui.R
-import com.rossomak.flashcards.core.ui.composables.DEFAULT_CONTAINER_ALPHA
 import com.rossomak.flashcards.core.ui.theme.FlashcardsTheme
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -134,7 +134,7 @@ object FlashcardsVoiceCaptureIndicatorDefaults {
     val discContainerColor: Color
         @Composable
         @ReadOnlyComposable
-        get() = discContentColor.copy(alpha = DEFAULT_CONTAINER_ALPHA)
+        get() = discContentColor.copy(alpha = TINT_CONTAINER_ALPHA)
 }
 
 /**
